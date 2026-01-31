@@ -1,7 +1,13 @@
 import { ok, err } from "../../utils/result.js";
 import { parse } from "../parser/parser.js";
 import { createFeed, createArticle } from "../storage/schema.js";
-import { addFeed, feedExistsByUrl, addArticles } from "../storage/db.js";
+import {
+  addFeed,
+  feedExistsByUrl,
+  getFeeds,
+  removeFeedsByUrl,
+  addArticles,
+} from "../storage/db.js";
 
 /**
  * Translate internal parser/validator errors into user-friendly messages.
@@ -31,7 +37,15 @@ export async function addFeedFlow(url) {
     // Check for duplicate using the plaintext URL index (no decryption needed)
     const exists = await feedExistsByUrl(url);
     if (exists.ok && exists.value) {
-      return err("A feed with this URL already exists");
+      // URL exists in index — check if it's a real feed or an orphan
+      // (orphan = record exists but can't be decrypted, e.g. from old salt)
+      const allFeeds = await getFeeds();
+      const isReal = allFeeds.ok && allFeeds.value.some((f) => f.url === url);
+      if (isReal) {
+        return err("A feed with this URL already exists");
+      }
+      // Orphaned record — clean it up and proceed
+      await removeFeedsByUrl(url);
     }
 
     // Fetch feed content via CORS proxy

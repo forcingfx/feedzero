@@ -37,16 +37,28 @@ const JSON_FEED_STR = JSON.stringify({
 // Mock db module
 vi.mock("../../../src/core/storage/db.js", () => {
   const feeds = new Map();
+  // URLs that exist in the index but can't be decrypted (orphans)
+  const orphanUrls = new Set();
   const articles = new Map();
   return {
     feedExistsByUrl: vi.fn(async (url) => ({
       ok: true,
-      value: feeds.has(url),
+      value: feeds.has(url) || orphanUrls.has(url),
     })),
+    getFeeds: vi.fn(async () => ({
+      ok: true,
+      // Orphans are NOT returned by getFeeds (decryption fails)
+      value: [...feeds.values()],
+    })),
+    removeFeedsByUrl: vi.fn(async (url) => {
+      orphanUrls.delete(url);
+      return { ok: true, value: true };
+    }),
     addFeed: vi.fn(async (feed) => {
       if (feeds.has(feed.url)) {
         return { ok: false, error: "A feed with this URL already exists" };
       }
+      orphanUrls.delete(feed.url);
       feeds.set(feed.url, feed);
       return { ok: true, value: true };
     }),
@@ -56,8 +68,10 @@ vi.mock("../../../src/core/storage/db.js", () => {
     }),
     _reset: () => {
       feeds.clear();
+      orphanUrls.clear();
       articles.clear();
     },
+    _addOrphan: (url) => orphanUrls.add(url),
     _feeds: feeds,
   };
 });
@@ -105,6 +119,25 @@ describe("feed-service", () => {
       const { feed, articles } = unwrap(result);
       expect(feed.title).toBe("Example JSON Feed");
       expect(articles[0].title).toBe("Test JSON Post");
+    });
+
+    it("should replace orphaned feed record and succeed", async () => {
+      // Simulate an orphan: URL exists in index but can't be decrypted
+      db._addOrphan("https://example.com/feed.xml");
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      const result = await addFeedFlow("https://example.com/feed.xml");
+      expect(isOk(result)).toBe(true);
+
+      const { feed } = unwrap(result);
+      expect(feed.title).toBe("Example Feed");
+      expect(db.removeFeedsByUrl).toHaveBeenCalledWith(
+        "https://example.com/feed.xml",
+      );
     });
 
     it("should return error for duplicate feed URL", async () => {

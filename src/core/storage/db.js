@@ -100,6 +100,29 @@ export async function getFeed(id) {
 }
 
 /**
+ * Remove all feed records matching a URL, plus their articles.
+ * Used to clean up orphaned records that can't be decrypted.
+ * @param {string} url
+ * @returns {Promise<Result<boolean>>}
+ */
+export async function removeFeedsByUrl(url) {
+  try {
+    const records = await db.feeds.where("url").equals(url).toArray();
+    for (const record of records) {
+      const articleKeys = await db.articles
+        .where("feedId")
+        .equals(record.id)
+        .primaryKeys();
+      await db.articles.bulkDelete(articleKeys);
+      await db.feeds.delete(record.id);
+    }
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove feeds by URL: ${e.message}`);
+  }
+}
+
+/**
  * Remove a feed and its articles.
  */
 export async function removeFeed(id) {
