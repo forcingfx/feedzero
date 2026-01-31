@@ -17,7 +17,7 @@ template.innerHTML = `
 <form aria-label="Add feed">
   <label>
     <span class="visually-hidden">Feed URL</span>
-    <input type="url" placeholder="Enter feed URL..." required aria-label="Feed URL">
+    <input type="text" inputmode="url" placeholder="Enter feed URL..." required aria-label="Feed URL">
   </label>
   <button type="submit">Add</button>
 </form>

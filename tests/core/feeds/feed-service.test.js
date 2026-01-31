@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { isOk, isErr, unwrap } from "../../../src/utils/result.js";
+import { normalizeUrl } from "../../../src/core/feeds/feed-service.js";
 
 // We'll test feed-service by mocking fetch and the db/parser modules
 const ATOM_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -349,5 +350,69 @@ describe("feed-service", () => {
       const { articles } = unwrap(result);
       expect(articles.length).toBe(1);
     });
+
+    it("should discover feed when user enters a website URL", async () => {
+      const pageHtml = `<!DOCTYPE html>
+<html><head>
+  <link rel="alternate" type="application/rss+xml" href="/feed.xml">
+</head><body><p>A website</p></body></html>`;
+
+      globalThis.fetch = vi.fn().mockImplementation((url) => {
+        // First call: try as feed — fails (it's a website)
+        if (url.includes("/api/feed") && !url.includes("feed.xml")) {
+          return Promise.resolve({
+            ok: true,
+            text: () => Promise.resolve(pageHtml),
+          });
+        }
+        // Discovery: fetch the discovered feed URL
+        if (url.includes("/api/feed") && url.includes("feed.xml")) {
+          return Promise.resolve({
+            ok: true,
+            text: () => Promise.resolve(ATOM_XML),
+          });
+        }
+        // Page fetch for discovery
+        if (url.includes("/api/page")) {
+          return Promise.resolve({
+            ok: true,
+            text: () => Promise.resolve(pageHtml),
+          });
+        }
+        return Promise.resolve({ ok: false, status: 404 });
+      });
+
+      const result = await addFeedFlow("https://example.com");
+      expect(isOk(result)).toBe(true);
+
+      const { feed } = unwrap(result);
+      expect(feed.title).toBe("Example Feed");
+    });
+  });
+});
+
+describe("normalizeUrl", () => {
+  it("should add https:// to bare domains", () => {
+    expect(normalizeUrl("example.com")).toBe("https://example.com");
+  });
+
+  it("should add https:// to domains with path", () => {
+    expect(normalizeUrl("example.com/rss")).toBe("https://example.com/rss");
+  });
+
+  it("should add https:// to www domains", () => {
+    expect(normalizeUrl("www.example.com")).toBe("https://www.example.com");
+  });
+
+  it("should preserve existing https scheme", () => {
+    expect(normalizeUrl("https://example.com/feed")).toBe(
+      "https://example.com/feed",
+    );
+  });
+
+  it("should preserve existing http scheme", () => {
+    expect(normalizeUrl("http://example.com/feed")).toBe(
+      "http://example.com/feed",
+    );
   });
 });

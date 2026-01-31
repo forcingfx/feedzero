@@ -1,6 +1,7 @@
 import { ok, err } from "../../utils/result.js";
 import { parse } from "../parser/parser.js";
 import { needsExtraction, extract } from "../extractor/extractor.js";
+import { discoverFeed } from "../discovery/discovery.js";
 import { createFeed, createArticle } from "../storage/schema.js";
 import {
   addFeed,
@@ -58,13 +59,23 @@ async function extractFullText(articles) {
  * Lowercases scheme/host, removes trailing slash, trims whitespace.
  */
 export function normalizeUrl(url) {
+  const trimmed = url.trim();
+
+  // Try parsing as-is first
   try {
-    const u = new URL(url.trim());
+    const u = new URL(trimmed);
     u.pathname = u.pathname.replace(/\/+$/, "") || "/";
-    // URL constructor already lowercases scheme and host
     return u.toString().replace(/\/+$/, "");
   } catch {
-    return url.trim();
+    // Not a valid URL — try prepending https://
+  }
+
+  try {
+    const u = new URL(`https://${trimmed}`);
+    u.pathname = u.pathname.replace(/\/+$/, "") || "/";
+    return u.toString().replace(/\/+$/, "");
+  } catch {
+    return trimmed;
   }
 }
 
@@ -99,18 +110,32 @@ export async function addFeedFlow(rawUrl) {
     }
     const text = await response.text();
 
-    // Parse feed content
+    // Parse feed content — if it fails, try feed discovery (maybe it's a website)
     const parseResult = parse(text, url);
-    if (!parseResult.ok) return err(friendlyError(parseResult.error));
 
-    const { feed: feedData, articles: parsedArticles } = parseResult.value;
+    let feedData;
+    let parsedArticles;
+    let discoveredUrl = url;
+
+    if (parseResult.ok) {
+      feedData = parseResult.value.feed;
+      parsedArticles = parseResult.value.articles;
+    } else {
+      // Not a feed — try discovering a feed from this URL
+      const discovery = await discoverFeed(url);
+      if (!discovery.ok) return err(friendlyError(parseResult.error));
+
+      feedData = discovery.value.feed;
+      parsedArticles = discovery.value.articles;
+      discoveredUrl = discovery.value.feedUrl;
+    }
 
     // Extract full text for articles that only have summaries
     await extractFullText(parsedArticles);
 
-    // Create and store feed
+    // Create and store feed (use discovered URL if feed was found via discovery)
     const feedResult = createFeed({
-      url,
+      url: discoveredUrl,
       title: feedData.title,
       description: feedData.description,
       siteUrl: feedData.siteUrl,
