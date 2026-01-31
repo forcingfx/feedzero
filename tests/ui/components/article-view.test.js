@@ -83,6 +83,32 @@ describe("ArticleView", () => {
     expect(meta).toMatch(/\d{1,2}:\d{2}/);
   });
 
+  it("should hide extracted button when feed has full content", () => {
+    const longContent =
+      "<p>" + "This is a comprehensive article. ".repeat(50) + "</p>";
+    el.setArticle({
+      title: "Full Content",
+      link: "https://example.com/4",
+      content: longContent,
+      summary:
+        "This is a comprehensive article. This is a comprehensive article.",
+    });
+    // Feed has >1000 chars of distinct content, summary is similar — no toggle
+    expect(el.shadowRoot.querySelector(".view-toggle")).toBeNull();
+  });
+
+  it("should show extracted button when feed content is short", () => {
+    el.setArticle({
+      title: "Short Content",
+      link: "https://example.com/5",
+      content: "<p>Brief intro.</p>",
+      summary: "Brief intro.",
+    });
+    const buttons = el.shadowRoot.querySelectorAll(".view-toggle button");
+    const labels = [...buttons].map((b) => b.textContent);
+    expect(labels).toContain("Extracted");
+  });
+
   it("should escape title to prevent XSS", () => {
     el.setArticle({
       title: "<img src=x onerror=alert(1)>",

@@ -62,9 +62,10 @@ export class ArticleView extends HTMLElement {
     const textA = this.#stripHtml(a);
     const textB = this.#stripHtml(b);
     if (!textA || !textB) return false;
-    const snippetA = textA.slice(0, 200);
-    const snippetB = textB.slice(0, 200);
-    return snippetA.startsWith(snippetB) || snippetB.startsWith(snippetA);
+    const shorter = textA.length <= textB.length ? textA : textB;
+    const longer = textA.length > textB.length ? textA : textB;
+    const snippet = shorter.slice(0, 150);
+    return snippet.length > 0 && longer.slice(0, 300).includes(snippet);
   }
 
   #getAvailableModes() {
@@ -82,8 +83,13 @@ export class ArticleView extends HTMLElement {
       modes.push("summary");
     }
 
-    // Add extracted — only if there's a valid link to extract from
-    if (article.link && article.link.startsWith("http")) {
+    // Add extracted — only if feed content looks incomplete
+    const strippedContent = this.#stripHtml(article.content || "");
+    const strippedSummary = this.#stripHtml(article.summary || "");
+    const feedAlreadyFull =
+      strippedContent.length > 1000 && strippedContent !== strippedSummary;
+
+    if (!feedAlreadyFull && article.link && article.link.startsWith("http")) {
       if (this.#extractedCache.has(article.link)) {
         const extracted = this.#extractedCache.get(article.link);
         if (!this.#contentsSimilar(feedContent, extracted)) {
