@@ -16,13 +16,14 @@ User enters feed URL in <feed-list>
   main.js calls addFeedFlow(url)
       │
       ▼
-  feed-service.js checks for duplicate URL in DB
+  feed-service.js normalizes URL + checks for duplicate in DB
       │
       ▼
   fetch(/api/feed?url=...) via CORS proxy
       │
       ▼
   validator.js → Detects JSON Feed, RSS 2.0, or Atom 1.0
+  (if parse fails → discovery.js tries autodiscovery, well-known paths, anchor scanning)
       │
       ▼
   parser.js → Extracts feed metadata + articles
@@ -62,6 +63,8 @@ Both use the same `proxyHandler()` function. Production will require a dedicated
 main.js
 ├── core/events/event-bus.js     (no deps)
 ├── core/feeds/feed-service.js
+│   ├── core/discovery/discovery.js
+│   │   └── core/discovery/strategies.js
 │   ├── core/extractor/extractor.js
 │   │   └── core/extractor/defuddle-extractor.js
 │   │       ├── defuddle               (npm)

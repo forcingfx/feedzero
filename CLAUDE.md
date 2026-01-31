@@ -36,9 +36,11 @@ User adds feed URL → `feed-service.js` (duplicate check) → `fetch` via `/api
 - **src/core/storage/crypto.js** — PBKDF2 key derivation + AES-GCM encrypt/decrypt via Web Crypto API.
 - **src/core/storage/db.js** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, publishedAt) stored in plaintext for querying; content fields encrypted. Call `open(passphrase)` before any operations.
 - **src/core/storage/schema.js** — `createFeed()`, `createArticle()` factory functions return Result types.
+- **src/core/discovery/discovery.js** — `discoverFeed(url)` runs a multi-strategy cascade to find a feed from a website URL: HTML `<link>` autodiscovery → well-known paths → anchor scanning.
+- **src/core/discovery/strategies.js** — Pure functions for each discovery strategy: `findFeedLinksInHtml()`, `getWellKnownFeedUrls()`, `findFeedLinksInAnchors()`.
 - **src/core/extractor/extractor.js** — Public API: `extract(html, url)` and `needsExtraction(article)`. Delegates to active extractor implementation.
 - **src/core/extractor/defuddle-extractor.js** — Defuddle-based extraction. Swap this import in `extractor.js` to use a different library.
-- **src/core/feeds/feed-service.js** — `addFeedFlow(url)` orchestrates: duplicate check → fetch via CORS proxy → parse → extract full text for summary-only articles → store. Returns Result.
+- **src/core/feeds/feed-service.js** — `addFeedFlow(url)` orchestrates: normalize URL → duplicate check → fetch → parse (on failure: discover feed) → extract full text → store. `normalizeUrl()` handles bare domains, missing scheme, trailing slashes.
 - **src/core/parser/parser.js** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1. Returns `{feed, articles}`.
 - **src/core/parser/sanitizer.js** — DOMPurify wrapper with allowlisted tags/attrs. Links get `rel="noopener noreferrer"` automatically.
 - **src/main.js** — App entry point. Only module that wires components together via event bus.
