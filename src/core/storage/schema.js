@@ -1,13 +1,13 @@
-import { ok, err } from '../../utils/result.js';
-import { SCHEMA_VERSION } from '../../utils/constants.js';
+import { ok, err } from "../../utils/result.js";
+import { SCHEMA_VERSION } from "../../utils/constants.js";
 
 export { SCHEMA_VERSION };
 
 /**
  * Create a new feed object with defaults.
  */
-export function createFeed({ url, title, description = '', siteUrl = '' }) {
-  if (!url || !title) return err('Feed requires url and title');
+export function createFeed({ url, title, description = "", siteUrl = "" }) {
+  if (!url || !title) return err("Feed requires url and title");
   return ok({
     id: crypto.randomUUID(),
     url,
@@ -22,11 +22,22 @@ export function createFeed({ url, title, description = '', siteUrl = '' }) {
 /**
  * Create a new article object with defaults.
  */
-export function createArticle({ feedId, title, link, content = '', summary = '', author = '', publishedAt = null }) {
-  if (!feedId || !title || !link) return err('Article requires feedId, title, and link');
+export function createArticle({
+  feedId,
+  title,
+  link,
+  guid = "",
+  content = "",
+  summary = "",
+  author = "",
+  publishedAt = null,
+}) {
+  if (!feedId || !title || !link)
+    return err("Article requires feedId, title, and link");
   return ok({
     id: crypto.randomUUID(),
     feedId,
+    guid: guid || link,
     title,
     link,
     content,
@@ -42,8 +53,9 @@ export function createArticle({ feedId, title, link, content = '', summary = '',
  * Validate a feed object has required fields.
  */
 export function validateFeed(feed) {
-  if (!feed || typeof feed !== 'object') return err('Feed must be an object');
-  if (!feed.id || !feed.url || !feed.title) return err('Feed missing required fields');
+  if (!feed || typeof feed !== "object") return err("Feed must be an object");
+  if (!feed.id || !feed.url || !feed.title)
+    return err("Feed missing required fields");
   return ok(feed);
 }
 
@@ -51,9 +63,10 @@ export function validateFeed(feed) {
  * Validate an article object has required fields.
  */
 export function validateArticle(article) {
-  if (!article || typeof article !== 'object') return err('Article must be an object');
+  if (!article || typeof article !== "object")
+    return err("Article must be an object");
   if (!article.id || !article.feedId || !article.title || !article.link) {
-    return err('Article missing required fields');
+    return err("Article missing required fields");
   }
   return ok(article);
 }

@@ -2,10 +2,16 @@ import { createEventBus } from "./core/events/event-bus.js";
 import {
   open,
   getFeeds,
+  getFeed,
   getArticles,
   updateArticle,
+  clearAll,
 } from "./core/storage/db.js";
-import { addFeedFlow } from "./core/feeds/feed-service.js";
+import {
+  addFeedFlow,
+  refreshFeed,
+  refreshAllFeeds,
+} from "./core/feeds/feed-service.js";
 import { createKeyboardNav } from "./ui/components/keyboard-nav.js";
 import { EVENTS } from "./utils/constants.js";
 
@@ -60,7 +66,7 @@ async function init() {
   bus.on(EVENTS.FEED_SELECTED, async ({ feedId }) => {
     const result = await getArticles(feedId);
     if (result.ok && articleList) {
-      articleList.setArticles(result.value);
+      articleList.setArticles(result.value, feedId);
     }
     articleView?.setArticle(null);
   });
@@ -76,6 +82,35 @@ async function init() {
     }
   });
 
+  // Handle refresh all feeds
+  bus.on(EVENTS.REFRESH_ALL, async () => {
+    await refreshAllFeeds();
+    const allFeeds = await getFeeds();
+    if (allFeeds.ok && feedList) {
+      feedList.setFeeds(allFeeds.value);
+    }
+    bus.emit(EVENTS.FEEDS_REFRESHED);
+  });
+
+  // Handle refresh single feed
+  bus.on(EVENTS.REFRESH_FEED, async ({ feedId }) => {
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return;
+    await refreshFeed(feedResult.value);
+    const articles = await getArticles(feedId);
+    if (articles.ok && articleList) {
+      articleList.setArticles(articles.value, feedId);
+    }
+  });
+
+  // Handle clear all data
+  bus.on(EVENTS.CLEAR_ALL, async () => {
+    await clearAll();
+    if (feedList) feedList.setFeeds([]);
+    if (articleList) articleList.setArticles([]);
+    articleView?.setArticle(null);
+  });
+
   // Keyboard navigation
   keyboard.attach();
 
@@ -89,6 +124,14 @@ async function init() {
   }
 
   bus.emit(EVENTS.STORAGE_READY);
+
+  // Auto-refresh all feeds on load (non-blocking)
+  refreshAllFeeds().then(async () => {
+    const allFeeds = await getFeeds();
+    if (allFeeds.ok && feedList) {
+      feedList.setFeeds(allFeeds.value);
+    }
+  });
 }
 
 init();

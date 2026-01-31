@@ -9,6 +9,8 @@ import {
   getFeeds,
   removeFeedsByUrl,
   addArticles,
+  getArticleByGuid,
+  updateArticle,
 } from "../storage/db.js";
 
 /**
@@ -171,4 +173,96 @@ export async function addFeedFlow(rawUrl) {
       "The feed at this URL could not be reached. Please check your connection and try again.",
     );
   }
+}
+
+/**
+ * Refresh a single feed: fetch latest XML, add new articles, update changed ones.
+ * Returns Result<{newCount, updatedCount}>.
+ */
+export async function refreshFeed(feed) {
+  try {
+    const proxyUrl = `/api/feed?url=${encodeURIComponent(feed.url)}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      return err(`Failed to fetch feed (HTTP ${response.status})`);
+    }
+    const text = await response.text();
+    const parseResult = parse(text, feed.url);
+    if (!parseResult.ok) return err(parseResult.error);
+
+    const parsedArticles = parseResult.value.articles;
+    const newArticles = [];
+    const updatedArticles = [];
+
+    for (const parsed of parsedArticles) {
+      const guid = parsed.guid || parsed.link;
+      if (!guid) continue;
+
+      const existing = await getArticleByGuid(feed.id, guid);
+      if (!existing.ok) continue;
+
+      if (existing.value === null) {
+        // New article
+        newArticles.push(parsed);
+      } else {
+        // Existing — check if content changed
+        const oldContent = existing.value.content || "";
+        const newContent = parsed.content || "";
+        if (newContent && newContent !== oldContent) {
+          existing.value.content = newContent;
+          existing.value.summary = parsed.summary || existing.value.summary;
+          existing.value.title = parsed.title || existing.value.title;
+          updatedArticles.push(existing.value);
+        }
+      }
+    }
+
+    // Extract full text for new articles
+    await extractFullText(newArticles);
+
+    // Store new articles
+    const created = newArticles
+      .map((a) => {
+        const r = createArticle({ feedId: feed.id, ...a });
+        return r.ok ? r.value : null;
+      })
+      .filter(Boolean);
+
+    if (created.length > 0) {
+      await addArticles(created);
+    }
+
+    // Update changed articles
+    for (const article of updatedArticles) {
+      await updateArticle(article);
+    }
+
+    return ok({
+      newCount: created.length,
+      updatedCount: updatedArticles.length,
+    });
+  } catch (e) {
+    return err(`Refresh failed: ${e.message}`);
+  }
+}
+
+/**
+ * Refresh all feeds sequentially.
+ * Returns Result<{results: Array<{feed, newCount, updatedCount, error?}>}>.
+ */
+export async function refreshAllFeeds() {
+  const feedsResult = await getFeeds();
+  if (!feedsResult.ok) return err(feedsResult.error);
+
+  const results = [];
+  for (const feed of feedsResult.value) {
+    const result = await refreshFeed(feed);
+    if (result.ok) {
+      results.push({ feed, ...result.value });
+    } else {
+      results.push({ feed, newCount: 0, updatedCount: 0, error: result.error });
+    }
+  }
+
+  return ok({ results });
 }

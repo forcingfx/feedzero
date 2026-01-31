@@ -13,7 +13,13 @@ template.innerHTML = `
   .title.read { font-weight: 400; color: var(--color-text-secondary); }
   .meta { font-size: 0.75rem; color: var(--color-text-secondary); margin-top: var(--space-xs); }
   .empty { color: var(--color-text-secondary); font-size: 0.875rem; padding: var(--space-sm); }
+  .header { display: flex; justify-content: flex-end; padding: var(--space-xs) var(--space-sm); }
+  .header button { font-size: 0.75rem; cursor: pointer; }
+  .header[hidden] { display: none; }
 </style>
+<div class="header" hidden>
+  <button class="refresh-feed" title="Refresh this feed">Refresh</button>
+</div>
 <ul role="listbox" aria-label="Articles"></ul>
 <div class="empty">Select a feed to view articles.</div>
 `;
@@ -22,6 +28,7 @@ export class ArticleList extends HTMLElement {
   #bus = null;
   #articles = [];
   #selectedId = null;
+  #feedId = null;
 
   constructor() {
     super();
@@ -34,6 +41,14 @@ export class ArticleList extends HTMLElement {
   }
 
   connectedCallback() {
+    this.shadowRoot
+      .querySelector(".refresh-feed")
+      .addEventListener("click", () => {
+        if (this.#bus && this.#feedId) {
+          this.#bus.emit(EVENTS.REFRESH_FEED, { feedId: this.#feedId });
+        }
+      });
+
     this.shadowRoot.querySelector("ul").addEventListener("click", (e) => {
       const li = e.target.closest("li");
       if (li) this.selectArticle(li.dataset.id);
@@ -59,9 +74,11 @@ export class ArticleList extends HTMLElement {
     }
   }
 
-  setArticles(articles) {
+  setArticles(articles, feedId = null) {
     this.#articles = articles;
     this.#selectedId = null;
+    this.#feedId = feedId;
+    this.shadowRoot.querySelector(".header").hidden = !feedId;
     this.render();
   }
 

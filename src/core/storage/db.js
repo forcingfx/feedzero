@@ -16,7 +16,7 @@ export async function open(passphrase) {
     db = new Dexie(DB_NAME);
     db.version(DB_VERSION).stores({
       feeds: "id, &url",
-      articles: "id, feedId, publishedAt",
+      articles: "id, feedId, publishedAt, [feedId+guid]",
       meta: "key",
     });
 
@@ -184,6 +184,41 @@ export async function updateArticle(article) {
   return putEncrypted("articles", article.id, article);
 }
 
+/**
+ * Find an article by its feedId + guid compound index.
+ * Returns the decrypted article if found, or null.
+ */
+export async function getArticleByGuid(feedId, guid) {
+  try {
+    const raw = await db.articles
+      .where("[feedId+guid]")
+      .equals([feedId, guid])
+      .first();
+    if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
+    const result = await decrypt(
+      cryptoKey,
+      new Uint8Array(raw.iv),
+      new Uint8Array(raw.ciphertext),
+    );
+    return result.ok ? ok(result.value) : ok(null);
+  } catch (e) {
+    return err(`Failed to find article by guid: ${e.message}`);
+  }
+}
+
+/**
+ * Delete all feeds, articles, and meta (except salt) from the database.
+ */
+export async function clearAll() {
+  try {
+    await db.feeds.clear();
+    await db.articles.clear();
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to clear database: ${e.message}`);
+  }
+}
+
 // --- Internal helpers ---
 
 async function putEncrypted(table, id, data) {
@@ -203,6 +238,7 @@ async function putEncrypted(table, id, data) {
     if (data.url !== undefined) record.url = data.url;
     if (data.feedId !== undefined) record.feedId = data.feedId;
     if (data.publishedAt !== undefined) record.publishedAt = data.publishedAt;
+    if (data.guid !== undefined) record.guid = data.guid;
 
     await db[table].put(record);
     return ok(true);

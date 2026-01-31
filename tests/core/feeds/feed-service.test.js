@@ -95,6 +95,23 @@ vi.mock("../../../src/core/storage/db.js", () => {
       for (const a of arts) articles.set(a.id, a);
       return { ok: true, value: true };
     }),
+    getArticleByGuid: vi.fn(async (feedId, guid) => {
+      for (const a of articles.values()) {
+        if (a.feedId === feedId && a.guid === guid) {
+          return { ok: true, value: a };
+        }
+      }
+      return { ok: true, value: null };
+    }),
+    updateArticle: vi.fn(async (article) => {
+      articles.set(article.id, article);
+      return { ok: true, value: true };
+    }),
+    clearAll: vi.fn(async () => {
+      feeds.clear();
+      articles.clear();
+      return { ok: true, value: true };
+    }),
     _reset: () => {
       feeds.clear();
       orphanUrls.clear();
@@ -102,10 +119,11 @@ vi.mock("../../../src/core/storage/db.js", () => {
     },
     _addOrphan: (url) => orphanUrls.add(url),
     _feeds: feeds,
+    _articles: articles,
   };
 });
 
-let addFeedFlow;
+let addFeedFlow, refreshFeed, refreshAllFeeds;
 let db;
 
 beforeEach(async () => {
@@ -116,6 +134,8 @@ beforeEach(async () => {
   // Reset module to clear any cached state
   const mod = await import("../../../src/core/feeds/feed-service.js");
   addFeedFlow = mod.addFeedFlow;
+  refreshFeed = mod.refreshFeed;
+  refreshAllFeeds = mod.refreshAllFeeds;
 });
 
 describe("feed-service", () => {
@@ -417,5 +437,134 @@ describe("normalizeUrl", () => {
     expect(normalizeUrl("http://example.com/feed")).toBe(
       "http://example.com/feed",
     );
+  });
+});
+
+// --- Refresh tests ---
+
+const ATOM_WITH_TWO = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Feed</title>
+  <link href="https://example.com" rel="alternate"/>
+  <entry>
+    <title>Test Post</title>
+    <link href="https://example.com/post/1" rel="alternate"/>
+    <id>tag:example.com,2024:1</id>
+    <published>2024-01-15T12:00:00Z</published>
+    <content type="html">&lt;p&gt;Content&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <title>New Post</title>
+    <link href="https://example.com/post/2" rel="alternate"/>
+    <id>tag:example.com,2024:2</id>
+    <published>2024-01-16T12:00:00Z</published>
+    <content type="html">&lt;p&gt;New content&lt;/p&gt;</content>
+  </entry>
+</feed>`;
+
+const ATOM_UPDATED_CONTENT = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Feed</title>
+  <link href="https://example.com" rel="alternate"/>
+  <entry>
+    <title>Test Post</title>
+    <link href="https://example.com/post/1" rel="alternate"/>
+    <id>tag:example.com,2024:1</id>
+    <published>2024-01-15T12:00:00Z</published>
+    <content type="html">&lt;p&gt;Updated content with corrections&lt;/p&gt;</content>
+  </entry>
+</feed>`;
+
+describe("refreshFeed", () => {
+  async function addTestFeed() {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_XML),
+    });
+    const result = await addFeedFlow("https://example.com/feed.xml");
+    return unwrap(result).feed;
+  }
+
+  it("should add new articles that are not in the database", async () => {
+    const feed = await addTestFeed();
+
+    // Now refresh with a feed that has 2 articles (1 existing + 1 new)
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_WITH_TWO),
+    });
+
+    const result = await refreshFeed(feed);
+    expect(isOk(result)).toBe(true);
+    expect(result.value.newCount).toBe(1);
+    expect(result.value.updatedCount).toBe(0);
+
+    // Verify new article was stored
+    expect(db.addArticles).toHaveBeenCalledTimes(2); // once for add, once for refresh
+  });
+
+  it("should not create duplicates when refreshing with same articles", async () => {
+    const feed = await addTestFeed();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_XML),
+    });
+
+    const result = await refreshFeed(feed);
+    expect(isOk(result)).toBe(true);
+    expect(result.value.newCount).toBe(0);
+    expect(result.value.updatedCount).toBe(0);
+  });
+
+  it("should update articles when content changes", async () => {
+    const feed = await addTestFeed();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_UPDATED_CONTENT),
+    });
+
+    const result = await refreshFeed(feed);
+    expect(isOk(result)).toBe(true);
+    expect(result.value.newCount).toBe(0);
+    expect(result.value.updatedCount).toBe(1);
+    expect(db.updateArticle).toHaveBeenCalledOnce();
+  });
+
+  it("should return error when fetch fails", async () => {
+    const feed = await addTestFeed();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+    });
+
+    const result = await refreshFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/Failed to fetch/);
+  });
+});
+
+describe("refreshAllFeeds", () => {
+  it("should refresh all stored feeds and return results", async () => {
+    // Add a feed first
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_XML),
+    });
+    await addFeedFlow("https://example.com/feed.xml");
+
+    // Now refresh — same content, so 0 new
+    const result = await refreshAllFeeds();
+    expect(isOk(result)).toBe(true);
+    expect(result.value.results.length).toBe(1);
+    expect(result.value.results[0].newCount).toBe(0);
+  });
+
+  it("should return empty results when no feeds exist", async () => {
+    const result = await refreshAllFeeds();
+    expect(isOk(result)).toBe(true);
+    expect(result.value.results.length).toBe(0);
   });
 });

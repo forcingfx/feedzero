@@ -11,6 +11,8 @@ import {
   addArticles,
   getArticles,
   updateArticle,
+  getArticleByGuid,
+  clearAll,
 } from "../../../src/core/storage/db.js";
 import { createFeed, createArticle } from "../../../src/core/storage/schema.js";
 import { isOk, isErr, unwrap } from "../../../src/utils/result.js";
@@ -225,10 +227,13 @@ describe("Database", () => {
       const rawData = await new Promise((resolve) => {
         const tx = indexedDB.open("feedzero");
         tx.onsuccess = () => {
-          const db = tx.result;
-          const rtx = db.transaction("feeds", "readonly");
+          const rawDb = tx.result;
+          const rtx = rawDb.transaction("feeds", "readonly");
           const req = rtx.objectStore("feeds").getAll();
-          req.onsuccess = () => resolve(req.result);
+          req.onsuccess = () => {
+            rawDb.close();
+            resolve(req.result);
+          };
         };
       });
 
@@ -238,6 +243,84 @@ describe("Database", () => {
       expect(rawData[0].ciphertext).toBeDefined();
       expect(rawData[0].title).toBeUndefined();
       expect(rawData[0].description).toBeUndefined();
+    });
+  });
+
+  describe("getArticleByGuid", () => {
+    it("should find an article by feedId and guid", async () => {
+      const feed = unwrap(createFeed({ url: "https://x.com/rss", title: "X" }));
+      await addFeed(feed);
+      const article = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post",
+          link: "https://x.com/1",
+          guid: "guid-123",
+        }),
+      );
+      await addArticles([article]);
+
+      const result = await getArticleByGuid(feed.id, "guid-123");
+      expect(isOk(result)).toBe(true);
+      expect(result.value).not.toBeNull();
+      expect(result.value.title).toBe("Post");
+    });
+
+    it("should return null for non-existent guid", async () => {
+      const feed = unwrap(createFeed({ url: "https://x.com/rss", title: "X" }));
+      await addFeed(feed);
+
+      const result = await getArticleByGuid(feed.id, "no-such-guid");
+      expect(isOk(result)).toBe(true);
+      expect(result.value).toBeNull();
+    });
+
+    it("should not match guid from a different feed", async () => {
+      const feed1 = unwrap(
+        createFeed({ url: "https://a.com/rss", title: "A" }),
+      );
+      const feed2 = unwrap(
+        createFeed({ url: "https://b.com/rss", title: "B" }),
+      );
+      await addFeed(feed1);
+      await addFeed(feed2);
+      const article = unwrap(
+        createArticle({
+          feedId: feed1.id,
+          title: "Post",
+          link: "https://a.com/1",
+          guid: "shared-guid",
+        }),
+      );
+      await addArticles([article]);
+
+      const result = await getArticleByGuid(feed2.id, "shared-guid");
+      expect(isOk(result)).toBe(true);
+      expect(result.value).toBeNull();
+    });
+  });
+
+  describe("clearAll", () => {
+    it("should remove all feeds and articles", async () => {
+      const feed = unwrap(createFeed({ url: "https://x.com/rss", title: "X" }));
+      await addFeed(feed);
+      const article = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post",
+          link: "https://x.com/1",
+        }),
+      );
+      await addArticles([article]);
+
+      const result = await clearAll();
+      expect(isOk(result)).toBe(true);
+
+      const feeds = await getFeeds();
+      expect(unwrap(feeds)).toHaveLength(0);
+
+      const articles = await getArticles(feed.id);
+      expect(unwrap(articles)).toHaveLength(0);
     });
   });
 });

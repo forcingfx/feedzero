@@ -1,5 +1,5 @@
 export const DB_NAME = "feedzero";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const CRYPTO = {
   ALGORITHM: "AES-GCM",
@@ -20,6 +20,10 @@ export const EVENTS = {
   STORAGE_READY: "storage:ready",
   STORAGE_ERROR: "storage:error",
   PARSE_ERROR: "parse:error",
+  REFRESH_ALL: "feeds:refresh-all",
+  REFRESH_FEED: "feed:refresh",
+  FEEDS_REFRESHED: "feeds:refreshed",
+  CLEAR_ALL: "storage:clear-all",
 };
 
 export const SCHEMA_VERSION = 1;
