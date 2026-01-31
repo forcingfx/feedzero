@@ -34,6 +34,55 @@ describe("ArticleView", () => {
     );
   });
 
+  it("should hide toggle when only feed mode is available", () => {
+    el.setArticle({
+      title: "No Summary",
+      link: "",
+      content: "<p>Full content here</p>",
+    });
+    expect(el.shadowRoot.querySelector(".view-toggle")).toBeNull();
+  });
+
+  it("should hide summary button when summary matches feed content", () => {
+    el.setArticle({
+      title: "Similar",
+      link: "https://example.com/2",
+      content:
+        "<p>This is the full article content with many details about the topic at hand.</p>",
+      summary: "This is the full article content with many details",
+    });
+    const buttons = el.shadowRoot.querySelectorAll(".view-toggle button");
+    const labels = [...buttons].map((b) => b.textContent);
+    expect(labels).not.toContain("Summary");
+  });
+
+  it("should show summary button when summary differs from feed", () => {
+    el.setArticle({
+      title: "Different",
+      link: "https://example.com/3",
+      content:
+        "<p>Full article with lots of unique content that is very different from the summary.</p>",
+      summary:
+        "A completely different teaser that does not overlap with the article.",
+    });
+    const buttons = el.shadowRoot.querySelectorAll(".view-toggle button");
+    const labels = [...buttons].map((b) => b.textContent);
+    expect(labels).toContain("Summary");
+  });
+
+  it("should show timestamp with hours and minutes", () => {
+    el.setArticle({
+      title: "Timestamp",
+      author: "Bob",
+      publishedAt: new Date("2024-06-15T14:30:00").getTime(),
+      link: "",
+      content: "text",
+    });
+    const meta = el.shadowRoot.querySelector(".meta").textContent;
+    // Should contain time portion (hours:minutes), not just date
+    expect(meta).toMatch(/\d{1,2}:\d{2}/);
+  });
+
   it("should escape title to prevent XSS", () => {
     el.setArticle({
       title: "<img src=x onerror=alert(1)>",

@@ -52,6 +52,51 @@ export class ArticleView extends HTMLElement {
     this.#render();
   }
 
+  #stripHtml(html) {
+    const div = document.createElement("div");
+    div.innerHTML = html || "";
+    return (div.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  #contentsSimilar(a, b) {
+    const textA = this.#stripHtml(a);
+    const textB = this.#stripHtml(b);
+    if (!textA || !textB) return false;
+    const snippetA = textA.slice(0, 200);
+    const snippetB = textB.slice(0, 200);
+    return snippetA.startsWith(snippetB) || snippetB.startsWith(snippetA);
+  }
+
+  #getAvailableModes() {
+    const article = this.#article;
+    if (!article) return ["feed"];
+
+    const modes = ["feed"];
+    const feedContent = article.content || article.summary || "";
+
+    // Add summary only if it exists and differs from feed content
+    if (
+      article.summary &&
+      !this.#contentsSimilar(feedContent, article.summary)
+    ) {
+      modes.push("summary");
+    }
+
+    // Add extracted — only if there's a valid link to extract from
+    if (article.link && article.link.startsWith("http")) {
+      if (this.#extractedCache.has(article.link)) {
+        const extracted = this.#extractedCache.get(article.link);
+        if (!this.#contentsSimilar(feedContent, extracted)) {
+          modes.push("extracted");
+        }
+      } else {
+        modes.push("extracted");
+      }
+    }
+
+    return modes;
+  }
+
   #render() {
     const container = this.shadowRoot.querySelector("article");
     const article = this.#article;
@@ -64,10 +109,32 @@ export class ArticleView extends HTMLElement {
 
     const meta = [];
     if (article.author) meta.push(article.author);
-    if (article.publishedAt)
-      meta.push(new Date(article.publishedAt).toLocaleDateString());
+    if (article.publishedAt) {
+      meta.push(
+        new Date(article.publishedAt).toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      );
+    }
+
+    const availableModes = this.#getAvailableModes();
+    // If current mode is no longer available, fall back to feed
+    if (!availableModes.includes(this.#viewMode)) {
+      this.#viewMode = "feed";
+    }
 
     const content = this.#getContent();
+
+    const toggleHtml =
+      availableModes.length > 1
+        ? `<div class="view-toggle">
+          ${availableModes.map((mode) => `<button data-mode="${mode}" aria-pressed="${this.#viewMode === mode}">${mode.charAt(0).toUpperCase() + mode.slice(1)}</button>`).join("")}
+        </div>`
+        : "";
 
     container.innerHTML = `
       <h2>${this.#escapeHtml(article.title)}</h2>
@@ -75,11 +142,7 @@ export class ArticleView extends HTMLElement {
         ${meta.map((m) => this.#escapeHtml(m)).join(" &bull; ")}
         ${article.link ? ` &mdash; <a href="${this.#escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">Original</a>` : ""}
       </div>
-      <div class="view-toggle">
-        <button data-mode="feed" aria-pressed="${this.#viewMode === "feed"}">Feed</button>
-        <button data-mode="extracted" aria-pressed="${this.#viewMode === "extracted"}">Extracted</button>
-        <button data-mode="summary" aria-pressed="${this.#viewMode === "summary"}">Summary</button>
-      </div>
+      ${toggleHtml}
       <div class="content">${content}</div>
     `;
 
@@ -177,6 +240,14 @@ export class ArticleView extends HTMLElement {
         article.link,
         "<p>Extraction failed. Please try again.</p>",
       );
+    }
+
+    // If extracted content is similar to feed, snap back to feed view
+    const feedContent = article.content || article.summary || "";
+    if (
+      this.#contentsSimilar(feedContent, this.#extractedCache.get(article.link))
+    ) {
+      this.#viewMode = "feed";
     }
 
     // Only re-render if this is still the active article
