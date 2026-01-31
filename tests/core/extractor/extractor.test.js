@@ -4,7 +4,9 @@ import { needsExtraction } from "../../../src/core/extractor/extractor.js";
 describe("needsExtraction", () => {
   it("should return false when article has full content", () => {
     const article = {
-      content: "<p>This is a long article with lots of content...</p>".repeat(20),
+      content: "<p>This is a long article with lots of content...</p>".repeat(
+        20,
+      ),
       summary: "Short summary",
       link: "https://example.com/post/1",
     };
@@ -51,6 +53,42 @@ describe("needsExtraction", () => {
       content: "",
       summary: "Non-http link.",
       link: "ftp://example.com/file",
+    };
+    expect(needsExtraction(article)).toBe(false);
+  });
+
+  it("should return false for Hacker News discussion pages", () => {
+    const article = {
+      content: "",
+      summary: "Short summary",
+      link: "https://news.ycombinator.com/item?id=46839375",
+    };
+    expect(needsExtraction(article)).toBe(false);
+  });
+
+  it("should return false for Reddit threads", () => {
+    const article = {
+      content: "",
+      summary: "Short summary",
+      link: "https://old.reddit.com/r/programming/comments/abc123/some_post",
+    };
+    expect(needsExtraction(article)).toBe(false);
+  });
+
+  it("should return false for Lobsters posts", () => {
+    const article = {
+      content: "",
+      summary: "Short summary",
+      link: "https://lobste.rs/s/abc123/some_story",
+    };
+    expect(needsExtraction(article)).toBe(false);
+  });
+
+  it("should return false for Slashdot stories", () => {
+    const article = {
+      content: "",
+      summary: "Short summary",
+      link: "https://slashdot.org/story/25/01/31/some-story",
     };
     expect(needsExtraction(article)).toBe(false);
   });
