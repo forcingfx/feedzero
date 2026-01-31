@@ -39,17 +39,17 @@ vi.mock("../../../src/core/storage/db.js", () => {
   const feeds = new Map();
   const articles = new Map();
   return {
+    feedExistsByUrl: vi.fn(async (url) => ({
+      ok: true,
+      value: feeds.has(url),
+    })),
     addFeed: vi.fn(async (feed) => {
       if (feeds.has(feed.url)) {
-        return { ok: false, error: "Duplicate feed URL" };
+        return { ok: false, error: "A feed with this URL already exists" };
       }
       feeds.set(feed.url, feed);
       return { ok: true, value: true };
     }),
-    getFeeds: vi.fn(async () => ({
-      ok: true,
-      value: [...feeds.values()],
-    })),
     addArticles: vi.fn(async (arts) => {
       for (const a of arts) articles.set(a.id, a);
       return { ok: true, value: true };

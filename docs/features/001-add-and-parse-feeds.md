@@ -100,7 +100,7 @@ Feature: Add a feed URL and display its articles
 
 - **CORS proxy as Vite plugin** — Simplest dev-time solution. No npm dependency. Production proxy is a separate concern.
 - **JSON Feed detection before XML** — `validator.js` checks for `{` prefix and parses JSON first. Avoids feeding JSON into DOMParser which produces confusing XML errors.
-- **Duplicate check before fetch** — Avoids wasting a network request on a feed that already exists.
+- **Duplicate check via index** — Uses `feedExistsByUrl()` to query the plaintext `url` index directly, avoiding decryption of all feeds. `addFeed()` also catches `ConstraintError` as a fallback.
 - **Auto-select after add** — Immediately shows the user the articles they just subscribed to.
 
 ## Error Handling

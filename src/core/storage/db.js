@@ -52,10 +52,37 @@ export function close() {
 }
 
 /**
+ * Check if a feed with the given URL already exists, using the
+ * plaintext url index. Does not require decryption.
+ * @param {string} url
+ * @returns {Promise<Result<boolean>>}
+ */
+export async function feedExistsByUrl(url) {
+  try {
+    const count = await db.feeds.where("url").equals(url).count();
+    return ok(count > 0);
+  } catch (e) {
+    return err(`Failed to check feed existence: ${e.message}`);
+  }
+}
+
+/**
  * Add a feed (encrypted at rest).
+ * Returns a friendly error if a feed with the same URL already exists.
  */
 export async function addFeed(feed) {
-  return putEncrypted("feeds", feed.id, feed);
+  try {
+    const exists = await feedExistsByUrl(feed.url);
+    if (exists.ok && exists.value) {
+      return err("A feed with this URL already exists");
+    }
+    return await putEncrypted("feeds", feed.id, feed);
+  } catch (e) {
+    if (e.name === "ConstraintError") {
+      return err("A feed with this URL already exists");
+    }
+    return err(`Failed to add feed: ${e.message}`);
+  }
 }
 
 /**

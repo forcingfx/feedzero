@@ -1,7 +1,7 @@
 import { ok, err } from "../../utils/result.js";
 import { parse } from "../parser/parser.js";
 import { createFeed, createArticle } from "../storage/schema.js";
-import { addFeed, getFeeds, addArticles } from "../storage/db.js";
+import { addFeed, feedExistsByUrl, addArticles } from "../storage/db.js";
 
 /**
  * Translate internal parser/validator errors into user-friendly messages.
@@ -28,9 +28,9 @@ function friendlyError(rawError) {
  */
 export async function addFeedFlow(url) {
   try {
-    // Check for duplicate
-    const existing = await getFeeds();
-    if (existing.ok && existing.value.some((f) => f.url === url)) {
+    // Check for duplicate using the plaintext URL index (no decryption needed)
+    const exists = await feedExistsByUrl(url);
+    if (exists.ok && exists.value) {
       return err("A feed with this URL already exists");
     }
 

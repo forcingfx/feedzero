@@ -6,6 +6,7 @@ import {
   addFeed,
   getFeeds,
   getFeed,
+  feedExistsByUrl,
   removeFeed,
   addArticles,
   getArticles,
@@ -128,6 +129,40 @@ describe("Database", () => {
 
       const articles = unwrap(await getArticles(feed.id));
       expect(articles[0].read).toBe(true);
+    });
+  });
+
+  describe("duplicate detection", () => {
+    it("should detect existing feed by URL using the index", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Example" }),
+      );
+      await addFeed(feed);
+
+      const exists = await feedExistsByUrl("https://example.com/rss");
+      expect(isOk(exists)).toBe(true);
+      expect(unwrap(exists)).toBe(true);
+    });
+
+    it("should return false for non-existent URL", async () => {
+      const exists = await feedExistsByUrl("https://example.com/nope");
+      expect(isOk(exists)).toBe(true);
+      expect(unwrap(exists)).toBe(false);
+    });
+
+    it("should not throw ConstraintError when adding duplicate URL", async () => {
+      const feed1 = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "First" }),
+      );
+      await addFeed(feed1);
+
+      // Adding a second feed with the same URL should return an error, not throw
+      const feed2 = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Second" }),
+      );
+      const result = await addFeed(feed2);
+      expect(isErr(result)).toBe(true);
+      expect(result.error).toMatch(/already exists/i);
     });
   });
 
