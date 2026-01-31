@@ -183,6 +183,30 @@ describe("feed-service", () => {
       expect(result.error).toMatch(/already exists/i);
     });
 
+    it("should detect duplicate when trailing slash differs", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      await addFeedFlow("https://example.com/feed");
+      const result = await addFeedFlow("https://example.com/feed/");
+      expect(isErr(result)).toBe(true);
+      expect(result.error).toMatch(/already exists/i);
+    });
+
+    it("should detect duplicate when scheme case differs", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      await addFeedFlow("https://example.com/feed");
+      const result = await addFeedFlow("HTTPS://Example.COM/feed");
+      expect(isErr(result)).toBe(true);
+      expect(result.error).toMatch(/already exists/i);
+    });
+
     it("should return error when fetch fails", async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,

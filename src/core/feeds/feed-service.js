@@ -54,10 +54,26 @@ async function extractFullText(articles) {
 }
 
 /**
+ * Normalize a feed URL for consistent storage and duplicate detection.
+ * Lowercases scheme/host, removes trailing slash, trims whitespace.
+ */
+export function normalizeUrl(url) {
+  try {
+    const u = new URL(url.trim());
+    u.pathname = u.pathname.replace(/\/+$/, "") || "/";
+    // URL constructor already lowercases scheme and host
+    return u.toString().replace(/\/+$/, "");
+  } catch {
+    return url.trim();
+  }
+}
+
+/**
  * Full add-feed flow: check duplicate → fetch → parse → store.
  * Returns Result<{feed, articles}> with user-friendly error messages.
  */
-export async function addFeedFlow(url) {
+export async function addFeedFlow(rawUrl) {
+  const url = normalizeUrl(rawUrl);
   try {
     // Check for duplicate using the plaintext URL index (no decryption needed)
     const exists = await feedExistsByUrl(url);
