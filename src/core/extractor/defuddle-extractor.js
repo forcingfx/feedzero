@@ -1,6 +1,7 @@
 import Defuddle from "defuddle";
 import { ok, err } from "../../utils/result.js";
 import { sanitize } from "../parser/sanitizer.js";
+import { cleanExtractedContent } from "./cleanup.js";
 
 /**
  * Extract readable content from an HTML string using Defuddle.
@@ -29,7 +30,7 @@ export function extract(html, url) {
     }
 
     return ok({
-      content: sanitize(result.content),
+      content: sanitize(cleanExtractedContent(result.content)),
       title: result.title || "",
       author: result.author || "",
       excerpt: result.description || "",

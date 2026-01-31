@@ -21,6 +21,8 @@ import "./ui/components/article-view.js";
 
 const bus = createEventBus();
 const keyboard = createKeyboardNav();
+let refreshingAll = false;
+let refreshingFeed = false;
 
 async function init() {
   // Initialize storage with a default passphrase
@@ -81,24 +83,36 @@ async function init() {
     }
   });
 
-  // Handle refresh all feeds
+  // Handle refresh all feeds (debounced)
   bus.on(EVENTS.REFRESH_ALL, async () => {
-    await refreshAllFeeds();
-    const allFeeds = await getFeeds();
-    if (allFeeds.ok && feedList) {
-      feedList.setFeeds(allFeeds.value);
+    if (refreshingAll) return;
+    refreshingAll = true;
+    try {
+      await refreshAllFeeds();
+      const allFeeds = await getFeeds();
+      if (allFeeds.ok && feedList) {
+        feedList.setFeeds(allFeeds.value);
+      }
+      bus.emit(EVENTS.FEEDS_REFRESHED);
+    } finally {
+      refreshingAll = false;
     }
-    bus.emit(EVENTS.FEEDS_REFRESHED);
   });
 
-  // Handle refresh single feed
+  // Handle refresh single feed (debounced)
   bus.on(EVENTS.REFRESH_FEED, async ({ feedId }) => {
-    const feedResult = await getFeed(feedId);
-    if (!feedResult.ok) return;
-    await refreshFeed(feedResult.value);
-    const articles = await getArticles(feedId);
-    if (articles.ok && articleList) {
-      articleList.setArticles(articles.value, feedId);
+    if (refreshingFeed) return;
+    refreshingFeed = true;
+    try {
+      const feedResult = await getFeed(feedId);
+      if (!feedResult.ok) return;
+      await refreshFeed(feedResult.value);
+      const articles = await getArticles(feedId);
+      if (articles.ok && articleList) {
+        articleList.setArticles(articles.value, feedId);
+      }
+    } finally {
+      refreshingFeed = false;
     }
   });
 

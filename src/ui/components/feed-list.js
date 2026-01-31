@@ -51,7 +51,17 @@ export class FeedList extends HTMLElement {
       e.preventDefault();
       const input = this.shadowRoot.querySelector("input");
       const url = input.value.trim();
-      if (url && this.#bus) {
+      if (!url) return;
+      // Block dangerous URL schemes (javascript:, data:, file:, etc.)
+      if (
+        url.includes(":") &&
+        !url.startsWith("http://") &&
+        !url.startsWith("https://")
+      ) {
+        this.showError("Only http and https URLs are supported.");
+        return;
+      }
+      if (this.#bus) {
         this.#bus.emit(EVENTS.FEED_ADDED, { url });
         input.value = "";
         this.hideError();

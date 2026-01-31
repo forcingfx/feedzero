@@ -15,6 +15,28 @@ function proxyHandler(defaultContentType) {
     }
 
     try {
+      const parsed = new URL(target);
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        res.statusCode = 400;
+        res.end("Only http and https URLs are allowed");
+        return;
+      }
+      const hostname = parsed.hostname;
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1" ||
+        hostname === "0.0.0.0" ||
+        hostname.startsWith("10.") ||
+        hostname.startsWith("192.168.") ||
+        hostname.startsWith("172.16.") ||
+        hostname === "169.254.169.254"
+      ) {
+        res.statusCode = 403;
+        res.end("Access to internal addresses is blocked");
+        return;
+      }
+
       const response = await fetch(target);
       res.setHeader(
         "Content-Type",

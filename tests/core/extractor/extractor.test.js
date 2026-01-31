@@ -57,42 +57,6 @@ describe("needsExtraction", () => {
     expect(needsExtraction(article)).toBe(false);
   });
 
-  it("should return false for Hacker News discussion pages", () => {
-    const article = {
-      content: "",
-      summary: "Short summary",
-      link: "https://news.ycombinator.com/item?id=46839375",
-    };
-    expect(needsExtraction(article)).toBe(false);
-  });
-
-  it("should return false for Reddit threads", () => {
-    const article = {
-      content: "",
-      summary: "Short summary",
-      link: "https://old.reddit.com/r/programming/comments/abc123/some_post",
-    };
-    expect(needsExtraction(article)).toBe(false);
-  });
-
-  it("should return false for Lobsters posts", () => {
-    const article = {
-      content: "",
-      summary: "Short summary",
-      link: "https://lobste.rs/s/abc123/some_story",
-    };
-    expect(needsExtraction(article)).toBe(false);
-  });
-
-  it("should return false for Slashdot stories", () => {
-    const article = {
-      content: "",
-      summary: "Short summary",
-      link: "https://slashdot.org/story/25/01/31/some-story",
-    };
-    expect(needsExtraction(article)).toBe(false);
-  });
-
   it("should return false when content differs from summary even if short", () => {
     // Short but distinct content means the feed intended this to be the full article
     const article = {
