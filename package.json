@@ -1,0 +1,26 @@
+{
+  "name": "feedzero",
+  "version": "0.1.0",
+  "description": "Privacy-first RSS reader",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "fake-indexeddb": "^6.2.5",
+    "happy-dom": "^17.0.0",
+    "vite": "^7.3.1",
+    "vitest": "^3.0.0"
+  },
+  "private": true,
+  "dependencies": {
+    "dexie": "^4.3.0",
+    "dompurify": "^3.3.1"
+  }
+}

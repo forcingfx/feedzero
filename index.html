@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>FeedZero</title>
+        <link rel="stylesheet" href="./src/ui/styles/variables.css" />
+        <link rel="stylesheet" href="./src/ui/styles/base.css" />
+    </head>
+    <body>
+        <header role="banner">
+            <h1>FeedZero</h1>
+        </header>
+        <main role="main">
+            <nav aria-label="Feed list" class="panel panel-feeds">
+                <feed-list></feed-list>
+            </nav>
+            <section aria-label="Article list" class="panel panel-articles">
+                <article-list></article-list>
+            </section>
+            <section aria-label="Article content" class="panel panel-content">
+                <article-view></article-view>
+            </section>
+        </main>
+        <script type="module" src="./src/main.js"></script>
+    </body>
+</html>
