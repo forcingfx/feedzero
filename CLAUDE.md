@@ -72,6 +72,39 @@ Follow this sequence for all features:
 4. **VERIFY** — Run full test suite, confirm no regressions.
 5. **DOCUMENT** — Review the `docs/` folder. Update `docs/architecture.md`, `docs/data-schema.md`, and relevant feature docs in `docs/features/` to reflect what changed. Create a new feature doc from `docs/features/TEMPLATE.md` for any new feature. Update ADRs in `docs/decisions/` if architectural decisions were made.
 
+## Commit Messages
+
+Write detailed commit messages. Use conventional commit prefixes (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`).
+
+**For features:** Summarize what was added and why. List key files created or modified.
+
+**For bug fixes:** The commit body must include four sections:
+1. **What** — What the bug was (observable symptom)
+2. **Why** — Why it occurred (root cause)
+3. **Fix** — How it was fixed (what changed)
+4. **Prevention** — What preventive measures were added (tests, docs, lint rules)
+
+Example:
+```
+fix: use getElementsByTagName for namespaced XML elements
+
+What: Full article content was silently dropped — only the short
+<description> was displayed instead of <content:encoded>.
+
+Why: querySelector fails with namespace-prefixed tags like
+content:encoded because the colon is interpreted as a CSS
+pseudo-class separator. happy-dom (test env) handled it
+differently, masking the bug.
+
+Fix: Switched text() helper from querySelector to
+getElementsByTagName, which takes the literal tag name
+including namespace prefix.
+
+Prevention: Added regression tests with namespaced RSS fixtures
+(content:encoded, dc:creator). Documented happy-dom DOM fidelity
+gaps in CLAUDE.md.
+```
+
 ## Principles
 
 - **Security first** — Encrypt at rest, sanitize all external content, never trust user or feed input. Use production-grade libraries (DOMPurify, Web Crypto) over hand-rolled implementations.
