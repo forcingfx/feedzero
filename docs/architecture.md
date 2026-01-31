@@ -7,13 +7,22 @@ FeedZero is a privacy-first RSS reader built with vanilla JavaScript (ES modules
 ## Data Flow
 
 ```
-User adds feed URL
+User enters feed URL in <feed-list>
       │
       ▼
-  fetch(url) → XML response
+  Event bus emits feed:added
       │
       ▼
-  validator.js → Checks RSS 2.0 or Atom 1.0
+  main.js calls addFeedFlow(url)
+      │
+      ▼
+  feed-service.js checks for duplicate URL in DB
+      │
+      ▼
+  fetch(/api/feed?url=...) via CORS proxy
+      │
+      ▼
+  validator.js → Detects JSON Feed, RSS 2.0, or Atom 1.0
       │
       ▼
   parser.js → Extracts feed metadata + articles
@@ -31,24 +40,31 @@ User adds feed URL
   db.js → Dexie stores encrypted blobs in IndexedDB
       │
       ▼
-  Event bus emits feed:added → UI components re-render
+  main.js refreshes feed list → auto-selects new feed → loads articles
 ```
+
+## CORS Proxy
+
+Browsers block cross-origin feed fetches. In development, `vite.config.js` defines a plugin that proxies `/api/feed?url=<encoded>` — the Vite server fetches the feed server-side and returns the response. Production will require a dedicated proxy or server function.
 
 ## Module Dependency Graph
 
 ```
 main.js
 ├── core/events/event-bus.js     (no deps)
-├── core/storage/db.js
-│   ├── dexie                    (npm)
-│   ├── core/storage/crypto.js
-│   │   └── utils/constants.js
-│   └── core/storage/schema.js
-│       └── utils/result.js
-├── core/parser/parser.js
-│   ├── core/parser/validator.js
-│   └── core/parser/sanitizer.js
-│       └── dompurify            (npm)
+├── core/feeds/feed-service.js
+│   ├── core/parser/parser.js
+│   │   ├── core/parser/validator.js
+│   │   │   └── utils/result.js
+│   │   └── core/parser/sanitizer.js
+│   │       └── dompurify            (npm)
+│   ├── core/storage/schema.js
+│   │   └── utils/result.js
+│   └── core/storage/db.js
+│       ├── dexie                    (npm)
+│       └── core/storage/crypto.js
+│           └── utils/constants.js
+├── core/storage/db.js               (also used directly for getFeeds, getArticles, etc.)
 ├── ui/components/feed-list.js
 ├── ui/components/article-list.js
 ├── ui/components/article-view.js

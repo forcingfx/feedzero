@@ -4,15 +4,17 @@
 
 ### Feed
 
-| Field       | Type   | Description                    |
-|-------------|--------|--------------------------------|
-| id          | string | UUID v4, primary key           |
-| url         | string | Feed XML URL (unique index)    |
-| title       | string | Feed title from XML            |
-| description | string | Feed description, default ''   |
-| siteUrl     | string | Website URL, default ''        |
-| createdAt   | number | Unix ms timestamp              |
-| updatedAt   | number | Unix ms timestamp              |
+| Field       | Type   | Description                         |
+|-------------|--------|-------------------------------------|
+| id          | string | UUID v4, primary key                |
+| url         | string | Feed URL (unique index)             |
+| title       | string | Feed title from source              |
+| description | string | Feed description, default ''        |
+| siteUrl     | string | Website URL, default ''             |
+| createdAt   | number | Unix ms timestamp                   |
+| updatedAt   | number | Unix ms timestamp                   |
+
+Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 
 ### Article
 
