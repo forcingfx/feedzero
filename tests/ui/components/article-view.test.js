@@ -83,17 +83,15 @@ describe("ArticleView", () => {
     expect(meta).toMatch(/\d{1,2}:\d{2}/);
   });
 
-  it("should hide extracted button when feed has full content", () => {
-    const longContent =
-      "<p>" + "This is a comprehensive article. ".repeat(50) + "</p>";
+  it("should hide extracted button when feed provides content longer than summary", () => {
     el.setArticle({
-      title: "Full Content",
+      title: "Sponsor Post",
       link: "https://example.com/4",
-      content: longContent,
-      summary:
-        "This is a comprehensive article. This is a comprehensive article.",
+      content:
+        "<p>Thanks to Acme for sponsoring. Acme is great. Buy Acme products today from the store.</p>",
+      summary: "Thanks to Acme for sponsoring. Acme is great.",
     });
-    // Feed has >1000 chars of distinct content, summary is similar — no toggle
+    // Content is longer than summary — feed already has full article, no toggle
     expect(el.shadowRoot.querySelector(".view-toggle")).toBeNull();
   });
 

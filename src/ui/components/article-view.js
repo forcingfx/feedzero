@@ -84,10 +84,14 @@ export class ArticleView extends HTMLElement {
     }
 
     // Add extracted — only if feed content looks incomplete
+    // If the feed provides both content and summary and content is longer,
+    // the publisher already included the full article — no extraction needed
     const strippedContent = this.#stripHtml(article.content || "");
     const strippedSummary = this.#stripHtml(article.summary || "");
     const feedAlreadyFull =
-      strippedContent.length > 1000 && strippedContent !== strippedSummary;
+      strippedContent.length > 0 &&
+      strippedSummary.length > 0 &&
+      strippedContent.length > strippedSummary.length;
 
     if (!feedAlreadyFull && article.link && article.link.startsWith("http")) {
       if (this.#extractedCache.has(article.link)) {
