@@ -1,4 +1,5 @@
 import { extract } from "../../core/extractor/extractor.js";
+import { getAvailableModes, stripHtml, textsSimilar } from "./content-modes.js";
 
 const template = document.createElement("template");
 template.innerHTML = `
@@ -52,61 +53,6 @@ export class ArticleView extends HTMLElement {
     this.#render();
   }
 
-  #stripHtml(html) {
-    const div = document.createElement("div");
-    div.innerHTML = html || "";
-    return (div.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-  }
-
-  #contentsSimilar(a, b) {
-    const textA = this.#stripHtml(a);
-    const textB = this.#stripHtml(b);
-    if (!textA || !textB) return false;
-    const shorter = textA.length <= textB.length ? textA : textB;
-    const longer = textA.length > textB.length ? textA : textB;
-    const snippet = shorter.slice(0, 150);
-    return snippet.length > 0 && longer.slice(0, 300).includes(snippet);
-  }
-
-  #getAvailableModes() {
-    const article = this.#article;
-    if (!article) return ["feed"];
-
-    const modes = ["feed"];
-    const feedContent = article.content || article.summary || "";
-
-    // Add summary only if it exists and differs from feed content
-    if (
-      article.summary &&
-      !this.#contentsSimilar(feedContent, article.summary)
-    ) {
-      modes.push("summary");
-    }
-
-    // Add extracted — only if feed content looks incomplete
-    // If the feed provides both content and summary and content is longer,
-    // the publisher already included the full article — no extraction needed
-    const strippedContent = this.#stripHtml(article.content || "");
-    const strippedSummary = this.#stripHtml(article.summary || "");
-    const feedAlreadyFull =
-      strippedContent.length > 0 &&
-      strippedSummary.length > 0 &&
-      strippedContent.length > strippedSummary.length;
-
-    if (!feedAlreadyFull && article.link && article.link.startsWith("http")) {
-      if (this.#extractedCache.has(article.link)) {
-        const extracted = this.#extractedCache.get(article.link);
-        if (!this.#contentsSimilar(feedContent, extracted)) {
-          modes.push("extracted");
-        }
-      } else {
-        modes.push("extracted");
-      }
-    }
-
-    return modes;
-  }
-
   #render() {
     const container = this.shadowRoot.querySelector("article");
     const article = this.#article;
@@ -131,7 +77,12 @@ export class ArticleView extends HTMLElement {
       );
     }
 
-    const availableModes = this.#getAvailableModes();
+    const availableModes = getAvailableModes({
+      content: article.content,
+      summary: article.summary,
+      link: article.link,
+      cachedExtraction: this.#extractedCache.get(article.link),
+    });
     // If current mode is no longer available, fall back to feed
     if (!availableModes.includes(this.#viewMode)) {
       this.#viewMode = "feed";
@@ -253,10 +204,9 @@ export class ArticleView extends HTMLElement {
     }
 
     // If extracted content is similar to feed, snap back to feed view
-    const feedContent = article.content || article.summary || "";
-    if (
-      this.#contentsSimilar(feedContent, this.#extractedCache.get(article.link))
-    ) {
+    const feedText = stripHtml(article.content || article.summary || "");
+    const extractedText = stripHtml(this.#extractedCache.get(article.link));
+    if (textsSimilar(feedText, extractedText)) {
       this.#viewMode = "feed";
     }
 
