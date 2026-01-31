@@ -103,6 +103,18 @@ Feature: Add a feed URL and display its articles
 - **Duplicate check before fetch** — Avoids wasting a network request on a feed that already exists.
 - **Auto-select after add** — Immediately shows the user the articles they just subscribed to.
 
+## Error Handling
+
+All errors shown to the user are human-readable. Internal errors from the XML parser, validator, and network layer are translated in `feed-service.js` via `friendlyError()`:
+
+| Internal error | User sees |
+|---------------|-----------|
+| `Invalid XML: ...` | "This URL is not a valid feed. Please check the URL and try again." |
+| `Unrecognized feed format: <html>` | Same as above |
+| HTTP 404/500 from fetch | "The feed at this URL could not be reached (HTTP 404)." |
+| Network failure (fetch throws) | "The feed at this URL could not be reached. Please check your connection and try again." |
+| Duplicate URL | "A feed with this URL already exists" |
+
 ## Limitations
 
 - No feed refresh/polling yet

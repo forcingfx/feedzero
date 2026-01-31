@@ -4,8 +4,27 @@ import { createFeed, createArticle } from "../storage/schema.js";
 import { addFeed, getFeeds, addArticles } from "../storage/db.js";
 
 /**
+ * Translate internal parser/validator errors into user-friendly messages.
+ * Keeps the original error in parentheses for debugging.
+ */
+function friendlyError(rawError) {
+  if (
+    rawError.startsWith("Invalid XML") ||
+    rawError.startsWith("Unrecognized feed format") ||
+    rawError.startsWith("Unknown feed type") ||
+    rawError.startsWith("No root element") ||
+    rawError.startsWith("JSON object is not a JSON Feed") ||
+    rawError.startsWith("Parse error") ||
+    rawError.startsWith("Feed content is empty")
+  ) {
+    return "This URL is not a valid feed. Please check the URL and try again.";
+  }
+  return rawError;
+}
+
+/**
  * Full add-feed flow: check duplicate → fetch → parse → store.
- * Returns Result<{feed, articles}>.
+ * Returns Result<{feed, articles}> with user-friendly error messages.
  */
 export async function addFeedFlow(url) {
   try {
@@ -15,17 +34,19 @@ export async function addFeedFlow(url) {
       return err("A feed with this URL already exists");
     }
 
-    // Fetch feed content
+    // Fetch feed content via CORS proxy
     const proxyUrl = `/api/feed?url=${encodeURIComponent(url)}`;
     const response = await fetch(proxyUrl);
     if (!response.ok) {
-      return err(`Failed to fetch feed: ${response.status}`);
+      return err(
+        `The feed at this URL could not be reached (HTTP ${response.status}).`,
+      );
     }
     const text = await response.text();
 
-    // Parse
+    // Parse feed content
     const parseResult = parse(text, url);
-    if (!parseResult.ok) return parseResult;
+    if (!parseResult.ok) return err(friendlyError(parseResult.error));
 
     const { feed: feedData, articles: parsedArticles } = parseResult.value;
 
@@ -54,6 +75,8 @@ export async function addFeedFlow(url) {
 
     return ok({ feed, articles });
   } catch (e) {
-    return err(`Error adding feed: ${e.message}`);
+    return err(
+      "The feed at this URL could not be reached. Please check your connection and try again.",
+    );
   }
 }

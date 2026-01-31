@@ -130,7 +130,7 @@ describe("feed-service", () => {
 
       const result = await addFeedFlow("https://example.com/feed");
       expect(isErr(result)).toBe(true);
-      expect(result.error).toMatch(/404/);
+      expect(result.error).toMatch(/could not be reached/i);
     });
 
     it("should return error when fetch throws (network error)", async () => {
@@ -138,7 +138,7 @@ describe("feed-service", () => {
 
       const result = await addFeedFlow("https://example.com/feed");
       expect(isErr(result)).toBe(true);
-      expect(result.error).toMatch(/Network error/);
+      expect(result.error).toMatch(/could not be reached/i);
     });
 
     it("should return error for non-feed content", async () => {
@@ -149,6 +149,57 @@ describe("feed-service", () => {
 
       const result = await addFeedFlow("https://example.com/page");
       expect(isErr(result)).toBe(true);
+    });
+
+    it("should return user-friendly error for HTML pages (not raw XML errors)", async () => {
+      // Simulates fetching a website like https://daringfireball.net
+      // which returns HTML, not a feed
+      const html = `<!DOCTYPE html><html><head><title>Example</title><link rel="stylesheet" href="/style.css"></head><body><p>Hello</p></body></html>`;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(html),
+      });
+
+      const result = await addFeedFlow("https://example.com");
+      expect(isErr(result)).toBe(true);
+      // Should NOT contain raw XML parser internals
+      expect(result.error).not.toMatch(/parsererror/i);
+      expect(result.error).not.toMatch(/Invalid XML/);
+      expect(result.error).not.toMatch(/mismatched tag/i);
+      // Should be a clear, actionable message
+      expect(result.error).toMatch(/not a valid feed/i);
+    });
+
+    it("should return user-friendly error for unrecognized XML format", async () => {
+      const xml = `<?xml version="1.0"?><html><body>Not a feed</body></html>`;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(xml),
+      });
+
+      const result = await addFeedFlow("https://example.com/page");
+      expect(isErr(result)).toBe(true);
+      expect(result.error).toMatch(/not a valid feed/i);
+      expect(result.error).not.toMatch(/Unrecognized feed format/);
+    });
+
+    it("should return user-friendly error for fetch failure", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      const result = await addFeedFlow("https://example.com/missing");
+      expect(isErr(result)).toBe(true);
+      expect(result.error).toMatch(/could not be reached/i);
+    });
+
+    it("should return user-friendly error for network failure", async () => {
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("fetch failed"));
+
+      const result = await addFeedFlow("https://example.com/feed");
+      expect(isErr(result)).toBe(true);
+      expect(result.error).toMatch(/could not be reached/i);
     });
   });
 });
