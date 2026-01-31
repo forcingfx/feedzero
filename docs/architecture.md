@@ -29,10 +29,6 @@ User enters feed URL in <feed-list>
   parser.js → Extracts feed metadata + articles
       │
       ▼
-  extractor.js → For summary-only articles: fetch page via /api/page,
-                  extract full text with Defuddle, sanitize with DOMPurify
-      │
-      ▼
   sanitizer.js → DOMPurify strips dangerous HTML
       │
       ▼
@@ -46,6 +42,39 @@ User enters feed URL in <feed-list>
       │
       ▼
   main.js refreshes feed list → auto-selects new feed → loads articles
+```
+
+### On-Demand Extraction (user-initiated)
+
+```
+User clicks "Extracted" in <article-view>
+      │
+      ▼
+  fetch(/api/page?url=...) via CORS proxy
+      │
+      ▼
+  extractor.js → defuddle-extractor.js (Defuddle parse)
+      │
+      ▼
+  cleanup.js → Removes empty elements, collapses <br> tags
+      │
+      ▼
+  sanitizer.js → DOMPurify strips dangerous HTML
+      │
+      ▼
+  Cached in article-view → displayed (snaps back to Feed if similar)
+```
+
+### Feed Refresh
+
+```
+Auto-refresh on app load (non-blocking) OR manual refresh (per-feed / all)
+      │
+      ▼
+  feed-service.js refreshFeed() → fetch → parse → for each article:
+      │
+      ├── New (guid not in DB) → store
+      └── Existing + changed → update
 ```
 
 ## CORS Proxy
@@ -68,6 +97,7 @@ main.js
 │   ├── core/extractor/extractor.js
 │   │   └── core/extractor/defuddle-extractor.js
 │   │       ├── defuddle               (npm)
+│   │       ├── core/extractor/cleanup.js
 │   │       └── core/parser/sanitizer.js
 │   ├── core/parser/parser.js
 │   │   ├── core/parser/validator.js
@@ -91,7 +121,7 @@ main.js
 
 All components communicate through the event bus — no direct references between them. `main.js` is the only orchestrator that wires event handlers.
 
-Events: `feed:added`, `feed:selected`, `feed:removed`, `feed:updated`, `article:selected`, `article:read`, `storage:ready`, `storage:error`, `parse:error`
+Events: `feed:added`, `feed:selected`, `feed:removed`, `feed:updated`, `article:selected`, `article:read`, `storage:ready`, `storage:error`, `parse:error`, `feeds:refresh-all`, `feed:refresh`, `feeds:refreshed`
 
 ## Encryption Model
 
@@ -107,7 +137,7 @@ Events: `feed:added`, `feed:selected`, `feed:removed`, `feed:updated`, `article:
 Dexie.js manages IndexedDB with these stores:
 
 - `feeds` — keyPath: `id`, unique index: `url`
-- `articles` — keyPath: `id`, indexes: `feedId`, `publishedAt`
+- `articles` — keyPath: `id`, indexes: `feedId`, `publishedAt`, `[feedId+guid]` (compound, for dedup)
 - `meta` — keyPath: `key` (stores encryption salt)
 
 Schema migrations are handled by Dexie's `version().stores()` API.

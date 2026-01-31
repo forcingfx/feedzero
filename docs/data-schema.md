@@ -1,6 +1,6 @@
 # Data Schema
 
-## Version: 1
+## Version: 2
 
 ### Feed
 
@@ -22,6 +22,7 @@ Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 |-------------|---------|-------------------------------------|
 | id          | string  | UUID v4, primary key                |
 | feedId      | string  | Foreign key to Feed.id (indexed)    |
+| guid        | string  | Unique article identifier, defaults to link |
 | title       | string  | Article title                       |
 | link        | string  | Original article URL                |
 | content     | string  | Sanitized HTML content              |
@@ -41,7 +42,7 @@ Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 ### IndexedDB Stores
 
 - `feeds` — keyPath: `id`, index: `url` (unique)
-- `articles` — keyPath: `id`, indexes: `feedId`, `publishedAt`
+- `articles` — keyPath: `id`, indexes: `feedId`, `publishedAt`, `[feedId+guid]` (compound)
 - `meta` — keyPath: `key`
 
 ### Encryption at Rest
@@ -52,7 +53,7 @@ Feed and Article content is encrypted. Index fields are stored in plaintext for 
 { "id": "uuid", "iv": [12 bytes], "ciphertext": [encrypted JSON], "url": "...", "feedId": "...", "publishedAt": 123 }
 ```
 
-Only `url`, `feedId`, and `publishedAt` are plaintext (for indexing). All other fields (title, content, author, etc.) are inside the encrypted blob.
+Only `url`, `feedId`, `guid`, and `publishedAt` are plaintext (for indexing). All other fields (title, content, author, etc.) are inside the encrypted blob.
 
 The `meta` store is unencrypted (stores encryption salt).
 

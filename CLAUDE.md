@@ -26,7 +26,9 @@ FeedZero is a privacy-first RSS reader. Vanilla JS (ES modules), Web Components,
 
 ### Data Flow
 
-User adds feed URL → `feed-service.js` (duplicate check) → `fetch` via `/api/feed` CORS proxy → `validator.js` (RSS/Atom/JSON Feed detection) → `parser.js` (extraction) → `extractor.js` (full-text extraction for summary-only articles via `/api/page`) → `sanitizer.js` (DOMPurify) → `schema.js` (object creation) → `crypto.js` (AES-GCM-256 encryption) → `db.js` (Dexie/IndexedDB storage) → event bus notifies UI → auto-selects new feed.
+User adds feed URL → `feed-service.js` (normalize URL, duplicate check) → `fetch` via `/api/feed` CORS proxy → `validator.js` (RSS/Atom/JSON Feed detection) → `parser.js` (extraction) → `sanitizer.js` (DOMPurify) → `schema.js` (object creation with guid) → `crypto.js` (AES-GCM-256 encryption) → `db.js` (Dexie/IndexedDB storage) → event bus notifies UI → auto-selects new feed.
+
+Full-text extraction is user-initiated: in article-view, click "Extracted" → fetch via `/api/page` → `extractor.js` → `defuddle-extractor.js` (Defuddle parse → `cleanup.js` → DOMPurify sanitize) → cached and displayed.
 
 ### Core Modules
 
@@ -40,7 +42,8 @@ User adds feed URL → `feed-service.js` (duplicate check) → `fetch` via `/api
 - **src/core/discovery/strategies.js** — Pure functions for each discovery strategy: `findFeedLinksInHtml()`, `getWellKnownFeedUrls()`, `findFeedLinksInAnchors()`.
 - **src/core/extractor/extractor.js** — Public API: `extract(html, url)` and `needsExtraction(article)`. Delegates to active extractor implementation.
 - **src/core/extractor/defuddle-extractor.js** — Defuddle-based extraction. Swap this import in `extractor.js` to use a different library.
-- **src/core/feeds/feed-service.js** — `addFeedFlow(url)` orchestrates: normalize URL → duplicate check → fetch → parse (on failure: discover feed) → extract full text → store. `normalizeUrl()` handles bare domains, missing scheme, trailing slashes.
+- **src/core/extractor/cleanup.js** — `cleanExtractedContent(html)` removes empty elements, collapses consecutive `<br>` tags. Called after Defuddle, before sanitize.
+- **src/core/feeds/feed-service.js** — `addFeedFlow(url)` orchestrates: normalize URL → duplicate check → fetch → parse (on failure: discover feed) → store. `refreshFeed(feed)` and `refreshAllFeeds()` handle feed refresh with guid-based dedup. `normalizeUrl()` handles bare domains, missing scheme, trailing slashes.
 - **src/core/parser/parser.js** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1. Returns `{feed, articles}`.
 - **src/core/parser/sanitizer.js** — DOMPurify wrapper with allowlisted tags/attrs. Links get `rel="noopener noreferrer"` automatically.
 - **src/main.js** — App entry point. Only module that wires components together via event bus.
@@ -48,6 +51,10 @@ User adds feed URL → `feed-service.js` (duplicate check) → `fetch` via `/api
 ### UI Components (Web Components)
 
 `<feed-list>`, `<article-list>`, `<article-view>` — set `.eventBus` property to connect. `keyboard-nav.js` manages j/k/Enter/Escape navigation.
+
+- `<feed-list>` — Add feed form, Refresh All button, per-feed remove button (× on hover with confirm dialog)
+- `<article-list>` — Article list with per-feed refresh button
+- `<article-view>` — Smart content view toggle (Feed/Extracted/Summary). Modes hidden when redundant (similarity check). Extraction is on-demand and cached. Timestamps show date + time (no seconds).
 
 ### Testing
 
