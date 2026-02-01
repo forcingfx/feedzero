@@ -40,31 +40,44 @@
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
 }
 
-/*
- * FeedZero light theme — mapped to shadcn's variable convention.
- * Original tokens: --color-bg → --background, --color-text → --foreground, etc.
- */
+/* FeedZero light theme — shadcn slate palette */
 :root {
-    --background: #ffffff;
-    --foreground: #1a1a1a;
-    --card: #ffffff;
-    --card-foreground: #1a1a1a;
-    --popover: #ffffff;
-    --popover-foreground: #1a1a1a;
-    --primary: #0066cc;
-    --primary-foreground: #ffffff;
-    --secondary: #f5f5f5;
-    --secondary-foreground: #1a1a1a;
-    --muted: #f5f5f5;
-    --muted-foreground: #666666;
-    --accent: #e0e0e0;
-    --accent-foreground: #1a1a1a;
-    --destructive: #cc0000;
-    --border: #e0e0e0;
-    --input: #e0e0e0;
-    --ring: #0066cc;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0.014 285.823);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0.014 285.823);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0.014 285.823);
+    --primary: oklch(0.205 0.024 285.823);
+    --primary-foreground: oklch(0.985 0.002 285.823);
+    --secondary: oklch(0.965 0.005 285.823);
+    --secondary-foreground: oklch(0.205 0.024 285.823);
+    --muted: oklch(0.965 0.005 285.823);
+    --muted-foreground: oklch(0.556 0.022 285.823);
+    --accent: oklch(0.965 0.005 285.823);
+    --accent-foreground: oklch(0.205 0.024 285.823);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.917 0.007 285.823);
+    --input: oklch(0.917 0.007 285.823);
+    --ring: oklch(0.205 0.024 285.823);
+    --sidebar: oklch(0.985 0.002 285.823);
+    --sidebar-foreground: oklch(0.145 0.014 285.823);
+    --sidebar-primary: oklch(0.205 0.024 285.823);
+    --sidebar-primary-foreground: oklch(0.985 0.002 285.823);
+    --sidebar-accent: oklch(0.965 0.005 285.823);
+    --sidebar-accent-foreground: oklch(0.205 0.024 285.823);
+    --sidebar-border: oklch(0.917 0.007 285.823);
+    --sidebar-ring: oklch(0.205 0.024 285.823);
 }
 
 @layer base {
@@ -83,34 +96,6 @@
         min-height: 100vh;
         display: flex;
         flex-direction: column;
-    }
-
-    header[role="banner"] {
-        padding: var(--spacing-sm) var(--spacing-md);
-        border-bottom: 1px solid var(--border);
-        background: var(--secondary);
-    }
-
-    header h1 {
-        font-size: 1.25rem;
-        font-weight: 600;
-    }
-
-    main[role="main"] {
-        flex: 1;
-        display: grid;
-        grid-template-columns: 250px 300px 1fr;
-        min-height: 0;
-    }
-
-    .panel {
-        border-right: 1px solid var(--border);
-        overflow: hidden;
-        min-height: 0;
-    }
-
-    .panel:last-child {
-        border-right: none;
     }
 }
 

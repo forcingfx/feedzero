@@ -5,20 +5,21 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { Header } from "@/components/layout/header.tsx";
-import { Panel } from "@/components/layout/panel.tsx";
-import { FeedList } from "@/components/feeds/feed-list.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
+import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 
 /**
- * Main page component. On desktop, renders all 3 panels.
- * On mobile, renders only the panel matching the current route depth.
- *
- * Routes:
- *   /feeds                              → feed list
- *   /feeds/:feedId                      → article list (+ feed list on desktop)
- *   /feeds/:feedId/articles/:articleId  → reader (+ all panels on desktop)
+ * Main page component.
+ * Desktop: sidebar (feeds) + article list + reader pane.
+ * Mobile: sidebar collapses to offcanvas, single panel navigation.
  */
 export function FeedsPage() {
   const { feedId, articleId } = useParams();
@@ -30,7 +31,6 @@ export function FeedsPage() {
   const articles = useArticleStore((s) => s.articles);
   const selectArticle = useArticleStore((s) => s.selectArticle);
 
-  // Sync URL params → store
   useEffect(() => {
     if (feedId) {
       selectFeed(feedId);
@@ -38,7 +38,6 @@ export function FeedsPage() {
     }
   }, [feedId, selectFeed, loadArticles]);
 
-  // Sync articleId from URL → store
   useEffect(() => {
     if (articleId && articles.length > 0) {
       const article = articles.find((a) => a.id === articleId);
@@ -46,7 +45,6 @@ export function FeedsPage() {
     }
   }, [articleId, articles, selectArticle]);
 
-  // Navigation handlers that components use to change URLs
   function handleFeedSelect(id: string) {
     selectFeed(id);
     navigate(`/feeds/${id}`);
@@ -66,63 +64,70 @@ export function FeedsPage() {
     }
   }
 
-  // Mobile: show one panel based on route depth
+  // Mobile: sidebar is offcanvas, show one content panel at a time
   if (!isDesktop) {
-    if (articleId && feedId) {
-      return (
-        <>
-          <Header />
-          <main role="main" className="flex-1 flex flex-col min-h-0">
-            <Button variant="link" size="sm" onClick={handleBack}>
-              ← Back
-            </Button>
-            <div className="flex-1 overflow-y-auto">
-              <ReaderPanel />
-            </div>
-          </main>
-        </>
-      );
-    }
-    if (feedId) {
-      return (
-        <>
-          <Header />
-          <main role="main" className="flex-1 flex flex-col min-h-0">
-            <Button variant="link" size="sm" onClick={handleBack}>
-              ← Back
-            </Button>
-            <div className="flex-1 overflow-y-auto">
-              <ArticleList onArticleSelect={handleArticleSelect} />
-            </div>
-          </main>
-        </>
-      );
-    }
     return (
-      <>
-        <Header />
-        <main role="main" className="flex-1 flex flex-col min-h-0">
-          <FeedList onFeedSelect={handleFeedSelect} />
-        </main>
-      </>
+      <SidebarProvider defaultOpen={false}>
+        <AppSidebar onFeedSelect={handleFeedSelect} />
+        <SidebarInset>
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+            <SidebarTrigger />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+            <span className="text-sm font-medium truncate">
+              {articleId ? "Article" : feedId ? "Articles" : "Feeds"}
+            </span>
+          </header>
+          <main role="main" className="flex-1 flex flex-col min-h-0">
+            {(articleId || feedId) && (
+              <Button
+                variant="link"
+                size="sm"
+                onClick={handleBack}
+                className="justify-start"
+              >
+                ← Back
+              </Button>
+            )}
+            <div className="flex-1 overflow-y-auto">
+              {articleId && feedId ? (
+                <ReaderPanel />
+              ) : feedId ? (
+                <ArticleList onArticleSelect={handleArticleSelect} />
+              ) : (
+                <div className="p-4 text-muted-foreground text-sm">
+                  Open the sidebar to select a feed.
+                </div>
+              )}
+            </div>
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
     );
   }
 
-  // Desktop: 3-panel grid
+  // Desktop: sidebar + article list + reader pane
   return (
-    <>
-      <Header />
-      <main role="main">
-        <Panel>
-          <FeedList onFeedSelect={handleFeedSelect} />
-        </Panel>
-        <Panel>
-          <ArticleList onArticleSelect={handleArticleSelect} />
-        </Panel>
-        <Panel>
-          <ReaderPanel />
-        </Panel>
-      </main>
-    </>
+    <SidebarProvider>
+      <AppSidebar onFeedSelect={handleFeedSelect} />
+      <SidebarInset>
+        <div className="flex h-full min-h-0">
+          {/* Article list — fixed width, independently scrollable */}
+          <div className="w-[300px] shrink-0 border-r overflow-hidden">
+            <ScrollArea className="h-full">
+              <ArticleList onArticleSelect={handleArticleSelect} />
+            </ScrollArea>
+          </div>
+          {/* Reader pane — fills remaining space, independently scrollable */}
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
+              <ReaderPanel />
+            </ScrollArea>
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
