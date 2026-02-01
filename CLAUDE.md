@@ -54,13 +54,19 @@ Full-text extraction is user-initiated: in article-view, click "Extracted" → f
 
 - `<feed-list>` — Add feed form, Refresh All button, per-feed remove button (× on hover with confirm dialog)
 - `<article-list>` — Article list with per-feed refresh button
-- `<article-view>` — Smart content view toggle (Feed/Extracted/Summary). Modes hidden when redundant (similarity check). Extraction is on-demand and cached. Timestamps show date + time (no seconds).
+- `<article-view>` — Smart content view toggle (Feed/Extracted). Distinct summaries shown as inline subheading above feed content. Modes hidden when redundant (similarity check). Extraction is on-demand and cached. Timestamps show date + time (no seconds).
+- `content-modes.js` — Pure functions for content view modes (Feed/Extracted visibility, summary subheading detection, similarity/completeness heuristics). Used by `<article-view>`.
+
+### Service Worker
+
+`src/workers/service-worker.js` — Excluded from test coverage. Located under `src/workers/`.
 
 ### Testing
 
 - Vitest with happy-dom environment. `fake-indexeddb` needed for db.js tests.
 - Test files mirror source structure under `tests/`.
-- Coverage threshold: 90% branches/functions/lines/statements.
+- Coverage threshold: 90% branches/functions/lines/statements. `src/workers/**` excluded from coverage.
+- E2E tests (Playwright): test dir is `tests/e2e/`, runs on port 3001 (separate from dev server on 3000).
 - Note: DOMPurify + happy-dom will execute inline scripts during sanitization. Use non-callable code in test fixtures (e.g., `var x = 1;` not `alert(1)`).
 - **happy-dom DOM fidelity gaps:** happy-dom's DOMParser does not behave identically to browser DOMParser. Known differences:
   - `querySelector` with CSS-escaped colons (e.g. `content\\:encoded`) may work in happy-dom but fail in browsers. Always use `getElementsByTagName` for XML namespace-prefixed elements.
@@ -69,7 +75,9 @@ Full-text extraction is user-initiated: in article-view, click "Extracted" → f
 
 ### CORS Proxy
 
-`vite.config.js` defines a dev-only Vite plugin that proxies `/api/feed?url=<encoded>` to fetch feeds server-side, bypassing browser CORS restrictions. Production will need a real proxy.
+`vite.config.js` defines a dev-only Vite plugin that proxies `/api/feed?url=<encoded>` and `/api/page?url=<encoded>` to fetch feeds/pages server-side, bypassing browser CORS restrictions. Production will need a real proxy.
+
+**SSRF protections** — The proxy blocks requests to internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http:`/`https:` protocols. Do not weaken these checks.
 
 ## Development Workflow
 

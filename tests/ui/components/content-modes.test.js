@@ -3,7 +3,14 @@ import {
   stripHtml,
   textsSimilar,
   getAvailableModes,
+  hasSummarySubheading,
+  isExtractionMeaningful,
 } from "../../../src/ui/components/content-modes.js";
+
+/** Generate a string with exactly `n` words, starting from offset `from` to avoid prefix overlap. */
+function words(n, from = 0) {
+  return Array.from({ length: n }, (_, i) => `word${from + i}`).join(" ");
+}
 
 describe("content-modes", () => {
   describe("stripHtml", () => {
@@ -58,13 +65,13 @@ describe("content-modes", () => {
       expect(modes).toEqual(["feed"]);
     });
 
-    it("should show summary when it differs from content", () => {
+    it("should not include summary mode even when summary differs from content", () => {
       const modes = getAvailableModes({
         content: "<p>Full article about technology trends in 2026.</p>",
         summary: "A completely different teaser that does not overlap.",
         link: "",
       });
-      expect(modes).toContain("summary");
+      expect(modes).not.toContain("summary");
     });
 
     it("should hide summary when similar to content", () => {
@@ -106,15 +113,108 @@ describe("content-modes", () => {
       expect(modes).not.toContain("extracted");
     });
 
-    it("should show extracted when cached extraction differs from feed", () => {
+    it("should show extracted when cached extraction is meaningfully richer", () => {
       const modes = getAvailableModes({
         content: "<p>Brief intro.</p>",
         summary: "Brief intro.",
         link: "https://example.com",
-        cachedExtraction:
-          "<p>This is the full article with lots of additional detail and new information.</p>",
+        cachedExtraction: `<p>${words(200, 500)}</p>`,
       });
       expect(modes).toContain("extracted");
+    });
+
+    it("should hide extracted for description-only feeds with 100+ words", () => {
+      const fullArticle = `<p>${words(150)}</p>`;
+      const modes = getAvailableModes({
+        content: fullArticle,
+        summary: fullArticle,
+        link: "https://example.com",
+      });
+      expect(modes).not.toContain("extracted");
+    });
+
+    it("should show extracted for description-only feeds with short content", () => {
+      const shortText = `<p>${words(30)}</p>`;
+      const modes = getAvailableModes({
+        content: shortText,
+        summary: shortText,
+        link: "https://example.com",
+      });
+      expect(modes).toContain("extracted");
+    });
+
+    it("should hide extracted when cached extraction is not meaningful", () => {
+      const feedText = `<p>${words(30)}</p>`;
+      const extractedText = `<p>${words(30)} ${words(20)}</p>`;
+      const modes = getAvailableModes({
+        content: feedText,
+        summary: feedText,
+        link: "https://example.com",
+        cachedExtraction: extractedText,
+      });
+      expect(modes).not.toContain("extracted");
+    });
+  });
+
+  describe("hasSummarySubheading", () => {
+    it("should return true when content and summary both exist and differ", () => {
+      expect(
+        hasSummarySubheading(
+          "<p>Full article about technology trends in 2026.</p>",
+          "A completely different teaser that does not overlap.",
+        ),
+      ).toBe(true);
+    });
+
+    it("should return false when summary is similar to content", () => {
+      expect(
+        hasSummarySubheading(
+          "<p>The quick brown fox jumps over the lazy dog and continues running.</p>",
+          "The quick brown fox jumps over the lazy dog",
+        ),
+      ).toBe(false);
+    });
+
+    it("should return false when summary is empty", () => {
+      expect(hasSummarySubheading("<p>Some content</p>", "")).toBe(false);
+      expect(hasSummarySubheading("<p>Some content</p>", null)).toBe(false);
+    });
+
+    it("should return false when content is empty", () => {
+      expect(hasSummarySubheading("", "A summary")).toBe(false);
+      expect(hasSummarySubheading(null, "A summary")).toBe(false);
+    });
+  });
+
+  describe("isExtractionMeaningful", () => {
+    it("should return true when extracted adds 100+ words and 50%+ increase", () => {
+      expect(isExtractionMeaningful(words(200), words(350, 1000))).toBe(true);
+    });
+
+    it("should return false when extracted adds fewer than 100 words", () => {
+      expect(isExtractionMeaningful(words(200), words(230, 1000))).toBe(false);
+    });
+
+    it("should return false when increase is less than 50%", () => {
+      // 400 vs 300 = 33% increase, meets word count but not percentage
+      expect(isExtractionMeaningful(words(300), words(400, 1000))).toBe(false);
+    });
+
+    it("should return true for short feed with substantial extraction", () => {
+      expect(isExtractionMeaningful(words(50), words(300, 1000))).toBe(true);
+    });
+
+    it("should return false when texts are similar", () => {
+      const text = "the quick brown fox jumps over the lazy dog and runs away";
+      expect(isExtractionMeaningful(text, text + " some extra words")).toBe(
+        false,
+      );
+    });
+
+    it("should return false for empty inputs", () => {
+      expect(isExtractionMeaningful("", words(200))).toBe(false);
+      expect(isExtractionMeaningful(words(200), "")).toBe(false);
+      expect(isExtractionMeaningful("", "")).toBe(false);
     });
   });
 });

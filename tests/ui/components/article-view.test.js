@@ -56,7 +56,7 @@ describe("ArticleView", () => {
     expect(labels).not.toContain("Summary");
   });
 
-  it("should show summary button when summary differs from feed", () => {
+  it("should show summary as subheading when it differs from feed content", () => {
     el.setArticle({
       title: "Different",
       link: "https://example.com/3",
@@ -65,9 +65,37 @@ describe("ArticleView", () => {
       summary:
         "A completely different teaser that does not overlap with the article.",
     });
+    const subheading = el.shadowRoot.querySelector(".summary-subheading");
+    expect(subheading).not.toBeNull();
+    expect(subheading.textContent).toContain("completely different teaser");
+    // No Summary toggle button
     const buttons = el.shadowRoot.querySelectorAll(".view-toggle button");
     const labels = [...buttons].map((b) => b.textContent);
-    expect(labels).toContain("Summary");
+    expect(labels).not.toContain("Summary");
+  });
+
+  it("should not show summary subheading when summary is similar to content", () => {
+    el.setArticle({
+      title: "Similar",
+      link: "https://example.com/3b",
+      content:
+        "<p>This is the full article content with many details about the topic at hand.</p>",
+      summary: "This is the full article content with many details",
+    });
+    expect(el.shadowRoot.querySelector(".summary-subheading")).toBeNull();
+  });
+
+  it("should not show summary subheading when content is empty", () => {
+    el.setArticle({
+      title: "No Content",
+      link: "",
+      content: "",
+      summary: "A summary that should become the main content.",
+    });
+    expect(el.shadowRoot.querySelector(".summary-subheading")).toBeNull();
+    expect(el.shadowRoot.querySelector(".content").textContent).toContain(
+      "A summary that should become the main content",
+    );
   });
 
   it("should show timestamp with hours and minutes", () => {

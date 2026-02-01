@@ -1,5 +1,10 @@
 import { extract } from "../../core/extractor/extractor.js";
-import { getAvailableModes, stripHtml, textsSimilar } from "./content-modes.js";
+import {
+  getAvailableModes,
+  hasSummarySubheading,
+  isExtractionMeaningful,
+  stripHtml,
+} from "./content-modes.js";
 
 const template = document.createElement("template");
 template.innerHTML = `
@@ -29,6 +34,7 @@ template.innerHTML = `
   .content img { max-width: 100%; height: auto; }
   .content pre { overflow-x: auto; background: var(--color-bg-secondary); padding: var(--space-sm); border-radius: var(--radius); }
   .content blockquote { border-left: 3px solid var(--color-border); padding-left: var(--space-md); color: var(--color-text-secondary); }
+  .summary-subheading { font-style: italic; color: var(--color-text-secondary); border-left: 3px solid var(--color-border); padding-left: var(--space-md); margin-bottom: var(--space-md); }
   .extracting { color: var(--color-text-secondary); font-style: italic; }
 </style>
 <article>
@@ -123,16 +129,18 @@ export class ArticleView extends HTMLElement {
 
   #getContent() {
     const article = this.#article;
-    if (this.#viewMode === "summary") {
-      return article.summary || "<p>No summary available.</p>";
-    }
     if (this.#viewMode === "extracted") {
       const cached = this.#extractedCache.get(article.link);
       if (cached) return cached;
       return "<p>No extracted content available.</p>";
     }
     // "feed" mode — default
-    return article.content || article.summary || "<p>No content available.</p>";
+    const body =
+      article.content || article.summary || "<p>No content available.</p>";
+    if (hasSummarySubheading(article.content, article.summary)) {
+      return `<div class="summary-subheading">${article.summary}</div>${body}`;
+    }
+    return body;
   }
 
   async #fetchExtracted(article) {
@@ -203,10 +211,10 @@ export class ArticleView extends HTMLElement {
       );
     }
 
-    // If extracted content is similar to feed, snap back to feed view
+    // If extracted content is not meaningfully richer, snap back to feed view
     const feedText = stripHtml(article.content || article.summary || "");
     const extractedText = stripHtml(this.#extractedCache.get(article.link));
-    if (textsSimilar(feedText, extractedText)) {
+    if (!isExtractionMeaningful(feedText, extractedText)) {
       this.#viewMode = "feed";
     }
 
