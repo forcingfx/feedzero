@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { extract } from "../core/extractor/extractor.ts";
+import { registry } from "../core/extractor/adapters/index.ts";
 
 interface ExtractionStore {
   cache: Record<string, string>;
@@ -22,14 +23,18 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
 
     set({ isExtracting: true });
     try {
-      const proxyUrl = `/api/page?url=${encodeURIComponent(url)}`;
+      // Check if a site adapter wants to remap the URL
+      const adapter = registry.findAdapter(url);
+      const sourceUrl = adapter?.getSourceUrl?.(url) ?? url;
+
+      const proxyUrl = `/api/page?url=${encodeURIComponent(sourceUrl)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) {
         set({ isExtracting: false });
         return;
       }
-      const html = await response.text();
-      const result = extract(html, url);
+      const text = await response.text();
+      const result = extract(text, url);
       if (result.ok && result.value.content) {
         set({ cache: { ...get().cache, [url]: result.value.content } });
       }

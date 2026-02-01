@@ -1,12 +1,18 @@
-import { extract as defuddleExtract } from "./defuddle-extractor.ts";
+import { registry } from "./adapters/index.ts";
+import { defaultAdapter } from "./adapters/default-adapter.ts";
 import type { Article } from "../../types/index.ts";
+import type { Result } from "../../utils/result.ts";
+import type { ExtractionResult } from "./defuddle-extractor.ts";
 
 /**
- * Extract readable content from an HTML page.
- * Delegates to the active extractor implementation (currently Defuddle).
- * Swap the import to use a different library (e.g. Readability).
+ * Extract readable content from fetched text.
+ * Routes to a domain-specific adapter if one is registered,
+ * otherwise falls back to the default Defuddle extractor.
  */
-export const extract = defuddleExtract;
+export function extract(text: string, url: string): Result<ExtractionResult> {
+  const adapter = registry.findAdapter(url) ?? defaultAdapter;
+  return adapter.extract(text, url);
+}
 
 /**
  * Determine whether an article needs full-text extraction.
