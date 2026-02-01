@@ -75,57 +75,38 @@ export function ReaderPanel() {
   }
 
   return (
-    <article>
-      {modes.length > 1 && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-md py-sm flex items-center justify-between">
-          <span className="text-sm text-muted-foreground truncate mr-4">
-            {article.title}
-          </span>
-          <ViewToggle
-            modes={modes}
-            activeMode={viewMode}
-            onModeChange={handleModeChange}
-          />
-        </div>
-      )}
+    <article className="p-md px-lg">
+      <h2 className="text-2xl font-semibold mb-sm">{article.title}</h2>
 
-      <div className="p-md px-lg">
-        <h2 className="text-2xl font-semibold mb-sm">{article.title}</h2>
-
-        <div className="text-sm text-muted-foreground mb-md">
-          {article.author && <>{article.author} &bull; </>}
-          {formatDate(article.publishedAt)}
-          {article.link && (
-            <>
-              {" — "}
-              <a
-                href={article.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:text-primary/80"
-              >
-                Original
-              </a>
-            </>
-          )}
-        </div>
-
-        {modes.length <= 1 && (
-          <ViewToggle
-            modes={modes}
-            activeMode={viewMode}
-            onModeChange={handleModeChange}
-          />
-        )}
-
-        {isExtracting ? (
-          <p className="italic text-muted-foreground">
-            Extracting full article…
-          </p>
-        ) : (
-          <ArticleContent html={getContent()} />
+      <div className="text-sm text-muted-foreground mb-md">
+        {article.author && <>{article.author} &bull; </>}
+        {formatDate(article.publishedAt)}
+        {article.link && (
+          <>
+            {" — "}
+            <a
+              href={article.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:text-primary/80"
+            >
+              Original
+            </a>
+          </>
         )}
       </div>
+
+      <ViewToggle
+        modes={modes}
+        activeMode={viewMode}
+        onModeChange={handleModeChange}
+      />
+
+      {isExtracting ? (
+        <p className="italic text-muted-foreground">Extracting full article…</p>
+      ) : (
+        <ArticleContent html={getContent()} />
+      )}
     </article>
   );
 }
