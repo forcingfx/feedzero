@@ -105,7 +105,7 @@ export function ReaderPanel() {
       {isExtracting ? (
         <p className="italic text-muted-foreground">Extracting full article…</p>
       ) : (
-        <ArticleContent html={getContent()} />
+        <ArticleContent key={viewMode} html={getContent()} />
       )}
     </article>
   );

@@ -15,7 +15,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
   return (
     <div
-      className="leading-relaxed max-w-180 [&_p]:mb-4 [&_blockquote]:border-l-3 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:my-4 [&_img]:max-w-full [&_img]:h-auto [&_pre]:overflow-x-auto [&_pre]:bg-secondary [&_pre]:p-sm [&_pre]:rounded [&_figure]:my-4 [&_figcaption]:text-sm [&_figcaption]:text-muted-foreground [&_figcaption]:mt-2 [&_figcaption]:text-center"
+      className="leading-relaxed max-w-180 animate-in fade-in duration-200 [&_p]:mb-4 [&_blockquote]:border-l-3 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:my-4 [&_img]:max-w-full [&_img]:h-auto [&_pre]:overflow-x-auto [&_pre]:bg-secondary [&_pre]:p-sm [&_pre]:rounded [&_figure]:my-4 [&_figcaption]:text-sm [&_figcaption]:text-muted-foreground [&_figcaption]:mt-2 [&_figcaption]:text-center"
       dangerouslySetInnerHTML={{ __html: clean }}
     />
   );

@@ -7,6 +7,11 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable.tsx";
+import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
@@ -113,20 +118,22 @@ export function FeedsPage() {
     <SidebarProvider>
       <AppSidebar onFeedSelect={handleFeedSelect} />
       <SidebarInset>
-        <div className="flex h-full min-h-0">
-          {/* Article list — fixed width, independently scrollable */}
-          <div className="w-[300px] shrink-0 border-r overflow-hidden">
+        <ResizablePanelGroup
+          orientation="horizontal"
+          className="h-full min-h-0"
+        >
+          <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
             <ScrollArea className="h-full">
               <ArticleList onArticleSelect={handleArticleSelect} />
             </ScrollArea>
-          </div>
-          {/* Reader pane — fills remaining space, independently scrollable */}
-          <div className="flex-1 overflow-hidden">
+          </ResizablePanel>
+          <ResizableHandle />
+          <ResizablePanel defaultSize={75}>
             <ScrollArea className="h-full">
               <ReaderPanel />
             </ScrollArea>
-          </div>
-        </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </SidebarInset>
     </SidebarProvider>
   );

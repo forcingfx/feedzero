@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { Toaster } from "@/components/ui/sonner.tsx";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 
 function AppInit({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/feeds" replace />} />
         </Routes>
       </AppInit>
+      <Toaster />
     </BrowserRouter>
   );
 }

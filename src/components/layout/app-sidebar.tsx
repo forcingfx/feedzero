@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Rss, X } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +34,6 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
-  const error = useFeedStore((s) => s.error);
   const removeFeed = useFeedStore((s) => s.removeFeed);
   const refreshAll = useFeedStore((s) => s.refreshAll);
 
@@ -77,12 +75,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
               </Button>
             </div>
 
-            {error && (
-              <Alert variant="destructive" className="mx-2 mb-2">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
             {feeds.length === 0 ? (
               <div className="px-2 py-4 text-muted-foreground text-sm">
                 No feeds yet. Add one above.
@@ -118,7 +110,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
 
       <AlertDialog
         open={feedToRemove !== null}
-        onOpenChange={(open) => { if (!open) setFeedToRemove(null); }}
+        onOpenChange={(open) => {
+          if (!open) setFeedToRemove(null);
+        }}
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
