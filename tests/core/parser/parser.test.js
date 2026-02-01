@@ -59,6 +59,36 @@ const RSS_WITH_CONTENT_ENCODED = `<?xml version="1.0" encoding="UTF-8"?>
   </channel>
 </rss>`;
 
+const RSS_DOUBLE_ENCODED = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Ben&amp;#39;s Blog</title>
+    <link>https://example.com</link>
+    <description>A feed with double-encoded entities</description>
+    <item>
+      <title>It&amp;#39;s a &amp;quot;test&amp;quot;</title>
+      <link>https://example.com/1</link>
+      <description>Entities &amp;amp; more &amp;#39;stuff&amp;#39;</description>
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+
+const ATOM_DOUBLE_ENCODED = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>She&amp;#39;s Blog</title>
+  <link href="https://example.com" rel="alternate"/>
+  <entry>
+    <title>She&amp;#39;s Here &amp;amp; Ready</title>
+    <link href="https://example.com/atom/1" rel="alternate"/>
+    <id>tag:example.com,2024:1</id>
+    <published>2024-01-15T12:00:00Z</published>
+    <summary>An entry with &amp;#39;entities&amp;#39;</summary>
+    <content type="html">&lt;p&gt;Content&lt;/p&gt;</content>
+    <author><name>Jane &amp;amp; John</name></author>
+  </entry>
+</feed>`;
+
 describe("Parser", () => {
   describe("RSS 2.0", () => {
     it("should parse feed metadata", () => {
@@ -105,6 +135,15 @@ describe("Parser", () => {
       expect(articles[0].author).toBe("Alice");
     });
 
+    it("should decode double-encoded entities in titles and descriptions", () => {
+      const result = parse(RSS_DOUBLE_ENCODED, "https://example.com/feed");
+      const { feed, articles } = unwrap(result);
+      expect(feed.title).toBe("Ben's Blog");
+      expect(articles[0].title).toBe('It\'s a "test"');
+      expect(articles[0].summary).toContain("Entities & more");
+      expect(articles[0].summary).toContain("'stuff'");
+    });
+
     it("should keep summary separate from content:encoded", () => {
       const { articles } = unwrap(
         parse(RSS_WITH_CONTENT_ENCODED, "https://example.com/feed"),
@@ -131,6 +170,15 @@ describe("Parser", () => {
       expect(articles[0].link).toBe("https://example.com/atom/1");
       expect(articles[0].author).toBe("Jane Doe");
       expect(articles[0].content).toContain("Full content");
+    });
+
+    it("should decode double-encoded entities in Atom feeds", () => {
+      const { feed, articles } = unwrap(
+        parse(ATOM_DOUBLE_ENCODED, "https://example.com/atom"),
+      );
+      expect(feed.title).toBe("She's Blog");
+      expect(articles[0].title).toBe("She's Here & Ready");
+      expect(articles[0].author).toBe("Jane & John");
     });
   });
 

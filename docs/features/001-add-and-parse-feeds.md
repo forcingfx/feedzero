@@ -83,7 +83,7 @@ Feature: Add a feed URL and display its articles
 |------|------|
 | `src/core/feeds/feed-service.js` | Orchestrates the full add-feed flow |
 | `src/core/parser/validator.js` | Detects RSS 2.0, Atom 1.0, or JSON Feed 1.1 |
-| `src/core/parser/parser.js` | Parses all three formats into `{feed, articles}` |
+| `src/core/parser/parser.js` | Parses all three formats into `{feed, articles}`. Decodes double-encoded HTML entities from malformed feeds. |
 | `src/core/parser/sanitizer.js` | DOMPurify wrapper for HTML content |
 | `src/main.js` | Wires FEED_ADDED event to feed-service, handles auto-select |
 | `src/ui/components/feed-list.js` | Add-feed form, feed list display, error display |
@@ -93,7 +93,7 @@ Feature: Add a feed URL and display its articles
 
 | File | Coverage |
 |------|----------|
-| `tests/core/parser/parser.test.js` | RSS, Atom, and JSON Feed parsing (14 tests) |
+| `tests/core/parser/parser.test.js` | RSS, Atom, and JSON Feed parsing, double-encoded entity handling (19 tests) |
 | `tests/core/parser/validator.test.js` | Format detection (5 tests) |
 | `tests/core/feeds/feed-service.test.js` | Full flow, error messages, orphan cleanup, duplicates (11 tests) |
 | `tests/core/storage/db.test.js` | Index-level duplicate detection, ConstraintError handling (3 tests) |

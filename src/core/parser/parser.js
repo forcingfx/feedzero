@@ -82,12 +82,21 @@ function parseAtom(doc, feedUrl) {
   return ok({ feed, articles });
 }
 
+/** Decode HTML entities that survive XML parsing (double-encoded feeds). */
+function decodeEntities(str) {
+  if (!str || !str.includes("&")) return str;
+  const el = document.createElement("textarea");
+  el.innerHTML = str;
+  return el.textContent;
+}
+
 function text(parent, tag) {
   if (!parent) return "";
   // Use getElementsByTagName for reliable namespaced element lookup
   // (querySelector fails with namespace-prefixed tags like content:encoded)
   const els = parent.getElementsByTagName(tag);
-  return els.length > 0 ? els[0].textContent.trim() : "";
+  if (els.length === 0) return "";
+  return decodeEntities(els[0].textContent.trim());
 }
 
 function linkHref(parent, rel) {
