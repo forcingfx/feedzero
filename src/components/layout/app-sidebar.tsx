@@ -35,6 +35,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar.tsx";
 import { AddFeedForm } from "@/components/feeds/add-feed-form.tsx";
+import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Feed } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -126,6 +127,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       tooltip={feed.title}
                       className="group-has-[[data-state=open]]/menu-item:bg-sidebar-accent"
                     >
+                      <FeedFavicon siteUrl={feed.siteUrl} />
                       <span className="truncate">{feed.title}</span>
                       {refreshingFeedIds.has(feed.id) && (
                         <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
