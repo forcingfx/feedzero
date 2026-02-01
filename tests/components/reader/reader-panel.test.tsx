@@ -112,7 +112,7 @@ describe("ReaderPanel", () => {
 
     const { container } = render(<ReaderPanel />);
     // Click "Extracted" button to switch mode
-    await user.click(screen.getByRole("button", { name: "Extracted" }));
+    await user.click(screen.getByRole("radio", { name: "Extracted" }));
     expect(container.textContent).toContain("expanded");
   });
 
@@ -127,9 +127,9 @@ describe("ReaderPanel", () => {
     });
 
     render(<ReaderPanel />);
-    expect(screen.getByRole("button", { name: "Feed" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Feed" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Extracted" }),
+      screen.getByRole("radio", { name: "Extracted" }),
     ).toBeInTheDocument();
   });
 });

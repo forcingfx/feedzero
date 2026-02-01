@@ -4,6 +4,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
+import { Button } from "@/components/ui/button.tsx";
 import { Header } from "@/components/layout/header.tsx";
 import { Panel } from "@/components/layout/panel.tsx";
 import { FeedList } from "@/components/feeds/feed-list.tsx";
@@ -72,12 +73,9 @@ export function FeedsPage() {
         <>
           <Header />
           <main role="main" className="flex-1 flex flex-col min-h-0">
-            <button
-              onClick={handleBack}
-              className="text-sm px-sm py-xs text-accent"
-            >
+            <Button variant="link" size="sm" onClick={handleBack}>
               ← Back
-            </button>
+            </Button>
             <div className="flex-1 overflow-y-auto">
               <ReaderPanel />
             </div>
@@ -90,12 +88,9 @@ export function FeedsPage() {
         <>
           <Header />
           <main role="main" className="flex-1 flex flex-col min-h-0">
-            <button
-              onClick={handleBack}
-              className="text-sm px-sm py-xs text-accent"
-            >
+            <Button variant="link" size="sm" onClick={handleBack}>
               ← Back
-            </button>
+            </Button>
             <div className="flex-1 overflow-y-auto">
               <ArticleList onArticleSelect={handleArticleSelect} />
             </div>

@@ -1,3 +1,16 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog.tsx";
 import type { Feed } from "@/types/index.ts";
 
 interface FeedItemProps {
@@ -7,12 +20,21 @@ interface FeedItemProps {
   onRemove: (feedId: string) => void;
 }
 
-export function FeedItem({ feed, isSelected, onSelect, onRemove }: FeedItemProps) {
-  function handleRemove(e: React.MouseEvent) {
+export function FeedItem({
+  feed,
+  isSelected,
+  onSelect,
+  onRemove,
+}: FeedItemProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  function handleRemoveClick(e: React.MouseEvent) {
     e.stopPropagation();
-    if (confirm(`Remove "${feed.title}"?`)) {
-      onRemove(feed.id);
-    }
+    setDialogOpen(true);
+  }
+
+  function handleConfirmRemove() {
+    onRemove(feed.id);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -30,16 +52,40 @@ export function FeedItem({ feed, isSelected, onSelect, onRemove }: FeedItemProps
       data-id={feed.id}
       onClick={() => onSelect(feed.id)}
       onKeyDown={handleKeyDown}
-      className="flex items-center justify-between px-sm py-xs cursor-pointer hover:bg-bg-hover aria-selected:bg-bg-active aria-selected:font-semibold group"
+      className="flex items-center justify-between px-sm py-xs cursor-pointer hover:bg-accent aria-selected:bg-accent aria-selected:font-semibold group"
     >
       <span className="truncate">{feed.title}</span>
-      <button
-        className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-danger border-none bg-transparent px-xs"
-        aria-label={`Remove ${feed.title}`}
-        onClick={handleRemove}
-      >
-        &times;
-      </button>
+      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-destructive"
+            aria-label={`Remove ${feed.title}`}
+            onClick={handleRemoveClick}
+          >
+            &times;
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove feed</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove &ldquo;{feed.title}&rdquo;? This will also delete all its
+              articles.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleConfirmRemove}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </li>
   );
 }

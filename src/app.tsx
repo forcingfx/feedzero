@@ -24,12 +24,12 @@ function AppInit({ children }: { children: React.ReactNode }) {
 
   if (error) {
     return (
-      <div className="p-md text-danger">Failed to initialize: {error}</div>
+      <div className="p-md text-destructive">Failed to initialize: {error}</div>
     );
   }
 
   if (!isDbReady) {
-    return <div className="p-md text-text-secondary">Loading…</div>;
+    return <div className="p-md text-muted-foreground">Loading…</div>;
   }
 
   return <>{children}</>;

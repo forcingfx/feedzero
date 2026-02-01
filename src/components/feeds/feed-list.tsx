@@ -1,4 +1,6 @@
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { AddFeedForm } from "./add-feed-form.tsx";
 import { FeedItem } from "./feed-item.tsx";
 
@@ -22,23 +24,24 @@ export function FeedList({ onFeedSelect }: FeedListProps) {
       <AddFeedForm />
 
       <div className="flex px-sm pb-sm">
-        <button
-          className="text-xs"
+        <Button
+          variant="outline"
+          size="xs"
           title="Refresh all feeds"
           onClick={refreshAll}
         >
           Refresh All
-        </button>
+        </Button>
       </div>
 
       {error && (
-        <div role="alert" className="px-sm py-xs text-danger text-sm">
-          {error}
-        </div>
+        <Alert variant="destructive" className="mx-sm">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {feeds.length === 0 ? (
-        <div className="p-sm text-text-secondary text-sm">
+        <div className="p-sm text-muted-foreground text-sm">
           No feeds yet. Add one above.
         </div>
       ) : (

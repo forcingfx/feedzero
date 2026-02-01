@@ -10,12 +10,19 @@ function formatDate(timestamp: number): string {
   if (!timestamp) return "";
   const d = new Date(timestamp);
   return d.toLocaleDateString(undefined, {
-    year: "numeric", month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
-export function ArticleItem({ article, isSelected, onSelect }: ArticleItemProps) {
+export function ArticleItem({
+  article,
+  isSelected,
+  onSelect,
+}: ArticleItemProps) {
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -31,12 +38,12 @@ export function ArticleItem({ article, isSelected, onSelect }: ArticleItemProps)
       data-id={article.id}
       onClick={() => onSelect(article)}
       onKeyDown={handleKeyDown}
-      className="px-sm py-sm border-b border-border cursor-pointer hover:bg-bg-hover aria-selected:bg-bg-active"
+      className="px-sm py-sm border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent"
     >
-      <div className={article.read ? "text-text-secondary" : "font-semibold"}>
+      <div className={article.read ? "text-muted-foreground" : "font-semibold"}>
         {article.title}
       </div>
-      <div className="text-xs text-text-secondary mt-xs">
+      <div className="text-xs text-muted-foreground mt-xs">
         {article.author && <>{article.author} &bull; </>}
         {formatDate(article.publishedAt)}
       </div>

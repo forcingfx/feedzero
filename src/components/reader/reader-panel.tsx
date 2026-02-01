@@ -36,7 +36,7 @@ export function ReaderPanel() {
 
   if (!article) {
     return (
-      <div className="p-md text-text-secondary text-sm">
+      <div className="p-md text-muted-foreground text-sm">
         Select an article to read.
       </div>
     );
@@ -69,7 +69,7 @@ export function ReaderPanel() {
     );
 
     if (showSubheading) {
-      return `<div class="italic border-l-3 border-border pl-sm mb-md text-text-secondary">${article!.summary}</div>${content}`;
+      return `<div class="italic border-l-3 border-border pl-sm mb-md text-muted-foreground">${article!.summary}</div>${content}`;
     }
     return content;
   }
@@ -78,7 +78,7 @@ export function ReaderPanel() {
     <article className="p-md px-lg overflow-y-auto">
       <h2 className="text-2xl font-semibold mb-sm">{article.title}</h2>
 
-      <div className="text-sm text-text-secondary mb-md">
+      <div className="text-sm text-muted-foreground mb-md">
         {article.author && <>{article.author} &bull; </>}
         {formatDate(article.publishedAt)}
         {article.link && (
@@ -88,7 +88,7 @@ export function ReaderPanel() {
               href={article.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-accent hover:text-accent-hover"
+              className="text-primary hover:text-primary/80"
             >
               Original
             </a>
@@ -103,7 +103,7 @@ export function ReaderPanel() {
       />
 
       {isExtracting ? (
-        <p className="italic text-text-secondary">Extracting full article…</p>
+        <p className="italic text-muted-foreground">Extracting full article…</p>
       ) : (
         <ArticleContent html={getContent()} />
       )}
