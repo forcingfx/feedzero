@@ -90,13 +90,21 @@ Single CSS entry point: `src/ui/styles/app.css`. Tailwind CSS v4 via `@tailwindc
 
 ## Development Workflow
 
-Follow this sequence for all features:
+This project follows **Red-Green-Refactor (RGR)** — the TDD cycle where you write a failing test (red), make it pass with minimal code (green), then clean up (refactor). Every feature follows this sequence. **Do not skip the refactor step.**
 
 1. **PLAN** — Gherkin-style stories, minimal scope. Confirm with user before proceeding.
-2. **TEST** — Write failing tests first. Run them to confirm they fail for the right reasons.
-3. **CODE** — Write the minimum code to pass the tests. Add JSDoc to all public functions. Add inline comments where intent or "why" is not obvious from the code itself. Do not comment the obvious.
+2. **RED** — Write failing tests first. Run them to confirm they fail for the right reasons.
+3. **GREEN** — Write the minimum code to pass the tests. Add JSDoc to all public functions. Add inline comments where intent or "why" is not obvious from the code itself. Do not comment the obvious.
 4. **VERIFY** — Run full test suite, confirm no regressions.
-5. **DOCUMENT** — Review the `docs/` folder. Update `docs/architecture.md`, `docs/data-schema.md`, and relevant feature docs in `docs/features/` to reflect what changed. Create a new feature doc from `docs/features/TEMPLATE.md` for any new feature. Update ADRs in `docs/decisions/` if architectural decisions were made.
+5. **REFACTOR** — This step is mandatory, not optional. Clean up the code you wrote and touched:
+   - Extract unclear blocks into well-named functions
+   - Remove duplication (DRY, but not at the cost of clarity)
+   - Ensure each function does one thing (Single Responsibility)
+   - Use intention-revealing names for variables, functions, and parameters
+   - Keep functions short — if a function needs a comment to explain what it does, extract and name it instead
+   - Apply the Boy Scout Rule: leave every file you touched cleaner than you found it
+   - Re-run tests after refactoring to confirm no regressions
+6. **DOCUMENT** — Review the `docs/` folder. Update `docs/architecture.md`, `docs/data-schema.md`, and relevant feature docs in `docs/features/` to reflect what changed. Create a new feature doc from `docs/features/TEMPLATE.md` for any new feature. Update ADRs in `docs/decisions/` if architectural decisions were made.
 
 ## Commit Messages
 
@@ -137,7 +145,7 @@ gaps in CLAUDE.md.
 - **Privacy and anonymity** — No telemetry, no analytics, no external calls except explicit user actions (fetching feeds). No data leaves the browser unless the user initiates it.
 - **Open source first** — Prefer actively maintained OSS libraries where they reduce code and improve correctness. Do not reimplement what a well-maintained library handles better. Evaluate libraries by: active maintenance, small footprint, browser compatibility.
 - **Minimal but clear** — Write the least code that solves the problem. No speculative features, no premature abstractions, no dead code. Three similar lines are better than a premature helper. Delete code that has no callers.
-- **Clean code** — Self-evident naming, small functions, explicit error handling via Result types. Comments only where the logic is non-obvious.
+- **Clean code** — Self-evident naming, small single-responsibility functions, explicit error handling via Result types. Functions should do one thing and their name should say what that thing is. If you need a comment to explain *what* code does, rename or extract instead. Comments only for *why* — never *what*.
 
 ### Key Patterns
 
