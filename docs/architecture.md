@@ -86,6 +86,17 @@ Browsers block cross-origin fetches. In development, `vite.config.js` defines a 
 
 Both use the same `proxyHandler()` function. Production will require a dedicated proxy or server function.
 
+## Styling
+
+Tailwind CSS v4 via `@tailwindcss/vite` (build-time only, zero runtime cost). Single CSS entry point: `src/ui/styles/app.css`.
+
+- **`@theme`** — Design tokens (colors, spacing, fonts, radius) replacing the former `variables.css`
+- **`@layer base`** — Global resets, layout grid, button/input base styles (formerly `base.css`)
+- **Tailwind utilities** — Available in light DOM (`index.html` elements). Not used inside Web Components yet.
+- **Web Component styles** — Scoped `<style>` blocks in Shadow DOM, using CSS custom properties inherited from the light DOM theme.
+
+See [ADR 004](decisions/004-tailwind-css.md) for rationale.
+
 ## Module Dependency Graph
 
 ```

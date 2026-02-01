@@ -16,7 +16,7 @@ Run a single test file: `npx vitest run tests/core/parser/parser.test.js`
 
 ## Architecture
 
-FeedZero is a privacy-first RSS reader. Vanilla JS (ES modules), Web Components, with targeted library use for security-critical code.
+FeedZero is a privacy-first RSS reader. Vanilla JS (ES modules), Web Components, Tailwind CSS v4 (build-time only), with targeted library use for security-critical code.
 
 ### Runtime Dependencies
 
@@ -47,6 +47,15 @@ Full-text extraction is user-initiated: in article-view, click "Extracted" → f
 - **src/core/parser/parser.js** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1. Returns `{feed, articles}`.
 - **src/core/parser/sanitizer.js** — DOMPurify wrapper with allowlisted tags/attrs. Links get `rel="noopener noreferrer"` automatically.
 - **src/main.js** — App entry point. Only module that wires components together via event bus.
+
+### Styling
+
+Single CSS entry point: `src/ui/styles/app.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero runtime cost).
+
+- **`@theme`** — Design tokens (colors, spacing, fonts, radius). Use `--color-*`, `--spacing-*`, `--font-*` tokens.
+- **`@layer base`** — Global resets, layout grid, button/input base styles.
+- **Tailwind utilities** — Available in light DOM. Not used inside Web Components (Shadow DOM blocks them).
+- **Web Component styles** — Scoped `<style>` blocks in Shadow DOM, referencing CSS custom properties inherited from the light DOM `@theme`. These still use `--space-*` naming (legacy); Tailwind utilities use `--spacing-*`.
 
 ### UI Components (Web Components)
 

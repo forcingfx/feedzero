@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 
 /**
  * Generic proxy handler for server-side fetches (bypasses CORS).
@@ -66,5 +67,5 @@ export default defineConfig({
   server: {
     port: 3000,
   },
-  plugins: [feedProxyPlugin()],
+  plugins: [tailwindcss(), feedProxyPlugin()],
 });
