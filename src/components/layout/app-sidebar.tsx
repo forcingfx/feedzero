@@ -25,6 +25,7 @@ import {
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -34,6 +35,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar.tsx";
+import { SyncStatusChip } from "@/components/sync/sync-status-chip.tsx";
 import { AddFeedForm } from "@/components/feeds/add-feed-form.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Feed } from "@/types/index.ts";
@@ -66,102 +68,110 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   }
 
   return (
-    <Sidebar {...props}>
-      <SidebarHeader>
-        <div className="flex items-center justify-between px-2 py-1">
-          <span className="text-lg font-semibold tracking-tight">FeedZero</span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              title="Refresh all feeds"
-              disabled={isRefreshingAll}
-              onClick={refreshAll}
-            >
-              <RefreshCw
-                className={`size-4 ${isRefreshingAll ? "animate-spin" : ""}`}
-              />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              title={addFormOpen ? "Cancel" : "Add feed"}
-              onClick={() => setAddFormOpen(!addFormOpen)}
-            >
-              <Plus
-                className="size-4 transition-transform duration-200"
-                style={{
-                  transform: addFormOpen ? "rotate(45deg)" : "rotate(0deg)",
-                }}
-              />
-            </Button>
+    <>
+      <Sidebar {...props}>
+        <SidebarHeader>
+          <div className="flex items-center justify-between px-2 py-1">
+            <span className="text-lg font-semibold tracking-tight">
+              FeedZero
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                title="Refresh all feeds"
+                disabled={isRefreshingAll}
+                onClick={refreshAll}
+              >
+                <RefreshCw
+                  className={`size-4 ${isRefreshingAll ? "animate-spin" : ""}`}
+                />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                title={addFormOpen ? "Cancel" : "Add feed"}
+                onClick={() => setAddFormOpen(!addFormOpen)}
+              >
+                <Plus
+                  className="size-4 transition-transform duration-200"
+                  style={{
+                    transform: addFormOpen ? "rotate(45deg)" : "rotate(0deg)",
+                  }}
+                />
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <Collapsible open={addFormOpen}>
-          <CollapsibleContent>
-            <AddFeedForm onAdded={() => setAddFormOpen(false)} />
-          </CollapsibleContent>
-        </Collapsible>
-      </SidebarHeader>
+          <Collapsible open={addFormOpen}>
+            <CollapsibleContent>
+              <AddFeedForm onAdded={() => setAddFormOpen(false)} />
+            </CollapsibleContent>
+          </Collapsible>
+        </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            {feeds.length === 0 ? (
-              <div className="px-2 py-4 text-muted-foreground text-sm">
-                No feeds yet. Add one above.
-              </div>
-            ) : (
-              <SidebarMenu>
-                {feeds.map((feed) => (
-                  <SidebarMenuItem key={feed.id}>
-                    <SidebarMenuButton
-                      isActive={feed.id === selectedFeedId}
-                      onClick={() => handleSelect(feed.id)}
-                      tooltip={feed.title}
-                      className="group-has-[[data-state=open]]/menu-item:bg-sidebar-accent"
-                    >
-                      <FeedFavicon siteUrl={feed.siteUrl} />
-                      <span className="truncate">{feed.title}</span>
-                      {refreshingFeedIds.has(feed.id) && (
-                        <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
-                      )}
-                    </SidebarMenuButton>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <SidebarMenuAction showOnHover>
-                          <MoreHorizontal />
-                          <span className="sr-only">More</span>
-                        </SidebarMenuAction>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent side="right" align="start">
-                        <DropdownMenuItem
-                          onClick={() => refreshSingleFeed(feed.id)}
-                        >
-                          <RefreshCw className="size-4" />
-                          Refresh
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setFeedToRemove(feed)}
-                        >
-                          <Trash2 className="size-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            )}
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              {feeds.length === 0 ? (
+                <div className="px-2 py-4 text-muted-foreground text-sm">
+                  No feeds yet. Add one above.
+                </div>
+              ) : (
+                <SidebarMenu>
+                  {feeds.map((feed) => (
+                    <SidebarMenuItem key={feed.id}>
+                      <SidebarMenuButton
+                        isActive={feed.id === selectedFeedId}
+                        onClick={() => handleSelect(feed.id)}
+                        tooltip={feed.title}
+                        className="font-semibold py-2 group-has-data-[state=open]/menu-item:bg-sidebar-accent"
+                      >
+                        <FeedFavicon siteUrl={feed.siteUrl} />
+                        <span className="truncate">{feed.title}</span>
+                        {refreshingFeedIds.has(feed.id) && (
+                          <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
+                        )}
+                      </SidebarMenuButton>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <SidebarMenuAction showOnHover>
+                            <MoreHorizontal />
+                            <span className="sr-only">More</span>
+                          </SidebarMenuAction>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start">
+                          <DropdownMenuItem
+                            onClick={() => refreshSingleFeed(feed.id)}
+                          >
+                            <RefreshCw className="size-4" />
+                            Refresh
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setFeedToRemove(feed)}
+                          >
+                            <Trash2 className="size-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
 
-      <SidebarRail />
+        <SidebarFooter>
+          <SyncStatusChip />
+        </SidebarFooter>
+
+        <SidebarRail />
+      </Sidebar>
 
       <AlertDialog
         open={feedToRemove !== null}
@@ -188,6 +198,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Sidebar>
+    </>
   );
 }

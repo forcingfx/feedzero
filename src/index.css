@@ -14,12 +14,6 @@
         "Liberation Mono", "Courier New", monospace;
 
     --radius: 0.375rem;
-
-    --spacing-xs: 0.25rem;
-    --spacing-sm: 0.5rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
 }
 
 @theme inline {

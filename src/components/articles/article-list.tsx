@@ -20,7 +20,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
   if (!selectedFeedId) {
     return (
-      <div className="p-sm text-muted-foreground text-sm">
+      <div className="p-2 text-muted-foreground text-sm">
         Select a feed to view articles.
       </div>
     );
@@ -29,7 +29,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   return (
     <>
       {articles.length === 0 ? (
-        <div className="p-sm text-muted-foreground text-sm">
+        <div className="p-2 text-muted-foreground text-sm">
           No articles found.
         </div>
       ) : (

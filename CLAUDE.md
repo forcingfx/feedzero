@@ -97,9 +97,10 @@ URL is the source of truth for navigation state. `FeedsPage` syncs URL params to
 
 Single CSS entry point: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero runtime cost).
 
-- **`@theme`** — Design tokens (colors, spacing, fonts, radius). Use `--color-*`, `--spacing-*`, `--font-*` tokens.
+- **`@theme`** — Design tokens (colors, fonts, radius). Use `--color-*`, `--font-*` tokens.
 - **`@layer base`** — Global resets, layout grid (`grid-template-columns: 250px 300px 1fr`), button/input base styles.
 - **Tailwind utilities** — Used in JSX `className` props. Use `cn()` from `src/lib/utils.ts` for conditional classes.
+- **Spacing** — Use Tailwind v4's default numeric spacing scale (`p-4`, `gap-2`, `mb-6`, etc.). Do **not** define custom `--spacing-xs/sm/md/lg/xl` tokens in `@theme` — these collide with Tailwind v4's `max-w-*` utilities (e.g., `max-w-lg` resolves to `--spacing-lg` instead of `--container-lg`). This is a [known Tailwind v4 gotcha](https://github.com/tailwindlabs/tailwindcss/discussions/17777).
 
 ### Types
 

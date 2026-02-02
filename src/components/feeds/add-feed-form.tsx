@@ -41,7 +41,7 @@ export function AddFeedForm({ onAdded }: AddFeedFormProps) {
     <form
       onSubmit={handleSubmit}
       aria-label="Add feed"
-      className="flex gap-xs p-2"
+      className="flex gap-1 p-2"
     >
       <Input
         ref={inputRef}

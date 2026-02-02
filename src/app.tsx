@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
+import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 
 function AppInit({ children }: { children: React.ReactNode }) {
@@ -25,12 +26,12 @@ function AppInit({ children }: { children: React.ReactNode }) {
 
   if (error) {
     return (
-      <div className="p-md text-destructive">Failed to initialize: {error}</div>
+      <div className="p-4 text-destructive">Failed to initialize: {error}</div>
     );
   }
 
   if (!isDbReady) {
-    return <div className="p-md text-muted-foreground">Loading…</div>;
+    return <div className="p-4 text-muted-foreground">Loading…</div>;
   }
 
   return <>{children}</>;
@@ -38,19 +39,22 @@ function AppInit({ children }: { children: React.ReactNode }) {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <AppInit>
-        <Routes>
-          <Route path="/feeds" element={<FeedsPage />} />
-          <Route path="/feeds/:feedId" element={<FeedsPage />} />
-          <Route
-            path="/feeds/:feedId/articles/:articleId"
-            element={<FeedsPage />}
-          />
-          <Route path="*" element={<Navigate to="/feeds" replace />} />
-        </Routes>
-      </AppInit>
-      <Toaster />
-    </BrowserRouter>
+    <>
+      <BrowserRouter>
+        <AppInit>
+          <Routes>
+            <Route path="/feeds" element={<FeedsPage />} />
+            <Route path="/feeds/:feedId" element={<FeedsPage />} />
+            <Route
+              path="/feeds/:feedId/articles/:articleId"
+              element={<FeedsPage />}
+            />
+            <Route path="*" element={<Navigate to="/feeds" replace />} />
+          </Routes>
+        </AppInit>
+        <Toaster />
+      </BrowserRouter>
+      <SyncSetupDialog />
+    </>
   );
 }

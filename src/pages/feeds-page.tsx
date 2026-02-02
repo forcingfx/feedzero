@@ -50,6 +50,15 @@ export function FeedsPage() {
     }
   }, [articleId, articles, selectArticle]);
 
+  // Auto-select first article when switching to a feed with no article selected
+  useEffect(() => {
+    if (feedId && articles.length > 0 && !articleId) {
+      navigate(`/feeds/${feedId}/articles/${articles[0].id}`, {
+        replace: true,
+      });
+    }
+  }, [feedId, articles, articleId, navigate]);
+
   function handleFeedSelect(id: string) {
     selectFeed(id);
     navigate(`/feeds/${id}`);
@@ -127,7 +136,7 @@ export function FeedsPage() {
               <ArticleList onArticleSelect={handleArticleSelect} />
             </ScrollArea>
           </ResizablePanel>
-          <ResizableHandle withHandle />
+          <ResizableHandle />
           <ResizablePanel defaultSize="60%" minSize="300px">
             <ScrollArea className="h-full">
               <ReaderPanel />

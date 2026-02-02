@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ExternalLink } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
@@ -6,6 +7,7 @@ import {
   getAvailableModes,
   hasSummarySubheading,
 } from "@/lib/content-modes.ts";
+import { Button } from "@/components/ui/button.tsx";
 import { ArticleContent } from "./article-content.tsx";
 import { ViewToggle } from "./view-toggle.tsx";
 
@@ -37,7 +39,7 @@ export function ReaderPanel() {
 
   if (!article) {
     return (
-      <div className="p-md text-muted-foreground text-sm">
+      <div className="p-4 text-muted-foreground text-sm">
         Select an article to read.
       </div>
     );
@@ -70,32 +72,34 @@ export function ReaderPanel() {
     );
 
     if (showSubheading) {
-      return `<div class="italic border-l-3 border-border pl-sm mb-md text-muted-foreground">${article!.summary}</div>${content}`;
+      return `<div class="italic border-l-3 border-border pl-2 mb-4 text-muted-foreground">${article!.summary}</div>${content}`;
     }
     return content;
   }
 
   return (
-    <article className="p-md px-lg">
-      <h2 className="text-xl font-semibold mb-sm">
+    <article className="p-4 px-6">
+      <h2 className="text-xl font-semibold mb-2">
         {decodeEntities(article.title)}
       </h2>
 
-      <div className="text-sm text-muted-foreground mb-md">
-        {article.author && <>{article.author} &bull; </>}
-        {formatDate(article.publishedAt)}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+        <span>
+          {article.author && <>{article.author} &bull; </>}
+          {formatDate(article.publishedAt)}
+        </span>
         {article.link && (
-          <>
-            {" — "}
-            <a
-              href={article.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:text-primary/80"
-            >
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="h-7 gap-1 text-xs"
+          >
+            <a href={article.link} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="size-3" />
               Original
             </a>
-          </>
+          </Button>
         )}
       </div>
 

@@ -39,12 +39,12 @@ export function ArticleItem({
       data-id={article.id}
       onClick={() => onSelect(article)}
       onKeyDown={handleKeyDown}
-      className="px-sm py-sm border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent"
+      className="px-2 py-2 border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent"
     >
       <div className={article.read ? "text-muted-foreground" : "font-semibold"}>
         {decodeEntities(article.title)}
       </div>
-      <div className="text-xs text-muted-foreground mt-xs">
+      <div className="text-xs text-muted-foreground mt-1">
         {article.author && <>{article.author} &bull; </>}
         {formatDate(article.publishedAt)}
       </div>
