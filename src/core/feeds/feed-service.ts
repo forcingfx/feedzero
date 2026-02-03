@@ -25,7 +25,12 @@ interface RefreshResult {
 }
 
 interface RefreshAllResult {
-  results: Array<{ feed: Feed; newCount: number; updatedCount: number; error?: string }>;
+  results: Array<{
+    feed: Feed;
+    newCount: number;
+    updatedCount: number;
+    error?: string;
+  }>;
 }
 
 /**
@@ -76,33 +81,48 @@ export function normalizeUrl(url: string): string {
  * Full add-feed flow: check duplicate → fetch → parse → store.
  * Returns Result<{feed, articles}> with user-friendly error messages.
  */
-export async function addFeedFlow(rawUrl: string): Promise<Result<AddFeedResult>> {
+export async function addFeedFlow(
+  rawUrl: string,
+): Promise<Result<AddFeedResult>> {
   const url = normalizeUrl(rawUrl);
+  console.log("[addFeedFlow] Starting feed addition for URL:", url);
+
   try {
     // Check for duplicate using the plaintext URL index (no decryption needed)
+    console.log("[addFeedFlow] Checking for duplicate...");
     const exists = await feedExistsByUrl(url);
     if (exists.ok && exists.value) {
       // URL exists in index — check if it's a real feed or an orphan
       const allFeeds = await getFeeds();
       const isReal = allFeeds.ok && allFeeds.value.some((f) => f.url === url);
       if (isReal) {
+        console.log("[addFeedFlow] Feed already exists");
         return err("A feed with this URL already exists");
       }
       // Orphaned record — clean it up and proceed
+      console.log("[addFeedFlow] Cleaning up orphaned record");
       await removeFeedsByUrl(url);
     }
 
     // Fetch feed content via CORS proxy
     const proxyUrl = `/api/feed?url=${encodeURIComponent(url)}`;
+    console.log("[addFeedFlow] Fetching via proxy:", proxyUrl);
     const response = await fetch(proxyUrl);
+    console.log(
+      "[addFeedFlow] Proxy response status:",
+      response.status,
+      response.ok,
+    );
     if (!response.ok) {
       return err(
         `The feed at this URL could not be reached (HTTP ${response.status}).`,
       );
     }
     const text = await response.text();
+    console.log("[addFeedFlow] Received response, length:", text.length);
 
     // Parse feed content — if it fails, try feed discovery (maybe it's a website)
+    console.log("[addFeedFlow] Attempting to parse as feed...");
     const parseResult = parse(text, url);
 
     let feedData;
@@ -110,12 +130,24 @@ export async function addFeedFlow(rawUrl: string): Promise<Result<AddFeedResult>
     let discoveredUrl = url;
 
     if (parseResult.ok) {
+      console.log("[addFeedFlow] Successfully parsed as feed");
       feedData = parseResult.value.feed;
       parsedArticles = parseResult.value.articles;
     } else {
+      console.log(
+        "[addFeedFlow] Not a feed, trying discovery...",
+        parseResult.error,
+      );
       // Not a feed — try discovering a feed from this URL
       const discovery = await discoverFeed(url);
-      if (!discovery.ok) return err(friendlyError(parseResult.error));
+      if (!discovery.ok) {
+        console.log("[addFeedFlow] Discovery failed:", discovery.error);
+        return err(friendlyError(parseResult.error));
+      }
+      console.log(
+        "[addFeedFlow] Discovery succeeded, found feed at:",
+        discovery.value.feedUrl,
+      );
 
       feedData = discovery.value.feed;
       parsedArticles = discovery.value.articles;
@@ -144,9 +176,11 @@ export async function addFeedFlow(rawUrl: string): Promise<Result<AddFeedResult>
       .filter((a): a is Article => a !== null);
 
     await addArticles(articles);
+    console.log("[addFeedFlow] Successfully added feed and articles");
 
     return ok({ feed, articles });
-  } catch {
+  } catch (e) {
+    console.error("[addFeedFlow] Caught exception:", e);
     return err(
       "The feed at this URL could not be reached. Please check your connection and try again.",
     );
