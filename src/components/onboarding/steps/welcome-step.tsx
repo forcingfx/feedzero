@@ -22,7 +22,7 @@ const FEATURES = [
   {
     number: 3,
     icon: ShieldCheck,
-    text: "Your data stays private, always",
+    text: "What you read is your business. Fully end-to-end encrypted.",
   },
 ] as const;
 

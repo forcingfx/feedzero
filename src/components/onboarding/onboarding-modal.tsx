@@ -8,6 +8,7 @@ import { WelcomeStep } from "./steps/welcome-step";
 import { StorageChoiceStep } from "./steps/storage-choice-step";
 import { PassphraseDisplayStep } from "./steps/passphrase-display-step";
 import { PassphraseConfirmStep } from "./steps/passphrase-confirm-step";
+import { RecoveryStep } from "./steps/recovery-step";
 
 function InitializingStep() {
   return (
@@ -62,6 +63,7 @@ export function OnboardingModal() {
         {step === "passphrase-display" && <PassphraseDisplayStep />}
         {step === "passphrase-confirm" && <PassphraseConfirmStep />}
         {step === "initializing" && <InitializingStep />}
+        {step === "recovery" && <RecoveryStep />}
       </DialogContent>
     </Dialog>
   );

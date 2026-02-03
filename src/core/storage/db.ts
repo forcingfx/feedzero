@@ -65,6 +65,20 @@ export function close(): void {
 }
 
 /**
+ * Delete the entire database and clear key material.
+ * This permanently destroys all data.
+ */
+export async function deleteDatabase(): Promise<Result<boolean>> {
+  try {
+    close();
+    await Dexie.delete(DB_NAME);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to delete database: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Check if a feed with the given URL already exists, using the
  * plaintext url index. Does not require decryption.
  */
@@ -154,7 +168,9 @@ export async function removeFeed(id: string): Promise<Result<boolean>> {
 /**
  * Add articles for a feed (encrypted at rest).
  */
-export async function addArticles(articles: Article[]): Promise<Result<boolean>> {
+export async function addArticles(
+  articles: Article[],
+): Promise<Result<boolean>> {
   try {
     for (const article of articles) {
       await putEncrypted("articles", article.id, article);
@@ -170,7 +186,11 @@ export async function addArticles(articles: Article[]): Promise<Result<boolean>>
  */
 export async function getArticles(feedId: string): Promise<Result<Article[]>> {
   try {
-    const raws: DexieRecord[] = await db!.table("articles").where("feedId").equals(feedId).toArray();
+    const raws: DexieRecord[] = await db!
+      .table("articles")
+      .where("feedId")
+      .equals(feedId)
+      .toArray();
     const results: Article[] = [];
     for (const raw of raws) {
       if (!raw.iv || !raw.ciphertext) continue;
@@ -191,7 +211,9 @@ export async function getArticles(feedId: string): Promise<Result<Article[]>> {
 /**
  * Update an article (e.g., mark as read).
  */
-export async function updateArticle(article: Article): Promise<Result<boolean>> {
+export async function updateArticle(
+  article: Article,
+): Promise<Result<boolean>> {
   return putEncrypted("articles", article.id, article);
 }
 
@@ -199,7 +221,10 @@ export async function updateArticle(article: Article): Promise<Result<boolean>> 
  * Find an article by its feedId + guid compound index.
  * Returns the decrypted article if found, or null.
  */
-export async function getArticleByGuid(feedId: string, guid: string): Promise<Result<Article | null>> {
+export async function getArticleByGuid(
+  feedId: string,
+  guid: string,
+): Promise<Result<Article | null>> {
   try {
     const raw: DexieRecord | undefined = await db!
       .table("articles")
@@ -220,7 +245,11 @@ export async function getArticleByGuid(feedId: string, guid: string): Promise<Re
 
 // --- Internal helpers ---
 
-async function putEncrypted(table: string, id: string, data: unknown): Promise<Result<boolean>> {
+async function putEncrypted(
+  table: string,
+  id: string,
+  data: unknown,
+): Promise<Result<boolean>> {
   try {
     const encResult = await encrypt(cryptoKey!, data);
     if (!encResult.ok) return encResult;
@@ -237,7 +266,8 @@ async function putEncrypted(table: string, id: string, data: unknown): Promise<R
     const d = data as Record<string, unknown>;
     if (d.url !== undefined) record.url = d.url as string;
     if (d.feedId !== undefined) record.feedId = d.feedId as string;
-    if (d.publishedAt !== undefined) record.publishedAt = d.publishedAt as number;
+    if (d.publishedAt !== undefined)
+      record.publishedAt = d.publishedAt as number;
     if (d.guid !== undefined) record.guid = d.guid as string;
 
     await db!.table(table).put(record);

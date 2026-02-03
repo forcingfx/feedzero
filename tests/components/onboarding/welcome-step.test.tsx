@@ -36,10 +36,11 @@ describe("WelcomeStep", () => {
 
   it("renders numbered feature list with icons", () => {
     renderInDialog(<WelcomeStep />);
-    // Check for the numbered items with new copy
     expect(screen.getByText(/add your favorite/i)).toBeInTheDocument();
     expect(screen.getByText(/read distraction-free/i)).toBeInTheDocument();
-    expect(screen.getByText(/your data stays private/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/what you read is your business/i),
+    ).toBeInTheDocument();
   });
 
   it("renders Get Started button", () => {

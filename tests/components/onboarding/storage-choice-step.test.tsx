@@ -33,13 +33,6 @@ describe("StorageChoiceStep", () => {
     expect(screen.getByText(/where should we store/i)).toBeInTheDocument();
   });
 
-  it("renders browser storage warning", () => {
-    renderInDialog(<StorageChoiceStep />);
-    expect(
-      screen.getByText(/your data lives in this browser/i),
-    ).toBeInTheDocument();
-  });
-
   it("renders Local only option", () => {
     renderInDialog(<StorageChoiceStep />);
     expect(screen.getByText(/local only/i)).toBeInTheDocument();
@@ -53,11 +46,47 @@ describe("StorageChoiceStep", () => {
     expect(screen.getByText(/no account needed/i)).toBeInTheDocument();
   });
 
-  it("choosing Local only sets mode and goes to initializing", async () => {
+  it("renders Continue button that is disabled by default", () => {
+    renderInDialog(<StorageChoiceStep />);
+    const button = screen.getByRole("button", { name: /continue/i });
+    expect(button).toBeDisabled();
+  });
+
+  it("enables Continue button when an option is selected", async () => {
     const user = userEvent.setup();
     renderInDialog(<StorageChoiceStep />);
 
-    await user.click(screen.getByRole("button", { name: /local only/i }));
+    const localOption = screen.getByRole("radio", { name: /local only/i });
+    await user.click(localOption);
+
+    const button = screen.getByRole("button", { name: /continue/i });
+    expect(button).toBeEnabled();
+  });
+
+  it("shows browser warning only when local option is selected", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    // Warning should not be visible initially
+    expect(
+      screen.queryByText(/your data lives in this browser/i),
+    ).not.toBeInTheDocument();
+
+    // Select local option
+    await user.click(screen.getByRole("radio", { name: /local only/i }));
+
+    // Warning should now be visible
+    expect(
+      screen.getByText(/your data lives in this browser/i),
+    ).toBeInTheDocument();
+  });
+
+  it("selecting Local only and clicking Continue sets mode and goes to initializing", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    await user.click(screen.getByRole("radio", { name: /local only/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
 
     const state = useOnboardingStore.getState();
     expect(state.storageMode).toBe("local");
@@ -65,17 +94,25 @@ describe("StorageChoiceStep", () => {
     expect(state.generatedPassphrase).toBe("carbon mango velvet prism");
   });
 
-  it("choosing Sync across devices sets mode and goes to passphrase-display", async () => {
+  it("selecting Sync and clicking Continue sets mode and goes to passphrase-display", async () => {
     const user = userEvent.setup();
     renderInDialog(<StorageChoiceStep />);
 
     await user.click(
-      screen.getByRole("button", { name: /sync across devices/i }),
+      screen.getByRole("radio", { name: /sync across devices/i }),
     );
+    await user.click(screen.getByRole("button", { name: /continue/i }));
 
     const state = useOnboardingStore.getState();
     expect(state.storageMode).toBe("sync");
     expect(state.step).toBe("passphrase-display");
     expect(state.generatedPassphrase).toBe("carbon mango velvet prism");
+  });
+
+  it("renders I have a recovery key link", () => {
+    renderInDialog(<StorageChoiceStep />);
+    expect(
+      screen.getByRole("button", { name: /i have a recovery key/i }),
+    ).toBeInTheDocument();
   });
 });

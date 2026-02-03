@@ -81,8 +81,11 @@
 
     /* Sync status colors */
     --sync-local: oklch(0.75 0.15 85);
+    --sync-local-bg: oklch(0.95 0.03 85);
     --sync-synced: oklch(0.55 0.2 145);
+    --sync-synced-bg: oklch(0.95 0.03 145);
     --sync-error: oklch(0.65 0.25 25);
+    --sync-error-bg: oklch(0.95 0.03 25);
 }
 
 @layer base {

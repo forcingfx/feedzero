@@ -6,7 +6,8 @@ type OnboardingStep =
   | "storage-choice"
   | "passphrase-display"
   | "passphrase-confirm"
-  | "initializing";
+  | "initializing"
+  | "recovery";
 
 type StorageMode = "local" | "sync";
 

@@ -98,8 +98,9 @@ describe("OnboardingModal", () => {
 
     await user.click(screen.getByRole("button", { name: /get started/i }));
     await user.click(
-      screen.getByRole("button", { name: /sync across devices/i }),
+      screen.getByRole("radio", { name: /sync across devices/i }),
     );
+    await user.click(screen.getByRole("button", { name: /continue/i }));
 
     expect(screen.getByText(/your secret key/i)).toBeInTheDocument();
     expect(screen.getByText("carbon mango velvet prism")).toBeInTheDocument();
@@ -111,8 +112,9 @@ describe("OnboardingModal", () => {
 
     await user.click(screen.getByRole("button", { name: /get started/i }));
     await user.click(
-      screen.getByRole("button", { name: /sync across devices/i }),
+      screen.getByRole("radio", { name: /sync across devices/i }),
     );
+    await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(
       screen.getByRole("checkbox", { name: /i've saved my secret key/i }),
     );
@@ -126,7 +128,8 @@ describe("OnboardingModal", () => {
     render(<OnboardingModal />);
 
     await user.click(screen.getByRole("button", { name: /get started/i }));
-    await user.click(screen.getByRole("button", { name: /local only/i }));
+    await user.click(screen.getByRole("radio", { name: /local only/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
 
     // Should trigger initialization
     await waitFor(() => {
@@ -140,10 +143,12 @@ describe("OnboardingModal", () => {
 
     // Welcome -> Storage Choice
     await user.click(screen.getByRole("button", { name: /get started/i }));
-    // Storage Choice -> Passphrase Display
+    // Select sync option
     await user.click(
-      screen.getByRole("button", { name: /sync across devices/i }),
+      screen.getByRole("radio", { name: /sync across devices/i }),
     );
+    // Continue to Passphrase Display
+    await user.click(screen.getByRole("button", { name: /continue/i }));
     // Check saved checkbox
     await user.click(
       screen.getByRole("checkbox", { name: /i've saved my secret key/i }),
@@ -171,8 +176,9 @@ describe("OnboardingModal", () => {
       // Complete sync onboarding flow
       await user.click(screen.getByRole("button", { name: /get started/i }));
       await user.click(
-        screen.getByRole("button", { name: /sync across devices/i }),
+        screen.getByRole("radio", { name: /sync across devices/i }),
       );
+      await user.click(screen.getByRole("button", { name: /continue/i }));
       await user.click(
         screen.getByRole("checkbox", { name: /i've saved my secret key/i }),
       );
@@ -201,7 +207,8 @@ describe("OnboardingModal", () => {
 
       // Complete local-only onboarding flow
       await user.click(screen.getByRole("button", { name: /get started/i }));
-      await user.click(screen.getByRole("button", { name: /local only/i }));
+      await user.click(screen.getByRole("radio", { name: /local only/i }));
+      await user.click(screen.getByRole("button", { name: /continue/i }));
 
       // Wait for onboarding to complete
       await waitFor(() => {

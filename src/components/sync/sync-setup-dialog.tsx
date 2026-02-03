@@ -1,5 +1,12 @@
 import { useState, useCallback } from "react";
-import { Copy, Check, Cloud, Loader2 } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Cloud,
+  Loader2,
+  Trash2,
+  AlertTriangle,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { generatePassphrase } from "@/core/crypto/passphrase-generator";
 import { useSyncStore } from "@/stores/sync-store";
+import { useAppStore } from "@/stores/app-store";
 
 type Step = "welcome" | "passphrase" | "syncing" | "done";
 
@@ -58,23 +66,19 @@ export function SyncSetupDialog() {
     setStep("done");
   }
 
-  // If sync is already configured, show status info instead of setup
-  if (status === "synced" || status === "syncing" || status === "error") {
+  // Show status/settings dialog for all states (including local-only)
+  if (
+    status === "synced" ||
+    status === "syncing" ||
+    status === "error" ||
+    status === "local-only"
+  ) {
     return (
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Sync status</DialogTitle>
-            <DialogDescription>
-              {status === "synced" && "Your data is encrypted and synced."}
-              {status === "syncing" && "Sync is in progress..."}
-              {status === "error" &&
-                "There was a sync error. Please try again."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter showCloseButton />
-        </DialogContent>
-      </Dialog>
+      <StatusDialog
+        open={open}
+        onOpenChange={handleOpenChange}
+        status={status}
+      />
     );
   }
 
@@ -173,6 +177,115 @@ export function SyncSetupDialog() {
             </DialogFooter>
           </>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface StatusDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  status: "local-only" | "synced" | "syncing" | "error";
+}
+
+function StatusDialog({ open, onOpenChange, status }: StatusDialogProps) {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const resetApp = useAppStore((s) => s.resetApp);
+  const disableSync = useSyncStore((s) => s.disableSync);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    await resetApp();
+    disableSync();
+    onOpenChange(false);
+  };
+
+  const getStatusDescription = () => {
+    switch (status) {
+      case "local-only":
+        return "Your data is stored locally in this browser only.";
+      case "synced":
+        return "Your data is encrypted and synced across devices.";
+      case "syncing":
+        return "Sync is in progress...";
+      case "error":
+        return "There was a sync error. Please try again.";
+    }
+  };
+
+  if (showConfirm) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex justify-center py-2">
+              <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10">
+                <AlertTriangle className="size-6 text-destructive" />
+              </div>
+            </div>
+            <DialogTitle className="text-center">Delete all data?</DialogTitle>
+            <DialogDescription className="text-center">
+              This will permanently delete all your feeds and articles. This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="w-full"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 size-4" />
+                  Delete everything
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirm(false)}
+              disabled={isDeleting}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Data & storage</DialogTitle>
+          <DialogDescription>{getStatusDescription()}</DialogDescription>
+        </DialogHeader>
+
+        <div className="border-t pt-4">
+          <p className="text-sm font-medium text-destructive mb-2">
+            Danger zone
+          </p>
+          <Button
+            variant="outline"
+            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => setShowConfirm(true)}
+          >
+            <Trash2 className="mr-2 size-4" />
+            Delete all data
+          </Button>
+        </div>
+
+        <DialogFooter showCloseButton />
       </DialogContent>
     </Dialog>
   );

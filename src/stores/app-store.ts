@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { open } from "../core/storage/db.ts";
+import { open, deleteDatabase } from "../core/storage/db.ts";
 
 const ONBOARDING_KEY = "feedzero:onboarding-complete";
 
@@ -11,6 +11,7 @@ interface AppStore {
   setError: (error: string | null) => void;
   completeOnboarding: () => void;
   checkOnboardingStatus: () => void;
+  resetApp: () => Promise<void>;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -37,5 +38,11 @@ export const useAppStore = create<AppStore>((set) => ({
   checkOnboardingStatus: () => {
     const completed = localStorage.getItem(ONBOARDING_KEY) === "true";
     set({ hasCompletedOnboarding: completed });
+  },
+
+  resetApp: async () => {
+    await deleteDatabase();
+    localStorage.removeItem(ONBOARDING_KEY);
+    set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
   },
 }));

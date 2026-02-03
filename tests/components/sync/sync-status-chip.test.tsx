@@ -13,36 +13,40 @@ describe("SyncStatusChip", () => {
   });
 
   describe("color-coded states", () => {
-    it("renders with amber color for local-only status", () => {
+    it("renders with amber colors for local-only status", () => {
       useSyncStore.setState({ status: "local-only" });
       render(<SyncStatusChip />);
 
       const button = screen.getByRole("button");
       expect(button).toHaveClass("text-sync-local");
+      expect(button).toHaveClass("bg-sync-local-bg");
     });
 
-    it("renders with green color for synced status", () => {
+    it("renders with green colors for synced status", () => {
       useSyncStore.setState({ status: "synced" });
       render(<SyncStatusChip />);
 
       const button = screen.getByRole("button");
       expect(button).toHaveClass("text-sync-synced");
+      expect(button).toHaveClass("bg-sync-synced-bg");
     });
 
-    it("renders with red color for error status", () => {
+    it("renders with red colors for error status", () => {
       useSyncStore.setState({ status: "error" });
       render(<SyncStatusChip />);
 
       const button = screen.getByRole("button");
       expect(button).toHaveClass("text-sync-error");
+      expect(button).toHaveClass("bg-sync-error-bg");
     });
 
-    it("renders with muted color for syncing status", () => {
+    it("renders with muted colors for syncing status", () => {
       useSyncStore.setState({ status: "syncing" });
       render(<SyncStatusChip />);
 
       const button = screen.getByRole("button");
       expect(button).toHaveClass("text-muted-foreground");
+      expect(button).toHaveClass("bg-muted");
     });
   });
 

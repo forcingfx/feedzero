@@ -9,10 +9,10 @@ const STATUS_CONFIG = {
 } as const;
 
 const STATUS_COLOR_CLASS: Record<SyncStatus, string> = {
-  "local-only": "text-sync-local",
-  syncing: "text-muted-foreground",
-  synced: "text-sync-synced",
-  error: "text-sync-error",
+  "local-only": "text-sync-local bg-sync-local-bg",
+  syncing: "text-muted-foreground bg-muted",
+  synced: "text-sync-synced bg-sync-synced-bg",
+  error: "text-sync-error bg-sync-error-bg",
 };
 
 export function SyncStatusChip() {
