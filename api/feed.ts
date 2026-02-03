@@ -1,4 +1,4 @@
-import { handleProxyRequest } from "../src/core/proxy/proxy-handler.ts";
+import { handleProxyRequest } from "../src/core/proxy/proxy-handler.js";
 
 /**
  * Vercel serverless function for proxying RSS/Atom/JSON feed requests.

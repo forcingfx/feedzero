@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { handleProxyRequest } from "../../src/core/proxy/proxy-handler.ts";
+import { handleProxyRequest } from "../../src/core/proxy/proxy-handler.js";
 
 describe("Proxy API Endpoints", () => {
   beforeEach(() => {

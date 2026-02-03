@@ -1,4 +1,4 @@
-import { validateProxyUrl } from "./validate-url.ts";
+import { validateProxyUrl } from "./validate-url.js";
 
 /**
  * Shared proxy logic for serverless functions.
