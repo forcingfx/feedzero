@@ -7,17 +7,27 @@ import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
 import { OnboardingModal } from "@/components/onboarding/onboarding-modal.tsx";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 
+const DEFAULT_PASSPHRASE = "feedzero-default-key";
+
 function AppInit({ children }: { children: React.ReactNode }) {
   const isDbReady = useAppStore((s) => s.isDbReady);
   const error = useAppStore((s) => s.error);
   const hasCompletedOnboarding = useAppStore((s) => s.hasCompletedOnboarding);
   const checkOnboardingStatus = useAppStore((s) => s.checkOnboardingStatus);
+  const initialize = useAppStore((s) => s.initialize);
   const loadFeeds = useFeedStore((s) => s.loadFeeds);
   const refreshAll = useFeedStore((s) => s.refreshAll);
 
   useEffect(() => {
     checkOnboardingStatus();
   }, []);
+
+  // For returning users who completed onboarding, initialize the database
+  useEffect(() => {
+    if (hasCompletedOnboarding === true && !isDbReady) {
+      initialize(DEFAULT_PASSPHRASE);
+    }
+  }, [hasCompletedOnboarding, isDbReady, initialize]);
 
   useEffect(() => {
     if (isDbReady) {
