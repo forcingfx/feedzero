@@ -1,0 +1,19 @@
+{
+  // TypeScript configuration for Vercel serverless functions in api/ directory.
+  // This extends the main tsconfig.json but includes the api/ directory and
+  // core modules needed by the serverless functions.
+  // Used by: Vercel build process for API endpoints
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "noEmit": false,
+    "outDir": ".vercel/output/functions",
+    "rootDir": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+    },
+  },
+  "include": ["api/**/*", "src/core/**/*", "src/utils/**/*"],
+}

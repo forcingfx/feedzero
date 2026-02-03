@@ -1,4 +1,4 @@
-import { ok, err, type Result } from "@/utils/result";
+import { ok, err, type Result } from "../../utils/result.ts";
 
 const BLOCKED_HOSTNAMES = new Set([
   "localhost",

@@ -116,12 +116,44 @@ URL is the source of truth for navigation. `FeedsPage` syncs URL params to Zusta
 
 ## CORS Proxy
 
-Browsers block cross-origin fetches. In development, `vite.config.js` defines a plugin with two proxy endpoints:
+Browsers block cross-origin fetches. The app uses server-side proxying to bypass CORS restrictions.
+
+### Development (Vite Plugin)
+
+`vite.config.js` defines a middleware plugin with two proxy endpoints:
 
 - `/api/feed?url=<encoded>` — fetches RSS/Atom/JSON feeds
 - `/api/page?url=<encoded>` — fetches article web pages for full-text extraction
 
-Both use the same `proxyHandler()` function. Production will require a dedicated proxy or server function.
+The Vite plugin calls `handleProxyRequest()` from `src/core/proxy/proxy-handler.ts`.
+
+### Production (Vercel Serverless Functions)
+
+Vercel automatically handles TypeScript in the `api/` directory as serverless functions:
+
+- `api/feed.ts` → `/api/feed` endpoint (Node.js 20.x runtime)
+- `api/page.ts` → `/api/page` endpoint (Node.js 20.x runtime)
+
+Both import and delegate to the shared `handleProxyRequest()` function.
+
+### TypeScript Configuration
+
+- **`tsconfig.json`** — Main config for frontend (`src/`, `tests/`)
+- **`tsconfig.api.json`** — Extends main config, includes `api/` directory for Vercel build
+
+The dual-config setup ensures:
+- Frontend uses bundler module resolution (Vite)
+- API functions compile correctly for Node.js ESM runtime
+- Both configs enforce strict type checking
+
+### SSRF Protection
+
+All proxy requests are validated by `validateProxyUrl()` in `src/core/proxy/validate-url.ts`:
+
+- Blocks `localhost`, `127.0.0.1`, `::1`, `0.0.0.0`
+- Blocks private IP ranges: `10.x`, `192.168.x`, `172.16-31.x`
+- Blocks AWS metadata endpoint: `169.254.169.254`
+- Only allows `http://` and `https://` protocols
 
 ## Styling
 

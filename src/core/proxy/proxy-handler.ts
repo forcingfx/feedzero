@@ -1,8 +1,16 @@
-import { validateProxyUrl } from "./validate-url";
+import { validateProxyUrl } from "./validate-url.ts";
 
 /**
  * Shared proxy logic for serverless functions.
  * Validates the target URL, fetches it, and returns the response.
+ *
+ * Used by:
+ * - Vercel serverless functions (api/feed.ts, api/page.ts) in production
+ * - Vite dev server middleware (vite.config.js) in development
+ *
+ * @param req - The incoming request with ?url=<target> query parameter
+ * @param defaultContentType - Fallback content type if upstream doesn't provide one
+ * @returns Response with proxied content or error message
  */
 export async function handleProxyRequest(
   req: Request,
@@ -14,7 +22,9 @@ export async function handleProxyRequest(
   const validation = validateProxyUrl(target);
   if (!validation.ok) {
     const status =
-      validation.error === "Access to internal addresses is blocked" ? 403 : 400;
+      validation.error === "Access to internal addresses is blocked"
+        ? 403
+        : 400;
     return new Response(validation.error, { status });
   }
 

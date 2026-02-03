@@ -126,7 +126,11 @@ Single CSS entry point: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite`
 
 ### CORS Proxy
 
-`vite.config.js` defines a dev-only Vite plugin that proxies `/api/feed?url=<encoded>` and `/api/page?url=<encoded>` to fetch feeds/pages server-side, bypassing browser CORS restrictions. Production will need a real proxy.
+**Development:** `vite.config.js` defines a Vite plugin that proxies `/api/feed?url=<encoded>` and `/api/page?url=<encoded>` server-side, bypassing browser CORS restrictions.
+
+**Production:** Vercel serverless functions (`api/feed.ts`, `api/page.ts`) handle proxying. Both dev and production use shared logic from `src/core/proxy/proxy-handler.ts`.
+
+**TypeScript setup:** `tsconfig.api.json` extends the main config to include the `api/` directory for Vercel's build process. API functions require `.ts` file extensions in imports for Node.js ESM compatibility. Path aliases (`@/`) don't work in serverless runtime — use relative paths.
 
 **SSRF protections** — The proxy blocks requests to internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http:`/`https:` protocols. Do not weaken these checks.
 
