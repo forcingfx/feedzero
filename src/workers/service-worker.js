@@ -26,11 +26,6 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Never cache API requests - let them pass through directly
-  if (url.pathname.startsWith("/api/")) {
-    return; // Don't intercept, let the browser handle it normally
-  }
-
   // Network-first for feed fetches (external URLs)
   if (url.origin !== self.location.origin) {
     event.respondWith(

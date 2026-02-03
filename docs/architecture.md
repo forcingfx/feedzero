@@ -116,41 +116,12 @@ URL is the source of truth for navigation. `FeedsPage` syncs URL params to Zusta
 
 ## CORS Proxy
 
-Browsers block cross-origin fetches. The app uses server-side proxying to bypass CORS restrictions.
-
-### Development (Vite Plugin)
-
-`vite.config.js` defines a middleware plugin with two proxy endpoints:
+Browsers block cross-origin fetches. In development, `vite.config.js` defines a plugin with two proxy endpoints:
 
 - `/api/feed?url=<encoded>` — fetches RSS/Atom/JSON feeds
 - `/api/page?url=<encoded>` — fetches article web pages for full-text extraction
 
-The Vite plugin calls `handleProxyRequest()` from `src/core/proxy/proxy-handler.ts`.
-
-### Production (Vercel Serverless Functions)
-
-Vercel automatically handles TypeScript in the `api/` directory as serverless functions:
-
-- `api/feed.ts` → `/api/feed` endpoint
-- `api/page.ts` → `/api/page` endpoint
-
-**Implementation**: Both functions have all proxy logic **inlined** (no external imports). Vercel transpiles TypeScript but doesn't bundle dependencies, so importing from `../src/core/proxy/` would fail at runtime. Each function is self-contained (~130 lines including SSRF validation and error handling).
-
-### TypeScript Configuration
-
-- **`tsconfig.json`** — Config for frontend (`src/`) and tests (`tests/`)
-- Serverless functions don't need separate config - Vercel handles TypeScript automatically
-
-### SSRF Protection
-
-All proxy requests are validated (logic inlined in both `api/feed.ts` and `api/page.ts`):
-
-- Blocks `localhost`, `127.0.0.1`, `::1`, `0.0.0.0`
-- Blocks private IP ranges: `10.x`, `192.168.x`, `172.16-31.x`
-- Blocks AWS metadata endpoint: `169.254.169.254`
-- Only allows `http://` and `https://` protocols
-
-**Note**: The original validation logic is in `src/core/proxy/validate-url.ts`, used by the Vite dev server. The production functions have this same logic inlined to avoid import dependencies.
+Both use the same `proxyHandler()` function. Production will require a dedicated proxy or server function.
 
 ## Styling
 
