@@ -426,5 +426,86 @@ describe("sync-store", () => {
 
       expect(mockPushVault).not.toHaveBeenCalled();
     });
+
+    it("resets feed store (clears feeds and selectedFeedId)", async () => {
+      const { useFeedStore } = await import("../../src/stores/feed-store");
+      useFeedStore.setState({
+        feeds: [
+          {
+            id: "f1",
+            title: "Test",
+            url: "https://example.com/feed",
+            description: "",
+            siteUrl: "",
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        ],
+        selectedFeedId: "f1",
+      });
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+      });
+
+      await useSyncStore.getState().logout();
+
+      const feedState = useFeedStore.getState();
+      expect(feedState.feeds).toEqual([]);
+      expect(feedState.selectedFeedId).toBeNull();
+    });
+
+    it("resets article store (clears articles and selectedArticle)", async () => {
+      const { useArticleStore } =
+        await import("../../src/stores/article-store");
+      const mockArticle = {
+        id: "a1",
+        feedId: "f1",
+        guid: "g1",
+        title: "Article",
+        link: "",
+        content: "",
+        summary: "",
+        author: "",
+        publishedAt: 0,
+        read: false,
+        createdAt: 0,
+      };
+      useArticleStore.setState({
+        articles: [mockArticle],
+        selectedArticle: mockArticle,
+      });
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+      });
+
+      await useSyncStore.getState().logout();
+
+      const articleState = useArticleStore.getState();
+      expect(articleState.articles).toEqual([]);
+      expect(articleState.selectedArticle).toBeNull();
+    });
+
+    it("resets onboarding store to initial state", async () => {
+      const { useOnboardingStore } =
+        await import("../../src/stores/onboarding-store");
+      useOnboardingStore.setState({
+        step: "passphrase-confirm",
+        storageMode: "sync",
+        generatedPassphrase: "some old passphrase",
+      });
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+      });
+
+      await useSyncStore.getState().logout();
+
+      const onboardingState = useOnboardingStore.getState();
+      expect(onboardingState.step).toBe("welcome");
+      expect(onboardingState.storageMode).toBeNull();
+      expect(onboardingState.generatedPassphrase).toBe("");
+    });
   });
 });

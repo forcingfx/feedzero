@@ -103,9 +103,15 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       error: null,
       passphrase: null,
     });
-    // Lazy import to avoid circular dependency at module load time
+    // Lazy imports to avoid circular dependencies at module load time
     const { useAppStore } = await import("./app-store.ts");
+    const { useFeedStore } = await import("./feed-store.ts");
+    const { useArticleStore } = await import("./article-store.ts");
+    const { useOnboardingStore } = await import("./onboarding-store.ts");
     useAppStore.setState({ isDbReady: false, hasCompletedOnboarding: false });
+    useFeedStore.setState({ feeds: [], selectedFeedId: null });
+    useArticleStore.setState({ articles: [], selectedArticle: null });
+    useOnboardingStore.getState().reset();
   },
 
   push: async () => {

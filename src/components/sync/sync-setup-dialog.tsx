@@ -337,7 +337,7 @@ export function SyncSetupDialog() {
           </div>
         }
         title="Log out of this device?"
-        description="This will clear all local data from this browser. Your encrypted cloud backup is preserved. You can restore it anytime by entering your secret key."
+        description="This will clear all local data from this browser. Your encrypted cloud backup is preserved — you will need your secret key to access your feeds again."
         confirmLabel="Log out"
         loadingLabel="Logging out..."
         isLoading={isLoggingOut}

@@ -166,6 +166,30 @@ describe("SyncSetupDialog", () => {
     });
   });
 
+  describe("logout confirmation", () => {
+    beforeEach(() => {
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+        lastSyncedAt: Date.now(),
+        dialogOpen: true,
+      });
+    });
+
+    it("warns user they will need their secret key to access feeds again", async () => {
+      const user = userEvent.setup();
+      render(<SyncSetupDialog />);
+
+      await user.click(
+        screen.getByRole("button", { name: /log out of this device/i }),
+      );
+
+      expect(
+        screen.getByText(/you will need your secret key/i),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("syncing status", () => {
     it("disables Switch to local only while syncing", () => {
       useSyncStore.setState({
