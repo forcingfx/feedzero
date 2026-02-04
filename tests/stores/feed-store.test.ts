@@ -175,6 +175,80 @@ describe("feed-store", () => {
     });
   });
 
+  describe("pull-before-refresh", () => {
+    it("pulls sync blob before refreshing for sync users", async () => {
+      const callOrder: string[] = [];
+      const pullSpy = vi
+        .spyOn(useSyncStore.getState(), "pull")
+        .mockImplementation(async () => {
+          callOrder.push("pull");
+        });
+      vi.mocked(refreshAllFeeds).mockImplementation(async () => {
+        callOrder.push("refreshAllFeeds");
+        return { ok: true, value: { results: [] } };
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+      useSyncStore.setState({ passphrase: "test-passphrase" });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(pullSpy).toHaveBeenCalled();
+      expect(callOrder.indexOf("pull")).toBeLessThan(
+        callOrder.indexOf("refreshAllFeeds"),
+      );
+      pullSpy.mockRestore();
+    });
+
+    it("does not pull for local-only users", async () => {
+      const pullSpy = vi.spyOn(useSyncStore.getState(), "pull");
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+      useSyncStore.setState({ passphrase: null });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(pullSpy).not.toHaveBeenCalled();
+      pullSpy.mockRestore();
+    });
+
+    it("reloads feeds from DB after pull before refreshing", async () => {
+      const callOrder: string[] = [];
+      const newFeed = mockFeed("pulled", "Pulled Feed");
+      let getFeedsCallCount = 0;
+
+      vi.spyOn(useSyncStore.getState(), "pull").mockImplementation(async () => {
+        callOrder.push("pull");
+      });
+      vi.mocked(getFeeds).mockImplementation(async () => {
+        getFeedsCallCount++;
+        callOrder.push(`getFeeds-${getFeedsCallCount}`);
+        if (getFeedsCallCount === 1) {
+          return { ok: true, value: [newFeed] };
+        }
+        return { ok: true, value: [newFeed] };
+      });
+      vi.mocked(refreshAllFeeds).mockImplementation(async () => {
+        callOrder.push("refreshAllFeeds");
+        return { ok: true, value: { results: [] } };
+      });
+      useSyncStore.setState({ passphrase: "test-passphrase" });
+
+      await useFeedStore.getState().refreshAll();
+
+      // After pull, getFeeds should be called to load pulled feeds,
+      // then refreshAllFeeds, then getFeeds again for final state
+      expect(callOrder).toEqual([
+        "pull",
+        "getFeeds-1",
+        "refreshAllFeeds",
+        "getFeeds-2",
+      ]);
+    });
+  });
+
   describe("sync triggers", () => {
     let scheduleSpy: ReturnType<typeof vi.spyOn>;
 

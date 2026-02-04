@@ -78,6 +78,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     if (get().isRefreshingAll) return;
     set({ isRefreshingAll: true });
     try {
+      const syncStore = useSyncStore.getState();
+      if (syncStore.passphrase) {
+        await syncStore.pull();
+        const pulled = await getFeeds();
+        if (pulled.ok) set({ feeds: pulled.value });
+      }
       await refreshAllFeeds();
       const allFeeds = await getFeeds();
       if (allFeeds.ok) set({ feeds: allFeeds.value });
