@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm test              # Run all unit/integration tests (Vitest)
 npm run test:watch    # Run tests in watch mode
-npm run test:coverage # Run with V8 coverage (90% threshold enforced)
+npm run test:coverage # Run with V8 coverage (thresholds enforced)
 npm run test:e2e      # Run Playwright E2E tests
 npm run dev           # Dev server on http://localhost:3000
 npm run serve         # Standalone Hono server (self-hosting, requires build first)
@@ -137,17 +137,35 @@ Single CSS entry point: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite`
 
 ### Testing
 
-- Vitest with happy-dom environment. `fake-indexeddb` needed for db.ts tests.
-- React Testing Library + userEvent for component tests. Setup file: `tests/setup.ts`.
-- Store tests use Zustand's `getState()`/`setState()` directly — no React rendering needed.
-- Test files mirror source structure under `tests/`.
-- Coverage threshold: 90% branches/functions/lines/statements. `src/workers/**` excluded from coverage.
-- E2E tests (Playwright): test dir is `tests/e2e/`, runs on port 3001 (separate from dev server on 3000).
-- Note: DOMPurify + happy-dom will execute inline scripts during sanitization. Use non-callable code in test fixtures (e.g., `var x = 1;` not `alert(1)`).
-- **happy-dom DOM fidelity gaps:** happy-dom's DOMParser does not behave identically to browser DOMParser. Known differences:
-  - `querySelector` with CSS-escaped colons (e.g. `content\\:encoded`) may work in happy-dom but fail in browsers. Always use `getElementsByTagName` for XML namespace-prefixed elements.
-  - `CDATA` sections in XML with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead of `<![CDATA[<p>]]>` in test fixtures.
-  - When writing parser tests, always include fixtures with real RSS namespace prefixes (`content:encoded`, `dc:creator`) to catch selector issues that only manifest in browsers.
+Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) for the full guide.
+
+**Tier 1 — Unit/Integration (Vitest + happy-dom, ~500+ tests):**
+- Core modules, stores, components, hooks. Test files mirror `src/` under `tests/`.
+- `fake-indexeddb` for db.ts tests. React Testing Library + userEvent for components.
+- Store tests use `getState()`/`setState()` directly — no React rendering needed.
+- Setup file: `tests/setup.ts`.
+
+**Tier 2 — Structural Assertions (Vitest + RTL, ~57 tests):**
+- Verify critical CSS classes (`overflow-hidden`, `min-h-0`, `h-svh`), ARIA attributes (`role="listbox"`, `aria-selected`), and DOM composition.
+- Catch layout regressions that happy-dom can't detect via computed styles but can detect via class presence.
+- Located in `tests/components/` alongside unit tests.
+
+**Tier 3 — E2E (Playwright + Chromium, 56 tests across 9 spec files):**
+- Two viewport projects: `desktop` (1280x720) and `mobile` (Pixel 5, 393x851).
+- Test dir: `tests/e2e/`. Dev server on port 3001 (separate from dev on 3000).
+- Feed responses mocked via `page.route()` with fixtures in `tests/e2e/feed-fixtures.ts`.
+- Onboarding bypassed via `localStorage` in `tests/e2e/fixtures.ts`.
+
+**Coverage thresholds (enforced by `npm run test:coverage`):**
+- Statements/Lines/Functions: 90%. Branches: 83%.
+- Excluded: `src/workers/**`, `src/main.tsx`, `src/**/*.d.ts`, `src/types/**`, `src/core/extractor/adapters/types.ts`, `src/core/sync/types.ts`, `src/components/ui/**` (shadcn wrappers).
+
+**happy-dom gotchas:**
+- DOMPurify + happy-dom executes inline scripts during sanitization. Use non-callable code in test fixtures (e.g., `var x = 1;` not `alert(1)`).
+- `querySelector` with CSS-escaped colons (e.g. `content\\:encoded`) may work in happy-dom but fail in browsers. Always use `getElementsByTagName` for XML namespace-prefixed elements.
+- `CDATA` sections with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead of `<![CDATA[<p>]]>`.
+- `isContentEditable` may not behave identically to browsers. Dispatch keyboard events from the target element, not `document`.
+- Radix UI `AlertDialog` renders curly quotes (`\u201C`/`\u201D`). Use flexible regex matchers (e.g., `/Remove.*Feed Name/`).
 
 ### App Initialization Flow
 

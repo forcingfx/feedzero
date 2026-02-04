@@ -198,6 +198,31 @@ Optional cloud sync that stores only opaque encrypted blobs on the server. See [
 - Storage adapter pattern: filesystem (default), Vercel Blob (opt-in), memory (dev/tests)
 - Standalone Hono server (`server.ts`) for self-hosting; Vercel wrappers for cloud deployment
 
+## Testing
+
+Three-tier strategy. Full details in [Testing Strategy](testing-strategy.md).
+
+```
+┌─────────────────────────────────────────────────────┐
+│  E2E Tests (Playwright)                              │
+│  9 spec files, 56 tests                              │
+│  Desktop (1280x720) + Mobile (393x851)               │
+│  Real Chromium, Vite dev server on port 3001         │
+├─────────────────────────────────────────────────────┤
+│  Structural Assertions (Vitest + RTL)                │
+│  7 test files, ~57 tests                             │
+│  CSS classes, ARIA attributes, DOM composition       │
+├─────────────────────────────────────────────────────┤
+│  Unit / Integration Tests (Vitest + happy-dom)       │
+│  ~50 test files, 500+ tests                          │
+│  Core modules, stores, components, hooks             │
+└─────────────────────────────────────────────────────┘
+```
+
+Test files mirror `src/` under `tests/`. Vitest matches `*.test.{js,ts,tsx}`. Playwright matches `*.spec.ts` in `tests/e2e/`.
+
+Coverage thresholds: 90% statements/lines/functions, 83% branches. shadcn/ui wrappers (`src/components/ui/**`) and type-only files excluded from coverage.
+
 ## Storage Model
 
 Dexie.js manages IndexedDB with these stores:
