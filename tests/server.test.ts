@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createApp } from "../server";
 import { SUPPORTED_METHODS } from "../src/core/sync/sync-handler";
-import * as vercelSyncExports from "../api/sync";
+import * as vercelSyncExports from "../src/api/sync";
 
 // Mock fetch globally for proxy handler tests
 const mockFetch = vi.fn();

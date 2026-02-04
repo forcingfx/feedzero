@@ -1,28 +1,29 @@
 /**
- * Bundles each api/*.ts serverless function into a self-contained .mjs file.
+ * Bundles each src/api/*.ts serverless function into a self-contained api/*.js file.
  *
  * Vercel's Node.js builder does NOT bundle imports from src/ — it compiles
  * each api/*.ts file individually. This script uses esbuild to inline all
  * dependencies so the output files are self-contained and work in any
  * serverless runtime (Vercel, Cloudflare, plain Node.js).
  *
- * Output files (api/*.mjs) are gitignored build artifacts.
- * Vercel prefers .mjs over .ts for ESM projects.
+ * Source: src/api/*.ts (tracked in git)
+ * Output: api/*.js (gitignored build artifacts)
  */
 import esbuild from "esbuild";
 import { readdirSync } from "fs";
 import path from "path";
 
-const apiDir = path.resolve("api");
-const entryPoints = readdirSync(apiDir)
+const srcDir = path.resolve("src/api");
+const outDir = path.resolve("api");
+
+const entryPoints = readdirSync(srcDir)
   .filter((f) => f.endsWith(".ts"))
-  .map((f) => path.join(apiDir, f));
+  .map((f) => path.join(srcDir, f));
 
 await esbuild.build({
   entryPoints,
   bundle: true,
-  outdir: apiDir,
-  outExtension: { ".js": ".mjs" },
+  outdir: outDir,
   format: "esm",
   platform: "node",
   target: "node20",
@@ -31,5 +32,5 @@ await esbuild.build({
 
 console.log(
   `Bundled ${entryPoints.length} API functions:`,
-  entryPoints.map((f) => path.basename(f, ".ts") + ".mjs").join(", "),
+  entryPoints.map((f) => path.basename(f, ".ts") + ".js").join(", "),
 );

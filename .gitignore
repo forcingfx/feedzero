@@ -1,7 +1,7 @@
 node_modules/
 dist/
 coverage/
-api/*.mjs
+api/*.js
 .env
 .env.*
 test-results/
