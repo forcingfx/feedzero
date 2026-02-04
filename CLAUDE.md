@@ -168,7 +168,7 @@ Single CSS entry point: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite`
 All API handlers use the Web standard `Request → Response` pattern via shared handler functions (`proxy-handler.ts`, `sync-handler.ts`). Three entry points consume these handlers:
 
 - **`server.ts`** — Hono standalone server for self-hosting (`npm run serve`). Mounts proxy + sync handlers + static file serving.
-- **`api/*.ts`** — Vercel Serverless Functions. All three (`api/feed.ts`, `api/page.ts`, `api/sync.ts`) import shared handlers from `src/core/`.
+- **`api/*.ts`** — Vercel Serverless Functions. In git, these are thin wrappers (~5-10 lines) that import shared handlers from `src/core/`. During build, `scripts/build-api.js` replaces their content with self-contained esbuild bundles (all deps inlined) because **Vercel's builder compiles each `.ts` individually without bundling cross-directory imports**. See ADR 007.
 - **`vite.config.js`** — Dev proxy using lazy-imported shared handlers with a memory adapter for sync.
 
 **Endpoints**: `/api/feed?url=<encoded>` (feed proxy), `/api/page?url=<encoded>` (page proxy), `/api/sync` (GET/PUT/DELETE encrypted vault).
@@ -179,7 +179,9 @@ All API handlers use the Web standard `Request → Response` pattern via shared 
 
 ### Deployment
 
-Deployed on **Vercel**. `vercel.json` configures SPA routing (rewrites non-API paths to `index.html`). API routes (`/api/*`) pass through to serverless functions in `api/`.
+Deployed on **Vercel**. Build command: `npm run build:all` (Vite SPA build + `scripts/build-api.js` serverless function bundling). Output directory: `dist/`. `vercel.json` configures SPA routing (rewrites non-API paths to `index.html`). API routes (`/api/*`) pass through to serverless functions in `api/`.
+
+**Adding a new serverless function:** Create `api/<name>.ts` that imports from `src/core/`. The build script auto-discovers all `api/*.ts` files and bundles them. No extra config needed. Mark any Vercel-provided runtime packages (like `@vercel/blob`) as `external` in `scripts/build-api.js`.
 
 ### Linting & Formatting
 

@@ -120,7 +120,7 @@ URL is the source of truth for navigation. `FeedsPage` syncs URL params to Zusta
 All API handlers use the Web standard `Request -> Response` pattern via shared handler functions (`proxy-handler.ts`, `sync-handler.ts`). Three entry points consume them:
 
 - **`server.ts`** — Hono standalone server for self-hosting (`npm run serve`)
-- **`api/*.ts`** — Vercel Serverless Functions. All three (`api/feed.ts`, `api/page.ts`, `api/sync.ts`) import shared handlers from `src/core/`.
+- **`api/*.ts`** — Vercel Serverless Functions. In git, these are thin wrappers that import shared handlers from `src/core/`. During `npm run build:all`, `scripts/build-api.js` replaces their content with self-contained esbuild bundles (all deps inlined) because Vercel's builder does not bundle cross-directory imports. See ADR 007.
 - **`vite.config.js`** — Dev proxy using lazy-imported shared handlers with a memory adapter for sync.
 
 Endpoints:

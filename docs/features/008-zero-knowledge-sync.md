@@ -97,7 +97,7 @@ Server storage uses a pluggable adapter interface:
 All API handlers use the Web standard `Request -> Response` pattern. Three entry points:
 
 - `server.ts` — Hono standalone server (`npm run serve`) for self-hosting
-- `api/sync.ts` — Vercel serverless wrapper
+- `api/sync.ts` — Vercel serverless wrapper (thin wrapper in git; pre-bundled with all deps inlined during build — see ADR 007)
 - `vite.config.js` — Dev proxy with memory adapter
 
 ### Files
@@ -115,7 +115,7 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 | `src/core/sync/adapters/resolve-adapter.ts` | Reads `SYNC_STORAGE` env var, returns adapter |
 | `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `scheduleSyncPush` |
 | `server.ts` | Hono standalone server |
-| `api/sync.ts` | Vercel serverless wrapper |
+| `api/sync.ts` | Vercel serverless wrapper (pre-bundled during build, ADR 007) |
 
 ### Tests
 
