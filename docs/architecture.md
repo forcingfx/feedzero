@@ -99,10 +99,11 @@ Core Modules (framework-agnostic TypeScript)
 IndexedDB (encrypted via Dexie + Web Crypto)
 ```
 
-- **app-store** — DB initialization, global error state
-- **feed-store** — Feed CRUD, selection, refresh. Debounces concurrent refreshAll calls.
-- **article-store** — Article list for selected feed, selection (auto-marks read), read state
+- **app-store** — DB initialization, global error state, onboarding status. `initializeReturningUser()` handles returning-user flow (detect storage mode, open DB, optionally pull sync).
+- **feed-store** — Feed CRUD, selection, refresh. Debounces concurrent refreshAll calls. Triggers sync push after mutations.
+- **article-store** — Article list for selected feed, selection (auto-marks read), read state. Triggers sync push after mark-as-read.
 - **extraction-store** — Extraction cache (link → HTML), view mode toggle, fetch status
+- **sync-store** — Cloud sync state: `enableSync`, `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce). Passphrase persistence in localStorage.
 
 ## Routing
 
@@ -114,14 +115,23 @@ IndexedDB (encrypted via Dexie + Web Crypto)
 
 URL is the source of truth for navigation. `FeedsPage` syncs URL params to Zustand stores. Desktop (≥1024px) shows all 3 panels in a CSS grid. Mobile (<1024px) shows one panel at a time with back navigation.
 
-## CORS Proxy
+## CORS Proxy & API Layer
 
-Browsers block cross-origin fetches. In development, `vite.config.js` defines a plugin with two proxy endpoints:
+All API handlers use the Web standard `Request -> Response` pattern via shared handler functions (`proxy-handler.ts`, `sync-handler.ts`). Three entry points consume them:
 
-- `/api/feed?url=<encoded>` — fetches RSS/Atom/JSON feeds
-- `/api/page?url=<encoded>` — fetches article web pages for full-text extraction
+- **`server.ts`** — Hono standalone server for self-hosting (`npm run serve`)
+- **`api/*.ts`** — Vercel Serverless Functions. All three (`api/feed.ts`, `api/page.ts`, `api/sync.ts`) import shared handlers from `src/core/`.
+- **`vite.config.js`** — Dev proxy using lazy-imported shared handlers with a memory adapter for sync.
 
-Both use the same `proxyHandler()` function. Production will require a dedicated proxy or server function.
+Endpoints:
+
+- `/api/feed?url=<encoded>` — Proxies RSS/Atom/JSON feed requests (CORS bypass)
+- `/api/page?url=<encoded>` — Proxies web page requests for full-text extraction
+- `/api/sync` — GET retrieves encrypted vault, PUT stores encrypted vault
+
+### SSRF Protection
+
+All proxy endpoints block internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16-31.x, 192.168.x, 169.254.169.254) and only allow http/https protocols.
 
 ## Styling
 
@@ -172,6 +182,15 @@ main.tsx → app.tsx
 - Each record encrypted with random 12-byte IV
 - Stored as `{id, iv, ciphertext, ...indexFields}` — content encrypted, index fields in plaintext for Dexie queries
 - Key derived once on app open, held in memory, cleared on close
+
+## Zero-Knowledge Sync
+
+Optional cloud sync that stores only opaque encrypted blobs on the server. See [Feature 008](features/008-zero-knowledge-sync.md) and [ADR 006](decisions/006-sync-storage-and-passphrase.md).
+
+- Passphrase derives both vault ID (lookup key) and encryption key via separate PBKDF2 derivations
+- Full-state sync: entire vault pushed/pulled as one encrypted blob
+- Storage adapter pattern: filesystem (default), Vercel Blob (opt-in), memory (dev/tests)
+- Standalone Hono server (`server.ts`) for self-hosting; Vercel wrappers for cloud deployment
 
 ## Storage Model
 

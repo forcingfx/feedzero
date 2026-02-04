@@ -14,6 +14,17 @@ vi.mock("@/core/crypto/passphrase-generator", () => ({
   generatePassphrase: vi.fn(() => "carbon mango velvet prism"),
 }));
 
+vi.mock("@/core/sync/sync-service", () => ({
+  pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
+  pullVault: vi
+    .fn()
+    .mockResolvedValue({
+      ok: true,
+      value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+    }),
+  importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
+}));
+
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {

@@ -60,3 +60,26 @@ The `meta` store is unencrypted (stores encryption salt).
 ### Migration Strategy
 
 Schema migrations are handled by Dexie's `version().stores()` API in `db.js`.
+
+### Sync Vault (server-side)
+
+The sync server stores encrypted vault blobs. The server never sees plaintext.
+
+#### VaultData (plaintext, client-side only)
+
+| Field      | Type      | Description                          |
+|------------|-----------|--------------------------------------|
+| version    | number    | Format version (currently 1)         |
+| exportedAt | number    | Unix ms timestamp of export          |
+| feeds      | Feed[]    | All feeds                            |
+| articles   | Article[] | All articles                         |
+
+#### EncryptedVault (stored on server)
+
+| Field      | Type     | Description                          |
+|------------|----------|--------------------------------------|
+| version    | number   | Format version (currently 1)         |
+| iv         | number[] | 12-byte AES-GCM initialization vector|
+| ciphertext | string   | Base64-encoded encrypted VaultData   |
+
+Vault ID (64-char hex) is derived from the passphrase via PBKDF2 and used as the server-side lookup key. See [ADR 006](decisions/006-sync-storage-and-passphrase.md).

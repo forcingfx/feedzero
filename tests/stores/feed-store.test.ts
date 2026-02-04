@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
+import { useSyncStore } from "../../src/stores/sync-store.ts";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
   getFeeds: vi.fn(),
@@ -13,18 +14,36 @@ vi.mock("../../src/core/feeds/feed-service.ts", () => ({
   refreshAllFeeds: vi.fn(),
 }));
 
+vi.mock("../../src/core/sync/sync-service", () => ({
+  pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
+  pullVault: vi.fn(),
+  importVault: vi.fn(),
+}));
+
 import { getFeeds, getFeed, removeFeed } from "../../src/core/storage/db.ts";
-import { addFeedFlow, refreshFeed, refreshAllFeeds } from "../../src/core/feeds/feed-service.ts";
+import {
+  addFeedFlow,
+  refreshFeed,
+  refreshAllFeeds,
+} from "../../src/core/feeds/feed-service.ts";
 
 const mockFeed = (id: string, title: string) => ({
-  id, url: `https://${id}.com/feed`, title, description: "",
-  siteUrl: `https://${id}.com`, createdAt: Date.now(), updatedAt: Date.now(),
+  id,
+  url: `https://${id}.com/feed`,
+  title,
+  description: "",
+  siteUrl: `https://${id}.com`,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
 });
 
 describe("feed-store", () => {
   beforeEach(() => {
     useFeedStore.setState({
-      feeds: [], selectedFeedId: null, isLoading: false, error: null,
+      feeds: [],
+      selectedFeedId: null,
+      isLoading: false,
+      error: null,
     });
     vi.clearAllMocks();
   });
@@ -47,7 +66,10 @@ describe("feed-store", () => {
     });
 
     it("sets error on failure", async () => {
-      vi.mocked(getFeeds).mockResolvedValue({ ok: false, error: "load failed" });
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: false,
+        error: "load failed",
+      });
 
       await useFeedStore.getState().loadFeeds();
 
@@ -60,7 +82,8 @@ describe("feed-store", () => {
     it("calls addFeedFlow and reloads feeds", async () => {
       const feed = mockFeed("new", "New Feed");
       vi.mocked(addFeedFlow).mockResolvedValue({
-        ok: true, value: { feed, articles: [] },
+        ok: true,
+        value: { feed, articles: [] },
       });
       vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
 
@@ -72,7 +95,10 @@ describe("feed-store", () => {
     });
 
     it("sets error on failure", async () => {
-      vi.mocked(addFeedFlow).mockResolvedValue({ ok: false, error: "not a feed" });
+      vi.mocked(addFeedFlow).mockResolvedValue({
+        ok: false,
+        error: "not a feed",
+      });
 
       await useFeedStore.getState().addFeed("https://bad.com");
 
@@ -104,7 +130,10 @@ describe("feed-store", () => {
 
   describe("refreshAll", () => {
     it("refreshes all feeds and reloads", async () => {
-      vi.mocked(refreshAllFeeds).mockResolvedValue({ ok: true, value: { results: [] } });
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
       vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
 
       await useFeedStore.getState().refreshAll();
@@ -115,7 +144,10 @@ describe("feed-store", () => {
 
     it("debounces concurrent calls", async () => {
       vi.mocked(refreshAllFeeds).mockImplementation(
-        () => new Promise((r) => setTimeout(() => r({ ok: true, value: { results: [] } }), 50)),
+        () =>
+          new Promise((r) =>
+            setTimeout(() => r({ ok: true, value: { results: [] } }), 50),
+          ),
       );
       vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
 
@@ -131,12 +163,69 @@ describe("feed-store", () => {
     it("refreshes a single feed and reloads articles", async () => {
       const feed = mockFeed("f1", "Feed 1");
       vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
-      vi.mocked(refreshFeed).mockResolvedValue({ ok: true, value: { newCount: 2, updatedCount: 0 } });
+      vi.mocked(refreshFeed).mockResolvedValue({
+        ok: true,
+        value: { newCount: 2, updatedCount: 0 },
+      });
 
       await useFeedStore.getState().refreshSingleFeed("f1");
 
       expect(getFeed).toHaveBeenCalledWith("f1");
       expect(refreshFeed).toHaveBeenCalledWith(feed);
+    });
+  });
+
+  describe("sync triggers", () => {
+    let scheduleSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      scheduleSpy = vi.spyOn(useSyncStore.getState(), "scheduleSyncPush");
+    });
+
+    it("schedules sync push after addFeed succeeds", async () => {
+      const feed = mockFeed("new", "New Feed");
+      vi.mocked(addFeedFlow).mockResolvedValue({
+        ok: true,
+        value: { feed, articles: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
+
+      await useFeedStore.getState().addFeed("https://new.com/feed");
+
+      expect(scheduleSpy).toHaveBeenCalled();
+    });
+
+    it("does not schedule sync push after addFeed fails", async () => {
+      vi.mocked(addFeedFlow).mockResolvedValue({ ok: false, error: "bad" });
+
+      await useFeedStore.getState().addFeed("https://bad.com");
+
+      expect(scheduleSpy).not.toHaveBeenCalled();
+    });
+
+    it("schedules sync push after removeFeed succeeds", async () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("x", "X")],
+        selectedFeedId: "x",
+      });
+      vi.mocked(removeFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().removeFeed("x");
+
+      expect(scheduleSpy).toHaveBeenCalled();
+    });
+
+    it("schedules sync push after refreshAll completes", async () => {
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(scheduleSpy).toHaveBeenCalled();
     });
   });
 });

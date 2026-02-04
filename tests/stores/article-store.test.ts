@@ -1,24 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useArticleStore } from "../../src/stores/article-store.ts";
+import { useSyncStore } from "../../src/stores/sync-store.ts";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
   getArticles: vi.fn(),
   updateArticle: vi.fn(),
 }));
 
+vi.mock("../../src/core/sync/sync-service", () => ({
+  pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
+  pullVault: vi.fn(),
+  importVault: vi.fn(),
+}));
+
 import { getArticles, updateArticle } from "../../src/core/storage/db.ts";
 
 const mockArticle = (id: string, read = false) => ({
-  id, feedId: "f1", guid: id, title: `Article ${id}`,
-  link: `https://example.com/${id}`, content: "<p>content</p>",
-  summary: "summary", author: "author", publishedAt: Date.now(),
-  read, createdAt: Date.now(),
+  id,
+  feedId: "f1",
+  guid: id,
+  title: `Article ${id}`,
+  link: `https://example.com/${id}`,
+  content: "<p>content</p>",
+  summary: "summary",
+  author: "author",
+  publishedAt: Date.now(),
+  read,
+  createdAt: Date.now(),
 });
 
 describe("article-store", () => {
   beforeEach(() => {
     useArticleStore.setState({
-      articles: [], selectedArticle: null, isLoading: false,
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
     });
     vi.clearAllMocks();
   });
@@ -85,6 +101,31 @@ describe("article-store", () => {
       const updated = useArticleStore.getState().articles;
       expect(updated[0].read).toBe(true);
       expect(updated[1].read).toBe(false);
+    });
+  });
+
+  describe("sync triggers", () => {
+    let scheduleSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      scheduleSpy = vi.spyOn(useSyncStore.getState(), "scheduleSyncPush");
+    });
+
+    it("schedules sync push after selectArticle marks as read", async () => {
+      const article = mockArticle("a1", false);
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().selectArticle(article);
+
+      expect(scheduleSpy).toHaveBeenCalled();
+    });
+
+    it("does not schedule sync push when article is already read", async () => {
+      const article = mockArticle("a1", true);
+
+      await useArticleStore.getState().selectArticle(article);
+
+      expect(scheduleSpy).not.toHaveBeenCalled();
     });
   });
 });

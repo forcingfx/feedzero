@@ -243,6 +243,57 @@ export async function getArticleByGuid(
   }
 }
 
+/**
+ * Export all feeds and articles (decrypted) for vault sync.
+ */
+export async function exportAll(): Promise<
+  Result<{ feeds: Feed[]; articles: Article[] }>
+> {
+  try {
+    const feedsResult = await getFeeds();
+    if (!feedsResult.ok) return feedsResult;
+
+    const allArticles: Article[] = [];
+    for (const feed of feedsResult.value) {
+      const articlesResult = await getArticles(feed.id);
+      if (articlesResult.ok) {
+        allArticles.push(...articlesResult.value);
+      }
+    }
+
+    return ok({ feeds: feedsResult.value, articles: allArticles });
+  } catch (e) {
+    return err(`Failed to export data: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Clear all feeds and articles, then import the provided data.
+ * Used for vault sync restore.
+ */
+export async function importAll(
+  feeds: Feed[],
+  articles: Article[],
+): Promise<Result<boolean>> {
+  try {
+    await db!.table("feeds").clear();
+    await db!.table("articles").clear();
+
+    for (const feed of feeds) {
+      const result = await putEncrypted("feeds", feed.id, feed);
+      if (!result.ok) return result;
+    }
+    for (const article of articles) {
+      const result = await putEncrypted("articles", article.id, article);
+      if (!result.ok) return result;
+    }
+
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to import data: ${(e as Error).message}`);
+  }
+}
+
 // --- Internal helpers ---
 
 async function putEncrypted(

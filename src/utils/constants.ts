@@ -10,19 +10,29 @@ export const CRYPTO = {
   HASH: "SHA-256",
 } as const;
 
-export const EVENTS = {
-  FEED_ADDED: "feed:added",
-  FEED_SELECTED: "feed:selected",
-  FEED_REMOVED: "feed:removed",
-  FEED_UPDATED: "feed:updated",
-  ARTICLE_SELECTED: "article:selected",
-  ARTICLE_READ: "article:read",
-  STORAGE_READY: "storage:ready",
-  STORAGE_ERROR: "storage:error",
-  PARSE_ERROR: "parse:error",
-  REFRESH_ALL: "feeds:refresh-all",
-  REFRESH_FEED: "feed:refresh",
-  FEEDS_REFRESHED: "feeds:refreshed",
+export const SCHEMA_VERSION = 1;
+
+export const DEFAULT_PASSPHRASE = "feedzero-default-key";
+
+export const LOCAL_STORAGE = {
+  ONBOARDING_COMPLETE: "feedzero:onboarding-complete",
+  SYNC_PASSPHRASE: "feedzero:sync-passphrase",
+  STORAGE_MODE: "feedzero:storage-mode",
 } as const;
 
-export const SCHEMA_VERSION = 1;
+const textEncoder = new TextEncoder();
+
+export const SYNC = {
+  /** Static salt for vault ID derivation (domain separation from encryption key). */
+  VAULT_ID_SALT: textEncoder.encode("feedzero:vault-id:v1"),
+  /** Static salt seed for deterministic encryption salt derivation. */
+  ENCRYPTION_SALT_SEED: textEncoder.encode("feedzero:enc-salt:v1"),
+  /** Vault ID is 32 bytes, rendered as 64-character hex string. */
+  VAULT_ID_LENGTH: 32,
+  /** Deterministic encryption salt length in bytes. */
+  ENCRYPTION_SALT_LENGTH: 16,
+  /** Maximum vault payload size in bytes (5 MB). */
+  MAX_VAULT_SIZE: 5 * 1024 * 1024,
+  /** Sync data format version for forward compatibility. */
+  FORMAT_VERSION: 1,
+} as const;

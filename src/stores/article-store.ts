@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getArticles, updateArticle } from "../core/storage/db.ts";
+import { useSyncStore } from "./sync-store.ts";
 import type { Article } from "../types/index.ts";
 
 interface ArticleStore {
@@ -35,12 +36,12 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       const updated = { ...article, read: true };
       set({ selectedArticle: updated });
       await updateArticle(updated);
-      // Update in list too
       set({
         articles: get().articles.map((a) =>
           a.id === article.id ? { ...a, read: true } : a,
         ),
       });
+      useSyncStore.getState().scheduleSyncPush();
     } else {
       set({ selectedArticle: article });
     }

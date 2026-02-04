@@ -44,6 +44,40 @@ export async function deriveKey(
 }
 
 /**
+ * Derive raw bytes from a passphrase and salt using PBKDF2.
+ * Used for vault ID derivation and deterministic salt generation
+ * where a CryptoKey is not needed.
+ */
+export async function deriveBytes(
+  passphrase: string,
+  salt: Uint8Array,
+  length: number,
+): Promise<Result<Uint8Array>> {
+  try {
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(passphrase),
+      "PBKDF2",
+      false,
+      ["deriveBits"],
+    );
+    const bits = await crypto.subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt: salt as BufferSource,
+        iterations: CRYPTO.PBKDF2_ITERATIONS,
+        hash: CRYPTO.HASH,
+      },
+      keyMaterial,
+      length * 8,
+    );
+    return ok(new Uint8Array(bits));
+  } catch (e) {
+    return err(`Byte derivation failed: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Generate a random salt.
  */
 export function generateSalt(): Uint8Array {

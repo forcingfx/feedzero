@@ -5,22 +5,41 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { RecoveryStep } from "@/components/onboarding/steps/recovery-step";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
+import { useSyncStore } from "@/stores/sync-store";
 
-// Mock the db module
 vi.mock("@/core/storage/db", () => ({
   open: vi.fn(),
 }));
 
-import { open } from "@/core/storage/db";
+vi.mock("@/core/sync/sync-service", () => ({
+  pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
+  pullVault: vi.fn().mockResolvedValue({ ok: false, error: "Not found" }),
+  importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
+}));
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-Object.defineProperty(globalThis, "localStorage", { value: localStorageMock });
+import { open } from "@/core/storage/db";
+import { pullVault, importVault } from "@/core/sync/sync-service";
+
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+  };
+})();
+
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStorageMock,
+  writable: true,
+});
 
 function renderInDialog(ui: React.ReactNode) {
   return render(
@@ -33,6 +52,7 @@ function renderInDialog(ui: React.ReactNode) {
 describe("RecoveryStep", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorageMock.clear();
     useOnboardingStore.setState({
       step: "recovery",
       storageMode: null,
@@ -44,6 +64,13 @@ describe("RecoveryStep", () => {
       isDbReady: false,
       error: null,
       hasCompletedOnboarding: false,
+    });
+    useSyncStore.setState({
+      status: "local-only",
+      lastSyncedAt: null,
+      error: null,
+      passphrase: null,
+      dialogOpen: false,
     });
   });
 
@@ -78,7 +105,7 @@ describe("RecoveryStep", () => {
     expect(button).toBeEnabled();
   });
 
-  it("shows error when passphrase is invalid", async () => {
+  it("shows error when db open fails", async () => {
     const user = userEvent.setup();
     vi.mocked(open).mockResolvedValue({
       ok: false,
@@ -98,7 +125,7 @@ describe("RecoveryStep", () => {
     });
   });
 
-  it("completes onboarding when passphrase is valid", async () => {
+  it("completes onboarding when passphrase is valid (local-only)", async () => {
     const user = userEvent.setup();
     vi.mocked(open).mockResolvedValue({ ok: true, value: true });
 
@@ -122,5 +149,120 @@ describe("RecoveryStep", () => {
     await user.click(screen.getByRole("button", { name: /back/i }));
 
     expect(useOnboardingStore.getState().step).toBe("storage-choice");
+  });
+
+  describe("cloud pull recovery", () => {
+    it("pulls vault from server and imports on successful recovery", async () => {
+      const user = userEvent.setup();
+      const vaultData = {
+        version: 1,
+        exportedAt: Date.now(),
+        feeds: [
+          {
+            id: "f1",
+            url: "https://example.com/feed",
+            title: "Test",
+            description: "",
+            siteUrl: "https://example.com",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+        ],
+        articles: [],
+      };
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(pullVault).mockResolvedValue({ ok: true, value: vaultData });
+      vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
+
+      renderInDialog(<RecoveryStep />);
+
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+      });
+
+      expect(pullVault).toHaveBeenCalledWith("carbon mango velvet prism");
+      expect(importVault).toHaveBeenCalledWith(vaultData);
+    });
+
+    it("sets sync store state after cloud pull recovery", async () => {
+      const user = userEvent.setup();
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: true,
+        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      });
+      vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
+
+      renderInDialog(<RecoveryStep />);
+
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(useSyncStore.getState().passphrase).toBe(
+          "carbon mango velvet prism",
+        );
+      });
+      expect(useSyncStore.getState().status).toBe("synced");
+    });
+
+    it("persists sync passphrase and storage mode to localStorage", async () => {
+      const user = userEvent.setup();
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: true,
+        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      });
+      vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
+
+      renderInDialog(<RecoveryStep />);
+
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(localStorageMock.setItem).toHaveBeenCalledWith(
+          "feedzero:sync-passphrase",
+          "carbon mango velvet prism",
+        );
+      });
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "feedzero:storage-mode",
+        "sync",
+      );
+    });
+
+    it("completes onboarding even if pull fails (falls back to local)", async () => {
+      const user = userEvent.setup();
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: false,
+        error: "Not found",
+      });
+
+      renderInDialog(<RecoveryStep />);
+
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+      });
+    });
   });
 });

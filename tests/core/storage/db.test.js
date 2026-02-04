@@ -12,6 +12,8 @@ import {
   getArticles,
   updateArticle,
   getArticleByGuid,
+  exportAll,
+  importAll,
 } from "../../../src/core/storage/db.ts";
 import { createFeed, createArticle } from "../../../src/core/storage/schema.ts";
 import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
@@ -296,6 +298,108 @@ describe("Database", () => {
       const result = await getArticleByGuid(feed2.id, "shared-guid");
       expect(isOk(result)).toBe(true);
       expect(result.value).toBeNull();
+    });
+  });
+
+  describe("exportAll / importAll", () => {
+    it("should export all feeds and articles", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Example" }),
+      );
+      await addFeed(feed);
+      const article = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post",
+          link: "https://example.com/1",
+        }),
+      );
+      await addArticles([article]);
+
+      const result = await exportAll();
+      expect(isOk(result)).toBe(true);
+      const data = unwrap(result);
+      expect(data.feeds).toHaveLength(1);
+      expect(data.feeds[0].title).toBe("Example");
+      expect(data.articles).toHaveLength(1);
+      expect(data.articles[0].title).toBe("Post");
+    });
+
+    it("should export empty arrays when database is empty", async () => {
+      const result = await exportAll();
+      expect(isOk(result)).toBe(true);
+      const data = unwrap(result);
+      expect(data.feeds).toEqual([]);
+      expect(data.articles).toEqual([]);
+    });
+
+    it("should import feeds and articles, replacing existing data", async () => {
+      // Add some existing data
+      const oldFeed = unwrap(
+        createFeed({ url: "https://old.com/rss", title: "Old" }),
+      );
+      await addFeed(oldFeed);
+
+      // Import new data
+      const newFeed = unwrap(
+        createFeed({ url: "https://new.com/rss", title: "New" }),
+      );
+      const newArticle = unwrap(
+        createArticle({
+          feedId: newFeed.id,
+          title: "New Post",
+          link: "https://new.com/1",
+        }),
+      );
+
+      const importResult = await importAll([newFeed], [newArticle]);
+      expect(isOk(importResult)).toBe(true);
+
+      // Old data should be gone
+      const feeds = unwrap(await getFeeds());
+      expect(feeds).toHaveLength(1);
+      expect(feeds[0].title).toBe("New");
+
+      const articles = unwrap(await getArticles(newFeed.id));
+      expect(articles).toHaveLength(1);
+      expect(articles[0].title).toBe("New Post");
+    });
+
+    it("should round-trip: export then import preserves data", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://rt.com/rss", title: "RoundTrip" }),
+      );
+      await addFeed(feed);
+      const a1 = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post 1",
+          link: "https://rt.com/1",
+        }),
+      );
+      const a2 = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post 2",
+          link: "https://rt.com/2",
+        }),
+      );
+      await addArticles([a1, a2]);
+
+      // Export
+      const exported = unwrap(await exportAll());
+
+      // Clear and reimport
+      const importResult = await importAll(exported.feeds, exported.articles);
+      expect(isOk(importResult)).toBe(true);
+
+      // Verify data matches
+      const feeds = unwrap(await getFeeds());
+      expect(feeds).toHaveLength(1);
+      expect(feeds[0].url).toBe("https://rt.com/rss");
+
+      const articles = unwrap(await getArticles(feed.id));
+      expect(articles).toHaveLength(2);
     });
   });
 });

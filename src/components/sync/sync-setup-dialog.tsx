@@ -26,7 +26,6 @@ type Step = "welcome" | "passphrase" | "syncing" | "done";
 export function SyncSetupDialog() {
   const status = useSyncStore((s) => s.status);
   const enableSync = useSyncStore((s) => s.enableSync);
-  const setSynced = useSyncStore((s) => s.setSynced);
   const open = useSyncStore((s) => s.dialogOpen);
   const onOpenChange = useSyncStore((s) => s.setDialogOpen);
 
@@ -58,11 +57,7 @@ export function SyncSetupDialog() {
 
   async function handleEnable() {
     setStep("syncing");
-    enableSync(passphrase);
-    // TODO: Phase 3 will wire this to actual sync (re-encrypt + push).
-    // For now, simulate a short delay then mark as synced.
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setSynced(Date.now());
+    await enableSync(passphrase);
     setStep("done");
   }
 

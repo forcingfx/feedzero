@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/dialog";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
+import { useSyncStore } from "@/stores/sync-store";
 import { open } from "@/core/storage/db";
+import { pullVault, importVault } from "@/core/sync/sync-service";
 
 export function RecoveryStep() {
   const [passphrase, setPassphrase] = useState("");
@@ -25,14 +27,23 @@ export function RecoveryStep() {
     setIsLoading(true);
     setError(null);
 
-    const result = await open(passphrase.trim());
+    const trimmed = passphrase.trim();
+    const result = await open(trimmed);
 
-    if (result.ok) {
-      completeOnboarding();
-    } else {
+    if (!result.ok) {
       setError("Could not open database. Please check your passphrase.");
       setIsLoading(false);
+      return;
     }
+
+    // Attempt cloud pull — if vault exists on server, import it
+    const pullResult = await pullVault(trimmed);
+    if (pullResult.ok) {
+      await importVault(pullResult.value);
+      useSyncStore.getState().restoreSync(trimmed);
+    }
+
+    completeOnboarding();
   };
 
   return (

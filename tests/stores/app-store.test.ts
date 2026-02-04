@@ -3,9 +3,18 @@ import { useAppStore } from "../../src/stores/app-store.ts";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
   open: vi.fn(),
+  deleteDatabase: vi.fn(),
+}));
+
+vi.mock("../../src/core/sync/sync-service", () => ({
+  pushVault: vi.fn(),
+  pullVault: vi.fn(),
+  importVault: vi.fn(),
 }));
 
 import { open } from "../../src/core/storage/db.ts";
+import { pullVault, importVault } from "../../src/core/sync/sync-service";
+import { useSyncStore } from "../../src/stores/sync-store.ts";
 
 const ONBOARDING_KEY = "feedzero:onboarding-complete";
 
@@ -111,6 +120,62 @@ describe("app-store", () => {
       useAppStore.setState({ hasCompletedOnboarding: true });
       useAppStore.getState().checkOnboardingStatus();
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
+    });
+  });
+
+  describe("initializeReturningUser", () => {
+    beforeEach(() => {
+      useSyncStore.setState({
+        status: "local-only",
+        passphrase: null,
+        lastSyncedAt: null,
+        error: null,
+      });
+    });
+
+    it("initializes with default passphrase for local-only users", async () => {
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      expect(open).toHaveBeenCalledWith("feedzero-default-key");
+      expect(useAppStore.getState().isDbReady).toBe(true);
+      expect(useSyncStore.getState().status).toBe("local-only");
+    });
+
+    it("initializes with stored passphrase and pulls for sync users", async () => {
+      localStorageMock.setItem("feedzero:storage-mode", "sync");
+      localStorageMock.setItem("feedzero:sync-passphrase", "test phrase");
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: true,
+        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      });
+      vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      expect(open).toHaveBeenCalledWith("test phrase");
+      expect(pullVault).toHaveBeenCalledWith("test phrase");
+      expect(importVault).toHaveBeenCalled();
+      expect(useAppStore.getState().isDbReady).toBe(true);
+      expect(useSyncStore.getState().status).toBe("synced");
+      expect(useSyncStore.getState().passphrase).toBe("test phrase");
+    });
+
+    it("still initializes DB when sync pull fails", async () => {
+      localStorageMock.setItem("feedzero:storage-mode", "sync");
+      localStorageMock.setItem("feedzero:sync-passphrase", "test phrase");
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: false,
+        error: "Not found",
+      });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      expect(useAppStore.getState().isDbReady).toBe(true);
+      expect(useSyncStore.getState().passphrase).toBe("test phrase");
     });
   });
 });

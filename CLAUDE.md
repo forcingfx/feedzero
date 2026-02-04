@@ -20,6 +20,7 @@ npm run test:watch    # Run tests in watch mode
 npm run test:coverage # Run with V8 coverage (90% threshold enforced)
 npm run test:e2e      # Run Playwright E2E tests
 npm run dev           # Dev server on http://localhost:3000
+npm run serve         # Standalone Hono server (self-hosting, requires build first)
 npx tsc --noEmit      # TypeScript type check (strict mode)
 ```
 
@@ -37,6 +38,14 @@ FeedZero is a privacy-first RSS reader. React + TypeScript UI with Zustand state
 - **DOMPurify** — HTML sanitization (XSS protection). Do not hand-roll sanitizers.
 - **Dexie.js** — IndexedDB wrapper with query API. Used in `db.ts` for encrypted storage.
 - **Defuddle** — Full-text extraction from web pages (browser bundle, zero deps). Pluggable — can be swapped for Readability or other extractors.
+- **marked** — Markdown-to-HTML parsing. Used by site-specific extractors (e.g., GitHub adapter). Output always passed through DOMPurify.
+- **Radix UI + shadcn/ui** — Headless UI primitives (`@radix-ui/react-*`) wrapped as styled components in `src/components/ui/`. Use these wrappers (Button, Dialog, AlertDialog, DropdownMenu, etc.) instead of building from scratch.
+- **lucide-react** — Icon library. Import icons from `lucide-react`.
+- **react-resizable-panels** — Resizable panel layout for the desktop 3-panel view.
+- **sonner** — Toast notifications. `<Toaster>` mounted in `src/app.tsx`, trigger via `toast()` from `sonner`.
+- **next-themes** — Theme provider (dark/light mode support).
+- **Hono** — Lightweight Web standard server framework (14kB). Powers the standalone server (`server.ts`) for self-hosting. Uses same `Request/Response` API as shared handlers.
+- **class-variance-authority** — Component variant definitions (used in `src/components/ui/`).
 - **clsx + tailwind-merge** — Tailwind class merging via `cn()` utility.
 
 ### Data Flow
@@ -47,36 +56,51 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 
 ### Core Modules (Framework-Agnostic TypeScript)
 
-- **src/utils/result.ts** — Generic `Result<T>` type (`ok`/`err`) used by all core functions instead of throwing. Check `.ok` before accessing `.value`.
-- **src/utils/constants.ts** — DB name, crypto params, event names (legacy, being phased out).
-- **src/core/events/event-bus.ts** — Pub/sub with wildcard `*` support. Legacy — being replaced by Zustand stores. Still used by integration tests.
+- **src/utils/result.ts** — Generic `Result<T>` type (`ok`/`err`) used by all core functions instead of throwing. Check `.ok` before accessing `.value`. Includes `andThen` for chaining and `fromPromise` for wrapping async calls.
+- **src/utils/constants.ts** — DB name, crypto params, localStorage key constants (`LOCAL_STORAGE`), default passphrase.
 - **src/core/storage/crypto.ts** — PBKDF2 key derivation + AES-GCM encrypt/decrypt via Web Crypto API.
 - **src/core/storage/db.ts** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, publishedAt) stored in plaintext for querying; content fields encrypted. Call `open(passphrase)` before any operations.
 - **src/core/storage/schema.ts** — `createFeed()`, `createArticle()` factory functions return Result types.
 - **src/core/discovery/discovery.ts** — `discoverFeed(url)` runs a multi-strategy cascade to find a feed from a website URL.
 - **src/core/discovery/strategies.ts** — Pure functions for each discovery strategy.
+- **src/core/crypto/passphrase-generator.ts** — Generates cryptographically random passphrases using EFF large wordlist (4 words, ~51.7 bits entropy). `eff-wordlist.ts` contains the wordlist.
+- **src/core/proxy/validate-url.ts** — Shared URL validation with SSRF protection (blocks private IPs, enforces http/https). Returns `Result<URL>`.
+- **src/core/proxy/proxy-handler.ts** — Shared proxy logic for serverless functions. Validates target URL, fetches, and returns response.
 - **src/core/extractor/extractor.ts** — Public API: `extract(html, url)` and `needsExtraction(article)`. Delegates to active extractor implementation.
 - **src/core/extractor/defuddle-extractor.ts** — Defuddle-based extraction. Swap this import in `extractor.ts` to use a different library.
 - **src/core/extractor/cleanup.ts** — `cleanExtractedContent(html)` removes empty elements, collapses consecutive `<br>` tags.
+- **src/core/extractor/markdown.ts** — `markdownToHtml(md)` converts markdown to sanitized HTML via `marked` + DOMPurify.
+- **src/core/extractor/adapters/** — Site-specific extraction adapters. `SiteAdapter` interface in `types.ts`, `AdapterRegistry` in `registry.ts` (O(1) domain-to-adapter lookup). `github-adapter.ts` extracts GitHub README as repo content. `default-adapter.ts` uses Defuddle. Add new adapters by implementing `SiteAdapter` and registering in the registry.
+- **src/core/sync/types.ts** — `VaultData`, `EncryptedVault`, `SyncStorageAdapter` interfaces.
+- **src/core/sync/vault-crypto.ts** — `deriveVaultId`, `deriveVaultKey`, `encryptVault`, `decryptVault`. Deterministic derivation from passphrase with domain-separated PBKDF2.
+- **src/core/sync/sync-service.ts** — Client-side sync orchestrator: `exportVault`, `importVault`, `pushVault`, `pullVault`.
+- **src/core/sync/sync-handler.ts** — Server-side `handleSyncRequest(request, adapter)` — shared `Request → Response` handler.
+- **src/core/sync/adapters/** — Storage adapter implementations: `memory-adapter.ts`, `filesystem-adapter.ts`, `vercel-blob-adapter.ts`, `resolve-adapter.ts`.
 - **src/core/feeds/feed-service.ts** — `addFeedFlow(url)` orchestrates the full add-feed flow. `refreshFeed(feed)` and `refreshAllFeeds()` handle feed refresh with guid-based dedup.
 - **src/core/parser/parser.ts** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1.
 - **src/core/parser/sanitizer.ts** — DOMPurify wrapper with allowlisted tags/attrs.
 
 ### Zustand Stores
 
-- **src/stores/app-store.ts** — DB initialization, global error state. `initialize(passphrase)` opens the database.
+- **src/stores/app-store.ts** — DB initialization, global error state, onboarding status. `initialize(passphrase)` opens the database. `checkOnboardingStatus()` reads from localStorage. `initializeReturningUser()` handles the full returning-user init flow (detect storage mode, open DB, optionally pull sync).
 - **src/stores/feed-store.ts** — `feeds[]`, `selectedFeedId`, CRUD actions. Actions call core modules directly (`addFeedFlow`, `refreshAllFeeds`, etc.).
 - **src/stores/article-store.ts** — `articles[]`, `selectedArticle`, `loadArticles(feedId)`, `selectArticle(article)` (auto-marks as read).
 - **src/stores/extraction-store.ts** — `cache` (link → extracted HTML), `viewMode`, `fetchExtracted(url)`. Extraction is on-demand and cached.
+- **src/stores/onboarding-store.ts** — Onboarding flow state machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery` for returning users). Storage modes: `local` (client-only, skips passphrase confirmation) vs `sync` (cloud-enabled, requires passphrase confirmation). Generates passphrases via `passphrase-generator.ts`.
+- **src/stores/sync-store.ts** — Cloud sync state and actions. Status: `local-only` | `syncing` | `synced` | `error`. Actions: `enableSync(passphrase)`, `restoreSync(passphrase)` (returning sync users), `push()`, `pull()`, `scheduleSyncPush()` (5s debounce), `disableSync()`. Persists passphrase and storage mode to localStorage.
 
 ### React Components
 
+- **src/components/ui/** — shadcn/ui-style wrappers around Radix UI primitives (Button, Dialog, AlertDialog, DropdownMenu, Input, Sheet, Sidebar, Skeleton, ScrollArea, Tooltip, etc.). Use these as building blocks for all new UI.
 - **src/components/layout/** — `header.tsx`, `panel.tsx` (layout primitives)
-- **src/components/feeds/** — `feed-list.tsx`, `feed-item.tsx`, `add-feed-form.tsx`
+- **src/components/feeds/** — `feed-list.tsx`, `feed-item.tsx`, `add-feed-form.tsx`, `feed-favicon.tsx`
 - **src/components/articles/** — `article-list.tsx`, `article-item.tsx`
 - **src/components/reader/** — `reader-panel.tsx`, `view-toggle.tsx`, `article-content.tsx`
+- **src/components/onboarding/** — Modal-based onboarding flow. `onboarding-modal.tsx` container with step components in `steps/` (welcome, storage-choice, passphrase-display, passphrase-confirm, recovery).
+- **src/components/sync/** — `sync-setup-dialog.tsx` (dialog for enabling cloud sync), `sync-status-chip.tsx` (status indicator).
 - **src/pages/feeds-page.tsx** — Main page component. Desktop: 3-panel CSS grid. Mobile: single panel with back navigation. Syncs URL params to Zustand stores.
-- **src/ui/components/content-modes.ts** — Pure functions for content view modes (Feed/Extracted visibility, summary subheading detection, similarity/completeness heuristics). Used by `reader-panel.tsx`.
+- **src/lib/content-modes.ts** — Pure functions for content view modes (Feed/Extracted visibility, summary subheading detection, similarity/completeness heuristics). Used by `reader-panel.tsx`.
+- **src/lib/decode-entities.ts** — Decodes HTML entities for plain text display.
 
 ### Routing
 
@@ -92,6 +116,7 @@ URL is the source of truth for navigation state. `FeedsPage` syncs URL params to
 
 - **src/hooks/use-keyboard-nav.ts** — j/k/Enter/Escape navigation. Queries `[role="option"]` elements in the DOM.
 - **src/hooks/use-media-query.ts** — Responsive breakpoint detection. `useIsDesktop()` for ≥1024px.
+- **src/hooks/use-mobile.ts** — `useIsMobile()` for <768px breakpoint (used by sidebar/sheet components).
 
 ### Styling
 
@@ -124,11 +149,41 @@ Single CSS entry point: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite`
   - `CDATA` sections in XML with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead of `<![CDATA[<p>]]>` in test fixtures.
   - When writing parser tests, always include fixtures with real RSS namespace prefixes (`content:encoded`, `dc:creator`) to catch selector issues that only manifest in browsers.
 
-### CORS Proxy
+### App Initialization Flow
 
-`vite.config.js` defines a dev-only Vite plugin that proxies `/api/feed?url=<encoded>` and `/api/page?url=<encoded>` to fetch feeds/pages server-side, bypassing browser CORS restrictions. Production will need a real proxy.
+`src/app.tsx` orchestrates startup via `AppInit`:
+
+1. `checkOnboardingStatus()` reads `feedzero:onboarding-complete` from localStorage.
+2. **New users** (`hasCompletedOnboarding === false`): `<OnboardingModal>` is shown (rendered outside `<BrowserRouter>`, always mounts). The onboarding store drives the step flow.
+3. **Returning users** (`hasCompletedOnboarding === true`): `initializeReturningUser()` in `app-store.ts` handles the full init flow:
+   - Reads storage mode and passphrase from localStorage (via centralized `LOCAL_STORAGE` keys)
+   - Local-only users: opens DB with `DEFAULT_PASSPHRASE`
+   - Sync users: opens DB with stored passphrase, pulls vault from server, updates sync store status
+4. Once `isDbReady`, the main app routes render.
+
+`<OnboardingModal>` and `<SyncSetupDialog>` are mounted at the top level alongside `<BrowserRouter>`, not inside routes.
+
+### CORS Proxy, Sync API & Server
+
+All API handlers use the Web standard `Request → Response` pattern via shared handler functions (`proxy-handler.ts`, `sync-handler.ts`). Three entry points consume these handlers:
+
+- **`server.ts`** — Hono standalone server for self-hosting (`npm run serve`). Mounts proxy + sync handlers + static file serving.
+- **`api/*.ts`** — Vercel Serverless Functions. All three (`api/feed.ts`, `api/page.ts`, `api/sync.ts`) import shared handlers from `src/core/`.
+- **`vite.config.js`** — Dev proxy using lazy-imported shared handlers with a memory adapter for sync.
+
+**Endpoints**: `/api/feed?url=<encoded>` (feed proxy), `/api/page?url=<encoded>` (page proxy), `/api/sync` (GET/PUT encrypted vault).
 
 **SSRF protections** — The proxy blocks requests to internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http:`/`https:` protocols. Do not weaken these checks.
+
+**Sync storage** — Uses a pluggable adapter (`SyncStorageAdapter` interface). Default: filesystem (`SYNC_STORAGE=filesystem`). Vercel: `SYNC_STORAGE=vercel-blob` + `BLOB_READ_WRITE_TOKEN`. Dev: memory adapter.
+
+### Deployment
+
+Deployed on **Vercel**. `vercel.json` configures SPA routing (rewrites non-API paths to `index.html`). API routes (`/api/*`) pass through to serverless functions in `api/`.
+
+### Linting & Formatting
+
+No ESLint or Prettier configuration exists in the project. TypeScript strict mode (`npx tsc --noEmit`) is the primary static analysis tool.
 
 ## Development Workflow
 

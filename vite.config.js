@@ -4,63 +4,86 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 /**
- * Generic proxy handler for server-side fetches (bypasses CORS).
- * Used by both /api/feed and /api/page endpoints.
+ * Converts a Node IncomingMessage to a Web Request object.
  */
-function proxyHandler(defaultContentType) {
-  return async (req, res) => {
-    const url = new URL(req.url, "http://localhost");
-    const target = url.searchParams.get("url");
-    if (!target) {
-      res.statusCode = 400;
-      res.end("Missing url parameter");
-      return;
-    }
+async function toWebRequest(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const bodyStr = Buffer.concat(chunks).toString();
 
-    try {
-      const parsed = new URL(target);
-      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-        res.statusCode = 400;
-        res.end("Only http and https URLs are allowed");
-        return;
-      }
-      const hostname = parsed.hostname;
-      if (
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "::1" ||
-        hostname === "0.0.0.0" ||
-        hostname.startsWith("10.") ||
-        hostname.startsWith("192.168.") ||
-        hostname.startsWith("172.16.") ||
-        hostname === "169.254.169.254"
-      ) {
-        res.statusCode = 403;
-        res.end("Access to internal addresses is blocked");
-        return;
-      }
-
-      const response = await fetch(target);
-      res.setHeader(
-        "Content-Type",
-        response.headers.get("content-type") || defaultContentType,
-      );
-      res.statusCode = response.status;
-      const body = await response.text();
-      res.end(body);
-    } catch (e) {
-      res.statusCode = 502;
-      res.end(`Proxy error: ${e.message}`);
-    }
-  };
+  const url = new URL(req.url, "http://localhost");
+  const hasBody = req.method !== "GET" && req.method !== "HEAD";
+  return new Request(url, {
+    method: req.method,
+    headers: { "Content-Type": req.headers["content-type"] || "" },
+    ...(hasBody ? { body: bodyStr } : {}),
+  });
 }
 
-function feedProxyPlugin() {
+/**
+ * Sends a Web Response through a Node ServerResponse.
+ */
+async function sendWebResponse(webRes, res) {
+  res.statusCode = webRes.status;
+  for (const [key, value] of webRes.headers.entries()) {
+    res.setHeader(key, value);
+  }
+  res.end(await webRes.text());
+}
+
+/**
+ * Dev server API proxy plugin.
+ * All handlers are lazy-imported to avoid Node loading issues at config time.
+ * Proxy and sync handler chains use only relative imports (no @/ aliases).
+ */
+function apiProxyPlugin() {
   return {
-    name: "feed-proxy",
+    name: "api-proxy",
     configureServer(server) {
-      server.middlewares.use("/api/feed", proxyHandler("text/xml"));
-      server.middlewares.use("/api/page", proxyHandler("text/html"));
+      let proxyHandler = null;
+      let syncHandler = null;
+      let syncAdapter = null;
+
+      async function ensureProxyHandler() {
+        if (!proxyHandler) {
+          const mod = await import("./src/core/proxy/proxy-handler.ts");
+          proxyHandler = mod.handleProxyRequest;
+        }
+        return proxyHandler;
+      }
+
+      async function ensureSyncHandler() {
+        if (!syncHandler) {
+          const [handlerMod, adapterMod] = await Promise.all([
+            import("./src/core/sync/sync-handler.ts"),
+            import("./src/core/sync/adapters/memory-adapter.ts"),
+          ]);
+          syncHandler = handlerMod.handleSyncRequest;
+          syncAdapter = adapterMod.createMemoryAdapter();
+        }
+        return { syncHandler, syncAdapter };
+      }
+
+      server.middlewares.use("/api/feed", async (req, res) => {
+        const handler = await ensureProxyHandler();
+        const webReq = await toWebRequest(req);
+        const webRes = await handler(webReq, "text/xml");
+        await sendWebResponse(webRes, res);
+      });
+
+      server.middlewares.use("/api/page", async (req, res) => {
+        const handler = await ensureProxyHandler();
+        const webReq = await toWebRequest(req);
+        const webRes = await handler(webReq, "text/html");
+        await sendWebResponse(webRes, res);
+      });
+
+      server.middlewares.use("/api/sync", async (req, res) => {
+        const { syncHandler, syncAdapter } = await ensureSyncHandler();
+        const webReq = await toWebRequest(req);
+        const webRes = await syncHandler(webReq, syncAdapter);
+        await sendWebResponse(webRes, res);
+      });
     },
   };
 }
@@ -74,5 +97,5 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  plugins: [react(), tailwindcss(), feedProxyPlugin()],
+  plugins: [react(), tailwindcss(), apiProxyPlugin()],
 });

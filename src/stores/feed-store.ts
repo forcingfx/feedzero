@@ -9,6 +9,7 @@ import {
   refreshFeed,
   refreshAllFeeds,
 } from "../core/feeds/feed-service.ts";
+import { useSyncStore } from "./sync-store.ts";
 import type { Feed } from "../types/index.ts";
 
 interface FeedStore {
@@ -56,6 +57,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       selectedFeedId: result.value.feed.id,
       isLoading: false,
     });
+    useSyncStore.getState().scheduleSyncPush();
   },
 
   removeFeed: async (feedId) => {
@@ -67,6 +69,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       feeds: allFeeds.ok ? allFeeds.value : [],
       selectedFeedId: currentSelection === feedId ? null : currentSelection,
     });
+    useSyncStore.getState().scheduleSyncPush();
   },
 
   selectFeed: (feedId) => set({ selectedFeedId: feedId }),
@@ -78,6 +81,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       await refreshAllFeeds();
       const allFeeds = await getFeeds();
       if (allFeeds.ok) set({ feeds: allFeeds.value });
+      useSyncStore.getState().scheduleSyncPush();
     } finally {
       set({ isRefreshingAll: false });
     }

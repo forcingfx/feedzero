@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "fake-indexeddb/auto";
-import { createEventBus } from "../../src/core/events/event-bus.ts";
 import {
   open,
   close,
@@ -12,7 +11,6 @@ import {
 import { parse } from "../../src/core/parser/parser.ts";
 import { createFeed, createArticle } from "../../src/core/storage/schema.ts";
 import { isOk, unwrap } from "../../src/utils/result.ts";
-import { EVENTS } from "../../src/utils/constants.ts";
 
 describe("App Integration", () => {
   beforeEach(async () => {
@@ -71,27 +69,5 @@ describe("App Integration", () => {
     expect(stored[0].title).toBe("Hello World");
     expect(stored[0].content).toContain("First post");
     expect(stored[0].content).not.toContain("<script>");
-  });
-
-  it("should handle event-driven flow", () => {
-    const bus = createEventBus();
-    const events = [];
-
-    bus.on(EVENTS.FEED_ADDED, (data) => events.push({ type: "added", data }));
-    bus.on(EVENTS.FEED_SELECTED, (data) =>
-      events.push({ type: "selected", data }),
-    );
-    bus.on(EVENTS.ARTICLE_SELECTED, (data) =>
-      events.push({ type: "article", data }),
-    );
-
-    bus.emit(EVENTS.FEED_ADDED, { url: "https://test.com/feed" });
-    bus.emit(EVENTS.FEED_SELECTED, { feedId: "f1" });
-    bus.emit(EVENTS.ARTICLE_SELECTED, { article: { id: "a1", title: "Post" } });
-
-    expect(events).toHaveLength(3);
-    expect(events[0].type).toBe("added");
-    expect(events[1].data.feedId).toBe("f1");
-    expect(events[2].data.article.title).toBe("Post");
   });
 });

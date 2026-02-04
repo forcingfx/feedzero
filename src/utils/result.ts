@@ -44,6 +44,34 @@ export function map<T, U>(result: Result<T>, fn: (value: T) => U): Result<U> {
   return result.ok ? ok(fn(result.value)) : result;
 }
 
-export function mapErr<T>(result: Result<T>, fn: (error: string) => string): Result<T> {
+export function mapErr<T>(
+  result: Result<T>,
+  fn: (error: string) => string,
+): Result<T> {
   return result.ok ? result : err(fn(result.error));
+}
+
+/**
+ * Chain a fallible operation onto a successful Result.
+ * Short-circuits on err without calling fn.
+ */
+export function andThen<T, U>(
+  result: Result<T>,
+  fn: (value: T) => Result<U>,
+): Result<U> {
+  return result.ok ? fn(result.value) : result;
+}
+
+/**
+ * Wrap a Promise into a Result, catching rejections as err.
+ */
+export async function fromPromise<T>(
+  promise: Promise<T>,
+  mapError: (e: unknown) => string,
+): Promise<Result<T>> {
+  try {
+    return ok(await promise);
+  } catch (e) {
+    return err(mapError(e));
+  }
 }

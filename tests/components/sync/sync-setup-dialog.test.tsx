@@ -5,9 +5,14 @@ import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog";
 import { useSyncStore } from "@/stores/sync-store";
 import { useAppStore } from "@/stores/app-store";
 
-// Mock the db module
 vi.mock("@/core/storage/db", () => ({
   deleteDatabase: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
+vi.mock("@/core/sync/sync-service", () => ({
+  pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
+  pullVault: vi.fn().mockResolvedValue({ ok: false, error: "Not found" }),
+  importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
 // Mock localStorage

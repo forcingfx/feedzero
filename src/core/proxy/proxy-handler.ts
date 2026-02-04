@@ -1,4 +1,4 @@
-import { validateProxyUrl } from "./validate-url";
+import { validateProxyUrl } from "./validate-url.ts";
 
 /**
  * Shared proxy logic for serverless functions.
@@ -14,7 +14,9 @@ export async function handleProxyRequest(
   const validation = validateProxyUrl(target);
   if (!validation.ok) {
     const status =
-      validation.error === "Access to internal addresses is blocked" ? 403 : 400;
+      validation.error === "Access to internal addresses is blocked"
+        ? 403
+        : 400;
     return new Response(validation.error, { status });
   }
 

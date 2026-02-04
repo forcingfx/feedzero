@@ -27,16 +27,14 @@ export function OnboardingModal() {
   const storageMode = useOnboardingStore((s) => s.storageMode);
   const generatedPassphrase = useOnboardingStore((s) => s.generatedPassphrase);
   const enableSync = useSyncStore((s) => s.enableSync);
-  const setSynced = useSyncStore((s) => s.setSynced);
 
   const isOpen = hasCompleted === false;
 
   useEffect(() => {
     if (step === "initializing" && generatedPassphrase) {
-      initialize(generatedPassphrase).then(() => {
+      initialize(generatedPassphrase).then(async () => {
         if (storageMode === "sync") {
-          enableSync(generatedPassphrase);
-          setSynced(Date.now());
+          await enableSync(generatedPassphrase);
         }
         completeOnboarding();
       });
@@ -47,7 +45,6 @@ export function OnboardingModal() {
     storageMode,
     initialize,
     enableSync,
-    setSynced,
     completeOnboarding,
   ]);
 
