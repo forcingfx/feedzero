@@ -16,12 +16,10 @@ vi.mock("@/core/crypto/passphrase-generator", () => ({
 
 vi.mock("@/core/sync/sync-service", () => ({
   pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
-  pullVault: vi
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
-    }),
+  pullVault: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+  }),
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
@@ -210,6 +208,28 @@ describe("OnboardingModal", () => {
       expect(syncState.status).toBe("synced");
       expect(syncState.passphrase).toBe("carbon mango velvet prism");
       expect(syncState.lastSyncedAt).not.toBeNull();
+    });
+
+    it("persists passphrase and storage mode to localStorage for local-only onboarding", async () => {
+      const user = userEvent.setup();
+      render(<OnboardingModal />);
+
+      await user.click(screen.getByRole("button", { name: /get started/i }));
+      await user.click(screen.getByRole("radio", { name: /local only/i }));
+      await user.click(screen.getByRole("button", { name: /continue/i }));
+
+      await waitFor(() => {
+        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+      });
+
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "feedzero:sync-passphrase",
+        "carbon mango velvet prism",
+      );
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "feedzero:storage-mode",
+        "local",
+      );
     });
 
     it("keeps sync store as local-only after local onboarding", async () => {

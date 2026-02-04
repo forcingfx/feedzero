@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useAppStore } from "@/stores/app-store";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useSyncStore } from "@/stores/sync-store";
+import { LOCAL_STORAGE } from "@/utils/constants";
 import { WelcomeStep } from "./steps/welcome-step";
 import { StorageChoiceStep } from "./steps/storage-choice-step";
 import { PassphraseDisplayStep } from "./steps/passphrase-display-step";
@@ -35,6 +36,12 @@ export function OnboardingModal() {
       initialize(generatedPassphrase).then(async () => {
         if (storageMode === "sync") {
           await enableSync(generatedPassphrase);
+        } else {
+          localStorage.setItem(
+            LOCAL_STORAGE.SYNC_PASSPHRASE,
+            generatedPassphrase,
+          );
+          localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "local");
         }
         completeOnboarding();
       });

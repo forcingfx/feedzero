@@ -37,7 +37,7 @@ export const useAppStore = create<AppStore>((set) => ({
     );
     const isSyncUser = storageMode === "sync" && storedPassphrase;
 
-    const passphrase = isSyncUser ? storedPassphrase : DEFAULT_PASSPHRASE;
+    const passphrase = storedPassphrase ?? DEFAULT_PASSPHRASE;
 
     if (isSyncUser) {
       useSyncStore.setState({ passphrase: storedPassphrase });

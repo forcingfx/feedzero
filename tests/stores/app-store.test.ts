@@ -143,6 +143,18 @@ describe("app-store", () => {
       expect(useSyncStore.getState().status).toBe("local-only");
     });
 
+    it("initializes with stored passphrase for local-only users when persisted", async () => {
+      localStorageMock.setItem("feedzero:storage-mode", "local");
+      localStorageMock.setItem("feedzero:sync-passphrase", "random local key");
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      expect(open).toHaveBeenCalledWith("random local key");
+      expect(useAppStore.getState().isDbReady).toBe(true);
+      expect(useSyncStore.getState().status).toBe("local-only");
+    });
+
     it("initializes with stored passphrase and pulls for sync users", async () => {
       localStorageMock.setItem("feedzero:storage-mode", "sync");
       localStorageMock.setItem("feedzero:sync-passphrase", "test phrase");

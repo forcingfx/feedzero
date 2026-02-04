@@ -56,10 +56,10 @@ describe("onboarding-store", () => {
       expect(useOnboardingStore.getState().storageMode).toBe("local");
     });
 
-    it("chooseStorageMode('local') uses DEFAULT_PASSPHRASE instead of generating one", () => {
+    it("chooseStorageMode('local') generates a random passphrase", () => {
       useOnboardingStore.getState().chooseStorageMode("local");
       expect(useOnboardingStore.getState().generatedPassphrase).toBe(
-        "feedzero-default-key",
+        "carbon mango velvet prism",
       );
     });
 

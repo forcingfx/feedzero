@@ -91,7 +91,7 @@ describe("StorageChoiceStep", () => {
     const state = useOnboardingStore.getState();
     expect(state.storageMode).toBe("local");
     expect(state.step).toBe("initializing");
-    expect(state.generatedPassphrase).toBe("feedzero-default-key");
+    expect(state.generatedPassphrase).toBe("carbon mango velvet prism");
   });
 
   it("selecting Sync and clicking Continue sets mode and goes to passphrase-display", async () => {
