@@ -27,7 +27,10 @@ describe("sync-handler", () => {
   describe("GET", () => {
     it("returns 404 when vault does not exist", async () => {
       const vaultId = "a".repeat(64);
-      const response = await handleSyncRequest(makeGetRequest(vaultId), adapter);
+      const response = await handleSyncRequest(
+        makeGetRequest(vaultId),
+        adapter,
+      );
       expect(response.status).toBe(404);
     });
 
@@ -39,7 +42,10 @@ describe("sync-handler", () => {
       });
       await adapter.put(vaultId, vaultJson);
 
-      const response = await handleSyncRequest(makeGetRequest(vaultId), adapter);
+      const response = await handleSyncRequest(
+        makeGetRequest(vaultId),
+        adapter,
+      );
       expect(response.status).toBe(200);
 
       const data = await response.json();
@@ -123,10 +129,64 @@ describe("sync-handler", () => {
     });
   });
 
-  describe("unsupported method", () => {
-    it("returns 405 for DELETE", async () => {
+  describe("DELETE", () => {
+    function makeDeleteRequest(vaultId: string): Request {
+      return new Request(`http://localhost/api/sync?vaultId=${vaultId}`, {
+        method: "DELETE",
+      });
+    }
+
+    it("deletes an existing vault and returns success", async () => {
+      const vaultId = "e".repeat(64);
+      await adapter.put(vaultId, '{"ok":true,"vault":{}}');
+
+      const response = await handleSyncRequest(
+        makeDeleteRequest(vaultId),
+        adapter,
+      );
+      expect(response.status).toBe(200);
+
+      const data = await response.json();
+      expect(data.ok).toBe(true);
+
+      // Verify it was deleted
+      const getResponse = await handleSyncRequest(
+        makeGetRequest(vaultId),
+        adapter,
+      );
+      expect(getResponse.status).toBe(404);
+    });
+
+    it("returns 200 for deleting a non-existent vault (idempotent)", async () => {
+      const vaultId = "f".repeat(64);
+      const response = await handleSyncRequest(
+        makeDeleteRequest(vaultId),
+        adapter,
+      );
+      expect(response.status).toBe(200);
+    });
+
+    it("returns 400 for missing vaultId", async () => {
       const request = new Request("http://localhost/api/sync", {
         method: "DELETE",
+      });
+      const response = await handleSyncRequest(request, adapter);
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 400 for invalid vaultId", async () => {
+      const response = await handleSyncRequest(
+        makeDeleteRequest("not-valid"),
+        adapter,
+      );
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe("unsupported method", () => {
+    it("returns 405 for PATCH", async () => {
+      const request = new Request("http://localhost/api/sync", {
+        method: "PATCH",
       });
       const response = await handleSyncRequest(request, adapter);
       expect(response.status).toBe(405);

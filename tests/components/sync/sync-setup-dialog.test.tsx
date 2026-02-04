@@ -13,6 +13,11 @@ vi.mock("@/core/sync/sync-service", () => ({
   pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
   pullVault: vi.fn().mockResolvedValue({ ok: false, error: "Not found" }),
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  deleteVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
+}));
+
+vi.mock("@/core/crypto/passphrase-generator", () => ({
+  generatePassphrase: vi.fn(() => "alpha bravo charlie delta"),
 }));
 
 // Mock localStorage
@@ -86,6 +91,95 @@ describe("SyncSetupDialog", () => {
       // The spinner should never be visible on first open
       const spinners = document.querySelectorAll(".animate-spin");
       expect(spinners.length).toBe(0);
+    });
+  });
+
+  describe("enable sync from local-only", () => {
+    beforeEach(() => {
+      useSyncStore.setState({
+        status: "local-only",
+        passphrase: null,
+        dialogOpen: true,
+      });
+    });
+
+    it("shows Enable sync button for local-only users", () => {
+      render(<SyncSetupDialog />);
+      expect(
+        screen.getByRole("button", { name: /enable sync/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("clicking Enable sync shows the passphrase setup flow", async () => {
+      const user = userEvent.setup();
+      render(<SyncSetupDialog />);
+
+      await user.click(screen.getByRole("button", { name: /enable sync/i }));
+
+      // Should show the passphrase generation step
+      expect(screen.getByText("Your secret key")).toBeInTheDocument();
+      expect(screen.getByText("alpha bravo charlie delta")).toBeInTheDocument();
+    });
+  });
+
+  describe("disable sync from synced", () => {
+    beforeEach(() => {
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+        lastSyncedAt: Date.now(),
+        dialogOpen: true,
+      });
+    });
+
+    it("shows Switch to local only button for synced users", () => {
+      render(<SyncSetupDialog />);
+      expect(
+        screen.getByRole("button", { name: /switch to local only/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("clicking Switch to local only shows confirmation", async () => {
+      const user = userEvent.setup();
+      render(<SyncSetupDialog />);
+
+      await user.click(
+        screen.getByRole("button", { name: /switch to local only/i }),
+      );
+
+      expect(
+        screen.getByText(/delete your encrypted data from the server/i),
+      ).toBeInTheDocument();
+    });
+
+    it("confirming disable sync calls disableSync and closes dialog", async () => {
+      const user = userEvent.setup();
+      render(<SyncSetupDialog />);
+
+      await user.click(
+        screen.getByRole("button", { name: /switch to local only/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /disable sync/i }));
+
+      // Store should be back to local-only
+      expect(useSyncStore.getState().status).toBe("local-only");
+    });
+  });
+
+  describe("syncing status", () => {
+    it("disables Switch to local only while syncing", () => {
+      useSyncStore.setState({
+        status: "syncing",
+        passphrase: "test passphrase",
+        dialogOpen: true,
+      });
+
+      render(<SyncSetupDialog />);
+
+      const button = screen.getByRole("button", {
+        name: /switch to local only/i,
+      });
+      expect(button).toBeDisabled();
     });
   });
 });

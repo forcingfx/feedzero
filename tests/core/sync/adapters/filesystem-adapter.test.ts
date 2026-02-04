@@ -62,4 +62,30 @@ describe("filesystem-adapter", () => {
     const getResult = await adapter.get("../../../etc/passwd");
     expect(isErr(getResult)).toBe(true);
   });
+
+  it("deletes an existing vault file", async () => {
+    const adapter = createFilesystemAdapter(tmpDir);
+    const vaultId = "e".repeat(64);
+
+    await adapter.put(vaultId, "data");
+    const deleteResult = await adapter.delete(vaultId);
+    expect(isOk(deleteResult)).toBe(true);
+
+    const getResult = await adapter.get(vaultId);
+    expect(unwrap(getResult)).toBeNull();
+  });
+
+  it("delete returns ok for a non-existent vault file", async () => {
+    const adapter = createFilesystemAdapter(tmpDir);
+    const vaultId = "f".repeat(64);
+
+    const result = await adapter.delete(vaultId);
+    expect(isOk(result)).toBe(true);
+  });
+
+  it("delete rejects an invalid vault ID", async () => {
+    const adapter = createFilesystemAdapter(tmpDir);
+    const result = await adapter.delete("../../../etc/passwd");
+    expect(isErr(result)).toBe(true);
+  });
 });

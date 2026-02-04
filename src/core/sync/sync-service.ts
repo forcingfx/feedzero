@@ -35,9 +35,7 @@ export async function importVault(vault: VaultData): Promise<Result<boolean>> {
  * Encrypt local data and push it to the sync server.
  * Returns the server-reported timestamp on success.
  */
-export async function pushVault(
-  passphrase: string,
-): Promise<Result<number>> {
+export async function pushVault(passphrase: string): Promise<Result<number>> {
   try {
     const [vaultIdResult, keyResult, vaultResult] = await Promise.all([
       deriveVaultId(passphrase),
@@ -48,7 +46,10 @@ export async function pushVault(
     if (!keyResult.ok) return keyResult;
     if (!vaultResult.ok) return vaultResult;
 
-    const encryptedResult = await encryptVault(keyResult.value, vaultResult.value);
+    const encryptedResult = await encryptVault(
+      keyResult.value,
+      vaultResult.value,
+    );
     if (!encryptedResult.ok) return encryptedResult;
 
     const response = await fetch("/api/sync", {
@@ -73,6 +74,32 @@ export async function pushVault(
 }
 
 /**
+ * Delete the encrypted vault from the sync server.
+ * Used when a user switches from sync to local-only.
+ */
+export async function deleteVault(
+  passphrase: string,
+): Promise<Result<boolean>> {
+  try {
+    const vaultIdResult = await deriveVaultId(passphrase);
+    if (!vaultIdResult.ok) return vaultIdResult;
+
+    const response = await fetch(`/api/sync?vaultId=${vaultIdResult.value}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return err(`Vault deletion failed (${response.status}): ${text}`);
+    }
+
+    return ok(true);
+  } catch (e) {
+    return err(`Vault deletion failed: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Pull encrypted vault from the sync server and decrypt it.
  * Does NOT import into local DB — caller decides what to do with the data.
  */
@@ -87,9 +114,7 @@ export async function pullVault(
     if (!vaultIdResult.ok) return vaultIdResult;
     if (!keyResult.ok) return keyResult;
 
-    const response = await fetch(
-      `/api/sync?vaultId=${vaultIdResult.value}`,
-    );
+    const response = await fetch(`/api/sync?vaultId=${vaultIdResult.value}`);
 
     if (!response.ok) {
       const text = await response.text();

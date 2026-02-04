@@ -71,6 +71,21 @@ async function handlePut(
   return jsonResponse({ ok: true, updatedAt: Date.now() });
 }
 
+async function handleDelete(
+  request: Request,
+  adapter: SyncStorageAdapter,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const rawId = url.searchParams.get("vaultId");
+  const vaultId = validateVaultId(rawId);
+  if (!vaultId) return errorResponse("Invalid or missing vaultId", 400);
+
+  const result = await adapter.delete(vaultId);
+  if (!result.ok) return errorResponse(result.error, 500);
+
+  return jsonResponse({ ok: true });
+}
+
 /**
  * Shared sync request handler using the Web standard Request/Response API.
  * Can be used by Vercel serverless functions, Hono, or any Web-compatible server.
@@ -84,6 +99,8 @@ export async function handleSyncRequest(
       return handleGet(request, adapter);
     case "PUT":
       return handlePut(request, adapter);
+    case "DELETE":
+      return handleDelete(request, adapter);
     default:
       return errorResponse("Method not allowed", 405);
   }

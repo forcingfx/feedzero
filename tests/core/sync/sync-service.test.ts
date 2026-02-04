@@ -10,6 +10,7 @@ import {
   importVault,
   pushVault,
   pullVault,
+  deleteVault,
 } from "@/core/sync/sync-service";
 
 describe("sync-service", () => {
@@ -195,6 +196,45 @@ describe("sync-service", () => {
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Offline")));
 
       const result = await pullVault("test-passphrase");
+      expect(isErr(result)).toBe(true);
+    });
+  });
+
+  describe("deleteVault", () => {
+    it("sends DELETE to /api/sync with derived vaultId", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ ok: true }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await deleteVault("test-passphrase");
+      expect(isOk(result)).toBe(true);
+
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const [url, options] = fetchMock.mock.calls[0];
+      expect(url).toMatch(/\/api\/sync\?vaultId=[0-9a-f]{64}$/);
+      expect(options.method).toBe("DELETE");
+    });
+
+    it("returns err on server error", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          text: () => Promise.resolve("Internal Server Error"),
+        }),
+      );
+
+      const result = await deleteVault("test-passphrase");
+      expect(isErr(result)).toBe(true);
+    });
+
+    it("returns err on network failure", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Offline")));
+
+      const result = await deleteVault("test-passphrase");
       expect(isErr(result)).toBe(true);
     });
   });

@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import { pushVault, pullVault, importVault } from "../core/sync/sync-service";
+import {
+  pushVault,
+  pullVault,
+  importVault,
+  deleteVault,
+} from "../core/sync/sync-service";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
 
 export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
@@ -17,8 +22,8 @@ interface SyncStore {
   enableSync: (passphrase: string) => Promise<void>;
   /** Restore sync state from a known passphrase without pushing (e.g., after recovery pull). */
   restoreSync: (passphrase: string) => void;
-  /** Disable sync: reset state and clear persisted data. */
-  disableSync: () => void;
+  /** Disable sync: delete server vault, reset state, clear persisted data. */
+  disableSync: () => Promise<void>;
   /** Push local data to the server. */
   push: () => Promise<void>;
   /** Pull data from the server and import into local DB. */
@@ -61,10 +66,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     });
   },
 
-  disableSync: () => {
+  disableSync: async () => {
     if (debounceTimer) {
       clearTimeout(debounceTimer);
       debounceTimer = null;
+    }
+    const { passphrase } = get();
+    if (passphrase) {
+      await deleteVault(passphrase);
     }
     localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);

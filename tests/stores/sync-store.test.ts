@@ -5,17 +5,20 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   pushVault: vi.fn(),
   pullVault: vi.fn(),
   importVault: vi.fn(),
+  deleteVault: vi.fn(),
 }));
 
 import {
   pushVault,
   pullVault,
   importVault,
+  deleteVault,
 } from "../../src/core/sync/sync-service";
 
 const mockPushVault = vi.mocked(pushVault);
 const mockPullVault = vi.mocked(pullVault);
 const mockImportVault = vi.mocked(importVault);
+const mockDeleteVault = vi.mocked(deleteVault);
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -266,17 +269,17 @@ describe("sync-store", () => {
   });
 
   describe("disableSync", () => {
-    it("resets state and clears localStorage", () => {
-      localStorageMock.setItem("feedzero:sync-passphrase", "test");
-      localStorageMock.setItem("feedzero:storage-mode", "sync");
+    it("deletes server vault, resets state, and clears localStorage", async () => {
+      mockDeleteVault.mockResolvedValue({ ok: true, value: true });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test",
+        passphrase: "test passphrase",
         lastSyncedAt: Date.now(),
       });
 
-      useSyncStore.getState().disableSync();
+      await useSyncStore.getState().disableSync();
 
+      expect(mockDeleteVault).toHaveBeenCalledWith("test passphrase");
       const state = useSyncStore.getState();
       expect(state.status).toBe("local-only");
       expect(state.passphrase).toBeNull();
@@ -288,6 +291,39 @@ describe("sync-store", () => {
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
       );
+    });
+
+    it("still clears local state even if server deletion fails", async () => {
+      mockDeleteVault.mockResolvedValue({ ok: false, error: "Network error" });
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+        lastSyncedAt: Date.now(),
+      });
+
+      await useSyncStore.getState().disableSync();
+
+      const state = useSyncStore.getState();
+      expect(state.status).toBe("local-only");
+      expect(state.passphrase).toBeNull();
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:sync-passphrase",
+      );
+    });
+
+    it("cancels pending debounced push", async () => {
+      mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
+      mockDeleteVault.mockResolvedValue({ ok: true, value: true });
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+      });
+
+      useSyncStore.getState().scheduleSyncPush();
+      await useSyncStore.getState().disableSync();
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockPushVault).not.toHaveBeenCalled();
     });
   });
 });

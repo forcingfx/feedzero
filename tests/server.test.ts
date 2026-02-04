@@ -108,7 +108,7 @@ describe("server", () => {
     });
 
     it("returns 405 for unsupported method", async () => {
-      const res = await createApp().request("/api/sync", { method: "DELETE" });
+      const res = await createApp().request("/api/sync", { method: "PATCH" });
       expect(res.status).toBe(405);
     });
   });

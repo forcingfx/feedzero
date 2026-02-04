@@ -109,10 +109,38 @@ describe("StorageChoiceStep", () => {
     expect(state.generatedPassphrase).toBe("carbon mango velvet prism");
   });
 
-  it("renders I have a recovery key link", () => {
+  it("renders recovery option as a radio card", () => {
     renderInDialog(<StorageChoiceStep />);
     expect(
-      screen.getByRole("button", { name: /i have a recovery key/i }),
+      screen.getByRole("radio", { name: /i already have a passphrase/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/restore from another device/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows info banner when recovery option is selected", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    await user.click(
+      screen.getByRole("radio", { name: /i already have a passphrase/i }),
+    );
+
+    expect(
+      screen.getByText(/enter your 4-word secret key/i),
+    ).toBeInTheDocument();
+  });
+
+  it("selecting recovery and clicking Continue navigates to recovery step", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    await user.click(
+      screen.getByRole("radio", { name: /i already have a passphrase/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(useOnboardingStore.getState().step).toBe("recovery");
   });
 });

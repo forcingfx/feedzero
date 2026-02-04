@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Smartphone, Lock, AlertTriangle, KeyRound } from "lucide-react";
+import { Smartphone, Lock, AlertTriangle, KeyRound, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DialogDescription,
@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 
-type StorageOption = "local" | "sync" | null;
+type StorageOption = "local" | "sync" | "recovery" | null;
 
 export function StorageChoiceStep() {
   const [selected, setSelected] = useState<StorageOption>(null);
@@ -17,7 +17,9 @@ export function StorageChoiceStep() {
   const setStep = useOnboardingStore((s) => s.setStep);
 
   const handleContinue = () => {
-    if (selected) {
+    if (selected === "recovery") {
+      setStep("recovery");
+    } else if (selected) {
       chooseStorageMode(selected);
     }
   };
@@ -122,6 +124,47 @@ export function StorageChoiceStep() {
             )}
           </div>
         </label>
+
+        {/* Recovery option */}
+        <label
+          className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+            selected === "recovery"
+              ? "border-blue-300 bg-blue-50/50 ring-1 ring-blue-300"
+              : "border-border hover:border-blue-200 hover:bg-blue-50/30"
+          }`}
+        >
+          <input
+            type="radio"
+            name="storage-option"
+            value="recovery"
+            checked={selected === "recovery"}
+            onChange={() => setSelected("recovery")}
+            className="sr-only"
+            aria-label="I already have a passphrase"
+          />
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <KeyRound className="size-5" />
+          </div>
+          <div className="flex-1">
+            <span className="font-medium">I already have a passphrase</span>
+            <p className="text-xs text-muted-foreground">
+              Restore from another device
+            </p>
+          </div>
+          <div
+            className={`mt-1 size-4 shrink-0 rounded-full border-2 ${
+              selected === "recovery"
+                ? "border-blue-500 bg-blue-500"
+                : "border-muted-foreground/30"
+            }`}
+          >
+            {selected === "recovery" && (
+              <div className="flex h-full items-center justify-center">
+                <div className="size-1.5 rounded-full bg-white" />
+              </div>
+            )}
+          </div>
+        </label>
       </div>
 
       {/* Browser warning - only shown when local is selected */}
@@ -135,7 +178,18 @@ export function StorageChoiceStep() {
         </div>
       )}
 
-      <DialogFooter className="flex-col gap-3 sm:flex-col">
+      {/* Recovery info - only shown when recovery is selected */}
+      {selected === "recovery" && (
+        <div className="flex items-start gap-2 rounded-md bg-blue-50 p-3 text-xs text-blue-700">
+          <Info className="size-4 shrink-0 mt-0.5" />
+          <span>
+            Enter your 4-word secret key to restore your feeds from another
+            device.
+          </span>
+        </div>
+      )}
+
+      <DialogFooter>
         <Button
           size="lg"
           onClick={handleContinue}
@@ -143,14 +197,6 @@ export function StorageChoiceStep() {
           className="w-full"
         >
           Continue
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setStep("recovery")}
-          className="text-muted-foreground"
-        >
-          <KeyRound className="mr-2 size-4" />I have a recovery key
         </Button>
       </DialogFooter>
     </>

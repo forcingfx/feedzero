@@ -47,4 +47,19 @@ describe("memory-adapter", () => {
     await adapter1.put("vault-1", "data");
     expect(unwrap(await adapter2.get("vault-1"))).toBeNull();
   });
+
+  it("deletes an existing vault", async () => {
+    const adapter = createMemoryAdapter();
+    await adapter.put("vault-del", "data");
+
+    const result = await adapter.delete("vault-del");
+    expect(isOk(result)).toBe(true);
+    expect(unwrap(await adapter.get("vault-del"))).toBeNull();
+  });
+
+  it("delete returns ok for a non-existent vault", async () => {
+    const adapter = createMemoryAdapter();
+    const result = await adapter.delete("no-such-vault");
+    expect(isOk(result)).toBe(true);
+  });
 });

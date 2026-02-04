@@ -44,5 +44,16 @@ export function createVercelBlobAdapter(): SyncStorageAdapter {
         return err(`Vercel Blob put failed: ${(e as Error).message}`);
       }
     },
+
+    async delete(vaultId) {
+      try {
+        const { del } = await import("@vercel/blob");
+        const pathname = `vaults/${vaultId}.json`;
+        await del(pathname);
+        return ok(true);
+      } catch (e) {
+        return err(`Vercel Blob delete failed: ${(e as Error).message}`);
+      }
+    },
   };
 }

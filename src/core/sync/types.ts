@@ -28,4 +28,5 @@ export interface SyncResponse {
 export interface SyncStorageAdapter {
   get(vaultId: string): Promise<Result<string | null>>;
   put(vaultId: string, data: string): Promise<Result<boolean>>;
+  delete(vaultId: string): Promise<Result<boolean>>;
 }

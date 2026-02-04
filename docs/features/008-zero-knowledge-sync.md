@@ -36,6 +36,19 @@ Feature: Zero-knowledge cloud sync
     When they add a feed, remove a feed, refresh feeds, or read an article
     Then a debounced push (5s) sends the updated encrypted vault to the server
 
+  Scenario: User disables sync
+    Given a sync-enabled user
+    When they switch to local-only from the Data & Storage dialog
+    Then the encrypted vault is deleted from the server
+    And local data is preserved
+    And the sync status chip turns amber
+
+  Scenario: Local-only user enables sync later
+    Given a local-only user
+    When they click Enable sync in the Data & Storage dialog
+    Then they are guided through passphrase generation and confirmation
+    And their data is encrypted and pushed to the server
+
   Scenario: Server never sees plaintext
     Given any sync operation
     Then the server only stores/retrieves opaque encrypted blobs
@@ -64,8 +77,10 @@ Same passphrase always produces same vault ID and same encryption key. No extern
 
 1. **Push**: `exportAll()` from IndexedDB -> serialize to `VaultData` -> `encryptVault()` with AES-GCM-256 -> PUT `/api/sync` with vault ID + ciphertext
 2. **Pull**: GET `/api/sync?vaultId=<hex>` -> `decryptVault()` -> `importAll()` into IndexedDB
-3. **Startup (sync user)**: Pull first, then load from local DB
-4. **After mutations**: Debounced push (5s after last change)
+3. **Delete**: DELETE `/api/sync?vaultId=<hex>` -> removes encrypted blob from server
+4. **Startup (sync user)**: Pull first, then load from local DB
+5. **After mutations**: Debounced push (5s after last change)
+6. **Disable sync**: Delete server vault -> clear localStorage keys -> reset store to local-only
 
 ### Storage Adapter Pattern
 
@@ -92,7 +107,7 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 | `src/utils/base64.ts` | Base64 encode/decode for vault ciphertext |
 | `src/core/sync/types.ts` | `VaultData`, `EncryptedVault`, `SyncStorageAdapter` interfaces |
 | `src/core/sync/vault-crypto.ts` | Vault ID derivation, key derivation, encrypt/decrypt |
-| `src/core/sync/sync-service.ts` | Client-side orchestration: export, import, push, pull |
+| `src/core/sync/sync-service.ts` | Client-side orchestration: export, import, push, pull, delete |
 | `src/core/sync/sync-handler.ts` | Server-side `handleSyncRequest(req, adapter)` |
 | `src/core/sync/adapters/memory-adapter.ts` | In-memory storage adapter |
 | `src/core/sync/adapters/filesystem-adapter.ts` | Filesystem storage adapter |
@@ -129,6 +144,5 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 
 - No conflict resolution — last push wins
 - No incremental sync — full vault transferred each time
-- No vault deletion API
 - Vault size limited to 5MB
 - No passphrase change/rotation flow yet

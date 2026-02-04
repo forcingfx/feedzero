@@ -74,7 +74,7 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/core/sync/types.ts** — `VaultData`, `EncryptedVault`, `SyncStorageAdapter` interfaces.
 - **src/core/sync/vault-crypto.ts** — `deriveVaultId`, `deriveVaultKey`, `encryptVault`, `decryptVault`. Deterministic derivation from passphrase with domain-separated PBKDF2.
 - **src/core/sync/sync-service.ts** — Client-side sync orchestrator: `exportVault`, `importVault`, `pushVault`, `pullVault`.
-- **src/core/sync/sync-handler.ts** — Server-side `handleSyncRequest(request, adapter)` — shared `Request → Response` handler.
+- **src/core/sync/sync-handler.ts** — Server-side `handleSyncRequest(request, adapter)` — shared `Request → Response` handler. Supports GET (pull), PUT (push), DELETE (vault removal).
 - **src/core/sync/adapters/** — Storage adapter implementations: `memory-adapter.ts`, `filesystem-adapter.ts`, `vercel-blob-adapter.ts`, `resolve-adapter.ts`.
 - **src/core/feeds/feed-service.ts** — `addFeedFlow(url)` orchestrates the full add-feed flow. `refreshFeed(feed)` and `refreshAllFeeds()` handle feed refresh with guid-based dedup.
 - **src/core/parser/parser.ts** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1.
@@ -87,7 +87,7 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/stores/article-store.ts** — `articles[]`, `selectedArticle`, `loadArticles(feedId)`, `selectArticle(article)` (auto-marks as read).
 - **src/stores/extraction-store.ts** — `cache` (link → extracted HTML), `viewMode`, `fetchExtracted(url)`. Extraction is on-demand and cached.
 - **src/stores/onboarding-store.ts** — Onboarding flow state machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery` for returning users). Storage modes: `local` (client-only, skips passphrase confirmation) vs `sync` (cloud-enabled, requires passphrase confirmation). Generates passphrases via `passphrase-generator.ts`.
-- **src/stores/sync-store.ts** — Cloud sync state and actions. Status: `local-only` | `syncing` | `synced` | `error`. Actions: `enableSync(passphrase)`, `restoreSync(passphrase)` (returning sync users), `push()`, `pull()`, `scheduleSyncPush()` (5s debounce), `disableSync()`. Persists passphrase and storage mode to localStorage.
+- **src/stores/sync-store.ts** — Cloud sync state and actions. Status: `local-only` | `syncing` | `synced` | `error`. Actions: `enableSync(passphrase)`, `restoreSync(passphrase)` (returning sync users), `push()`, `pull()`, `scheduleSyncPush()` (5s debounce), `disableSync()` (deletes server vault + clears local state). Persists passphrase and storage mode to localStorage.
 
 ### React Components
 
@@ -97,7 +97,7 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/components/articles/** — `article-list.tsx`, `article-item.tsx`
 - **src/components/reader/** — `reader-panel.tsx`, `view-toggle.tsx`, `article-content.tsx`
 - **src/components/onboarding/** — Modal-based onboarding flow. `onboarding-modal.tsx` container with step components in `steps/` (welcome, storage-choice, passphrase-display, passphrase-confirm, recovery).
-- **src/components/sync/** — `sync-setup-dialog.tsx` (dialog for enabling cloud sync), `sync-status-chip.tsx` (status indicator).
+- **src/components/sync/** — `sync-setup-dialog.tsx` (dialog for enabling/disabling cloud sync, data management, vault deletion), `sync-status-chip.tsx` (color-coded status indicator: amber local, green synced, red error).
 - **src/pages/feeds-page.tsx** — Main page component. Desktop: 3-panel CSS grid. Mobile: single panel with back navigation. Syncs URL params to Zustand stores.
 - **src/lib/content-modes.ts** — Pure functions for content view modes (Feed/Extracted visibility, summary subheading detection, similarity/completeness heuristics). Used by `reader-panel.tsx`.
 - **src/lib/decode-entities.ts** — Decodes HTML entities for plain text display.
@@ -171,7 +171,7 @@ All API handlers use the Web standard `Request → Response` pattern via shared 
 - **`api/*.ts`** — Vercel Serverless Functions. All three (`api/feed.ts`, `api/page.ts`, `api/sync.ts`) import shared handlers from `src/core/`.
 - **`vite.config.js`** — Dev proxy using lazy-imported shared handlers with a memory adapter for sync.
 
-**Endpoints**: `/api/feed?url=<encoded>` (feed proxy), `/api/page?url=<encoded>` (page proxy), `/api/sync` (GET/PUT encrypted vault).
+**Endpoints**: `/api/feed?url=<encoded>` (feed proxy), `/api/page?url=<encoded>` (page proxy), `/api/sync` (GET/PUT/DELETE encrypted vault).
 
 **SSRF protections** — The proxy blocks requests to internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http:`/`https:` protocols. Do not weaken these checks.
 

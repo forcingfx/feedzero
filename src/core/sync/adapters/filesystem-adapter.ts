@@ -49,5 +49,20 @@ export function createFilesystemAdapter(dataDir: string): SyncStorageAdapter {
         return err(`Failed to write vault: ${(e as Error).message}`);
       }
     },
+
+    async delete(vaultId) {
+      if (!validateVaultId(vaultId)) {
+        return err("Invalid vault ID");
+      }
+      try {
+        fs.rmSync(path.join(vaultsDir, `${vaultId}.json`));
+        return ok(true);
+      } catch (e) {
+        if ((e as { code?: string }).code === "ENOENT") {
+          return ok(true);
+        }
+        return err(`Failed to delete vault: ${(e as Error).message}`);
+      }
+    },
   };
 }

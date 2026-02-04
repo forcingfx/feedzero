@@ -103,7 +103,7 @@ IndexedDB (encrypted via Dexie + Web Crypto)
 - **feed-store** — Feed CRUD, selection, refresh. Debounces concurrent refreshAll calls. Triggers sync push after mutations.
 - **article-store** — Article list for selected feed, selection (auto-marks read), read state. Triggers sync push after mark-as-read.
 - **extraction-store** — Extraction cache (link → HTML), view mode toggle, fetch status
-- **sync-store** — Cloud sync state: `enableSync`, `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce). Passphrase persistence in localStorage.
+- **sync-store** — Cloud sync state: `enableSync`, `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce), `disableSync` (deletes server vault + clears local state). Passphrase persistence in localStorage.
 
 ## Routing
 
@@ -127,7 +127,7 @@ Endpoints:
 
 - `/api/feed?url=<encoded>` — Proxies RSS/Atom/JSON feed requests (CORS bypass)
 - `/api/page?url=<encoded>` — Proxies web page requests for full-text extraction
-- `/api/sync` — GET retrieves encrypted vault, PUT stores encrypted vault
+- `/api/sync` — GET retrieves encrypted vault, PUT stores encrypted vault, DELETE removes encrypted vault
 
 ### SSRF Protection
 
