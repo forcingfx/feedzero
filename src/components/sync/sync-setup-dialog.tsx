@@ -7,6 +7,7 @@ import {
   Loader2,
   Trash2,
   AlertTriangle,
+  LogOut,
 } from "lucide-react";
 import {
   Dialog,
@@ -24,12 +25,90 @@ import { useAppStore } from "@/stores/app-store";
 import { toast } from "sonner";
 
 type SetupStep = "passphrase" | "syncing" | "done";
-type DialogView = "status" | "setup" | "confirm-delete" | "confirm-disable";
+type DialogView =
+  | "status"
+  | "setup"
+  | "confirm-delete"
+  | "confirm-disable"
+  | "confirm-logout";
+
+interface ConfirmationViewProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  loadingLabel: string;
+  isLoading: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  variant?: "default" | "destructive";
+  confirmIcon?: React.ReactNode;
+}
+
+function ConfirmationView({
+  open,
+  onOpenChange,
+  icon,
+  title,
+  description,
+  confirmLabel,
+  loadingLabel,
+  isLoading,
+  onConfirm,
+  onCancel,
+  variant = "default",
+  confirmIcon,
+}: ConfirmationViewProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="flex justify-center py-2">{icon}</div>
+          <DialogTitle className="text-center">{title}</DialogTitle>
+          <DialogDescription className="text-center">
+            {description}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex-col gap-2 sm:flex-col">
+          <Button
+            variant={variant}
+            onClick={onConfirm}
+            disabled={isLoading}
+            className="w-full"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                {loadingLabel}
+              </>
+            ) : (
+              <>
+                {confirmIcon}
+                {confirmLabel}
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            disabled={isLoading}
+            className="w-full"
+          >
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function SyncSetupDialog() {
   const status = useSyncStore((s) => s.status);
   const enableSync = useSyncStore((s) => s.enableSync);
   const disableSync = useSyncStore((s) => s.disableSync);
+  const logout = useSyncStore((s) => s.logout);
   const resetApp = useAppStore((s) => s.resetApp);
   const open = useSyncStore((s) => s.dialogOpen);
   const onOpenChange = useSyncStore((s) => s.setDialogOpen);
@@ -41,6 +120,7 @@ export function SyncSetupDialog() {
   const [copied, setCopied] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDisabling, setIsDisabling] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Reset all internal state when dialog closes
   useEffect(() => {
@@ -52,6 +132,7 @@ export function SyncSetupDialog() {
       setCopied(false);
       setIsDeleting(false);
       setIsDisabling(false);
+      setIsLoggingOut(false);
     }
   }, [open]);
 
@@ -89,6 +170,12 @@ export function SyncSetupDialog() {
     setIsDeleting(true);
     await resetApp();
     await disableSync();
+    handleOpenChange(false);
+  }
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+    await logout();
     handleOpenChange(false);
   }
 
@@ -191,102 +278,69 @@ export function SyncSetupDialog() {
     );
   }
 
-  // --- Delete all data confirmation ---
+  // --- Confirmation views ---
   if (view === "confirm-delete") {
     return (
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex justify-center py-2">
-              <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10">
-                <AlertTriangle className="size-6 text-destructive" />
-              </div>
-            </div>
-            <DialogTitle className="text-center">Delete all data?</DialogTitle>
-            <DialogDescription className="text-center">
-              This will permanently delete all your feeds and articles. This
-              action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button
-              variant="destructive"
-              onClick={handleDeleteAll}
-              disabled={isDeleting}
-              className="w-full"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 size-4" />
-                  Delete everything
-                </>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setView("status")}
-              disabled={isDeleting}
-              className="w-full"
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationView
+        open={open}
+        onOpenChange={handleOpenChange}
+        icon={
+          <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10">
+            <AlertTriangle className="size-6 text-destructive" />
+          </div>
+        }
+        title="Delete all data?"
+        description="This will permanently delete all your feeds and articles. This action cannot be undone."
+        confirmLabel="Delete everything"
+        loadingLabel="Deleting..."
+        confirmIcon={<Trash2 className="mr-2 size-4" />}
+        isLoading={isDeleting}
+        onConfirm={handleDeleteAll}
+        onCancel={() => setView("status")}
+        variant="destructive"
+      />
     );
   }
 
-  // --- Disable sync confirmation ---
   if (view === "confirm-disable") {
     return (
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex justify-center py-2">
-              <div className="flex size-12 items-center justify-center rounded-full bg-amber-100">
-                <CloudOff className="size-6 text-amber-600" />
-              </div>
-            </div>
-            <DialogTitle className="text-center">
-              Switch to local only?
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              This will delete your encrypted data from the server. Your local
-              data will be kept. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button
-              variant="default"
-              onClick={handleDisableSync}
-              disabled={isDisabling}
-              className="w-full"
-            >
-              {isDisabling ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Disabling sync...
-                </>
-              ) : (
-                "Disable sync"
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setView("status")}
-              disabled={isDisabling}
-              className="w-full"
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationView
+        open={open}
+        onOpenChange={handleOpenChange}
+        icon={
+          <div className="flex size-12 items-center justify-center rounded-full bg-amber-100">
+            <CloudOff className="size-6 text-amber-600" />
+          </div>
+        }
+        title="Switch to local only?"
+        description="This will delete your encrypted data from the server. Your local data will be kept. This cannot be undone."
+        confirmLabel="Disable sync"
+        loadingLabel="Disabling sync..."
+        isLoading={isDisabling}
+        onConfirm={handleDisableSync}
+        onCancel={() => setView("status")}
+      />
+    );
+  }
+
+  if (view === "confirm-logout") {
+    return (
+      <ConfirmationView
+        open={open}
+        onOpenChange={handleOpenChange}
+        icon={
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <LogOut className="size-6 text-muted-foreground" />
+          </div>
+        }
+        title="Log out of this device?"
+        description="This will clear all local data from this browser. Your encrypted cloud backup is preserved. You can restore it anytime by entering your secret key."
+        confirmLabel="Log out"
+        loadingLabel="Logging out..."
+        isLoading={isLoggingOut}
+        onConfirm={handleLogout}
+        onCancel={() => setView("status")}
+      />
     );
   }
 
@@ -316,7 +370,7 @@ export function SyncSetupDialog() {
         {(status === "synced" ||
           status === "syncing" ||
           status === "error") && (
-          <div className="border-t pt-4">
+          <div className="border-t pt-4 space-y-2">
             <Button
               variant="outline"
               className="w-full"
@@ -325,6 +379,15 @@ export function SyncSetupDialog() {
             >
               <CloudOff className="mr-2 size-4" />
               Switch to local only
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setView("confirm-logout")}
+              disabled={status === "syncing"}
+            >
+              <LogOut className="mr-2 size-4" />
+              Log out of this device
             </Button>
           </div>
         )}

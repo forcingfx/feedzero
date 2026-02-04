@@ -5,6 +5,7 @@ import {
   importVault,
   deleteVault,
 } from "../core/sync/sync-service";
+import { deleteDatabase } from "../core/storage/db.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
 
 export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
@@ -24,6 +25,8 @@ interface SyncStore {
   restoreSync: (passphrase: string) => void;
   /** Disable sync: delete server vault, reset state, clear persisted data. */
   disableSync: () => Promise<void>;
+  /** Log out: clear local data and reset to onboarding. Cloud vault is preserved. */
+  logout: () => Promise<void>;
   /** Push local data to the server. */
   push: () => Promise<void>;
   /** Pull data from the server and import into local DB. */
@@ -83,6 +86,26 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       error: null,
       passphrase: null,
     });
+  },
+
+  logout: async () => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    await deleteDatabase();
+    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
+    localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
+    localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
+    set({
+      status: "local-only",
+      lastSyncedAt: null,
+      error: null,
+      passphrase: null,
+    });
+    // Lazy import to avoid circular dependency at module load time
+    const { useAppStore } = await import("./app-store.ts");
+    useAppStore.setState({ isDbReady: false, hasCompletedOnboarding: false });
   },
 
   push: async () => {

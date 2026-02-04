@@ -8,17 +8,24 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   deleteVault: vi.fn(),
 }));
 
+vi.mock("../../src/core/storage/db", () => ({
+  deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
+}));
+
 import {
   pushVault,
   pullVault,
   importVault,
   deleteVault,
 } from "../../src/core/sync/sync-service";
+import { deleteDatabase } from "../../src/core/storage/db";
+import { useAppStore } from "../../src/stores/app-store";
 
 const mockPushVault = vi.mocked(pushVault);
 const mockPullVault = vi.mocked(pullVault);
 const mockImportVault = vi.mocked(importVault);
 const mockDeleteVault = vi.mocked(deleteVault);
+const mockDeleteDatabase = vi.mocked(deleteDatabase);
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -321,6 +328,100 @@ describe("sync-store", () => {
 
       useSyncStore.getState().scheduleSyncPush();
       await useSyncStore.getState().disableSync();
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockPushVault).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("logout", () => {
+    it("deletes the local database", async () => {
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+        lastSyncedAt: Date.now(),
+      });
+
+      await useSyncStore.getState().logout();
+
+      expect(mockDeleteDatabase).toHaveBeenCalled();
+    });
+
+    it("does NOT delete the server vault", async () => {
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+        lastSyncedAt: Date.now(),
+      });
+
+      await useSyncStore.getState().logout();
+
+      expect(mockDeleteVault).not.toHaveBeenCalled();
+    });
+
+    it("clears sync-related localStorage keys", async () => {
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+        lastSyncedAt: Date.now(),
+      });
+
+      await useSyncStore.getState().logout();
+
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:sync-passphrase",
+      );
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:storage-mode",
+      );
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:onboarding-complete",
+      );
+    });
+
+    it("resets sync state to local-only defaults", async () => {
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+        lastSyncedAt: Date.now(),
+        error: "some old error",
+      });
+
+      await useSyncStore.getState().logout();
+
+      const state = useSyncStore.getState();
+      expect(state.status).toBe("local-only");
+      expect(state.passphrase).toBeNull();
+      expect(state.lastSyncedAt).toBeNull();
+      expect(state.error).toBeNull();
+    });
+
+    it("resets app store (isDbReady and hasCompletedOnboarding)", async () => {
+      useAppStore.setState({
+        isDbReady: true,
+        hasCompletedOnboarding: true,
+      });
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+      });
+
+      await useSyncStore.getState().logout();
+
+      const appState = useAppStore.getState();
+      expect(appState.isDbReady).toBe(false);
+      expect(appState.hasCompletedOnboarding).toBe(false);
+    });
+
+    it("cancels pending debounce timer", async () => {
+      mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+      });
+
+      useSyncStore.getState().scheduleSyncPush();
+      await useSyncStore.getState().logout();
       await vi.advanceTimersByTimeAsync(5000);
 
       expect(mockPushVault).not.toHaveBeenCalled();
