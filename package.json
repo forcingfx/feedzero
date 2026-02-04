@@ -67,6 +67,6 @@
     "zustand": "^5.0.11"
   },
   "optionalDependencies": {
-    "@vercel/blob": "^2.0.1"
+    "@vercel/blob": "^2.1.0"
   }
 }
