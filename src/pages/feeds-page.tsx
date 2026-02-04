@@ -124,20 +124,28 @@ export function FeedsPage() {
 
   // Desktop: sidebar + article list + reader pane
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-svh overflow-hidden">
       <AppSidebar onFeedSelect={handleFeedSelect} />
-      <SidebarInset>
+      <SidebarInset className="overflow-hidden">
         <header className="flex h-10 shrink-0 items-center border-b px-2">
           <SidebarTrigger />
         </header>
         <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-          <ResizablePanel defaultSize="40%" minSize="300px">
+          <ResizablePanel
+            defaultSize="40%"
+            minSize="300px"
+            className="overflow-hidden"
+          >
             <ScrollArea className="h-full">
               <ArticleList onArticleSelect={handleArticleSelect} />
             </ScrollArea>
           </ResizablePanel>
           <ResizableHandle />
-          <ResizablePanel defaultSize="60%" minSize="300px">
+          <ResizablePanel
+            defaultSize="60%"
+            minSize="300px"
+            className="overflow-hidden"
+          >
             <ScrollArea className="h-full">
               <ReaderPanel />
             </ScrollArea>
