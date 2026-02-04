@@ -48,6 +48,12 @@
     --color-sidebar-primary: var(--sidebar-primary);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar: var(--sidebar);
+    --color-sync-local: var(--sync-local);
+    --color-sync-local-bg: var(--sync-local-bg);
+    --color-sync-synced: var(--sync-synced);
+    --color-sync-synced-bg: var(--sync-synced-bg);
+    --color-sync-error: var(--sync-error);
+    --color-sync-error-bg: var(--sync-error-bg);
 }
 
 /* FeedZero light theme — shadcn slate palette */
