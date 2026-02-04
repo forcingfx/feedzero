@@ -2,12 +2,14 @@
  * Vercel Serverless Function: Sync Endpoint
  *
  * Stores and retrieves encrypted vault blobs for zero-knowledge sync.
- * Delegates to the shared sync handler with a resolved storage adapter.
+ * Uses the Vercel Blob adapter directly — this route only runs on Vercel,
+ * so we bypass resolveAdapter() to avoid bundling unused adapters and
+ * depending on the SYNC_STORAGE env var.
  */
 import { handleSyncRequest } from "../src/core/sync/sync-handler.ts";
-import { resolveAdapter } from "../src/core/sync/adapters/resolve-adapter.ts";
+import { createVercelBlobAdapter } from "../src/core/sync/adapters/vercel-blob-adapter.ts";
 
-const adapter = resolveAdapter();
+const adapter = createVercelBlobAdapter();
 
 export async function GET(req: Request): Promise<Response> {
   return handleSyncRequest(req, adapter);
