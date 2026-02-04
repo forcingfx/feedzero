@@ -56,10 +56,10 @@ describe("onboarding-store", () => {
       expect(useOnboardingStore.getState().storageMode).toBe("local");
     });
 
-    it("chooseStorageMode('local') generates a passphrase", () => {
+    it("chooseStorageMode('local') uses DEFAULT_PASSPHRASE instead of generating one", () => {
       useOnboardingStore.getState().chooseStorageMode("local");
       expect(useOnboardingStore.getState().generatedPassphrase).toBe(
-        "carbon mango velvet prism"
+        "feedzero-default-key",
       );
     });
 
@@ -76,7 +76,7 @@ describe("onboarding-store", () => {
     it("chooseStorageMode('sync') generates a passphrase", () => {
       useOnboardingStore.getState().chooseStorageMode("sync");
       expect(useOnboardingStore.getState().generatedPassphrase).toBe(
-        "carbon mango velvet prism"
+        "carbon mango velvet prism",
       );
     });
 
@@ -90,7 +90,7 @@ describe("onboarding-store", () => {
     it("generateNewPassphrase creates a passphrase", () => {
       useOnboardingStore.getState().generateNewPassphrase();
       expect(useOnboardingStore.getState().generatedPassphrase).toBe(
-        "carbon mango velvet prism"
+        "carbon mango velvet prism",
       );
     });
   });
@@ -98,7 +98,9 @@ describe("onboarding-store", () => {
   describe("confirmation input", () => {
     it("setConfirmationInput updates the input value", () => {
       useOnboardingStore.getState().setConfirmationInput("test input");
-      expect(useOnboardingStore.getState().confirmationInput).toBe("test input");
+      expect(useOnboardingStore.getState().confirmationInput).toBe(
+        "test input",
+      );
     });
 
     it("setConfirmationInput clears any existing error", () => {
@@ -153,7 +155,7 @@ describe("onboarding-store", () => {
       });
       useOnboardingStore.getState().validateConfirmation();
       expect(useOnboardingStore.getState().confirmationError).toBe(
-        "That doesn't match. Try again."
+        "That doesn't match. Try again.",
       );
     });
 

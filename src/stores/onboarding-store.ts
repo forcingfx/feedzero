@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { generatePassphrase } from "../core/crypto/passphrase-generator";
+import { DEFAULT_PASSPHRASE } from "../utils/constants";
 
 type OnboardingStep =
   | "welcome"
@@ -40,14 +41,14 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
   setStep: (step) => set({ step }),
 
   chooseStorageMode: (mode) => {
-    const passphrase = generatePassphrase();
     if (mode === "local") {
       set({
         storageMode: mode,
-        generatedPassphrase: passphrase,
+        generatedPassphrase: DEFAULT_PASSPHRASE,
         step: "initializing",
       });
     } else {
+      const passphrase = generatePassphrase();
       set({
         storageMode: mode,
         generatedPassphrase: passphrase,
