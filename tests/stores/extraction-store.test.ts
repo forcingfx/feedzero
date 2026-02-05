@@ -168,4 +168,40 @@ describe("extraction-store", () => {
       expect(fetch).not.toHaveBeenCalled();
     });
   });
+
+  describe("toggleViewMode", () => {
+    it("switches from feed to extracted and triggers fetch", () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve("<html><body><p>Content</p></body></html>"),
+      }) as unknown as typeof fetch;
+      vi.mocked(extract).mockReturnValue({
+        ok: true,
+        value: {
+          content: "<p>Content</p>",
+          title: "",
+          author: "",
+          excerpt: "",
+        },
+      });
+
+      useExtractionStore.getState().toggleViewMode("https://example.com/post");
+
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+      expect(fetch).toHaveBeenCalled();
+    });
+
+    it("switches from extracted back to feed without fetching", () => {
+      useExtractionStore.setState({
+        cache: {},
+        viewMode: "extracted",
+        isExtracting: false,
+      });
+
+      useExtractionStore.getState().toggleViewMode("https://example.com/post");
+
+      expect(useExtractionStore.getState().viewMode).toBe("feed");
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
 });
