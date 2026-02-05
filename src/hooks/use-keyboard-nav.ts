@@ -123,9 +123,15 @@ function openOriginal() {
 }
 
 function toggleView() {
-  const { viewMode, setViewMode } = useExtractionStore.getState();
-  const newMode = viewMode === "feed" ? "extracted" : "feed";
-  setViewMode(newMode);
+  const { viewMode, setViewMode, switchToExtracted } =
+    useExtractionStore.getState();
+  const { selectedArticle } = useArticleStore.getState();
+
+  if (viewMode === "feed") {
+    switchToExtracted(selectedArticle?.link);
+  } else {
+    setViewMode("feed");
+  }
 }
 
 function requestAddFeed() {

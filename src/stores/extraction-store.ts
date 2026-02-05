@@ -7,6 +7,8 @@ interface ExtractionStore {
   viewMode: "feed" | "extracted";
   isExtracting: boolean;
   setViewMode: (mode: "feed" | "extracted") => void;
+  /** Switch to extracted mode and fetch content if not cached. */
+  switchToExtracted: (articleLink: string | undefined) => void;
   fetchExtracted: (url: string) => Promise<void>;
   resetForArticle: () => void;
 }
@@ -17,6 +19,13 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
   isExtracting: false,
 
   setViewMode: (mode) => set({ viewMode: mode }),
+
+  switchToExtracted: (articleLink) => {
+    set({ viewMode: "extracted" });
+    if (articleLink && !get().cache[articleLink]) {
+      get().fetchExtracted(articleLink);
+    }
+  },
 
   fetchExtracted: async (url) => {
     if (get().cache[url]) return;

@@ -426,6 +426,81 @@ describe("useKeyboardNav", () => {
 
       expect(useExtractionStore.getState().viewMode).toBe("feed");
     });
+
+    it("triggers fetchExtracted when switching to extracted mode with article", () => {
+      const fetchExtracted = vi.fn();
+      useExtractionStore.setState({
+        viewMode: "feed",
+        cache: {},
+        fetchExtracted,
+      });
+      useArticleStore.setState({
+        selectedArticle: {
+          id: "a1",
+          feedId: "f1",
+          guid: "guid-a1",
+          title: "Test Article",
+          link: "https://example.com/article",
+          content: "<p>Content</p>",
+          summary: "",
+          author: "",
+          publishedAt: Date.now(),
+          read: false,
+          createdAt: Date.now(),
+        },
+      });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("e");
+
+      expect(fetchExtracted).toHaveBeenCalledWith(
+        "https://example.com/article",
+      );
+    });
+
+    it("does not fetch if article content is already cached", () => {
+      const fetchExtracted = vi.fn();
+      useExtractionStore.setState({
+        viewMode: "feed",
+        cache: { "https://example.com/article": "<p>Cached</p>" },
+        fetchExtracted,
+      });
+      useArticleStore.setState({
+        selectedArticle: {
+          id: "a1",
+          feedId: "f1",
+          guid: "guid-a1",
+          title: "Test Article",
+          link: "https://example.com/article",
+          content: "<p>Content</p>",
+          summary: "",
+          author: "",
+          publishedAt: Date.now(),
+          read: false,
+          createdAt: Date.now(),
+        },
+      });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("e");
+
+      expect(fetchExtracted).not.toHaveBeenCalled();
+    });
+
+    it("does not fetch when no article is selected", () => {
+      const fetchExtracted = vi.fn();
+      useExtractionStore.setState({
+        viewMode: "feed",
+        cache: {},
+        fetchExtracted,
+      });
+      useArticleStore.setState({ selectedArticle: null });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("e");
+
+      expect(fetchExtracted).not.toHaveBeenCalled();
+    });
   });
 
   describe("add feed (n)", () => {

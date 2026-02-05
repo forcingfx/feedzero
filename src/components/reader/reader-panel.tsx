@@ -32,7 +32,7 @@ export function ReaderPanel() {
   const viewMode = useExtractionStore((s) => s.viewMode);
   const isExtracting = useExtractionStore((s) => s.isExtracting);
   const setViewMode = useExtractionStore((s) => s.setViewMode);
-  const fetchExtracted = useExtractionStore((s) => s.fetchExtracted);
+  const switchToExtracted = useExtractionStore((s) => s.switchToExtracted);
   const resetForArticle = useExtractionStore((s) => s.resetForArticle);
 
   // Reset view mode when article changes
@@ -66,9 +66,10 @@ export function ReaderPanel() {
   });
 
   function handleModeChange(mode: "feed" | "extracted") {
-    setViewMode(mode);
-    if (mode === "extracted" && article?.link && !cache[article.link]) {
-      fetchExtracted(article.link);
+    if (mode === "extracted") {
+      switchToExtracted(article?.link);
+    } else {
+      setViewMode("feed");
     }
   }
 

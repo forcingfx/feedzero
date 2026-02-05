@@ -119,4 +119,53 @@ describe("extraction-store", () => {
       expect(s.cache["https://a.com"]).toBe("<p>a</p>");
     });
   });
+
+  describe("switchToExtracted", () => {
+    it("sets view mode to extracted and triggers fetch", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve("<html><body><p>Content</p></body></html>"),
+      }) as unknown as typeof fetch;
+      vi.mocked(extract).mockReturnValue({
+        ok: true,
+        value: {
+          content: "<p>Content</p>",
+          title: "",
+          author: "",
+          excerpt: "",
+        },
+      });
+
+      useExtractionStore
+        .getState()
+        .switchToExtracted("https://example.com/post");
+
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/page?url=https%3A%2F%2Fexample.com%2Fpost",
+      );
+    });
+
+    it("does not fetch if content is already cached", () => {
+      useExtractionStore.setState({
+        cache: { "https://example.com/post": "<p>Cached</p>" },
+        viewMode: "feed",
+        isExtracting: false,
+      });
+
+      useExtractionStore
+        .getState()
+        .switchToExtracted("https://example.com/post");
+
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("does not fetch if no article link provided", () => {
+      useExtractionStore.getState().switchToExtracted(undefined);
+
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
 });

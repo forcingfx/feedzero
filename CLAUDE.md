@@ -160,6 +160,12 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 - Statements/Lines/Functions: 90%. Branches: 83%.
 - Excluded: `src/workers/**`, `src/main.tsx`, `src/**/*.d.ts`, `src/types/**`, `src/core/extractor/adapters/types.ts`, `src/core/sync/types.ts`, `src/components/ui/**` (shadcn wrappers).
 
+**Test behavior, not implementation:**
+- Tests should verify user-observable outcomes, not internal mechanisms.
+- Bad: "toggleView sets viewMode to extracted" — only checks state change.
+- Good: "pressing E triggers content extraction" — verifies the complete user action.
+- If the same user action has multiple code paths (e.g., click handler vs keyboard shortcut), both must be tested for identical behavior — otherwise bugs slip through when one path diverges.
+
 **happy-dom gotchas:**
 - DOMPurify + happy-dom executes inline scripts during sanitization. Use non-callable code in test fixtures (e.g., `var x = 1;` not `alert(1)`).
 - `querySelector` with CSS-escaped colons (e.g. `content\\:encoded`) may work in happy-dom but fail in browsers. Always use `getElementsByTagName` for XML namespace-prefixed elements.
