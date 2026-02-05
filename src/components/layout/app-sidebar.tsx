@@ -92,19 +92,23 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
             <span className="text-lg font-semibold tracking-tight">
               FeedZero
             </span>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isRefreshingAll}
-                onClick={refreshAll}
-                className="min-w-0 font-mono text-xs"
-              >
-                <span className="truncate">
-                  {isRefreshingAll ? "Refreshing…" : "Refresh"}
-                </span>
-                {!isRefreshingAll && <Kbd className="ml-auto shrink-0">R</Kbd>}
-              </Button>
+            <div className={feeds.length > 0 ? "grid grid-cols-2 gap-2" : ""}>
+              {feeds.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isRefreshingAll}
+                  onClick={refreshAll}
+                  className="min-w-0 font-mono text-xs"
+                >
+                  <span className="truncate">
+                    {isRefreshingAll ? "Refreshing…" : "Refresh"}
+                  </span>
+                  {!isRefreshingAll && (
+                    <Kbd className="ml-auto shrink-0">R</Kbd>
+                  )}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -115,16 +119,22 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                 <Kbd className="ml-auto shrink-0">N</Kbd>
               </Button>
             </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
-              <span className="flex items-center gap-1">
-                <Kbd>U</Kbd>
-                <Kbd>I</Kbd> feeds
-              </span>
-              <span className="flex items-center gap-1">
-                <Kbd>J</Kbd>
-                <Kbd>K</Kbd> articles
-              </span>
-            </div>
+            {(feeds.length > 1 || feeds.length > 0) && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                {feeds.length > 1 && (
+                  <span className="flex items-center gap-1">
+                    <Kbd>U</Kbd>
+                    <Kbd>I</Kbd> feeds
+                  </span>
+                )}
+                {feeds.length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Kbd>J</Kbd>
+                    <Kbd>K</Kbd> articles
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <Collapsible open={addFormOpen}>

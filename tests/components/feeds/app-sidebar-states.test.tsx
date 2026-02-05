@@ -74,7 +74,10 @@ describe("AppSidebar states", () => {
   });
 
   it("refresh all button is disabled and shows text during refresh", () => {
-    useFeedStore.setState({ isRefreshingAll: true });
+    useFeedStore.setState({
+      feeds: [mockFeed("a", "Alpha Feed")],
+      isRefreshingAll: true,
+    });
     renderSidebar();
     const refreshBtn = screen.getByRole("button", { name: /refreshing/i });
     expect(refreshBtn).toBeDisabled();
@@ -173,38 +176,51 @@ describe("AppSidebar states", () => {
     expect(keys).toContain("I");
   });
 
-  it("shows u/i hints in header even with only 1 feed", () => {
+  it("hides u/i hints when only 1 feed exists", () => {
     useFeedStore.setState({
       feeds: [mockFeed("a", "Alpha Feed")],
     });
     const { container } = renderSidebar();
     const kbds = container.querySelectorAll("kbd");
     const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).toContain("U");
-    expect(keys).toContain("I");
+    expect(keys).not.toContain("U");
+    expect(keys).not.toContain("I");
   });
 
-  it("shows u/i hints in header even with no feeds", () => {
+  it("hides u/i hints when no feeds exist", () => {
     const { container } = renderSidebar();
     const kbds = container.querySelectorAll("kbd");
     const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).toContain("U");
-    expect(keys).toContain("I");
+    expect(keys).not.toContain("U");
+    expect(keys).not.toContain("I");
   });
 
   it("hides R kbd hint while refreshing", () => {
-    useFeedStore.setState({ isRefreshingAll: true });
+    useFeedStore.setState({
+      feeds: [mockFeed("a", "Alpha Feed")],
+      isRefreshingAll: true,
+    });
     const { container } = renderSidebar();
     const kbds = container.querySelectorAll("kbd");
     const keys = Array.from(kbds).map((kbd) => kbd.textContent);
     expect(keys).not.toContain("R");
   });
 
-  it("shows R keyboard hint in refresh button", () => {
+  it("shows R keyboard hint in refresh button when feeds exist", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("a", "Alpha Feed")],
+    });
     const { container } = renderSidebar();
     const kbds = container.querySelectorAll("kbd");
     const keys = Array.from(kbds).map((kbd) => kbd.textContent);
     expect(keys).toContain("R");
+  });
+
+  it("hides R keyboard hint when no feeds exist", () => {
+    const { container } = renderSidebar();
+    const kbds = container.querySelectorAll("kbd");
+    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
+    expect(keys).not.toContain("R");
   });
 
   it("opens add form when feedzero:add-feed event is dispatched", () => {

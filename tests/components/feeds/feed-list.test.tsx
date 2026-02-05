@@ -86,7 +86,13 @@ describe("AppSidebar", () => {
     ).toBeInTheDocument();
   });
 
-  it("has refresh all button", () => {
+  it("has refresh all button when feeds exist", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("a", "Alpha Feed")],
+      selectedFeedId: null,
+      isLoading: false,
+      error: null,
+    });
     renderSidebar();
     expect(
       screen.getByRole("button", { name: /refresh/i }),
