@@ -1,17 +1,15 @@
 import { useEffect } from "react";
-import { ExternalLink } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import {
   getAvailableModes,
   hasSummarySubheading,
 } from "@/lib/content-modes.ts";
-import { Button } from "@/components/ui/button.tsx";
-import { Kbd } from "@/components/ui/kbd.tsx";
 import { ArticleContent } from "./article-content.tsx";
-import { ViewToggle } from "./view-toggle.tsx";
+import { ViewToggle, type ViewMode } from "./view-toggle.tsx";
 
 function formatDate(timestamp: number): string {
   if (!timestamp) return "";
@@ -41,7 +39,13 @@ export function ReaderPanel() {
   }, [article?.id, resetForArticle]);
 
   // Defensive: don't render article if it doesn't belong to current feed
-  if (article && selectedFeedId && article.feedId !== selectedFeedId) {
+  // (skip check for global view where articles from any feed are allowed)
+  if (
+    article &&
+    selectedFeedId &&
+    selectedFeedId !== ALL_FEEDS_ID &&
+    article.feedId !== selectedFeedId
+  ) {
     return (
       <div className="p-4 text-muted-foreground text-sm">
         Select an article to read.
@@ -65,7 +69,9 @@ export function ReaderPanel() {
     cachedExtraction,
   });
 
-  function handleModeChange(mode: "feed" | "extracted") {
+  function handleModeChange(mode: ViewMode) {
+    // "original" is handled by the link itself (opens in new tab)
+    if (mode === "original") return;
     if (mode === "extracted") {
       switchToExtracted(article?.link);
     } else {
@@ -96,30 +102,15 @@ export function ReaderPanel() {
         {decodeEntities(article.title)}
       </h2>
 
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <span>
-          {article.author && <>{article.author} &bull; </>}
-          {formatDate(article.publishedAt)}
-        </span>
-        {article.link && (
-          <Button
-            variant="outline"
-            size="sm"
-            asChild
-            className="h-7 gap-1 text-xs"
-          >
-            <a href={article.link} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="size-3" />
-              Original
-              <Kbd className="ml-1">O</Kbd>
-            </a>
-          </Button>
-        )}
+      <div className="text-sm text-muted-foreground mb-4">
+        {article.author && <>{article.author} &bull; </>}
+        {formatDate(article.publishedAt)}
       </div>
 
       <ViewToggle
         modes={modes}
         activeMode={viewMode}
+        articleLink={article.link}
         onModeChange={handleModeChange}
       />
 

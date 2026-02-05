@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -19,9 +20,14 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
   refreshAllFeeds: vi.fn(),
 }));
 
-const mockArticle = (id: string, title: string, read = false) => ({
+const mockArticle = (
+  id: string,
+  title: string,
+  read = false,
+  feedId = "f1",
+) => ({
   id,
-  feedId: "f1",
+  feedId,
   guid: id,
   title,
   link: `https://example.com/${id}`,
@@ -31,6 +37,16 @@ const mockArticle = (id: string, title: string, read = false) => ({
   publishedAt: Date.now(),
   read,
   createdAt: Date.now(),
+});
+
+const mockFeed = (id: string, title: string) => ({
+  id,
+  url: `https://${id}.com/feed`,
+  title,
+  description: "",
+  siteUrl: `https://${id}.com`,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
 });
 
 describe("ArticleList", () => {
@@ -98,44 +114,6 @@ describe("ArticleList", () => {
     expect(onSelect).toHaveBeenCalled();
   });
 
-  it("shows j/k keyboard hints when articles are present", () => {
-    useFeedStore.setState({
-      feeds: [],
-      selectedFeedId: "f1",
-      isLoading: false,
-      error: null,
-    });
-    useArticleStore.setState({
-      articles: [mockArticle("a1", "First Post")],
-      selectedArticle: null,
-      isLoading: false,
-    });
-
-    const { container } = render(<ArticleList />);
-    const kbds = container.querySelectorAll("kbd");
-    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).toContain("J");
-    expect(keys).toContain("K");
-  });
-
-  it("does not show j/k hints when no articles", () => {
-    useFeedStore.setState({
-      feeds: [],
-      selectedFeedId: "f1",
-      isLoading: false,
-      error: null,
-    });
-    useArticleStore.setState({
-      articles: [],
-      selectedArticle: null,
-      isLoading: false,
-    });
-
-    const { container } = render(<ArticleList />);
-    const kbds = container.querySelectorAll("kbd");
-    expect(kbds).toHaveLength(0);
-  });
-
   it("shows read/unread styling", () => {
     useFeedStore.setState({
       feeds: [],
@@ -153,7 +131,94 @@ describe("ArticleList", () => {
     });
 
     render(<ArticleList />);
-    expect(screen.getByText("Unread").className).toContain("font-semibold");
-    expect(screen.getByText("Read").className).not.toContain("font-semibold");
+    // Unread items use text-foreground, read items use text-muted-foreground with opacity
+    expect(screen.getByText("Unread").className).toContain("text-foreground");
+    expect(screen.getByText("Read").className).toContain(
+      "text-muted-foreground",
+    );
+  });
+
+  describe("global view (ALL_FEEDS_ID)", () => {
+    it("shows feed title for each article when in global view", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Tech News"), mockFeed("f2", "Gaming Daily")],
+        selectedFeedId: ALL_FEEDS_ID,
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles: [
+          mockArticle("a1", "Tech Article", false, "f1"),
+          mockArticle("a2", "Another Article", false, "f2"),
+        ],
+        selectedArticle: null,
+        isLoading: false,
+      });
+
+      render(<ArticleList />);
+
+      expect(screen.getByText(/Tech News/)).toBeInTheDocument();
+      expect(screen.getByText(/Gaming Daily/)).toBeInTheDocument();
+    });
+
+    it("does not show feed title when not in global view", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Tech News")],
+        selectedFeedId: "f1",
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles: [mockArticle("a1", "Tech Article", false, "f1")],
+        selectedArticle: null,
+        isLoading: false,
+      });
+
+      render(<ArticleList />);
+
+      expect(screen.queryByText(/Tech News/)).not.toBeInTheDocument();
+    });
+
+    it("shows feed favicon for each article when in global view", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Tech News"), mockFeed("f2", "Gaming Daily")],
+        selectedFeedId: ALL_FEEDS_ID,
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles: [
+          mockArticle("a1", "Tech Article", false, "f1"),
+          mockArticle("a2", "Another Article", false, "f2"),
+        ],
+        selectedArticle: null,
+        isLoading: false,
+      });
+
+      const { container } = render(<ArticleList />);
+
+      const favicons = container.querySelectorAll("img");
+      expect(favicons).toHaveLength(2);
+      expect(favicons[0]).toHaveAttribute("src", "https://f1.com/favicon.ico");
+      expect(favicons[1]).toHaveAttribute("src", "https://f2.com/favicon.ico");
+    });
+
+    it("does not show feed favicon when not in global view", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Tech News")],
+        selectedFeedId: "f1",
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles: [mockArticle("a1", "Tech Article", false, "f1")],
+        selectedArticle: null,
+        isLoading: false,
+      });
+
+      const { container } = render(<ArticleList />);
+
+      expect(container.querySelector("img")).not.toBeInTheDocument();
+    });
   });
 });

@@ -118,10 +118,10 @@ describe("HeaderBreadcrumbs", () => {
 
   it("feed title has truncate class", () => {
     useFeedStore.setState({ feeds: [FEED], selectedFeedId: "feed-1" });
-    const { container } = renderBreadcrumbs();
-    const feedLink = container.querySelector("a, [role='link']");
-    expect(feedLink).not.toBeNull();
-    expect(feedLink!.className).toContain("truncate");
+    renderBreadcrumbs();
+    // Truncate is on the span inside the link, not the link itself
+    const feedTitle = screen.getByText("Example Feed");
+    expect(feedTitle.className).toContain("truncate");
   });
 
   it("feed breadcrumb is clickable", async () => {

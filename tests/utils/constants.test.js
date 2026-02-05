@@ -6,6 +6,7 @@ import {
   SCHEMA_VERSION,
   LOCAL_STORAGE,
   DEFAULT_PASSPHRASE,
+  ALL_FEEDS_ID,
 } from "../../src/utils/constants.ts";
 
 describe("Constants", () => {
@@ -34,5 +35,9 @@ describe("Constants", () => {
 
   it("should define default passphrase", () => {
     expect(DEFAULT_PASSPHRASE).toBe("feedzero-default-key");
+  });
+
+  it("should define ALL_FEEDS_ID for global feed view", () => {
+    expect(ALL_FEEDS_ID).toBe("all");
   });
 });

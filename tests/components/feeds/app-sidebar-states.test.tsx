@@ -148,7 +148,7 @@ describe("AppSidebar states", () => {
     expect(removeFeed).toHaveBeenCalledWith("a");
   });
 
-  it("active feed has left border indicator", () => {
+  it("active feed has accent background (sidebar defaults)", () => {
     useFeedStore.setState({
       feeds: [mockFeed("a", "Alpha Feed")],
       selectedFeedId: "a",
@@ -156,9 +156,9 @@ describe("AppSidebar states", () => {
     renderSidebar();
 
     const feedButton = screen.getByText("Alpha Feed").closest("button");
-    expect(feedButton?.className).toContain("data-[active=true]:border-l-2");
+    // Using shadcn sidebar defaults: accent background for active state
     expect(feedButton?.className).toContain(
-      "data-[active=true]:border-primary",
+      "data-[active=true]:bg-sidebar-accent",
     );
   });
 
@@ -173,23 +173,23 @@ describe("AppSidebar states", () => {
     expect(keys).toContain("I");
   });
 
-  it("does not show u/i hints when only 1 feed", () => {
+  it("shows u/i hints in header even with only 1 feed", () => {
     useFeedStore.setState({
       feeds: [mockFeed("a", "Alpha Feed")],
     });
     const { container } = renderSidebar();
     const kbds = container.querySelectorAll("kbd");
     const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).not.toContain("U");
-    expect(keys).not.toContain("I");
+    expect(keys).toContain("U");
+    expect(keys).toContain("I");
   });
 
-  it("does not show u/i hints when no feeds", () => {
+  it("shows u/i hints in header even with no feeds", () => {
     const { container } = renderSidebar();
     const kbds = container.querySelectorAll("kbd");
     const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).not.toContain("U");
-    expect(keys).not.toContain("I");
+    expect(keys).toContain("U");
+    expect(keys).toContain("I");
   });
 
   it("hides R kbd hint while refreshing", () => {

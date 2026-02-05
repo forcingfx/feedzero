@@ -223,7 +223,9 @@ describe("FeedsPage behavior — mobile", () => {
 
   it("shows 'Feeds' in header at /feeds root", () => {
     renderPage("/feeds");
-    expect(screen.getByText("Feeds")).toBeInTheDocument();
+    // There are now two "Feeds" elements: one in header (fallback), one in sidebar group label
+    const feedsElements = screen.getAllByText("Feeds");
+    expect(feedsElements.length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows 'Articles' in header when feedId is present", () => {

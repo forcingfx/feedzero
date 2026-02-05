@@ -3,7 +3,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
+import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn(),
@@ -145,5 +147,46 @@ describe("ReaderPanel", () => {
     const kbd = originalLink?.querySelector("kbd");
     expect(kbd).toBeTruthy();
     expect(kbd?.textContent).toBe("O");
+  });
+
+  describe("timestamp display (006-S11)", () => {
+    it("shows date and time with minutes, but not seconds", () => {
+      // Create article with a specific timestamp: Jan 15, 2024 at 14:30:45
+      const timestamp = new Date(2024, 0, 15, 14, 30, 45).getTime();
+      useArticleStore.setState({
+        selectedArticle: mockArticle({ publishedAt: timestamp }),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      // The formatted date should include hour and minute
+      const metaLine = screen.getByText(/Jan.*15.*2024/);
+      expect(metaLine).toBeInTheDocument();
+
+      // Should show time (hour:minute)
+      expect(metaLine.textContent).toMatch(/\d{1,2}:\d{2}/);
+
+      // Should NOT show seconds (:45)
+      expect(metaLine.textContent).not.toMatch(/:45/);
+    });
+  });
+
+  describe("global view (ALL_FEEDS_ID)", () => {
+    it("renders article when selectedFeedId is ALL_FEEDS_ID even with different feedId", () => {
+      useFeedStore.setState({ selectedFeedId: ALL_FEEDS_ID });
+      useArticleStore.setState({
+        selectedArticle: mockArticle({ feedId: "some-other-feed" }),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+        "Test Article",
+      );
+    });
   });
 });

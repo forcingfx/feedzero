@@ -110,3 +110,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
   },
 }));
+
+/**
+ * Selector that returns a map of feedId to Feed for efficient lookups.
+ */
+export function selectFeedsById(
+  state: Pick<FeedStore, "feeds">,
+): Record<string, Feed> {
+  return Object.fromEntries(state.feeds.map((f) => [f.id, f]));
+}

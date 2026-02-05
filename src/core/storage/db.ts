@@ -182,6 +182,24 @@ export async function addArticles(
 }
 
 /**
+ * Decrypt raw article records and sort by publishedAt descending.
+ */
+async function decryptAndSortArticles(raws: DexieRecord[]): Promise<Article[]> {
+  const results: Article[] = [];
+  for (const raw of raws) {
+    if (!raw.iv || !raw.ciphertext) continue;
+    const r = await decrypt(
+      cryptoKey!,
+      new Uint8Array(raw.iv),
+      new Uint8Array(raw.ciphertext),
+    );
+    if (r.ok) results.push(r.value as Article);
+  }
+  results.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+  return results;
+}
+
+/**
  * Get all articles for a feed (decrypted), sorted by publishedAt descending.
  */
 export async function getArticles(feedId: string): Promise<Result<Article[]>> {
@@ -191,20 +209,21 @@ export async function getArticles(feedId: string): Promise<Result<Article[]>> {
       .where("feedId")
       .equals(feedId)
       .toArray();
-    const results: Article[] = [];
-    for (const raw of raws) {
-      if (!raw.iv || !raw.ciphertext) continue;
-      const r = await decrypt(
-        cryptoKey!,
-        new Uint8Array(raw.iv),
-        new Uint8Array(raw.ciphertext),
-      );
-      if (r.ok) results.push(r.value as Article);
-    }
-    results.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
-    return ok(results);
+    return ok(await decryptAndSortArticles(raws));
   } catch (e) {
     return err(`Failed to get articles: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Get all articles from all feeds (decrypted), sorted by publishedAt descending.
+ */
+export async function getAllArticles(): Promise<Result<Article[]>> {
+  try {
+    const raws: DexieRecord[] = await db!.table("articles").toArray();
+    return ok(await decryptAndSortArticles(raws));
+  } catch (e) {
+    return err(`Failed to get all articles: ${(e as Error).message}`);
   }
 }
 
@@ -348,6 +367,8 @@ async function getAllDecrypted<T>(table: string): Promise<Result<T[]>> {
   try {
     const raws: DexieRecord[] = await db!.table(table).toArray();
     const results: T[] = [];
+    let failedCount = 0;
+
     for (const raw of raws) {
       if (!raw.iv || !raw.ciphertext) continue;
       const r = await decrypt(
@@ -355,8 +376,27 @@ async function getAllDecrypted<T>(table: string): Promise<Result<T[]>> {
         new Uint8Array(raw.iv),
         new Uint8Array(raw.ciphertext),
       );
-      if (r.ok) results.push(r.value as T);
+      if (r.ok) {
+        results.push(r.value as T);
+      } else {
+        failedCount++;
+      }
     }
+
+    // If records exist but ALL failed to decrypt, likely a passphrase mismatch
+    if (raws.length > 0 && results.length === 0 && failedCount > 0) {
+      return err(
+        `Failed to decrypt ${failedCount} records. This may indicate an incorrect passphrase.`,
+      );
+    }
+
+    // Log warning if some (but not all) records failed - possible data corruption
+    if (failedCount > 0 && results.length > 0) {
+      console.warn(
+        `[db] ${failedCount} of ${raws.length} records in "${table}" failed to decrypt`,
+      );
+    }
+
     return ok(results);
   } catch (e) {
     return err(`Failed to read all encrypted data: ${(e as Error).message}`);

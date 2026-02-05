@@ -4,6 +4,7 @@ import { useAppStore } from "../../src/stores/app-store.ts";
 vi.mock("../../src/core/storage/db.ts", () => ({
   open: vi.fn(),
   deleteDatabase: vi.fn(),
+  getFeeds: vi.fn(),
 }));
 
 vi.mock("../../src/core/sync/sync-service", () => ({
@@ -12,7 +13,7 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
-import { open } from "../../src/core/storage/db.ts";
+import { open, getFeeds } from "../../src/core/storage/db.ts";
 import { pullVault, importVault } from "../../src/core/sync/sync-service";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 
@@ -135,6 +136,7 @@ describe("app-store", () => {
 
     it("initializes with default passphrase for local-only users", async () => {
       vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
 
       await useAppStore.getState().initializeReturningUser();
 
@@ -147,6 +149,7 @@ describe("app-store", () => {
       localStorageMock.setItem("feedzero:storage-mode", "local");
       localStorageMock.setItem("feedzero:sync-passphrase", "random local key");
       vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
 
       await useAppStore.getState().initializeReturningUser();
 
@@ -159,6 +162,7 @@ describe("app-store", () => {
       localStorageMock.setItem("feedzero:storage-mode", "sync");
       localStorageMock.setItem("feedzero:sync-passphrase", "test phrase");
       vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
       vi.mocked(pullVault).mockResolvedValue({
         ok: true,
         value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
@@ -179,6 +183,7 @@ describe("app-store", () => {
       localStorageMock.setItem("feedzero:storage-mode", "sync");
       localStorageMock.setItem("feedzero:sync-passphrase", "test phrase");
       vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
       vi.mocked(pullVault).mockResolvedValue({
         ok: false,
         error: "Not found",
@@ -194,6 +199,7 @@ describe("app-store", () => {
       localStorageMock.setItem("feedzero:storage-mode", "sync");
       localStorageMock.setItem("feedzero:sync-passphrase", "test phrase");
       vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
       vi.mocked(pullVault).mockResolvedValue({
         ok: false,
         error: "Sync pull failed (404): Vault not found",
@@ -204,6 +210,38 @@ describe("app-store", () => {
       const syncState = useSyncStore.getState();
       expect(syncState.status).toBe("error");
       expect(syncState.error).toBe("Sync pull failed (404): Vault not found");
+    });
+
+    it("sets error when decryption validation fails after opening DB", async () => {
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: false,
+        error:
+          "Failed to decrypt 5 records. This may indicate an incorrect passphrase.",
+      });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      const state = useAppStore.getState();
+      expect(state.isDbReady).toBe(false);
+      expect(state.error).toBe(
+        "Failed to decrypt 5 records. This may indicate an incorrect passphrase.",
+      );
+    });
+
+    it("does not proceed to sync pull when decryption validation fails", async () => {
+      localStorageMock.setItem("feedzero:storage-mode", "sync");
+      localStorageMock.setItem("feedzero:sync-passphrase", "test phrase");
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: false,
+        error: "Decryption failed",
+      });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      expect(pullVault).not.toHaveBeenCalled();
+      expect(useAppStore.getState().isDbReady).toBe(false);
     });
   });
 });

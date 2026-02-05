@@ -10,6 +10,7 @@ import {
   removeFeed,
   addArticles,
   getArticles,
+  getAllArticles,
   updateArticle,
   getArticleByGuid,
   exportAll,
@@ -210,10 +211,10 @@ describe("Database", () => {
       const reopenResult = await open("wrong-passphrase");
       expect(isOk(reopenResult)).toBe(true);
 
-      // Data should not be readable (decryption fails silently, returns empty)
+      // Data should not be readable - returns error when all records fail to decrypt
       const feedsResult = await getFeeds();
-      expect(isOk(feedsResult)).toBe(true);
-      expect(unwrap(feedsResult)).toHaveLength(0);
+      expect(isErr(feedsResult)).toBe(true);
+      expect(feedsResult.error).toMatch(/incorrect passphrase/i);
     });
   });
 
@@ -400,6 +401,60 @@ describe("Database", () => {
 
       const articles = unwrap(await getArticles(feed.id));
       expect(articles).toHaveLength(2);
+    });
+  });
+
+  describe("getAllArticles", () => {
+    it("should return all articles from all feeds sorted by publishedAt desc", async () => {
+      const feed1 = unwrap(
+        createFeed({ url: "https://a.com/rss", title: "Feed A" }),
+      );
+      const feed2 = unwrap(
+        createFeed({ url: "https://b.com/rss", title: "Feed B" }),
+      );
+      await addFeed(feed1);
+      await addFeed(feed2);
+
+      const a1 = unwrap(
+        createArticle({
+          feedId: feed1.id,
+          title: "A Post 1",
+          link: "https://a.com/1",
+          publishedAt: 1000,
+        }),
+      );
+      const a2 = unwrap(
+        createArticle({
+          feedId: feed2.id,
+          title: "B Post 1",
+          link: "https://b.com/1",
+          publishedAt: 3000,
+        }),
+      );
+      const a3 = unwrap(
+        createArticle({
+          feedId: feed1.id,
+          title: "A Post 2",
+          link: "https://a.com/2",
+          publishedAt: 2000,
+        }),
+      );
+      await addArticles([a1, a2, a3]);
+
+      const result = await getAllArticles();
+      expect(isOk(result)).toBe(true);
+      const articles = unwrap(result);
+      expect(articles).toHaveLength(3);
+      // Sorted by publishedAt descending
+      expect(articles[0].title).toBe("B Post 1"); // 3000
+      expect(articles[1].title).toBe("A Post 2"); // 2000
+      expect(articles[2].title).toBe("A Post 1"); // 1000
+    });
+
+    it("should return empty array when no articles exist", async () => {
+      const result = await getAllArticles();
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result)).toEqual([]);
     });
   });
 });

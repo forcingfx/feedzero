@@ -25,7 +25,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar.tsx";
-import { Separator } from "@/components/ui/separator.tsx";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
@@ -132,10 +131,6 @@ export function FeedsPage() {
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
             <SidebarTrigger />
             <Kbd>[</Kbd>
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
             <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
           </header>
           <main role="main" className="flex-1 flex flex-col min-h-0">
@@ -175,10 +170,6 @@ export function FeedsPage() {
         <header className="flex h-10 shrink-0 items-center border-b px-2 gap-2">
           <SidebarTrigger />
           <Kbd>[</Kbd>
-          <Separator
-            orientation="vertical"
-            className="data-[orientation=vertical]:h-4"
-          />
           <HeaderBreadcrumbs />
         </header>
         {feeds.length === 0 ? (

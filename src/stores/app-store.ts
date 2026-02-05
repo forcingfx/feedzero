@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { open, deleteDatabase } from "../core/storage/db.ts";
+import { open, deleteDatabase, getFeeds } from "../core/storage/db.ts";
 import { DEFAULT_PASSPHRASE, LOCAL_STORAGE } from "../utils/constants.ts";
 import { useSyncStore } from "./sync-store.ts";
 
@@ -44,12 +44,23 @@ export const useAppStore = create<AppStore>((set) => ({
     }
 
     const result = await open(passphrase);
-    if (result.ok) {
-      set({ isDbReady: true, error: null });
-    } else {
+    if (!result.ok) {
       set({ isDbReady: false, error: result.error });
       return;
     }
+
+    // Validate that decryption works by attempting to read feeds
+    // This catches passphrase mismatches that would otherwise show an empty state
+    const feedsResult = await getFeeds();
+    if (!feedsResult.ok) {
+      set({
+        isDbReady: false,
+        error: feedsResult.error,
+      });
+      return;
+    }
+
+    set({ isDbReady: true, error: null });
 
     if (isSyncUser) {
       await useSyncStore.getState().pull();

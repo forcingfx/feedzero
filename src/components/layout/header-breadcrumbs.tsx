@@ -31,12 +31,12 @@ export function HeaderBreadcrumbs({ fallback }: HeaderBreadcrumbsProps) {
   }
 
   return (
-    <Breadcrumb>
+    <Breadcrumb className="min-w-0 flex-1">
       <BreadcrumbList className="flex-nowrap">
-        <BreadcrumbItem>
+        <BreadcrumbItem className="shrink-0">
           <BreadcrumbLink
             onClick={() => navigate(`/feeds/${feed.id}`)}
-            className="flex items-center gap-1.5 cursor-pointer max-w-[120px] sm:max-w-[200px] lg:max-w-none truncate"
+            className="flex items-center gap-1.5 cursor-pointer"
           >
             <FeedFavicon siteUrl={feed.siteUrl} className="size-4 shrink-0" />
             <span className="truncate">{feed.title}</span>
@@ -45,8 +45,8 @@ export function HeaderBreadcrumbs({ fallback }: HeaderBreadcrumbsProps) {
         {selectedArticle && (
           <>
             <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="max-w-[150px] sm:max-w-[250px] lg:max-w-[400px] truncate">
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbPage className="truncate">
                 {decodeEntities(selectedArticle.title)}
               </BreadcrumbPage>
             </BreadcrumbItem>

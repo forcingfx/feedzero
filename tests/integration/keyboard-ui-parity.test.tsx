@@ -16,6 +16,7 @@ import type { Article } from "../../src/types/index.ts";
 // Mock core modules
 vi.mock("../../src/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   updateArticle: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
@@ -27,8 +28,18 @@ vi.mock("../../src/core/extractor/extractor.ts", () => ({
 }));
 
 vi.mock("../../src/core/feeds/feed-service.ts", () => ({
-  refreshAllFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  refreshAllFeeds: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: { results: [] } }),
 }));
+
+vi.mock("../../src/core/sync/sync-service", () => ({
+  pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
+  pullVault: vi.fn(),
+  importVault: vi.fn(),
+}));
+
+import { refreshAllFeeds } from "../../src/core/feeds/feed-service.ts";
 
 const mockArticle = (id: string, feedId: string): Article => ({
   id,
@@ -76,6 +87,33 @@ describe("keyboard-UI behavior parity", () => {
   });
 
   describe("R key vs Refresh button", () => {
+    it("R key is ignored when refresh is already in progress", async () => {
+      // Set up: refresh takes 100ms to complete
+      vi.mocked(refreshAllFeeds).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ ok: true, value: { results: [] } }),
+              100,
+            ),
+          ),
+      );
+
+      // Start the first refresh (sets isRefreshingAll = true)
+      const firstRefreshPromise = useFeedStore.getState().refreshAll();
+      expect(useFeedStore.getState().isRefreshingAll).toBe(true);
+
+      // Now press R while refresh is in progress
+      renderHook(() => useKeyboardNav());
+      pressKey("r");
+
+      // Wait for first refresh to complete
+      await firstRefreshPromise;
+
+      // Observable behavior: refreshAllFeeds was only called once
+      expect(refreshAllFeeds).toHaveBeenCalledTimes(1);
+    });
+
     it("both call the same refreshAll store action", async () => {
       const refreshAllSpy = vi.fn();
       useFeedStore.setState({ refreshAll: refreshAllSpy });
@@ -91,21 +129,6 @@ describe("keyboard-UI behavior parity", () => {
       useFeedStore.getState().refreshAll();
 
       expect(refreshAllSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it("both respect isRefreshingAll guard", () => {
-      const refreshAllSpy = vi.fn();
-      useFeedStore.setState({
-        isRefreshingAll: true,
-        refreshAll: refreshAllSpy,
-      });
-
-      // Keyboard should still call refreshAll (guard is inside the action)
-      renderHook(() => useKeyboardNav());
-      pressKey("r");
-
-      // The action is called but internally checks isRefreshingAll
-      expect(refreshAllSpy).toHaveBeenCalled();
     });
   });
 

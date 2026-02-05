@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { MoreHorizontal, RefreshCw, Rss, Trash2 } from "lucide-react";
+import { Layers, MoreHorizontal, RefreshCw, Rss, Trash2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
   AlertDialog,
@@ -28,6 +29,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
@@ -113,6 +115,16 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                 <Kbd className="ml-auto shrink-0">N</Kbd>
               </Button>
             </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+              <span className="flex items-center gap-1">
+                <Kbd>U</Kbd>
+                <Kbd>I</Kbd> feeds
+              </span>
+              <span className="flex items-center gap-1">
+                <Kbd>J</Kbd>
+                <Kbd>K</Kbd> articles
+              </span>
+            </div>
           </div>
 
           <Collapsible open={addFormOpen}>
@@ -128,13 +140,8 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
 
         <SidebarContent>
           <SidebarGroup>
+            <SidebarGroupLabel>Feeds</SidebarGroupLabel>
             <SidebarGroupContent>
-              {feeds.length >= 2 && (
-                <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border font-mono">
-                  <Kbd>U</Kbd>
-                  <Kbd>I</Kbd> next/prev feed
-                </div>
-              )}
               {feeds.length === 0 ? (
                 <Empty className="border-0 py-8">
                   <EmptyHeader>
@@ -149,13 +156,22 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                 </Empty>
               ) : (
                 <SidebarMenu>
+                  <SidebarMenuItem key="all-items">
+                    <SidebarMenuButton
+                      isActive={selectedFeedId === ALL_FEEDS_ID}
+                      onClick={() => handleSelect(ALL_FEEDS_ID)}
+                      tooltip="All items"
+                    >
+                      <Layers className="size-4" />
+                      <span>All items</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                   {feeds.map((feed) => (
                     <SidebarMenuItem key={feed.id}>
                       <SidebarMenuButton
                         isActive={feed.id === selectedFeedId}
                         onClick={() => handleSelect(feed.id)}
                         tooltip={feed.title}
-                        className="py-2 group-has-data-[state=open]/menu-item:bg-sidebar-accent data-[active=true]:border-l-2 data-[active=true]:border-primary data-[active=true]:pl-1.5"
                       >
                         <FeedFavicon siteUrl={feed.siteUrl} />
                         <span className="truncate">{feed.title}</span>

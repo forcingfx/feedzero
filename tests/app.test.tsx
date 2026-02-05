@@ -25,6 +25,7 @@ vi.mock("@/core/sync/sync-service", () => ({
 }));
 
 import { pullVault, importVault } from "@/core/sync/sync-service";
+import { refreshAllFeeds } from "@/core/feeds/feed-service";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -93,6 +94,21 @@ describe("App sync-aware init", () => {
     // Should not touch sync store
     expect(useSyncStore.getState().status).toBe("local-only");
     expect(useSyncStore.getState().passphrase).toBeNull();
+  });
+
+  it("auto-refreshes all feeds on app load for returning users", async () => {
+    localStorageMock.setItem("feedzero:onboarding-complete", "true");
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().isDbReady).toBe(true);
+    });
+
+    // Observable: refreshAllFeeds is called after DB is ready
+    await waitFor(() => {
+      expect(refreshAllFeeds).toHaveBeenCalled();
+    });
   });
 
   it("restores sync state and uses stored passphrase for returning sync users", async () => {

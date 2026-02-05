@@ -1,0 +1,103 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
+import { SidebarProvider } from "@/components/ui/sidebar.tsx";
+import { useFeedStore } from "@/stores/feed-store.ts";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+
+vi.mock("@/core/storage/db.ts", () => ({
+  getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getFeed: vi.fn(),
+  removeFeed: vi.fn(),
+}));
+
+vi.mock("@/core/feeds/feed-service.ts", () => ({
+  addFeedFlow: vi.fn(),
+  refreshFeed: vi.fn(),
+  refreshAllFeeds: vi.fn(),
+}));
+
+const mockFeed = (id: string, title: string) => ({
+  id,
+  url: `https://${id}.com/feed`,
+  title,
+  description: "",
+  siteUrl: `https://${id}.com`,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+});
+
+function renderSidebar(onFeedSelect?: (feedId: string) => void) {
+  return render(
+    <SidebarProvider>
+      <AppSidebar onFeedSelect={onFeedSelect} />
+    </SidebarProvider>,
+  );
+}
+
+describe("AppSidebar All items entry", () => {
+  beforeEach(() => {
+    useFeedStore.setState({
+      feeds: [mockFeed("f1", "Tech News"), mockFeed("f2", "Sports")],
+      selectedFeedId: null,
+      isLoading: false,
+      error: null,
+      isRefreshingAll: false,
+      refreshingFeedIds: new Set(),
+    });
+  });
+
+  it("renders All items entry at top of feed list", () => {
+    renderSidebar();
+
+    expect(screen.getByText("All items")).toBeInTheDocument();
+  });
+
+  it("All items appears before individual feeds", () => {
+    const { container } = renderSidebar();
+
+    const menuButtons = container.querySelectorAll(
+      "[data-sidebar='menu-button']",
+    );
+    const texts = Array.from(menuButtons).map((btn) => btn.textContent);
+
+    expect(texts[0]).toContain("All items");
+    expect(texts[1]).toContain("Tech News");
+  });
+
+  it("calls onFeedSelect with ALL_FEEDS_ID when clicked", async () => {
+    const user = userEvent.setup();
+    const onFeedSelect = vi.fn();
+    renderSidebar(onFeedSelect);
+
+    await user.click(screen.getByText("All items"));
+
+    expect(onFeedSelect).toHaveBeenCalledWith(ALL_FEEDS_ID);
+  });
+
+  it("shows All items as active when selectedFeedId is ALL_FEEDS_ID", () => {
+    useFeedStore.setState({ selectedFeedId: ALL_FEEDS_ID });
+    const { container } = renderSidebar();
+
+    const allItemsButton = container.querySelector(
+      "[data-sidebar='menu-button'][data-active='true']",
+    );
+    expect(allItemsButton?.textContent).toContain("All items");
+  });
+
+  it("All items has a Layers icon", () => {
+    const { container } = renderSidebar();
+
+    const menuButtons = container.querySelectorAll(
+      "[data-sidebar='menu-button']",
+    );
+    const allItemsButton = menuButtons[0];
+
+    // All items should have Layers icon (lucide-react renders as svg)
+    const allItemsSvg = allItemsButton.querySelector("svg");
+    expect(allItemsSvg).toBeTruthy();
+    // Lucide icons have a class with lucide-
+    expect(allItemsSvg?.classList.toString()).toContain("lucide");
+  });
+});

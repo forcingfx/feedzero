@@ -4,12 +4,12 @@
 
 | Metric | Value |
 |--------|-------|
-| Tests Reviewed | 711 |
+| Tests Reviewed | 713 |
 | Test Files | 63 |
 | Feature Docs | 10 (9 existing + 1 created) |
 | Gherkin Scenarios | 81 |
-| Issues Found | 4 |
-| Issues Fixed | 4 |
+| Issues Found | 7 |
+| Issues Fixed | 7 |
 
 ## Anti-Patterns Found and Fixed
 
@@ -39,6 +39,23 @@ expect(currentUrl).toMatch(/^\/feeds\/feed-1/);
 **Found:** Mobile Back button behavior had 3 tests but no feature doc
 
 **Fixed:** Created `docs/features/010-mobile-navigation.md` with 6 Gherkin scenarios
+
+### 5. Fake Guard Test (005-S07)
+**Found:** Test "both respect isRefreshingAll guard" replaced `refreshAll` action with a spy, so guard logic never ran
+
+**Location:** `tests/integration/keyboard-ui-parity.test.tsx:96`
+
+**Fixed:** Rewrote as "R key is ignored when refresh is already in progress" — uses real store action, asserts `refreshAllFeeds` called exactly once
+
+### 6. Missing Timestamp Format Test (006-S11)
+**Found:** No test verified timestamps display with time (hour:minute) and exclude seconds
+
+**Fixed:** Added test in `tests/components/reader/reader-panel.test.tsx` — asserts meta line matches `/\d{1,2}:\d{2}/` and does NOT contain `:45` (seconds)
+
+### 7. Missing Auto-Refresh Test (005-S01)
+**Found:** No test verified `refreshAllFeeds` is called on app load for returning users
+
+**Fixed:** Added test in `tests/app.test.tsx` — asserts `refreshAllFeeds` is called after `isDbReady` becomes true
 
 ## Traceability Matrix
 
@@ -76,7 +93,7 @@ expect(currentUrl).toMatch(/^\/feeds\/feed-1/);
 ## Verification
 
 ```
-✓ npm test — 711 tests passing
+✓ npm test — 713 tests passing
 ✓ npx tsc --noEmit — 0 type errors
 ✓ All feature docs have matching tests
 ✓ All tests can be traced to feature scenarios

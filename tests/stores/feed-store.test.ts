@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useFeedStore } from "../../src/stores/feed-store.ts";
+import { useFeedStore, selectFeedsById } from "../../src/stores/feed-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
@@ -300,6 +300,27 @@ describe("feed-store", () => {
       await useFeedStore.getState().refreshAll();
 
       expect(scheduleSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("selectFeedsById selector", () => {
+    it("returns a map of feedId to feed", () => {
+      const feed1 = mockFeed("f1", "Feed One");
+      const feed2 = mockFeed("f2", "Feed Two");
+      useFeedStore.setState({ feeds: [feed1, feed2] });
+
+      const byId = selectFeedsById(useFeedStore.getState());
+
+      expect(byId["f1"].title).toBe("Feed One");
+      expect(byId["f2"].title).toBe("Feed Two");
+    });
+
+    it("returns empty object when no feeds", () => {
+      useFeedStore.setState({ feeds: [] });
+
+      const byId = selectFeedsById(useFeedStore.getState());
+
+      expect(byId).toEqual({});
     });
   });
 });

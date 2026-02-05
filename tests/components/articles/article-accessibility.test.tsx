@@ -127,7 +127,7 @@ describe("ArticleItem keyboard interaction", () => {
     expect(onSelect).toHaveBeenCalledWith(article);
   });
 
-  it("unread articles have font-semibold on title", () => {
+  it("unread articles have text-foreground on title", () => {
     const onSelect = vi.fn();
     render(
       <ArticleItem
@@ -136,7 +136,7 @@ describe("ArticleItem keyboard interaction", () => {
         onSelect={onSelect}
       />,
     );
-    expect(screen.getByText("Unread").className).toContain("font-semibold");
+    expect(screen.getByText("Unread").className).toContain("text-foreground");
   });
 
   it("selected article has accent background", () => {

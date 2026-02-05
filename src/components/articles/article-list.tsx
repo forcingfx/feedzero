@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { Kbd } from "@/components/ui/kbd.tsx";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { ArticleItem } from "./article-item.tsx";
 import type { Article } from "@/types/index.ts";
 
@@ -10,9 +11,16 @@ interface ArticleListProps {
 
 export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
+  const feeds = useFeedStore((s) => s.feeds);
   const articles = useArticleStore((s) => s.articles);
   const selectedArticle = useArticleStore((s) => s.selectedArticle);
   const selectArticle = useArticleStore((s) => s.selectArticle);
+  const isGlobalView = selectedFeedId === ALL_FEEDS_ID;
+
+  const feedsById = useMemo(
+    () => Object.fromEntries(feeds.map((f) => [f.id, f])),
+    [feeds],
+  );
 
   function handleSelect(article: Article) {
     selectArticle(article);
@@ -29,12 +37,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
   return (
     <>
-      {selectedFeedId && articles.length > 0 && (
-        <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border font-mono">
-          <Kbd>J</Kbd>
-          <Kbd>K</Kbd> next/prev article
-        </div>
-      )}
       {articles.length === 0 ? (
         <div className="p-2 text-muted-foreground text-sm">
           No articles found.
@@ -47,6 +49,12 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
               article={article}
               isSelected={article.id === selectedArticle?.id}
               onSelect={handleSelect}
+              feedTitle={
+                isGlobalView ? feedsById[article.feedId]?.title : undefined
+              }
+              feedSiteUrl={
+                isGlobalView ? feedsById[article.feedId]?.siteUrl : undefined
+              }
             />
           ))}
         </ul>

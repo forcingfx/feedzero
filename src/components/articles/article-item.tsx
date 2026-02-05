@@ -1,10 +1,13 @@
 import { decodeEntities } from "@/lib/decode-entities.ts";
+import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Article } from "@/types/index.ts";
 
 interface ArticleItemProps {
   article: Article;
   isSelected: boolean;
   onSelect: (article: Article) => void;
+  feedTitle?: string;
+  feedSiteUrl?: string;
 }
 
 function formatDate(timestamp: number): string {
@@ -23,6 +26,8 @@ export function ArticleItem({
   article,
   isSelected,
   onSelect,
+  feedTitle,
+  feedSiteUrl,
 }: ArticleItemProps) {
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" || e.key === " ") {
@@ -39,15 +44,25 @@ export function ArticleItem({
       data-id={article.id}
       onClick={() => onSelect(article)}
       onKeyDown={handleKeyDown}
-      className="px-2 py-2 border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent"
+      className="px-2 py-2 border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent flex gap-4"
     >
-      <div className={article.read ? "text-muted-foreground" : "font-semibold"}>
-        {decodeEntities(article.title)}
+      <div className={`min-w-0 flex-1 ${article.read ? "opacity-60" : ""}`}>
+        <div
+          className={article.read ? "text-muted-foreground" : "text-foreground"}
+        >
+          {decodeEntities(article.title)}
+        </div>
+        <div className="text-xs text-muted-foreground mt-1">
+          {feedTitle && (
+            <span className="font-medium">{feedTitle} &bull; </span>
+          )}
+          {article.author && <>{article.author} &bull; </>}
+          {formatDate(article.publishedAt)}
+        </div>
       </div>
-      <div className="text-xs text-muted-foreground mt-1">
-        {article.author && <>{article.author} &bull; </>}
-        {formatDate(article.publishedAt)}
-      </div>
+      {feedSiteUrl && (
+        <FeedFavicon siteUrl={feedSiteUrl} className="size-4 shrink-0" />
+      )}
     </li>
   );
 }

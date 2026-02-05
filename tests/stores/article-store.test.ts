@@ -4,6 +4,7 @@ import { useSyncStore } from "../../src/stores/sync-store.ts";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
   getArticles: vi.fn(),
+  getAllArticles: vi.fn(),
   updateArticle: vi.fn(),
 }));
 
@@ -13,7 +14,13 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
-import { getArticles, updateArticle } from "../../src/core/storage/db.ts";
+import {
+  getArticles,
+  getAllArticles,
+  updateArticle,
+} from "../../src/core/storage/db.ts";
+import { useFeedStore } from "../../src/stores/feed-store.ts";
+import { ALL_FEEDS_ID } from "../../src/utils/constants.ts";
 
 const mockArticle = (id: string, read = false) => ({
   id,
@@ -162,6 +169,39 @@ describe("article-store", () => {
       await useArticleStore.getState().selectArticle(article);
 
       expect(scheduleSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("global view (ALL_FEEDS_ID)", () => {
+    it("loadArticles calls getAllArticles when feedId is ALL_FEEDS_ID", async () => {
+      const articleFromFeed1 = { ...mockArticle("a1"), feedId: "feed-1" };
+      const articleFromFeed2 = { ...mockArticle("a2"), feedId: "feed-2" };
+      vi.mocked(getAllArticles).mockResolvedValue({
+        ok: true,
+        value: [articleFromFeed1, articleFromFeed2],
+      });
+
+      await useArticleStore.getState().loadArticles(ALL_FEEDS_ID);
+
+      expect(getAllArticles).toHaveBeenCalled();
+      expect(getArticles).not.toHaveBeenCalled();
+      expect(useArticleStore.getState().articles).toHaveLength(2);
+    });
+
+    it("selectArticle allows any feedId when selectedFeedId is ALL_FEEDS_ID", async () => {
+      useFeedStore.setState({ selectedFeedId: ALL_FEEDS_ID });
+      const articleFromDifferentFeed = {
+        ...mockArticle("a1"),
+        feedId: "some-other-feed",
+      };
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().selectArticle(articleFromDifferentFeed);
+
+      expect(useArticleStore.getState().selectedArticle).not.toBeNull();
+      expect(useArticleStore.getState().selectedArticle?.feedId).toBe(
+        "some-other-feed",
+      );
     });
   });
 });

@@ -14,6 +14,9 @@ export const SCHEMA_VERSION = 1;
 
 export const DEFAULT_PASSPHRASE = "feedzero-default-key";
 
+/** Special feed ID for the global "All items" view. */
+export const ALL_FEEDS_ID = "all";
+
 export const LOCAL_STORAGE = {
   ONBOARDING_COMPLETE: "feedzero:onboarding-complete",
   SYNC_PASSPHRASE: "feedzero:sync-passphrase",
