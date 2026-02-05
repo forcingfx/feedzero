@@ -12,97 +12,68 @@ describe("SyncStatusChip", () => {
     });
   });
 
-  describe("color-coded states", () => {
-    it("renders with amber colors for local-only status", () => {
-      useSyncStore.setState({ status: "local-only" });
-      render(<SyncStatusChip />);
+  describe.each([
+    {
+      status: "local-only" as const,
+      label: "Local only",
+      textClass: "text-sync-local",
+      bgClass: "bg-sync-local-bg",
+      hoverBg: "hover:bg-amber-600",
+      hoverText: "hover:text-white",
+    },
+    {
+      status: "synced" as const,
+      label: "Synced",
+      textClass: "text-sync-synced",
+      bgClass: "bg-sync-synced-bg",
+      hoverBg: "hover:bg-green-700",
+      hoverText: "hover:text-white",
+    },
+    {
+      status: "error" as const,
+      label: "Sync error",
+      textClass: "text-sync-error",
+      bgClass: "bg-sync-error-bg",
+      hoverBg: "hover:bg-red-700",
+      hoverText: "hover:text-white",
+    },
+    {
+      status: "syncing" as const,
+      label: "Syncing...",
+      textClass: "text-muted-foreground",
+      bgClass: "bg-muted",
+      hoverBg: "hover:bg-sidebar-accent",
+      hoverText: "hover:text-sidebar-accent-foreground",
+    },
+  ])(
+    "$status status",
+    ({ status, label, textClass, bgClass, hoverBg, hoverText }) => {
+      beforeEach(() => {
+        useSyncStore.setState({ status });
+      });
 
-      const button = screen.getByRole("button");
-      expect(button).toHaveClass("text-sync-local");
-      expect(button).toHaveClass("bg-sync-local-bg");
-    });
+      it(`displays "${label}" label`, () => {
+        render(<SyncStatusChip />);
+        expect(screen.getByText(label)).toBeInTheDocument();
+      });
 
-    it("renders with green colors for synced status", () => {
-      useSyncStore.setState({ status: "synced" });
-      render(<SyncStatusChip />);
+      it(`has ${textClass} and ${bgClass} colors`, () => {
+        render(<SyncStatusChip />);
+        const button = screen.getByRole("button");
+        expect(button).toHaveClass(textClass);
+        expect(button).toHaveClass(bgClass);
+      });
 
-      const button = screen.getByRole("button");
-      expect(button).toHaveClass("text-sync-synced");
-      expect(button).toHaveClass("bg-sync-synced-bg");
-    });
-
-    it("renders with red colors for error status", () => {
-      useSyncStore.setState({ status: "error" });
-      render(<SyncStatusChip />);
-
-      const button = screen.getByRole("button");
-      expect(button).toHaveClass("text-sync-error");
-      expect(button).toHaveClass("bg-sync-error-bg");
-    });
-
-    it("renders with muted colors for syncing status", () => {
-      useSyncStore.setState({ status: "syncing" });
-      render(<SyncStatusChip />);
-
-      const button = screen.getByRole("button");
-      expect(button).toHaveClass("text-muted-foreground");
-      expect(button).toHaveClass("bg-muted");
-    });
-  });
-
-  describe("color-aware hover states", () => {
-    it("has amber hover state for local-only", () => {
-      useSyncStore.setState({ status: "local-only" });
-      render(<SyncStatusChip />);
-      const button = screen.getByRole("button");
-      expect(button).toHaveClass("hover:bg-amber-600");
-      expect(button).toHaveClass("hover:text-white");
-    });
-
-    it("has green hover state for synced", () => {
-      useSyncStore.setState({ status: "synced" });
-      render(<SyncStatusChip />);
-      const button = screen.getByRole("button");
-      expect(button).toHaveClass("hover:bg-green-700");
-      expect(button).toHaveClass("hover:text-white");
-    });
-
-    it("has red hover state for error", () => {
-      useSyncStore.setState({ status: "error" });
-      render(<SyncStatusChip />);
-      const button = screen.getByRole("button");
-      expect(button).toHaveClass("hover:bg-red-700");
-      expect(button).toHaveClass("hover:text-white");
-    });
-
-    it("has default hover state for syncing", () => {
-      useSyncStore.setState({ status: "syncing" });
-      render(<SyncStatusChip />);
-      const button = screen.getByRole("button");
-      expect(button).toHaveClass("hover:bg-sidebar-accent");
-      expect(button).toHaveClass("hover:text-sidebar-accent-foreground");
-    });
-  });
+      it(`has ${hoverBg} hover state`, () => {
+        render(<SyncStatusChip />);
+        const button = screen.getByRole("button");
+        expect(button).toHaveClass(hoverBg);
+        expect(button).toHaveClass(hoverText);
+      });
+    },
+  );
 
   describe("behavior", () => {
-    it("displays correct label for each status", () => {
-      useSyncStore.setState({ status: "local-only" });
-      const { rerender } = render(<SyncStatusChip />);
-      expect(screen.getByText("Local only")).toBeInTheDocument();
-
-      useSyncStore.setState({ status: "synced" });
-      rerender(<SyncStatusChip />);
-      expect(screen.getByText("Synced")).toBeInTheDocument();
-
-      useSyncStore.setState({ status: "syncing" });
-      rerender(<SyncStatusChip />);
-      expect(screen.getByText("Syncing...")).toBeInTheDocument();
-
-      useSyncStore.setState({ status: "error" });
-      rerender(<SyncStatusChip />);
-      expect(screen.getByText("Sync error")).toBeInTheDocument();
-    });
-
     it("opens dialog when clicked", async () => {
       const user = userEvent.setup();
       const setDialogOpen = vi.fn();
