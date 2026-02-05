@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Smartphone, Lock, AlertTriangle, KeyRound, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
@@ -14,8 +14,14 @@ type StorageOption = "local" | "sync" | "recovery" | null;
 
 export function StorageChoiceStep() {
   const [selected, setSelected] = useState<StorageOption>(null);
+  const firstOptionRef = useRef<HTMLInputElement>(null);
   const chooseStorageMode = useOnboardingStore((s) => s.chooseStorageMode);
   const setStep = useOnboardingStore((s) => s.setStep);
+
+  // Focus first option on mount so Tab works immediately
+  useEffect(() => {
+    firstOptionRef.current?.focus();
+  }, []);
 
   const handleContinue = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -50,6 +56,7 @@ export function StorageChoiceStep() {
             }`}
           >
             <input
+              ref={firstOptionRef}
               type="radio"
               name="storage-option"
               value="local"
@@ -192,11 +199,11 @@ export function StorageChoiceStep() {
           </div>
         )}
 
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-4">
           <Kbd>Tab</Kbd> navigate options
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="mt-4">
           <Button
             type="submit"
             size="lg"
