@@ -58,6 +58,42 @@ describe("article-store", () => {
 
       expect(useArticleStore.getState().articles).toEqual([]);
     });
+
+    it("clears old articles immediately before loading new ones", async () => {
+      // Start with articles from feed A
+      const oldArticles = [mockArticle("old-a1"), mockArticle("old-a2")];
+      oldArticles.forEach((a) => (a.feedId = "feed-A"));
+      useArticleStore.setState({ articles: oldArticles });
+
+      // Set up a delayed response to simulate network latency
+      let resolveGetArticles: (value: {
+        ok: true;
+        value: typeof oldArticles;
+      }) => void;
+      vi.mocked(getArticles).mockReturnValue(
+        new Promise((resolve) => {
+          resolveGetArticles = resolve;
+        }),
+      );
+
+      // Start loading articles for feed B (don't await)
+      const loadPromise = useArticleStore.getState().loadArticles("feed-B");
+
+      // IMMEDIATELY after calling loadArticles, articles should be cleared
+      // This prevents showing old feed's articles with new feed's name
+      expect(useArticleStore.getState().articles).toEqual([]);
+      expect(useArticleStore.getState().isLoading).toBe(true);
+
+      // Now resolve the fetch
+      const newArticles = [mockArticle("new-b1")];
+      newArticles[0].feedId = "feed-B";
+      resolveGetArticles!({ ok: true, value: newArticles });
+      await loadPromise;
+
+      // After load completes, should have new articles
+      expect(useArticleStore.getState().articles).toEqual(newArticles);
+      expect(useArticleStore.getState().isLoading).toBe(false);
+    });
   });
 
   describe("selectArticle", () => {

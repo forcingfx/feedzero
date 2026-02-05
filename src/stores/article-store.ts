@@ -19,7 +19,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   isLoading: false,
 
   loadArticles: async (feedId) => {
-    set({ isLoading: true });
+    set({ articles: [], selectedArticle: null, isLoading: true });
     const result = await getArticles(feedId);
     set({
       articles: result.ok ? result.value : [],
