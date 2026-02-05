@@ -47,21 +47,11 @@ describe("AppSidebar states", () => {
     });
   });
 
-  it("shows empty state with title when no feeds", () => {
-    renderSidebar();
-    expect(screen.getByText("No feeds yet")).toBeInTheDocument();
-  });
-
-  it("shows empty state with description when no feeds", () => {
-    renderSidebar();
-    expect(
-      screen.getByText("Add your first RSS feed to get started"),
-    ).toBeInTheDocument();
-  });
-
-  it("renders empty component container when no feeds", () => {
+  it("hides Feeds group when no feeds exist", () => {
     const { container } = renderSidebar();
-    expect(container.querySelector("[data-slot='empty']")).toBeInTheDocument();
+    expect(
+      container.querySelector("[data-sidebar='group-label']"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders feed items with titles", () => {

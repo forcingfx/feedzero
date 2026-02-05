@@ -45,9 +45,11 @@ describe("AppSidebar", () => {
     });
   });
 
-  it("shows empty state when no feeds", () => {
-    renderSidebar();
-    expect(screen.getByText("No feeds yet")).toBeInTheDocument();
+  it("shows no Feeds group when no feeds exist", () => {
+    const { container } = renderSidebar();
+    expect(
+      container.querySelector("[data-sidebar='group-label']"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders feed items", () => {

@@ -60,8 +60,10 @@ describe("AppSidebar layout structure", () => {
           id: "feed-1",
           url: "https://example.com/rss",
           title: "Example Feed",
+          description: "",
           siteUrl: "https://example.com",
           createdAt: Date.now(),
+          updatedAt: Date.now(),
         },
       ],
       selectedFeedId: null,
@@ -81,13 +83,14 @@ describe("AppSidebar layout structure", () => {
     ).toBeInTheDocument();
   });
 
-  it("SidebarContent wraps feed list", () => {
+  it("SidebarContent is empty when no feeds exist", () => {
     const { container } = renderSidebar();
     const content = container.querySelector("[data-sidebar='content']");
     expect(content).not.toBeNull();
-    // Empty state component should be within the content area
-    const emptyMsg = screen.getByText("No feeds yet");
-    expect(content!.contains(emptyMsg)).toBe(true);
+    // No Feeds group when empty
+    expect(
+      content!.querySelector("[data-sidebar='group']"),
+    ).not.toBeInTheDocument();
   });
 
   it("SidebarFooter contains SyncStatusChip", () => {
@@ -114,8 +117,10 @@ describe("AppSidebar layout structure", () => {
           id: "feed-1",
           url: "https://example.com/rss",
           title: "Example Feed",
+          description: "",
           siteUrl: "https://example.com",
           createdAt: Date.now(),
+          updatedAt: Date.now(),
         },
       ],
       selectedFeedId: null,
@@ -139,15 +144,19 @@ describe("AppSidebar layout structure", () => {
           id: "feed-1",
           url: "https://a.com/rss",
           title: "Feed A",
+          description: "",
           siteUrl: "https://a.com",
           createdAt: Date.now(),
+          updatedAt: Date.now(),
         },
         {
           id: "feed-2",
           url: "https://b.com/rss",
           title: "Feed B",
+          description: "",
           siteUrl: "https://b.com",
           createdAt: Date.now(),
+          updatedAt: Date.now(),
         },
       ],
       selectedFeedId: null,

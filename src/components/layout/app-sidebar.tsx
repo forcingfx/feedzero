@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Layers, MoreHorizontal, RefreshCw, Rss, Trash2 } from "lucide-react";
+import { Layers, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -41,13 +41,6 @@ import { SyncStatusChip } from "@/components/sync/sync-status-chip.tsx";
 import { AddFeedForm } from "@/components/feeds/add-feed-form.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  EmptyDescription,
-} from "@/components/ui/empty.tsx";
 import type { Feed } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -149,22 +142,10 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Feeds</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {feeds.length === 0 ? (
-                <Empty className="border-0 py-8">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <Rss />
-                    </EmptyMedia>
-                    <EmptyTitle>No feeds yet</EmptyTitle>
-                    <EmptyDescription>
-                      Add your first RSS feed to get started
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              ) : (
+          {feeds.length > 0 && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Feeds</SidebarGroupLabel>
+              <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem key="all-items">
                     <SidebarMenuButton
@@ -215,9 +196,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
-              )}
-            </SidebarGroupContent>
-          </SidebarGroup>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
         </SidebarContent>
 
         <SidebarFooter>

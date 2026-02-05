@@ -181,7 +181,7 @@ export function FeedsPage() {
                 </EmptyMedia>
                 <EmptyTitle>Get started with FeedZero</EmptyTitle>
                 <EmptyDescription>
-                  Add your first feed using the sidebar
+                  Press <Kbd>N</Kbd> to add your first feed
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
