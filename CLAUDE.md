@@ -114,7 +114,11 @@ URL is the source of truth for navigation state. `FeedsPage` syncs URL params to
 
 ### Hooks
 
-- **src/hooks/use-keyboard-nav.ts** — j/k/Enter/Escape navigation. Queries `[role="option"]` elements in the DOM.
+- **src/hooks/use-keyboard-nav.ts** — Keyboard shortcuts for feed reader navigation. All shortcuts have verified behavior parity with their UI counterparts.
+  - Article nav: `j`/`k` (next/prev — clicks DOM elements, same as mouse click)
+  - Feed nav: `u`/`i` (next/prev feed — clicks sidebar buttons)
+  - Actions: `o` (open original), `e` (toggle view via `toggleViewMode()`), `n` (add feed via custom event), `[` (toggle sidebar), `r` (refresh via `refreshAll()`)
+  - Shortcuts are disabled when focus is in input/textarea/contenteditable
 - **src/hooks/use-media-query.ts** — Responsive breakpoint detection. `useIsDesktop()` for ≥1024px.
 - **src/hooks/use-mobile.ts** — `useIsMobile()` for <768px breakpoint (used by sidebar/sheet components).
 

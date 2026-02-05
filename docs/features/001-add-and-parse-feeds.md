@@ -59,6 +59,21 @@ Feature: Add a feed URL and display its articles
     Given a feed has been added with articles
     When the user clicks the feed in the feed list
     Then the article list displays article titles sorted by date (newest first)
+
+  Rule: Keyboard shortcut opens add feed form
+
+  Scenario: Add feed via keyboard
+    When the user presses "N"
+    Then the add feed form opens in the sidebar
+    And the URL input is focused
+
+  Scenario: Submit feed URL and auto-navigate
+    Given the add feed form is open
+    When the user enters a valid feed URL and presses Enter
+    Then the feed is added
+    And the new feed is selected automatically
+    And the URL navigates to /feeds/:feedId
+    And the article list shows the new feed's articles
 ```
 
 ## Architecture
@@ -85,8 +100,10 @@ Feature: Add a feed URL and display its articles
 | `src/core/parser/validator.js` | Detects RSS 2.0, Atom 1.0, or JSON Feed 1.1 |
 | `src/core/parser/parser.js` | Parses all three formats into `{feed, articles}`. Decodes double-encoded HTML entities from malformed feeds. |
 | `src/core/parser/sanitizer.js` | DOMPurify wrapper for HTML content |
-| `src/main.js` | Wires FEED_ADDED event to feed-service, handles auto-select |
-| `src/ui/components/feed-list.js` | Add-feed form, feed list display, error display |
+| `src/stores/feed-store.ts` | `addFeed()` action, auto-selects new feed |
+| `src/components/feeds/add-feed-form.tsx` | Add-feed form, calls `onFeedSelect` after success |
+| `src/components/layout/app-sidebar.tsx` | Listens for `feedzero:add-feed` event (N key) |
+| `src/hooks/use-keyboard-nav.ts` | N key dispatches add-feed event |
 | `vite.config.js` | Dev-only CORS proxy plugin |
 
 ### Tests

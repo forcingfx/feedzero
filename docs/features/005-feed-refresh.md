@@ -41,6 +41,20 @@ Feature: Feed refresh
     Given the user clicks refresh
     When they click refresh again before the first completes
     Then only one refresh operation runs
+
+  Rule: Keyboard shortcut refreshes all feeds
+
+  Scenario: Refresh via keyboard
+    Given the user has feeds
+    When the user presses "R"
+    Then all feeds are refreshed
+    And the refresh button shows "Refreshing..." state
+    And new articles appear in the list
+
+  Scenario: R key while refreshing is ignored
+    Given a refresh is already in progress
+    When the user presses "R"
+    Then no additional refresh starts
 ```
 
 ## Architecture
@@ -63,9 +77,9 @@ Feature: Feed refresh
 | `src/core/feeds/feed-service.js` | `refreshFeed()`, `refreshAllFeeds()` — fetch, parse, dedup, store |
 | `src/core/storage/db.js` | `getArticleByGuid(feedId, guid)` — compound index lookup |
 | `src/core/storage/schema.js` | `createArticle()` accepts `guid` param, defaults to `link` |
-| `src/main.js` | Event handlers for `REFRESH_ALL`, `REFRESH_FEED` with debounce guards |
-| `src/ui/components/feed-list.js` | "Refresh All" button emits `feeds:refresh-all` |
-| `src/ui/components/article-list.js` | Per-feed refresh button emits `feed:refresh` |
+| `src/stores/feed-store.ts` | `refreshAll()` action with `isRefreshingAll` guard |
+| `src/components/layout/app-sidebar.tsx` | "Refresh" button calls `refreshAll()` |
+| `src/hooks/use-keyboard-nav.ts` | R key calls `refreshAll()` directly |
 
 ### Tests
 

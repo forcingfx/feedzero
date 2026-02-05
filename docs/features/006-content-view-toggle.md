@@ -74,6 +74,25 @@ Feature: Content view toggle
     Given an article with a publishedAt date
     Then the meta line shows date and time up to minutes
     And seconds are not displayed
+
+  Rule: Keyboard shortcut toggles view mode
+
+  Scenario: Toggle view with E key
+    Given an article is selected in Feed view
+    When the user presses "E"
+    Then the view switches to Extracted mode
+    And the full article is fetched and displayed
+
+  Scenario: Toggle back with E key
+    Given an article is displayed in Extracted view
+    When the user presses "E"
+    Then the view switches back to Feed mode
+
+  Scenario: E key uses cached extraction
+    Given an article's extracted content is already cached
+    When the user presses "E"
+    Then the cached content is displayed immediately
+    And no network request is made
 ```
 
 ## Architecture
@@ -95,15 +114,20 @@ Feature: Content view toggle
 
 | File | Role |
 |------|------|
-| `src/ui/components/content-modes.js` | Pure functions: `getAvailableModes()`, `hasSummarySubheading()`, `isExtractionMeaningful()`, `textsSimilar()`, `stripHtml()` |
-| `src/ui/components/article-view.js` | Toggle UI, on-demand extraction, rendering, caching |
+| `src/lib/content-modes.ts` | Pure functions: `getAvailableModes()`, `hasSummarySubheading()`, `isExtractionMeaningful()`, `textsSimilar()`, `stripHtml()` |
+| `src/components/reader/reader-panel.tsx` | Toggle UI, on-demand extraction, rendering |
+| `src/components/reader/view-toggle.tsx` | Toggle button group component |
+| `src/stores/extraction-store.ts` | View mode state, extraction cache, `toggleViewMode()` action |
+| `src/hooks/use-keyboard-nav.ts` | E key handler calls `toggleViewMode()` |
 
 ### Tests
 
 | File | Coverage |
 |------|----------|
-| `tests/ui/components/content-modes.test.js` | 26 tests: stripHtml, textsSimilar, getAvailableModes (feed-only, summary never returned, extracted shown/hidden, cached meaningful/not, description-only 100+ words/short), hasSummarySubheading (distinct, similar, empty), isExtractionMeaningful (thresholds, similar, empty) |
-| `tests/ui/components/article-view.test.js` | 13 tests: empty state, content render, toggle hidden, summary subheading shown/hidden, no subheading when content empty, timestamp, extracted hidden/shown, XSS escape, fallback, reset |
+| `tests/ui/components/content-modes.test.js` | 26 tests: stripHtml, textsSimilar, getAvailableModes, hasSummarySubheading, isExtractionMeaningful |
+| `tests/stores/extraction-store.test.ts` | 12 tests: view mode, fetch/cache, toggleViewMode, switchToExtracted |
+| `tests/hooks/use-keyboard-nav.test.tsx` | E key toggle tests (3 tests): triggers fetch, uses cache, handles no article |
+| `tests/integration/view-toggle-parity.test.tsx` | 5 tests: keyboard vs click behavior parity |
 
 ## Design Decisions
 
@@ -121,4 +145,3 @@ Feature: Content view toggle
 - Similarity containment check may have edge cases with very similar but distinct articles
 - The 100-word threshold for description-only feeds is a heuristic — some feeds may have substantive short posts (< 100 words) that get incorrectly offered extraction
 - Extraction quality thresholds (100 words, 50%) are tunable but not user-configurable
-- No keyboard shortcut to cycle through view modes
