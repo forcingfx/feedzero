@@ -170,6 +170,12 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 - Good: "pressing E triggers content extraction" — verifies the complete user action.
 - If the same user action has multiple code paths (e.g., click handler vs keyboard shortcut), both must be tested for identical behavior — otherwise bugs slip through when one path diverges.
 
+**Store tests vs component tests:**
+- **Store unit tests** may assert on `getState()` — the store's state IS its observable output.
+- **Component/page tests** should NOT replace store methods with mocks and assert on mock calls. Instead, use real store methods and assert on observable outcomes: rendered UI, URL changes, or resulting store state.
+- Bad: `useFeedStore.setState({ selectFeed: mockSelectFeed }); expect(mockSelectFeed).toHaveBeenCalledWith("feed-1");`
+- Good: `renderPage("/feeds/feed-1"); expect(useFeedStore.getState().selectedFeedId).toBe("feed-1");`
+
 **happy-dom gotchas:**
 - DOMPurify + happy-dom executes inline scripts during sanitization. Use non-callable code in test fixtures (e.g., `var x = 1;` not `alert(1)`).
 - `querySelector` with CSS-escaped colons (e.g. `content\\:encoded`) may work in happy-dom but fail in browsers. Always use `getElementsByTagName` for XML namespace-prefixed elements.
