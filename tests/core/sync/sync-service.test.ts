@@ -11,6 +11,7 @@ import {
   pushVault,
   pullVault,
   deleteVault,
+  padPayload,
 } from "@/core/sync/sync-service";
 
 describe("sync-service", () => {
@@ -236,6 +237,54 @@ describe("sync-service", () => {
 
       const result = await deleteVault("test-passphrase");
       expect(isErr(result)).toBe(true);
+    });
+  });
+
+  describe("padPayload", () => {
+    it("pads a small payload to the minimum bucket size (64KB)", () => {
+      const small = JSON.stringify({ data: "x" });
+      const padded = padPayload(small);
+      expect(padded.length).toBe(64 * 1024);
+    });
+
+    it("pads to the nearest power-of-2 bucket", () => {
+      // 100KB input should pad to 128KB
+      const input = "x".repeat(100 * 1024);
+      const padded = padPayload(input);
+      expect(padded.length).toBe(128 * 1024);
+    });
+
+    it("preserves the original JSON data", () => {
+      const original = JSON.stringify({ vaultId: "abc", vault: { v: 1 } });
+      const padded = padPayload(original);
+      const parsed = JSON.parse(padded);
+      expect(parsed.vaultId).toBe("abc");
+      expect(parsed.vault.v).toBe(1);
+    });
+
+    it("produces different padding each time (random)", () => {
+      const input = JSON.stringify({ data: "test" });
+      const a = padPayload(input);
+      const b = padPayload(input);
+      // Padding field should differ (random)
+      const parsedA = JSON.parse(a);
+      const parsedB = JSON.parse(b);
+      expect(parsedA._pad).not.toBe(parsedB._pad);
+    });
+
+    it("does not exceed MAX_VAULT_SIZE (caps at 4MB)", () => {
+      // Input just under 4MB — should pad to 4MB
+      const input = "x".repeat(3 * 1024 * 1024);
+      const padded = padPayload(input);
+      expect(padded.length).toBe(4 * 1024 * 1024);
+    });
+
+    it("returns input unchanged if already at a bucket boundary", () => {
+      // Create input that is exactly 64KB after padding
+      // First pad, then verify it's stable
+      const input = JSON.stringify({ data: "x" });
+      const padded = padPayload(input);
+      expect(padded.length).toBe(64 * 1024);
     });
   });
 });

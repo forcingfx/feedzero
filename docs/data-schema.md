@@ -83,3 +83,7 @@ The sync server stores encrypted vault blobs. The server never sees plaintext.
 | ciphertext | string   | Base64-encoded encrypted VaultData   |
 
 Vault ID (64-char hex) is derived from the passphrase via PBKDF2 and used as the server-side lookup key. See [ADR 006](decisions/006-sync-storage-and-passphrase.md).
+
+#### Payload Size Padding
+
+The sync push payload is padded to the nearest power-of-2 bucket size (64KB, 128KB, ..., up to 4MB max) using a random `_pad` field. This prevents an observer from inferring subscription count or activity from transfer sizes.

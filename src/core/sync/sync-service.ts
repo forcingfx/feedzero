@@ -10,6 +10,45 @@ import {
 } from "./vault-crypto.ts";
 import type { VaultData, EncryptedVault } from "./types.ts";
 
+const MIN_BUCKET = 64 * 1024;
+
+/**
+ * Pad a JSON payload string to the nearest power-of-2 bucket size.
+ * Prevents an observer from inferring subscription count from transfer size.
+ * Adds a `_pad` field with random hex to reach the target length.
+ */
+export function padPayload(json: string): string {
+  const targetSize = Math.min(
+    nextPowerOf2(json.length, MIN_BUCKET),
+    SYNC.MAX_VAULT_SIZE,
+  );
+  const overhead = ',"_pad":""'.length;
+  const padLength = targetSize - json.length - overhead;
+  if (padLength <= 0) return json;
+
+  const pad = generateRandomHex(padLength);
+  return json.slice(0, -1) + ',"_pad":"' + pad + '"}';
+}
+
+function generateRandomHex(length: number): string {
+  const MAX_CHUNK = 65536;
+  const parts: string[] = [];
+  let remaining = Math.ceil(length / 2);
+  while (remaining > 0) {
+    const chunk = Math.min(remaining, MAX_CHUNK);
+    const bytes = crypto.getRandomValues(new Uint8Array(chunk));
+    for (const b of bytes) parts.push(b.toString(16).padStart(2, "0"));
+    remaining -= chunk;
+  }
+  return parts.join("").slice(0, length);
+}
+
+function nextPowerOf2(size: number, min: number): number {
+  let bucket = min;
+  while (bucket < size) bucket *= 2;
+  return bucket;
+}
+
 /**
  * Export all local data as a VaultData object.
  */
@@ -52,13 +91,17 @@ export async function pushVault(passphrase: string): Promise<Result<number>> {
     );
     if (!encryptedResult.ok) return encryptedResult;
 
-    const response = await fetch("/api/sync", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const body = padPayload(
+      JSON.stringify({
         vaultId: vaultIdResult.value,
         vault: encryptedResult.value,
       }),
+    );
+
+    const response = await fetch("/api/sync", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body,
     });
 
     if (!response.ok) {
