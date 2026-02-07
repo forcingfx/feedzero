@@ -8,8 +8,7 @@ export async function handleProxyRequest(
   req: Request,
   defaultContentType: string,
 ): Promise<Response> {
-  const url = new URL(req.url, "http://localhost");
-  const target = url.searchParams.get("url");
+  const target = await extractTargetUrl(req);
 
   const validation = validateProxyUrl(target);
   if (!validation.ok) {
@@ -36,4 +35,18 @@ export async function handleProxyRequest(
     const message = e instanceof Error ? e.message : "Unknown error";
     return new Response(`Proxy error: ${message}`, { status: 502 });
   }
+}
+
+/** Extract target URL from POST body (preferred) or GET query param (fallback). */
+async function extractTargetUrl(req: Request): Promise<string | null> {
+  if (req.method === "POST") {
+    try {
+      const body = (await req.json()) as { url?: string };
+      return body.url ?? null;
+    } catch {
+      return null;
+    }
+  }
+  const url = new URL(req.url, "http://localhost");
+  return url.searchParams.get("url");
 }

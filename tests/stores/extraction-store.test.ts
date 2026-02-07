@@ -141,9 +141,11 @@ describe("extraction-store", () => {
         .switchToExtracted("https://example.com/post");
 
       expect(useExtractionStore.getState().viewMode).toBe("extracted");
-      expect(fetch).toHaveBeenCalledWith(
-        "/api/page?url=https%3A%2F%2Fexample.com%2Fpost",
-      );
+      expect(fetch).toHaveBeenCalledWith("/api/page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: "https://example.com/post" }),
+      });
     });
 
     it("does not fetch if content is already cached", () => {

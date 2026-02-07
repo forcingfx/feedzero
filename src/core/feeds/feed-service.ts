@@ -13,6 +13,7 @@ import {
   updateArticle,
 } from "../storage/db.ts";
 import type { Feed, Article } from "../../types/index.ts";
+import { proxyFetch } from "../proxy/proxy-fetch.ts";
 
 interface AddFeedResult {
   feed: Feed;
@@ -25,7 +26,12 @@ interface RefreshResult {
 }
 
 interface RefreshAllResult {
-  results: Array<{ feed: Feed; newCount: number; updatedCount: number; error?: string }>;
+  results: Array<{
+    feed: Feed;
+    newCount: number;
+    updatedCount: number;
+    error?: string;
+  }>;
 }
 
 /**
@@ -76,7 +82,9 @@ export function normalizeUrl(url: string): string {
  * Full add-feed flow: check duplicate → fetch → parse → store.
  * Returns Result<{feed, articles}> with user-friendly error messages.
  */
-export async function addFeedFlow(rawUrl: string): Promise<Result<AddFeedResult>> {
+export async function addFeedFlow(
+  rawUrl: string,
+): Promise<Result<AddFeedResult>> {
   const url = normalizeUrl(rawUrl);
   try {
     // Check for duplicate using the plaintext URL index (no decryption needed)
@@ -93,8 +101,7 @@ export async function addFeedFlow(rawUrl: string): Promise<Result<AddFeedResult>
     }
 
     // Fetch feed content via CORS proxy
-    const proxyUrl = `/api/feed?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
+    const response = await proxyFetch("/api/feed", url);
     if (!response.ok) {
       return err(
         `The feed at this URL could not be reached (HTTP ${response.status}).`,
@@ -158,8 +165,7 @@ export async function addFeedFlow(rawUrl: string): Promise<Result<AddFeedResult>
  */
 export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
   try {
-    const proxyUrl = `/api/feed?url=${encodeURIComponent(feed.url)}`;
-    const response = await fetch(proxyUrl);
+    const response = await proxyFetch("/api/feed", feed.url);
     if (!response.ok) {
       return err(`Failed to fetch feed (HTTP ${response.status})`);
     }

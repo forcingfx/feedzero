@@ -7,6 +7,7 @@ import {
   getWellKnownFeedUrls,
   findFeedLinksInAnchors,
 } from "./strategies.ts";
+import { proxyFetch } from "../proxy/proxy-fetch.ts";
 
 interface DiscoveryResult extends ParseResult {
   feedUrl: string;
@@ -17,8 +18,7 @@ interface DiscoveryResult extends ParseResult {
  */
 async function tryParseFeed(feedUrl: string): Promise<DiscoveryResult | null> {
   try {
-    const proxyUrl = `/api/feed?url=${encodeURIComponent(feedUrl)}`;
-    const response = await fetch(proxyUrl);
+    const response = await proxyFetch("/api/feed", feedUrl);
     if (!response.ok) return null;
 
     const text = await response.text();
@@ -50,11 +50,12 @@ async function tryCandidates(urls: string[]): Promise<DiscoveryResult | null> {
  * 2. Well-known feed paths (/feed, /rss, /atom.xml, etc.)
  * 3. Anchor link scanning for feed-like URLs
  */
-export async function discoverFeed(url: string): Promise<Result<DiscoveryResult>> {
+export async function discoverFeed(
+  url: string,
+): Promise<Result<DiscoveryResult>> {
   try {
     // Fetch the page HTML (reused for strategies 1 and 3)
-    const pageProxyUrl = `/api/page?url=${encodeURIComponent(url)}`;
-    const pageResponse = await fetch(pageProxyUrl);
+    const pageResponse = await proxyFetch("/api/page", url);
     if (!pageResponse.ok) {
       return err("Could not fetch the page for feed discovery.");
     }

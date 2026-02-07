@@ -11,7 +11,9 @@ describe("handleProxyRequest", () => {
   it("sends a normalized User-Agent header to prevent fingerprinting", async () => {
     fetchSpy.mockResolvedValue(new Response("ok", { status: 200 }));
 
-    const req = new Request("http://localhost/api/feed?url=https://example.com/feed.xml");
+    const req = new Request(
+      "http://localhost/api/feed?url=https://example.com/feed.xml",
+    );
     await handleProxyRequest(req, "text/xml");
 
     expect(fetchSpy).toHaveBeenCalledOnce();
@@ -21,6 +23,30 @@ describe("handleProxyRequest", () => {
     expect(headers.get("User-Agent")).toBe("FeedZero/1.0 (RSS Reader)");
   });
 
+  it("accepts POST with JSON body to keep URLs out of server logs", async () => {
+    fetchSpy.mockResolvedValue(new Response("<rss/>", { status: 200 }));
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(fetchSpy.mock.calls[0][0]).toBe("https://example.com/feed.xml");
+  });
+
+  it("returns 400 for POST with missing url in body", async () => {
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(400);
+  });
+
   it("returns 400 for missing url parameter", async () => {
     const req = new Request("http://localhost/api/feed");
     const res = await handleProxyRequest(req, "text/xml");
@@ -28,7 +54,9 @@ describe("handleProxyRequest", () => {
   });
 
   it("returns 403 for internal addresses", async () => {
-    const req = new Request("http://localhost/api/feed?url=http://127.0.0.1/secret");
+    const req = new Request(
+      "http://localhost/api/feed?url=http://127.0.0.1/secret",
+    );
     const res = await handleProxyRequest(req, "text/xml");
     expect(res.status).toBe(403);
   });
@@ -36,7 +64,9 @@ describe("handleProxyRequest", () => {
   it("returns 502 on fetch failure", async () => {
     fetchSpy.mockRejectedValue(new Error("Network error"));
 
-    const req = new Request("http://localhost/api/feed?url=https://example.com/feed.xml");
+    const req = new Request(
+      "http://localhost/api/feed?url=https://example.com/feed.xml",
+    );
     const res = await handleProxyRequest(req, "text/xml");
     expect(res.status).toBe(502);
     expect(await res.text()).toContain("Network error");
@@ -50,7 +80,9 @@ describe("handleProxyRequest", () => {
       }),
     );
 
-    const req = new Request("http://localhost/api/feed?url=https://example.com/feed.xml");
+    const req = new Request(
+      "http://localhost/api/feed?url=https://example.com/feed.xml",
+    );
     const res = await handleProxyRequest(req, "text/xml");
     expect(res.headers.get("Content-Type")).toBe("application/atom+xml");
   });

@@ -32,8 +32,12 @@ export function createApp(adapter?: SyncStorageAdapter): Hono {
     }
   });
 
-  app.get("/api/feed", (c) => handleProxyRequest(c.req.raw, "text/xml"));
-  app.get("/api/page", (c) => handleProxyRequest(c.req.raw, "text/html"));
+  app.on(["GET", "POST"], "/api/feed", (c) =>
+    handleProxyRequest(c.req.raw, "text/xml"),
+  );
+  app.on(["GET", "POST"], "/api/page", (c) =>
+    handleProxyRequest(c.req.raw, "text/html"),
+  );
   app.get("/api/icon", (c) => handleProxyRequest(c.req.raw, "image/x-icon"));
   app.all("/api/sync", (c) => handleSyncRequest(c.req.raw, syncAdapter));
 

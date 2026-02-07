@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { extract } from "../core/extractor/extractor.ts";
 import { registry } from "../core/extractor/adapters/index.ts";
+import { proxyFetch } from "../core/proxy/proxy-fetch.ts";
 
 interface ExtractionStore {
   cache: Record<string, string>;
@@ -46,8 +47,7 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
       const adapter = registry.findAdapter(url);
       const sourceUrl = adapter?.getSourceUrl?.(url) ?? url;
 
-      const proxyUrl = `/api/page?url=${encodeURIComponent(sourceUrl)}`;
-      const response = await fetch(proxyUrl);
+      const response = await proxyFetch("/api/page", sourceUrl);
       if (!response.ok) {
         set({ isExtracting: false });
         return;

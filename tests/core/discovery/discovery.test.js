@@ -37,15 +37,20 @@ beforeEach(async () => {
 });
 
 describe("discoverFeed", () => {
+  /** Extract the target URL from a POST proxy call's body. */
+  function targetUrlFrom(opts) {
+    return JSON.parse(opts?.body ?? "{}").url ?? "";
+  }
+
   it("should discover feed via HTML link autodiscovery", async () => {
-    globalThis.fetch = vi.fn().mockImplementation((url) => {
-      if (url.includes("/api/page")) {
+    globalThis.fetch = vi.fn().mockImplementation((endpoint, opts) => {
+      if (endpoint === "/api/page") {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(PAGE_WITH_FEED_LINK),
         });
       }
-      if (url.includes("/api/feed")) {
+      if (endpoint === "/api/feed") {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(ATOM_XML),
@@ -64,21 +69,21 @@ describe("discoverFeed", () => {
   });
 
   it("should discover feed via well-known path when no HTML link exists", async () => {
-    globalThis.fetch = vi.fn().mockImplementation((url) => {
-      if (url.includes("/api/page")) {
+    globalThis.fetch = vi.fn().mockImplementation((endpoint, opts) => {
+      if (endpoint === "/api/page") {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(PAGE_WITH_NO_FEED),
         });
       }
       // Only /feed path returns valid feed
-      if (url.includes("/api/feed") && url.includes(encodeURIComponent("/feed"))) {
+      if (endpoint === "/api/feed" && targetUrlFrom(opts).includes("/feed")) {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(ATOM_XML),
         });
       }
-      if (url.includes("/api/feed")) {
+      if (endpoint === "/api/feed") {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve("<html><body>Not a feed</body></html>"),
@@ -95,21 +100,24 @@ describe("discoverFeed", () => {
   });
 
   it("should discover feed via anchor link scanning", async () => {
-    globalThis.fetch = vi.fn().mockImplementation((url) => {
-      if (url.includes("/api/page")) {
+    globalThis.fetch = vi.fn().mockImplementation((endpoint, opts) => {
+      if (endpoint === "/api/page") {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(PAGE_WITH_FEED_ANCHOR),
         });
       }
       // Only /rss.xml returns valid feed
-      if (url.includes("/api/feed") && url.includes(encodeURIComponent("/rss.xml"))) {
+      if (
+        endpoint === "/api/feed" &&
+        targetUrlFrom(opts).includes("/rss.xml")
+      ) {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(ATOM_XML),
         });
       }
-      if (url.includes("/api/feed")) {
+      if (endpoint === "/api/feed") {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve("<html><body>Not a feed</body></html>"),
@@ -123,14 +131,14 @@ describe("discoverFeed", () => {
   });
 
   it("should return error when no feed can be found", async () => {
-    globalThis.fetch = vi.fn().mockImplementation((url) => {
-      if (url.includes("/api/page")) {
+    globalThis.fetch = vi.fn().mockImplementation((endpoint) => {
+      if (endpoint === "/api/page") {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(PAGE_WITH_NO_FEED),
         });
       }
-      if (url.includes("/api/feed")) {
+      if (endpoint === "/api/feed") {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve("<html><body>Not a feed</body></html>"),

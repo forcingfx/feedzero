@@ -62,9 +62,11 @@ describe("view toggle behavior parity", () => {
     pressKey("e");
 
     expect(useExtractionStore.getState().viewMode).toBe("extracted");
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/page?url=https%3A%2F%2Fexample.com%2Farticle",
-    );
+    expect(fetch).toHaveBeenCalledWith("/api/page", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/article" }),
+    });
   });
 
   it("switchToExtracted triggers extraction fetch (click path)", () => {
@@ -72,9 +74,11 @@ describe("view toggle behavior parity", () => {
     useExtractionStore.getState().switchToExtracted(testArticle.link);
 
     expect(useExtractionStore.getState().viewMode).toBe("extracted");
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/page?url=https%3A%2F%2Fexample.com%2Farticle",
-    );
+    expect(fetch).toHaveBeenCalledWith("/api/page", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/article" }),
+    });
   });
 
   it("both paths use identical fetch URL encoding", () => {

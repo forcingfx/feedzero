@@ -309,23 +309,24 @@ describe("feed-service", () => {
   <link rel="alternate" type="application/rss+xml" href="/feed.xml">
 </head><body><p>A website</p></body></html>`;
 
-      globalThis.fetch = vi.fn().mockImplementation((url) => {
+      globalThis.fetch = vi.fn().mockImplementation((endpoint, opts) => {
+        const targetUrl = JSON.parse(opts?.body ?? "{}").url ?? "";
         // First call: try as feed — fails (it's a website)
-        if (url.includes("/api/feed") && !url.includes("feed.xml")) {
+        if (endpoint === "/api/feed" && !targetUrl.includes("feed.xml")) {
           return Promise.resolve({
             ok: true,
             text: () => Promise.resolve(pageHtml),
           });
         }
         // Discovery: fetch the discovered feed URL
-        if (url.includes("/api/feed") && url.includes("feed.xml")) {
+        if (endpoint === "/api/feed" && targetUrl.includes("feed.xml")) {
           return Promise.resolve({
             ok: true,
             text: () => Promise.resolve(ATOM_XML),
           });
         }
         // Page fetch for discovery
-        if (url.includes("/api/page")) {
+        if (endpoint === "/api/page") {
           return Promise.resolve({
             ok: true,
             text: () => Promise.resolve(pageHtml),
