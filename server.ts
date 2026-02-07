@@ -14,6 +14,24 @@ export function createApp(adapter?: SyncStorageAdapter): Hono {
   const syncAdapter = adapter ?? createMemoryAdapter();
   const app = new Hono();
 
+  const CSP = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+
+  app.use("*", async (c, next) => {
+    await next();
+    if (!c.req.path.startsWith("/api/")) {
+      c.header("Content-Security-Policy", CSP);
+    }
+  });
+
   app.get("/api/feed", (c) => handleProxyRequest(c.req.raw, "text/xml"));
   app.get("/api/page", (c) => handleProxyRequest(c.req.raw, "text/html"));
   app.get("/api/icon", (c) => handleProxyRequest(c.req.raw, "image/x-icon"));

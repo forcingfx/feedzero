@@ -12,6 +12,22 @@ describe("server", () => {
     mockFetch.mockReset();
   });
 
+  describe("security headers", () => {
+    it("sets Content-Security-Policy on HTML responses", async () => {
+      const res = await createApp().request("/");
+      const csp = res.headers.get("Content-Security-Policy");
+      expect(csp).toBeTruthy();
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toContain("script-src 'self'");
+    });
+
+    it("does not set CSP on API responses", async () => {
+      const res = await createApp().request("/api/feed");
+      const csp = res.headers.get("Content-Security-Policy");
+      expect(csp).toBeNull();
+    });
+  });
+
   describe("GET /api/feed", () => {
     it("proxies feed requests", async () => {
       mockFetch.mockResolvedValue(
