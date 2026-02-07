@@ -199,8 +199,12 @@ describe("ArticleList", () => {
 
       const favicons = container.querySelectorAll("img");
       expect(favicons).toHaveLength(2);
-      expect(favicons[0]).toHaveAttribute("src", "https://f1.com/favicon.ico");
-      expect(favicons[1]).toHaveAttribute("src", "https://f2.com/favicon.ico");
+      expect(favicons[0].getAttribute("src")).toBe(
+        "/api/icon?url=https%3A%2F%2Ff1.com%2Ffavicon.ico",
+      );
+      expect(favicons[1].getAttribute("src")).toBe(
+        "/api/icon?url=https%3A%2F%2Ff2.com%2Ffavicon.ico",
+      );
     });
 
     it("does not show feed favicon when not in global view", () => {

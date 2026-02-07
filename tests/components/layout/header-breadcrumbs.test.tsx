@@ -95,7 +95,9 @@ describe("HeaderBreadcrumbs", () => {
     const { container } = renderBreadcrumbs();
     const img = container.querySelector("img");
     expect(img).not.toBeNull();
-    expect(img!.src).toContain("example.com/favicon.ico");
+    expect(img!.getAttribute("src")).toBe(
+      "/api/icon?url=https%3A%2F%2Fexample.com%2Ffavicon.ico",
+    );
   });
 
   it("shows feed and article when both are selected", () => {

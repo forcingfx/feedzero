@@ -78,6 +78,13 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
+      server.middlewares.use("/api/icon", async (req, res) => {
+        const handler = await ensureProxyHandler();
+        const webReq = await toWebRequest(req);
+        const webRes = await handler(webReq, "image/x-icon");
+        await sendWebResponse(webRes, res);
+      });
+
       server.middlewares.use("/api/sync", async (req, res) => {
         const { syncHandler, syncAdapter } = await ensureSyncHandler();
         const webReq = await toWebRequest(req);

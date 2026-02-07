@@ -20,7 +20,8 @@ export function FeedFavicon({
   let faviconUrl: string;
   try {
     const url = new URL(siteUrl);
-    faviconUrl = `${url.origin}/favicon.ico`;
+    const directUrl = `${url.origin}/favicon.ico`;
+    faviconUrl = `/api/icon?url=${encodeURIComponent(directUrl)}`;
   } catch {
     return <Rss className={`${className} text-muted-foreground shrink-0`} />;
   }

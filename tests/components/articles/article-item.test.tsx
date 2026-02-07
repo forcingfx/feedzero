@@ -96,7 +96,9 @@ describe("ArticleItem", () => {
       );
 
       const img = container.querySelector("img");
-      expect(img).toHaveAttribute("src", "https://example.com/favicon.ico");
+      expect(img!.getAttribute("src")).toBe(
+        "/api/icon?url=https%3A%2F%2Fexample.com%2Ffavicon.ico",
+      );
     });
 
     it("does not render favicon when feedSiteUrl is not provided", () => {
