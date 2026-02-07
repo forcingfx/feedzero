@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { handleProxyRequest } from "@/core/proxy/proxy-handler";
+import {
+  handleProxyRequest,
+  SUPPORTED_METHODS,
+} from "@/core/proxy/proxy-handler";
 
 const fetchSpy = vi.spyOn(globalThis, "fetch");
 
@@ -85,5 +88,35 @@ describe("handleProxyRequest", () => {
     );
     const res = await handleProxyRequest(req, "text/xml");
     expect(res.headers.get("Content-Type")).toBe("application/atom+xml");
+  });
+});
+
+describe("proxyFetch ↔ handleProxyRequest contract", () => {
+  it("POST with JSON body (as proxyFetch sends) is parsed by handleProxyRequest", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("<rss/>", {
+        status: 200,
+        headers: { "content-type": "text/xml" },
+      }),
+    );
+
+    // Build the request exactly as proxyFetch does — method, headers, body
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+
+    const res = await handleProxyRequest(req, "text/xml");
+
+    expect(res.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://example.com/feed.xml",
+      expect.any(Object),
+    );
+  });
+
+  it("SUPPORTED_METHODS includes the method proxyFetch uses", () => {
+    expect(SUPPORTED_METHODS).toContain("POST");
   });
 });

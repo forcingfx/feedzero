@@ -184,6 +184,12 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 - `isContentEditable` may not behave identically to browsers. Dispatch keyboard events from the target element, not `document`.
 - Radix UI `AlertDialog` renders curly quotes (`\u201C`/`\u201D`). Use flexible regex matchers (e.g., `/Remove.*Feed Name/`).
 
+**Contract tests (Tier 1.5 — boundary verification):**
+- Every client-server boundary must have a contract test that validates the client's request shape is accepted by the server's handler.
+- Routing contract tests in `server.test.ts` verify that every Vercel serverless wrapper (`api/*.ts`) exports a handler for every HTTP method the shared handler supports. If you add or change a method, the test fails until the wrapper is updated.
+- Integration contract tests verify that `proxyFetch()` builds requests that `handleProxyRequest()` can parse. These tests mock only the external outbound fetch, never the boundary between client and server code.
+- **Rule: When a mock replaces a real function at a system boundary, a separate contract test must verify that both sides of the boundary agree on the interface.** Mocking `fetch` in a unit test is fine, but there must also be a test where the real request flows through the real handler.
+
 ### App Initialization Flow
 
 `src/app.tsx` orchestrates startup via `AppInit`:
@@ -207,7 +213,9 @@ All API handlers use the Web standard `Request → Response` pattern via shared 
 - **`api/*.ts`** — Vercel Serverless Functions. In git, these are thin wrappers (~5-10 lines) that import shared handlers from `src/core/`. During build, `scripts/build-api.js` replaces their content with self-contained esbuild bundles (all deps inlined) because **Vercel's builder compiles each `.ts` individually without bundling cross-directory imports**. See ADR 007.
 - **`vite.config.js`** — Dev proxy using lazy-imported shared handlers with a memory adapter for sync.
 
-**Endpoints**: `/api/feed?url=<encoded>` (feed proxy), `/api/page?url=<encoded>` (page proxy), `/api/sync` (GET/PUT/DELETE encrypted vault).
+**Three-entry-point rule:** Every API endpoint has three consumers (Hono, Vite, Vercel). When changing request format, HTTP method, headers, or URL structure, all three entry points MUST be updated and verified. The Vercel `api/*.ts` wrappers MUST export a named function for every HTTP method the shared handler supports. This is enforced by routing contract tests in `server.test.ts` — if you add a method to the shared handler, the test will fail until the Vercel wrapper exports it too. Never deploy without this verification.
+
+**Endpoints**: `POST /api/feed` with `{"url":"..."}` body (feed proxy), `POST /api/page` with `{"url":"..."}` body (page proxy), `/api/sync` (GET/PUT/DELETE/HEAD encrypted vault).
 
 **SSRF protections** — The proxy blocks requests to internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http:`/`https:` protocols. Do not weaken these checks.
 
@@ -238,6 +246,12 @@ This project follows **Red-Green-Refactor (RGR)** — the TDD cycle where you wr
 4. **VERIFY** — Run full test suite (`npm test`) AND type check (`npx tsc --noEmit`). Confirm zero failures, zero regressions, zero type errors.
    - ⛔ **STOP: Do not proceed if any test fails or types error. Fix first.**
 
+   **4a. VERIFY DEPLOYMENT ARTIFACTS** — If you changed any API endpoint (request format, HTTP method, URL structure, headers), verify:
+   - The shared handler accepts the new format (check `proxy-handler.ts` or `sync-handler.ts`)
+   - All three entry points are updated: `server.ts` (Hono), `vite.config.js` (dev), `api/*.ts` (Vercel)
+   - The Vercel wrapper exports match `SUPPORTED_METHODS` (enforced by routing contract tests in `server.test.ts`)
+   - ⛔ **STOP: Do not proceed if any entry point is missing the update. This is how production breaks.**
+
 5. **REFACTOR** — This step is **mandatory, not optional**. Clean up the code you wrote and touched:
    - Extract unclear blocks into well-named functions
    - Remove duplication (DRY, but not at the cost of clarity)
@@ -263,12 +277,17 @@ Write detailed commit messages. Use conventional commit prefixes (`feat:`, `fix:
 
 ## Principles
 
+FeedZero exists to protect its users. It is used by journalists, activists, and people living under surveillance. Every decision — architecture, testing, deployment — must be made as if a user's safety depends on it, because it does.
+
+**There is zero tolerance for regressions in core functionality, security, privacy, or anonymity. Working code must never break silently.**
+
 - **Security first** — Encrypt at rest, sanitize all external content, never trust user or feed input. Use production-grade libraries (DOMPurify, Web Crypto) over hand-rolled implementations.
 - **Privacy and anonymity** — No telemetry, no analytics, no external calls except explicit user actions (fetching feeds). No data leaves the browser unless the user initiates it.
 - **Open source first** — Prefer actively maintained OSS libraries where they reduce code and improve correctness. Do not reimplement what a well-maintained library handles better.
 - **Framework-pragmatic** — Use React, TypeScript, and ecosystem libraries where they improve correctness, developer experience, and code sharing across platforms. Core modules remain framework-agnostic for portability.
 - **Right-sized** — Use abstractions where they genuinely reduce complexity (components, hooks, stores). Avoid premature abstraction, but don't avoid *appropriate* abstraction.
 - **Clean code** — Self-evident naming, small single-responsibility functions, explicit error handling via Result types. Functions should do one thing and their name should say what that thing is. If you need a comment to explain *what* code does, rename or extract instead. Comments only for *why* — never *what*.
+- **Reliability and resilience** — The app must work. Core flows (adding feeds, reading articles, syncing) must never regress. Every deployment artifact must be tested. Every client-server boundary must have a contract test. If a mock replaces a real boundary, a separate test must verify the contract across that boundary.
 
 ### Key Patterns
 
@@ -285,4 +304,8 @@ Write detailed commit messages. Use conventional commit prefixes (`feat:`, `fix:
 
 ---
 
-**Reminder: Every code change follows Red-Green-Refactor. No test, no code. No refactor, no commit.**
+**Every code change follows Red-Green-Refactor. No test, no code. No refactor, no commit.**
+
+**Every client-server boundary has a contract test. No mock without a contract. No deployment without verification.**
+
+**FeedZero protects people. Act accordingly.**

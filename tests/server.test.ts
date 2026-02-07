@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createApp } from "../server";
 import { SUPPORTED_METHODS } from "../src/core/sync/sync-handler";
+import { SUPPORTED_METHODS as PROXY_SUPPORTED_METHODS } from "../src/core/proxy/proxy-handler";
 import * as vercelSyncExports from "../api/sync";
+import * as vercelFeedExports from "../api/feed";
+import * as vercelPageExports from "../api/page";
 
 // Mock fetch globally for proxy handler tests
 const mockFetch = vi.fn();
@@ -181,6 +184,81 @@ describe("server", () => {
         expect(
           res.status,
           `Hono server returned unexpected status for ${method}`,
+        ).not.toBe(405);
+      }
+    });
+  });
+
+  describe("proxy routing contract", () => {
+    it("PROXY_SUPPORTED_METHODS lists GET and POST", () => {
+      expect(PROXY_SUPPORTED_METHODS).toContain("GET");
+      expect(PROXY_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/feed.ts exports a handler for every supported method", () => {
+      for (const method of PROXY_SUPPORTED_METHODS) {
+        expect(
+          vercelFeedExports,
+          `api/feed.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelFeedExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/page.ts exports a handler for every supported method", () => {
+      for (const method of PROXY_SUPPORTED_METHODS) {
+        expect(
+          vercelPageExports,
+          `api/page.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelPageExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel proxy functions do not export unsupported methods", () => {
+      const allHttpMethods = [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+      ];
+      const unsupported = allHttpMethods.filter(
+        (m) => !PROXY_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelFeedExports,
+          `api/feed.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+        expect(
+          vercelPageExports,
+          `api/page.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts every supported proxy method", async () => {
+      const app = createApp();
+      for (const method of PROXY_SUPPORTED_METHODS) {
+        mockFetch.mockResolvedValue(
+          new Response("<rss/>", {
+            headers: { "content-type": "text/xml" },
+          }),
+        );
+        const res = await app.request(
+          "/api/feed?url=https://example.com/feed.xml",
+          { method },
+        );
+        expect(
+          res.status,
+          `Hono server returned 405 for ${method} /api/feed`,
         ).not.toBe(405);
       }
     });

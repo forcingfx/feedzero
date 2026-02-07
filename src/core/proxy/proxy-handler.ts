@@ -1,6 +1,13 @@
 import { validateProxyUrl } from "./validate-url.ts";
 
 /**
+ * HTTP methods the proxy handler accepts.
+ * Every routing layer (Vercel exports, Hono, Vite dev) must accept
+ * all of these. Tested by the routing contract in server.test.ts.
+ */
+export const SUPPORTED_METHODS: readonly string[] = ["GET", "POST"];
+
+/**
  * Shared proxy logic for serverless functions.
  * Validates the target URL, fetches it, and returns the response.
  */
