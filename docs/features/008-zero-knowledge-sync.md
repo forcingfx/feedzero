@@ -16,7 +16,8 @@ Feature: Zero-knowledge cloud sync
     Given a new user on the onboarding screen
     When they choose "Sync across devices" and confirm their passphrase
     Then their feeds and articles are encrypted and pushed to the server
-    And the passphrase is stored in localStorage for future sessions
+    And derived cryptographic keys (JWK format) are stored in localStorage for future sessions
+    And the raw passphrase is discarded from memory and never persisted
 
   Scenario: Returning sync user opens the app
     Given a returning user with sync enabled

@@ -188,7 +188,9 @@ describe("feed-store", () => {
         return { ok: true, value: { results: [] } };
       });
       vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
-      useSyncStore.setState({ passphrase: "test-passphrase" });
+      useSyncStore.setState({
+        credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey },
+      });
 
       await useFeedStore.getState().refreshAll();
 
@@ -206,7 +208,7 @@ describe("feed-store", () => {
         value: { results: [] },
       });
       vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
-      useSyncStore.setState({ passphrase: null });
+      useSyncStore.setState({ credentials: null });
 
       await useFeedStore.getState().refreshAll();
 
@@ -234,7 +236,9 @@ describe("feed-store", () => {
         callOrder.push("refreshAllFeeds");
         return { ok: true, value: { results: [] } };
       });
-      useSyncStore.setState({ passphrase: "test-passphrase" });
+      useSyncStore.setState({
+        credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey },
+      });
 
       await useFeedStore.getState().refreshAll();
 

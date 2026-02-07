@@ -12,6 +12,20 @@ vi.mock("../../src/core/storage/db", () => ({
   deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
+vi.mock("../../src/core/sync/vault-crypto", () => ({
+  deriveVaultId: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-id" }),
+  deriveVaultKey: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
+}));
+
+vi.mock("../../src/core/storage/key-material", () => ({
+  deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  clearStoredKeys: vi.fn(),
+}));
+
 import {
   pushVault,
   pullVault,
@@ -20,12 +34,22 @@ import {
 } from "../../src/core/sync/sync-service";
 import { deleteDatabase } from "../../src/core/storage/db";
 import { useAppStore } from "../../src/stores/app-store";
+import {
+  deriveAndStoreKeys,
+  clearStoredKeys,
+} from "../../src/core/storage/key-material";
 
 const mockPushVault = vi.mocked(pushVault);
 const mockPullVault = vi.mocked(pullVault);
 const mockImportVault = vi.mocked(importVault);
 const mockDeleteVault = vi.mocked(deleteVault);
 const mockDeleteDatabase = vi.mocked(deleteDatabase);
+
+/** A fake SyncCredentials object for use in tests. */
+const mockCredentials = {
+  vaultId: "mock-vault-id",
+  vaultKey: "mock-vault-key" as unknown as CryptoKey,
+};
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -56,7 +80,7 @@ describe("sync-store", () => {
       status: "local-only",
       lastSyncedAt: null,
       error: null,
-      passphrase: null,
+      credentials: null,
       dialogOpen: false,
     });
     vi.clearAllMocks();
@@ -71,7 +95,7 @@ describe("sync-store", () => {
     expect(state.status).toBe("local-only");
     expect(state.lastSyncedAt).toBeNull();
     expect(state.error).toBeNull();
-    expect(state.passphrase).toBeNull();
+    expect(state.credentials).toBeNull();
   });
 
   it("setDialogOpen toggles dialog state", () => {
@@ -88,9 +112,7 @@ describe("sync-store", () => {
 
       const promise = useSyncStore.getState().enableSync("test passphrase");
 
-      expect(useSyncStore.getState().status).toBe("syncing");
-      expect(useSyncStore.getState().passphrase).toBe("test passphrase");
-
+      // After deriving credentials (async), status transitions to syncing
       await promise;
 
       const state = useSyncStore.getState();
@@ -99,14 +121,18 @@ describe("sync-store", () => {
       expect(state.error).toBeNull();
     });
 
-    it("persists passphrase and storage mode to localStorage", async () => {
+    it("stores derived keys and removes raw passphrase from localStorage", async () => {
       mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
 
       await useSyncStore.getState().enableSync("test passphrase");
 
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
+      expect(deriveAndStoreKeys).toHaveBeenCalledWith(
         "test passphrase",
+        undefined,
+        { includeVaultKeys: true },
+      );
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:sync-passphrase",
       );
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
@@ -131,12 +157,12 @@ describe("sync-store", () => {
       mockPushVault.mockResolvedValue({ ok: true, value: timestamp });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       await useSyncStore.getState().push();
 
-      expect(mockPushVault).toHaveBeenCalledWith("test passphrase");
+      expect(mockPushVault).toHaveBeenCalledWith(mockCredentials);
       const state = useSyncStore.getState();
       expect(state.status).toBe("synced");
       expect(state.lastSyncedAt).toBe(timestamp);
@@ -146,7 +172,7 @@ describe("sync-store", () => {
       mockPushVault.mockResolvedValue({ ok: false, error: "Server down" });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       await useSyncStore.getState().push();
@@ -155,8 +181,8 @@ describe("sync-store", () => {
       expect(useSyncStore.getState().error).toBe("Server down");
     });
 
-    it("does nothing when no passphrase is set", async () => {
-      useSyncStore.setState({ status: "local-only", passphrase: null });
+    it("does nothing when no credentials are set", async () => {
+      useSyncStore.setState({ status: "local-only", credentials: null });
 
       await useSyncStore.getState().push();
 
@@ -174,18 +200,18 @@ describe("sync-store", () => {
       };
       mockPullVault.mockResolvedValue({ ok: true, value: vaultData });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
-      useSyncStore.setState({ passphrase: "test passphrase" });
+      useSyncStore.setState({ credentials: mockCredentials });
 
       await useSyncStore.getState().pull();
 
-      expect(mockPullVault).toHaveBeenCalledWith("test passphrase");
+      expect(mockPullVault).toHaveBeenCalledWith(mockCredentials);
       expect(mockImportVault).toHaveBeenCalledWith(vaultData);
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
     it("transitions to error on pull failure", async () => {
       mockPullVault.mockResolvedValue({ ok: false, error: "Not found" });
-      useSyncStore.setState({ passphrase: "test passphrase" });
+      useSyncStore.setState({ credentials: mockCredentials });
 
       await useSyncStore.getState().pull();
 
@@ -204,7 +230,7 @@ describe("sync-store", () => {
         },
       });
       mockImportVault.mockResolvedValue({ ok: false, error: "Import failed" });
-      useSyncStore.setState({ passphrase: "test passphrase" });
+      useSyncStore.setState({ credentials: mockCredentials });
 
       await useSyncStore.getState().pull();
 
@@ -212,8 +238,8 @@ describe("sync-store", () => {
       expect(useSyncStore.getState().error).toBe("Import failed");
     });
 
-    it("does nothing when no passphrase is set", async () => {
-      useSyncStore.setState({ status: "local-only", passphrase: null });
+    it("does nothing when no credentials are set", async () => {
+      useSyncStore.setState({ status: "local-only", credentials: null });
 
       await useSyncStore.getState().pull();
 
@@ -227,7 +253,7 @@ describe("sync-store", () => {
       mockPushVault.mockResolvedValue({ ok: true, value: timestamp });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       useSyncStore.getState().scheduleSyncPush();
@@ -244,7 +270,7 @@ describe("sync-store", () => {
       mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       useSyncStore.getState().scheduleSyncPush();
@@ -258,13 +284,11 @@ describe("sync-store", () => {
       expect(mockPushVault).toHaveBeenCalledTimes(1);
 
       // The push should not always fire at exactly the debounce time
-      // (this test validates the jitter mechanism exists — with Math.random
-      // mocked to return 0, it would fire immediately; otherwise it delays)
       expect(callsAtDebounce).toBeLessThanOrEqual(1);
     });
 
     it("does not push when status is local-only", async () => {
-      useSyncStore.setState({ status: "local-only", passphrase: null });
+      useSyncStore.setState({ status: "local-only", credentials: null });
 
       useSyncStore.getState().scheduleSyncPush();
       await vi.advanceTimersByTimeAsync(35000);
@@ -274,24 +298,20 @@ describe("sync-store", () => {
   });
 
   describe("restoreSync", () => {
-    it("sets passphrase and status without pushing to server", () => {
-      useSyncStore.getState().restoreSync("restored passphrase");
+    it("sets credentials and status without pushing to server", () => {
+      useSyncStore.getState().restoreSync(mockCredentials);
 
       const state = useSyncStore.getState();
-      expect(state.passphrase).toBe("restored passphrase");
+      expect(state.credentials).toBe(mockCredentials);
       expect(state.status).toBe("synced");
       expect(state.lastSyncedAt).toBeTypeOf("number");
       expect(state.error).toBeNull();
       expect(mockPushVault).not.toHaveBeenCalled();
     });
 
-    it("persists passphrase and storage mode to localStorage", () => {
-      useSyncStore.getState().restoreSync("restored passphrase");
+    it("persists storage mode to localStorage", () => {
+      useSyncStore.getState().restoreSync(mockCredentials);
 
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
-        "restored passphrase",
-      );
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
         "sync",
@@ -304,18 +324,19 @@ describe("sync-store", () => {
       mockDeleteVault.mockResolvedValue({ ok: true, value: true });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         lastSyncedAt: Date.now(),
       });
 
       await useSyncStore.getState().disableSync();
 
-      expect(mockDeleteVault).toHaveBeenCalledWith("test passphrase");
+      expect(mockDeleteVault).toHaveBeenCalledWith(mockCredentials);
       const state = useSyncStore.getState();
       expect(state.status).toBe("local-only");
-      expect(state.passphrase).toBeNull();
+      expect(state.credentials).toBeNull();
       expect(state.lastSyncedAt).toBeNull();
       expect(state.error).toBeNull();
+      expect(clearStoredKeys).toHaveBeenCalled();
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(
         "feedzero:sync-passphrase",
       );
@@ -328,7 +349,7 @@ describe("sync-store", () => {
       mockDeleteVault.mockResolvedValue({ ok: false, error: "Network error" });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         lastSyncedAt: Date.now(),
       });
 
@@ -336,10 +357,8 @@ describe("sync-store", () => {
 
       const state = useSyncStore.getState();
       expect(state.status).toBe("local-only");
-      expect(state.passphrase).toBeNull();
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
-      );
+      expect(state.credentials).toBeNull();
+      expect(clearStoredKeys).toHaveBeenCalled();
     });
 
     it("cancels pending debounced push", async () => {
@@ -347,7 +366,7 @@ describe("sync-store", () => {
       mockDeleteVault.mockResolvedValue({ ok: true, value: true });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       useSyncStore.getState().scheduleSyncPush();
@@ -362,7 +381,7 @@ describe("sync-store", () => {
     it("deletes the local database", async () => {
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         lastSyncedAt: Date.now(),
       });
 
@@ -374,7 +393,7 @@ describe("sync-store", () => {
     it("does NOT delete the server vault", async () => {
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         lastSyncedAt: Date.now(),
       });
 
@@ -383,15 +402,16 @@ describe("sync-store", () => {
       expect(mockDeleteVault).not.toHaveBeenCalled();
     });
 
-    it("clears sync-related localStorage keys", async () => {
+    it("clears stored keys and sync-related localStorage keys", async () => {
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         lastSyncedAt: Date.now(),
       });
 
       await useSyncStore.getState().logout();
 
+      expect(clearStoredKeys).toHaveBeenCalled();
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(
         "feedzero:sync-passphrase",
       );
@@ -406,7 +426,7 @@ describe("sync-store", () => {
     it("resets sync state to local-only defaults", async () => {
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         lastSyncedAt: Date.now(),
         error: "some old error",
       });
@@ -415,7 +435,7 @@ describe("sync-store", () => {
 
       const state = useSyncStore.getState();
       expect(state.status).toBe("local-only");
-      expect(state.passphrase).toBeNull();
+      expect(state.credentials).toBeNull();
       expect(state.lastSyncedAt).toBeNull();
       expect(state.error).toBeNull();
     });
@@ -427,7 +447,7 @@ describe("sync-store", () => {
       });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       await useSyncStore.getState().logout();
@@ -441,7 +461,7 @@ describe("sync-store", () => {
       mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       useSyncStore.getState().scheduleSyncPush();
@@ -469,7 +489,7 @@ describe("sync-store", () => {
       });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       await useSyncStore.getState().logout();
@@ -501,7 +521,7 @@ describe("sync-store", () => {
       });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       await useSyncStore.getState().logout();
@@ -521,7 +541,7 @@ describe("sync-store", () => {
       });
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
       });
 
       await useSyncStore.getState().logout();

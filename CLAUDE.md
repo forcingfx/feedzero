@@ -59,7 +59,8 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/utils/result.ts** — Generic `Result<T>` type (`ok`/`err`) used by all core functions instead of throwing. Check `.ok` before accessing `.value`. Includes `andThen` for chaining and `fromPromise` for wrapping async calls.
 - **src/utils/constants.ts** — DB name, crypto params, localStorage key constants (`LOCAL_STORAGE`), default passphrase.
 - **src/core/storage/crypto.ts** — PBKDF2 key derivation + AES-GCM encrypt/decrypt + HMAC-SHA256 index hashing via Web Crypto API.
-- **src/core/storage/db.ts** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, guid) are HMAC-SHA256 hashed before storage for querying without exposing plaintext; content fields AES-GCM encrypted. Call `open(passphrase)` before any operations.
+- **src/core/storage/db.ts** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, guid) are HMAC-SHA256 hashed before storage for querying without exposing plaintext; content fields AES-GCM encrypted. Call `open(passphrase)` or `openWithKeys(dbKeyJwk, hmacKeyJwk)` before any operations.
+- **src/core/storage/key-material.ts** — `deriveAndStoreKeys(passphrase)` derives all crypto keys (DB, HMAC, optional vault), exports as JWK, persists to localStorage. `loadStoredKeys()` reads them back. `clearStoredKeys()` removes them. Raw passphrase is never persisted.
 - **src/core/storage/schema.ts** — `createFeed()`, `createArticle()` factory functions return Result types.
 - **src/core/discovery/discovery.ts** — `discoverFeed(url)` runs a multi-strategy cascade to find a feed from a website URL.
 - **src/core/discovery/strategies.ts** — Pure functions for each discovery strategy.
@@ -87,7 +88,7 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/stores/article-store.ts** — `articles[]`, `selectedArticle`, `loadArticles(feedId)`, `selectArticle(article)` (auto-marks as read).
 - **src/stores/extraction-store.ts** — `cache` (link → extracted HTML), `viewMode`, `fetchExtracted(url)`. Extraction is on-demand and cached.
 - **src/stores/onboarding-store.ts** — Onboarding flow state machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery` for returning users). Storage modes: `local` (client-only, skips passphrase confirmation) vs `sync` (cloud-enabled, requires passphrase confirmation). Generates passphrases via `passphrase-generator.ts`.
-- **src/stores/sync-store.ts** — Cloud sync state and actions. Status: `local-only` | `syncing` | `synced` | `error`. Actions: `enableSync(passphrase)`, `restoreSync(passphrase)` (returning sync users), `push()`, `pull()`, `scheduleSyncPush()` (5s debounce), `disableSync()` (deletes server vault + clears local state), `logout()` (clears local data + resets to onboarding, preserves cloud vault). Persists passphrase and storage mode to localStorage.
+- **src/stores/sync-store.ts** — Cloud sync state and actions. Status: `local-only` | `syncing` | `synced` | `error`. State holds `credentials: SyncCredentials | null` (pre-derived vault ID + CryptoKey, never the raw passphrase). Actions: `enableSync(passphrase)` (derives credentials, stores derived keys, pushes vault), `restoreSync(credentials)` (returning sync users), `push()`, `pull()`, `scheduleSyncPush()` (5s debounce + 0-30s jitter), `disableSync()` (deletes server vault + clears stored keys), `logout()` (clears local data + resets to onboarding, preserves cloud vault).
 
 ### React Components
 
@@ -190,9 +191,10 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 1. `checkOnboardingStatus()` reads `feedzero:onboarding-complete` from localStorage.
 2. **New users** (`hasCompletedOnboarding === false`): `<OnboardingModal>` is shown (rendered outside `<BrowserRouter>`, always mounts). The onboarding store drives the step flow.
 3. **Returning users** (`hasCompletedOnboarding === true`): `initializeReturningUser()` in `app-store.ts` handles the full init flow:
-   - Reads storage mode and passphrase from localStorage (via centralized `LOCAL_STORAGE` keys)
-   - Local-only users: opens DB with `DEFAULT_PASSPHRASE`
-   - Sync users: opens DB with stored passphrase, pulls vault from server, updates sync store status
+   - Tries `loadStoredKeys()` first — if derived keys exist, uses `openWithKeys()` (no passphrase needed)
+   - Falls back to passphrase from localStorage for legacy users (auto-migrates: derives keys, stores them, removes raw passphrase)
+   - Local-only users without stored keys: opens DB with `DEFAULT_PASSPHRASE`
+   - Sync users: reconstructs `SyncCredentials` from stored vault ID + JWK, pulls vault from server
 4. Once `isDbReady`, the main app routes render.
 
 `<OnboardingModal>` and `<SyncSetupDialog>` are mounted at the top level alongside `<BrowserRouter>`, not inside routes.

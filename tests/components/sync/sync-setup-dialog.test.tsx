@@ -20,6 +20,20 @@ vi.mock("@/core/crypto/passphrase-generator", () => ({
   generatePassphrase: vi.fn(() => "alpha bravo charlie delta"),
 }));
 
+vi.mock("@/core/sync/vault-crypto", () => ({
+  deriveVaultId: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-id" }),
+  deriveVaultKey: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
+}));
+
+vi.mock("@/core/storage/key-material", () => ({
+  deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  clearStoredKeys: vi.fn(),
+}));
+
 // Mock localStorage
 const localStorageMock = {
   getItem: vi.fn(),
@@ -29,6 +43,11 @@ const localStorageMock = {
 };
 Object.defineProperty(globalThis, "localStorage", { value: localStorageMock });
 
+const mockCredentials = {
+  vaultId: "mock-vault-id",
+  vaultKey: "mock-vault-key" as unknown as CryptoKey,
+};
+
 describe("SyncSetupDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,7 +55,7 @@ describe("SyncSetupDialog", () => {
       status: "synced",
       lastSyncedAt: Date.now(),
       error: null,
-      passphrase: "test passphrase",
+      credentials: mockCredentials,
       dialogOpen: true,
     });
     useAppStore.setState({
@@ -98,7 +117,7 @@ describe("SyncSetupDialog", () => {
     beforeEach(() => {
       useSyncStore.setState({
         status: "local-only",
-        passphrase: null,
+        credentials: null,
         dialogOpen: true,
       });
     });
@@ -126,7 +145,7 @@ describe("SyncSetupDialog", () => {
     beforeEach(() => {
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         lastSyncedAt: Date.now(),
         dialogOpen: true,
       });
@@ -170,7 +189,7 @@ describe("SyncSetupDialog", () => {
     beforeEach(() => {
       useSyncStore.setState({
         status: "synced",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         lastSyncedAt: Date.now(),
         dialogOpen: true,
       });
@@ -194,7 +213,7 @@ describe("SyncSetupDialog", () => {
     it("disables Switch to local only while syncing", () => {
       useSyncStore.setState({
         status: "syncing",
-        passphrase: "test passphrase",
+        credentials: mockCredentials,
         dialogOpen: true,
       });
 

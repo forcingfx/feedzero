@@ -14,6 +14,8 @@ import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
 import { open } from "@/core/storage/db";
 import { pullVault, importVault } from "@/core/sync/sync-service";
+import { deriveAndStoreKeys } from "@/core/storage/key-material";
+import { deriveVaultId, deriveVaultKey } from "@/core/sync/vault-crypto";
 
 export function RecoveryStep() {
   const [passphrase, setPassphrase] = useState("");
@@ -38,11 +40,24 @@ export function RecoveryStep() {
       return;
     }
 
+    // Store derived keys, remove raw passphrase from persistence
+    await deriveAndStoreKeys(trimmed, undefined, { includeVaultKeys: true });
+
     // Attempt cloud pull — if vault exists on server, import it
-    const pullResult = await pullVault(trimmed);
-    if (pullResult.ok) {
-      await importVault(pullResult.value);
-      useSyncStore.getState().restoreSync(trimmed);
+    const [vaultIdResult, vaultKeyResult] = await Promise.all([
+      deriveVaultId(trimmed),
+      deriveVaultKey(trimmed),
+    ]);
+    if (vaultIdResult.ok && vaultKeyResult.ok) {
+      const credentials = {
+        vaultId: vaultIdResult.value,
+        vaultKey: vaultKeyResult.value,
+      };
+      const pullResult = await pullVault(credentials);
+      if (pullResult.ok) {
+        await importVault(pullResult.value);
+        useSyncStore.getState().restoreSync(credentials);
+      }
     }
 
     completeOnboarding();

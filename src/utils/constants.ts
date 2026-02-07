@@ -21,6 +21,7 @@ export const LOCAL_STORAGE = {
   ONBOARDING_COMPLETE: "feedzero:onboarding-complete",
   SYNC_PASSPHRASE: "feedzero:sync-passphrase",
   STORAGE_MODE: "feedzero:storage-mode",
+  DERIVED_KEYS: "feedzero:derived-keys",
 } as const;
 
 const textEncoder = new TextEncoder();

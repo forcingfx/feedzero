@@ -7,6 +7,8 @@ import {
   generateSalt,
   encrypt,
   decrypt,
+  exportCryptoKey,
+  importCryptoKey,
 } from "../../../src/core/storage/crypto.ts";
 import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
 
@@ -205,6 +207,77 @@ describe("Crypto", () => {
       const hash = await hmacIndex(key, url);
       expect(hash).not.toContain("example");
       expect(hash).not.toContain("rss");
+    });
+  });
+
+  describe("exportCryptoKey / importCryptoKey", () => {
+    it("should round-trip an AES-GCM key via JWK", async () => {
+      const salt = generateSalt();
+      const original = unwrap(
+        await deriveKey(passphrase, salt, { extractable: true }),
+      );
+      const jwk = await exportCryptoKey(original);
+      expect(jwk.kty).toBe("oct");
+
+      const imported = await importCryptoKey(jwk, {
+        name: "AES-GCM",
+        length: 256,
+      });
+      // Verify the imported key can decrypt data encrypted by the original
+      const data = { secret: "test" };
+      const encrypted = unwrap(await encrypt(original, data));
+      const decrypted = await decrypt(
+        imported,
+        encrypted.iv,
+        encrypted.ciphertext,
+      );
+      expect(isOk(decrypted)).toBe(true);
+      expect(unwrap(decrypted)).toEqual(data);
+    });
+
+    it("should round-trip an HMAC key via JWK", async () => {
+      const original = unwrap(
+        await deriveHmacKey(passphrase, { extractable: true }),
+      );
+      const jwk = await exportCryptoKey(original);
+      expect(jwk.kty).toBe("oct");
+
+      const imported = await importCryptoKey(jwk, {
+        name: "HMAC",
+        hash: "SHA-256",
+      });
+      // Verify the imported key produces the same HMAC
+      const h1 = await hmacIndex(original, "test-value");
+      const h2 = await hmacIndex(imported, "test-value");
+      expect(h1).toBe(h2);
+    });
+  });
+
+  describe("extractable key derivation", () => {
+    it("should derive an extractable AES-GCM key when requested", async () => {
+      const salt = generateSalt();
+      const key = unwrap(
+        await deriveKey(passphrase, salt, { extractable: true }),
+      );
+      expect(key.extractable).toBe(true);
+    });
+
+    it("should derive a non-extractable AES-GCM key by default", async () => {
+      const salt = generateSalt();
+      const key = unwrap(await deriveKey(passphrase, salt));
+      expect(key.extractable).toBe(false);
+    });
+
+    it("should derive an extractable HMAC key when requested", async () => {
+      const key = unwrap(
+        await deriveHmacKey(passphrase, { extractable: true }),
+      );
+      expect(key.extractable).toBe(true);
+    });
+
+    it("should derive a non-extractable HMAC key by default", async () => {
+      const key = unwrap(await deriveHmacKey(passphrase));
+      expect(key.extractable).toBe(false);
     });
   });
 });

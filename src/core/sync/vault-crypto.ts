@@ -45,10 +45,11 @@ export async function deriveEncryptionSalt(
  */
 export async function deriveVaultKey(
   passphrase: string,
+  options?: { extractable?: boolean },
 ): Promise<Result<CryptoKey>> {
   const saltResult = await deriveEncryptionSalt(passphrase);
   if (!saltResult.ok) return saltResult;
-  return deriveKey(passphrase, saltResult.value);
+  return deriveKey(passphrase, saltResult.value, options);
 }
 
 /**

@@ -23,6 +23,20 @@ vi.mock("@/core/sync/sync-service", () => ({
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
+vi.mock("@/core/sync/vault-crypto", () => ({
+  deriveVaultId: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-id" }),
+  deriveVaultKey: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
+}));
+
+vi.mock("@/core/storage/key-material", () => ({
+  deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  clearStoredKeys: vi.fn(),
+}));
+
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
@@ -64,7 +78,7 @@ describe("OnboardingModal", () => {
       status: "local-only",
       lastSyncedAt: null,
       error: null,
-      passphrase: null,
+      credentials: null,
       dialogOpen: false,
     });
   });
@@ -203,15 +217,17 @@ describe("OnboardingModal", () => {
         expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
       });
 
-      // Sync store should be updated
+      // Sync store should be updated with credentials (not raw passphrase)
       const syncState = useSyncStore.getState();
       expect(syncState.status).toBe("synced");
-      expect(syncState.passphrase).toBe("carbon mango velvet prism");
+      expect(syncState.credentials).not.toBeNull();
       expect(syncState.lastSyncedAt).not.toBeNull();
     });
 
-    it("persists passphrase and storage mode to localStorage for local-only onboarding", async () => {
+    it("stores derived keys for local-only onboarding instead of raw passphrase", async () => {
       const user = userEvent.setup();
+      const { deriveAndStoreKeys } =
+        await import("@/core/storage/key-material");
       render(<OnboardingModal />);
 
       await user.click(screen.getByRole("button", { name: /get started/i }));
@@ -222,13 +238,18 @@ describe("OnboardingModal", () => {
         expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
       });
 
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
+      // Should store derived keys, not raw passphrase
+      expect(deriveAndStoreKeys).toHaveBeenCalledWith(
         "carbon mango velvet prism",
       );
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
         "local",
+      );
+      // Raw passphrase should NOT be stored
+      expect(localStorageMock.setItem).not.toHaveBeenCalledWith(
+        "feedzero:sync-passphrase",
+        expect.anything(),
       );
     });
 
@@ -249,7 +270,7 @@ describe("OnboardingModal", () => {
       // Sync store should remain local-only
       const syncState = useSyncStore.getState();
       expect(syncState.status).toBe("local-only");
-      expect(syncState.passphrase).toBeNull();
+      expect(syncState.credentials).toBeNull();
     });
   });
 });

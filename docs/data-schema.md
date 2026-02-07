@@ -84,6 +84,22 @@ The sync server stores encrypted vault blobs. The server never sees plaintext.
 
 Vault ID (64-char hex) is derived from the passphrase via PBKDF2 and used as the server-side lookup key. See [ADR 006](decisions/006-sync-storage-and-passphrase.md).
 
+### Derived Key Storage (localStorage)
+
+The raw passphrase is never persisted. At onboarding/login, all cryptographic material is derived from the passphrase and stored as JWK objects in `localStorage["feedzero:derived-keys"]`:
+
+| Field        | Type       | Description                                   |
+|--------------|------------|-----------------------------------------------|
+| dbKeyJwk     | JsonWebKey | AES-GCM-256 key for IndexedDB encryption      |
+| hmacKeyJwk   | JsonWebKey | HMAC-SHA256 key for index field hashing        |
+| dbSalt       | number[]   | Salt used for DB key derivation                |
+| vaultId      | string?    | Vault lookup ID (sync users only)              |
+| vaultKeyJwk  | JsonWebKey?| AES-GCM-256 key for vault encryption (sync users only) |
+
+On subsequent app loads, `openWithKeys()` imports JWKs directly — no passphrase needed. Legacy users with a stored passphrase are auto-migrated: keys are derived, stored, and the raw passphrase is removed.
+
+Recovery still requires the original passphrase (re-derives all keys).
+
 #### Payload Size Padding
 
 The sync push payload is padded to the nearest power-of-2 bucket size (64KB, 128KB, ..., up to 4MB max) using a random `_pad` field. This prevents an observer from inferring subscription count or activity from transfer sizes.

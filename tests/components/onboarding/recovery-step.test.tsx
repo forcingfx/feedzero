@@ -17,8 +17,23 @@ vi.mock("@/core/sync/sync-service", () => ({
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
+vi.mock("@/core/storage/key-material", () => ({
+  deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  clearStoredKeys: vi.fn(),
+}));
+
+vi.mock("@/core/sync/vault-crypto", () => ({
+  deriveVaultId: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-id" }),
+  deriveVaultKey: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
+}));
+
 import { open } from "@/core/storage/db";
 import { pullVault, importVault } from "@/core/sync/sync-service";
+import { deriveAndStoreKeys } from "@/core/storage/key-material";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -69,7 +84,7 @@ describe("RecoveryStep", () => {
       status: "local-only",
       lastSyncedAt: null,
       error: null,
-      passphrase: null,
+      credentials: null,
       dialogOpen: false,
     });
   });
@@ -142,6 +157,29 @@ describe("RecoveryStep", () => {
     });
   });
 
+  it("stores derived keys on recovery", async () => {
+    const user = userEvent.setup();
+    vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+
+    renderInDialog(<RecoveryStep />);
+
+    await user.type(
+      screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+      "carbon mango velvet prism",
+    );
+    await user.click(screen.getByRole("button", { name: /recover/i }));
+
+    await waitFor(() => {
+      expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+    });
+
+    expect(deriveAndStoreKeys).toHaveBeenCalledWith(
+      "carbon mango velvet prism",
+      undefined,
+      { includeVaultKeys: true },
+    );
+  });
+
   it("renders Back button that returns to storage-choice", async () => {
     const user = userEvent.setup();
     renderInDialog(<RecoveryStep />);
@@ -186,11 +224,12 @@ describe("RecoveryStep", () => {
         expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
       });
 
-      expect(pullVault).toHaveBeenCalledWith("carbon mango velvet prism");
+      // pullVault is called with derived credentials (not raw passphrase)
+      expect(pullVault).toHaveBeenCalled();
       expect(importVault).toHaveBeenCalledWith(vaultData);
     });
 
-    it("sets sync store state after cloud pull recovery", async () => {
+    it("sets sync store credentials after cloud pull recovery", async () => {
       const user = userEvent.setup();
       vi.mocked(open).mockResolvedValue({ ok: true, value: true });
       vi.mocked(pullVault).mockResolvedValue({
@@ -208,14 +247,12 @@ describe("RecoveryStep", () => {
       await user.click(screen.getByRole("button", { name: /recover/i }));
 
       await waitFor(() => {
-        expect(useSyncStore.getState().passphrase).toBe(
-          "carbon mango velvet prism",
-        );
+        expect(useSyncStore.getState().credentials).not.toBeNull();
       });
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
-    it("persists sync passphrase and storage mode to localStorage", async () => {
+    it("persists storage mode to localStorage after cloud recovery", async () => {
       const user = userEvent.setup();
       vi.mocked(open).mockResolvedValue({ ok: true, value: true });
       vi.mocked(pullVault).mockResolvedValue({
@@ -234,14 +271,10 @@ describe("RecoveryStep", () => {
 
       await waitFor(() => {
         expect(localStorageMock.setItem).toHaveBeenCalledWith(
-          "feedzero:sync-passphrase",
-          "carbon mango velvet prism",
+          "feedzero:storage-mode",
+          "sync",
         );
       });
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:storage-mode",
-        "sync",
-      );
     });
 
     it("shows Enter kbd hint on Recover button", () => {

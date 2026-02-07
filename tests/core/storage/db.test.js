@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import "fake-indexeddb/auto";
 import {
   open,
+  openWithKeys,
   close,
   addFeed,
   getFeeds,
@@ -534,6 +535,56 @@ describe("Database", () => {
       const result = await getAllArticles();
       expect(isOk(result)).toBe(true);
       expect(unwrap(result)).toEqual([]);
+    });
+  });
+
+  describe("openWithKeys", () => {
+    it("should open database using pre-derived keys and read data written by passphrase open", async () => {
+      // Session 1: add data via passphrase-based open (already open from beforeEach)
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Key Test" }),
+      );
+      await addFeed(feed);
+
+      // Export the keys for the next session
+      const { deriveKey, deriveHmacKey, exportCryptoKey } =
+        await import("../../../src/core/storage/crypto.ts");
+
+      // We need to derive extractable keys from the same passphrase
+      // First get the salt from the meta store (it's stored during open)
+      close();
+
+      // Re-derive keys with extractable=true to export them
+      // We need to open the DB briefly to get the stored salt
+      const Dexie = (await import("dexie")).default;
+      const tempDb = new Dexie("feedzero");
+      tempDb.version(3).stores({
+        feeds: "id, &url",
+        articles: "id, feedId, [feedId+guid]",
+        meta: "key",
+      });
+      await tempDb.open();
+      const saltRecord = await tempDb.table("meta").get("salt");
+      const salt = new Uint8Array(saltRecord.value);
+      tempDb.close();
+
+      const dbKey = unwrap(
+        await deriveKey("test-passphrase", salt, { extractable: true }),
+      );
+      const hmac = unwrap(
+        await deriveHmacKey("test-passphrase", { extractable: true }),
+      );
+      const dbKeyJwk = await exportCryptoKey(dbKey);
+      const hmacKeyJwk = await exportCryptoKey(hmac);
+
+      // Session 2: open with pre-derived keys
+      const result = await openWithKeys(dbKeyJwk, hmacKeyJwk);
+      expect(isOk(result)).toBe(true);
+
+      // Should read data written in session 1
+      const feeds = unwrap(await getFeeds());
+      expect(feeds).toHaveLength(1);
+      expect(feeds[0].title).toBe("Key Test");
     });
   });
 });

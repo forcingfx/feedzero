@@ -10,6 +10,12 @@ import {
 } from "./vault-crypto.ts";
 import type { VaultData, EncryptedVault } from "./types.ts";
 
+/** Pre-derived sync credentials, avoiding the need to store the raw passphrase. */
+export interface SyncCredentials {
+  vaultId: string;
+  vaultKey: CryptoKey;
+}
+
 const MIN_BUCKET = 64 * 1024;
 
 /**
@@ -49,6 +55,26 @@ function nextPowerOf2(size: number, min: number): number {
   return bucket;
 }
 
+type SyncAuth = string | SyncCredentials;
+
+async function resolveCredentials(
+  auth: SyncAuth,
+): Promise<Result<SyncCredentials>> {
+  if (typeof auth !== "string") return ok(auth);
+  const [vaultIdResult, vaultKeyResult] = await Promise.all([
+    deriveVaultId(auth),
+    deriveVaultKey(auth),
+  ]);
+  if (!vaultIdResult.ok) return vaultIdResult;
+  if (!vaultKeyResult.ok) return vaultKeyResult;
+  return ok({ vaultId: vaultIdResult.value, vaultKey: vaultKeyResult.value });
+}
+
+async function resolveVaultId(auth: SyncAuth): Promise<Result<string>> {
+  if (typeof auth !== "string") return ok(auth.vaultId);
+  return deriveVaultId(auth);
+}
+
 /**
  * Export all local data as a VaultData object.
  */
@@ -72,28 +98,25 @@ export async function importVault(vault: VaultData): Promise<Result<boolean>> {
 
 /**
  * Encrypt local data and push it to the sync server.
+ * Accepts a passphrase string or pre-derived SyncCredentials.
  * Returns the server-reported timestamp on success.
  */
-export async function pushVault(passphrase: string): Promise<Result<number>> {
+export async function pushVault(auth: SyncAuth): Promise<Result<number>> {
   try {
-    const [vaultIdResult, keyResult, vaultResult] = await Promise.all([
-      deriveVaultId(passphrase),
-      deriveVaultKey(passphrase),
+    const [credsResult, vaultResult] = await Promise.all([
+      resolveCredentials(auth),
       exportVault(),
     ]);
-    if (!vaultIdResult.ok) return vaultIdResult;
-    if (!keyResult.ok) return keyResult;
+    if (!credsResult.ok) return credsResult;
     if (!vaultResult.ok) return vaultResult;
+    const { vaultId, vaultKey } = credsResult.value;
 
-    const encryptedResult = await encryptVault(
-      keyResult.value,
-      vaultResult.value,
-    );
+    const encryptedResult = await encryptVault(vaultKey, vaultResult.value);
     if (!encryptedResult.ok) return encryptedResult;
 
     const body = padPayload(
       JSON.stringify({
-        vaultId: vaultIdResult.value,
+        vaultId,
         vault: encryptedResult.value,
       }),
     );
@@ -118,13 +141,11 @@ export async function pushVault(passphrase: string): Promise<Result<number>> {
 
 /**
  * Delete the encrypted vault from the sync server.
- * Used when a user switches from sync to local-only.
+ * Accepts a passphrase string or pre-derived SyncCredentials.
  */
-export async function deleteVault(
-  passphrase: string,
-): Promise<Result<boolean>> {
+export async function deleteVault(auth: SyncAuth): Promise<Result<boolean>> {
   try {
-    const vaultIdResult = await deriveVaultId(passphrase);
+    const vaultIdResult = await resolveVaultId(auth);
     if (!vaultIdResult.ok) return vaultIdResult;
 
     const response = await fetch(`/api/sync?vaultId=${vaultIdResult.value}`, {
@@ -144,20 +165,16 @@ export async function deleteVault(
 
 /**
  * Pull encrypted vault from the sync server and decrypt it.
+ * Accepts a passphrase string or pre-derived SyncCredentials.
  * Does NOT import into local DB — caller decides what to do with the data.
  */
-export async function pullVault(
-  passphrase: string,
-): Promise<Result<VaultData>> {
+export async function pullVault(auth: SyncAuth): Promise<Result<VaultData>> {
   try {
-    const [vaultIdResult, keyResult] = await Promise.all([
-      deriveVaultId(passphrase),
-      deriveVaultKey(passphrase),
-    ]);
-    if (!vaultIdResult.ok) return vaultIdResult;
-    if (!keyResult.ok) return keyResult;
+    const credsResult = await resolveCredentials(auth);
+    if (!credsResult.ok) return credsResult;
+    const { vaultId, vaultKey } = credsResult.value;
 
-    const response = await fetch(`/api/sync?vaultId=${vaultIdResult.value}`);
+    const response = await fetch(`/api/sync?vaultId=${vaultId}`);
 
     if (!response.ok) {
       const text = await response.text();
@@ -169,21 +186,22 @@ export async function pullVault(
       return err("Server returned no vault data");
     }
 
-    return decryptVault(keyResult.value, data.vault as EncryptedVault);
+    return decryptVault(vaultKey, data.vault as EncryptedVault);
   } catch (e) {
     return err(`Sync pull failed: ${(e as Error).message}`);
   }
 }
 
 /**
- * Check if a vault exists on the server for the given passphrase.
+ * Check if a vault exists on the server.
+ * Accepts a passphrase string or pre-derived SyncCredentials.
  * Uses HEAD request to avoid downloading the entire vault.
  */
 export async function checkVaultExists(
-  passphrase: string,
+  auth: SyncAuth,
 ): Promise<Result<boolean>> {
   try {
-    const vaultIdResult = await deriveVaultId(passphrase);
+    const vaultIdResult = await resolveVaultId(auth);
     if (!vaultIdResult.ok) return vaultIdResult;
 
     const response = await fetch(`/api/sync?vaultId=${vaultIdResult.value}`, {

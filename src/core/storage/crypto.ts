@@ -11,12 +11,17 @@ export interface EncryptedPayload {
   ciphertext: Uint8Array;
 }
 
+interface DeriveOptions {
+  extractable?: boolean;
+}
+
 /**
  * Derive an AES-GCM key from a passphrase and salt using PBKDF2.
  */
 export async function deriveKey(
   passphrase: string,
   salt: Uint8Array,
+  options?: DeriveOptions,
 ): Promise<Result<CryptoKey>> {
   try {
     const keyMaterial = await crypto.subtle.importKey(
@@ -35,7 +40,7 @@ export async function deriveKey(
       },
       keyMaterial,
       { name: CRYPTO.ALGORITHM, length: CRYPTO.KEY_LENGTH },
-      false,
+      options?.extractable ?? false,
       ["encrypt", "decrypt"],
     );
     return ok(key);
@@ -114,6 +119,7 @@ export async function encrypt(
  */
 export async function deriveHmacKey(
   passphrase: string,
+  options?: DeriveOptions,
 ): Promise<Result<CryptoKey>> {
   try {
     const keyMaterial = await crypto.subtle.importKey(
@@ -132,7 +138,7 @@ export async function deriveHmacKey(
       },
       keyMaterial,
       { name: "HMAC", hash: CRYPTO.HASH, length: CRYPTO.KEY_LENGTH },
-      false,
+      options?.extractable ?? false,
       ["sign"],
     );
     return ok(key);
@@ -157,6 +163,26 @@ export async function hmacIndex(
   return Array.from(new Uint8Array(signature))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+/**
+ * Export a CryptoKey as a JWK object for localStorage persistence.
+ * The key must have been created with extractable: true.
+ */
+export async function exportCryptoKey(key: CryptoKey): Promise<JsonWebKey> {
+  return crypto.subtle.exportKey("jwk", key);
+}
+
+/**
+ * Import a JWK back into a non-extractable CryptoKey.
+ * The algorithm must match the original key's algorithm.
+ */
+export async function importCryptoKey(
+  jwk: JsonWebKey,
+  algorithm: AlgorithmIdentifier | AesKeyAlgorithm | HmacImportParams,
+): Promise<CryptoKey> {
+  const usages: KeyUsage[] = (jwk.key_ops as KeyUsage[] | undefined) ?? [];
+  return crypto.subtle.importKey("jwk", jwk, algorithm, false, usages);
 }
 
 /**

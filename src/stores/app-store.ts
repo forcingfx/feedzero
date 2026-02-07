@@ -1,6 +1,17 @@
 import { create } from "zustand";
-import { open, deleteDatabase, getFeeds } from "../core/storage/db.ts";
-import { DEFAULT_PASSPHRASE, LOCAL_STORAGE } from "../utils/constants.ts";
+import {
+  open,
+  openWithKeys,
+  deleteDatabase,
+  getFeeds,
+} from "../core/storage/db.ts";
+import {
+  DEFAULT_PASSPHRASE,
+  LOCAL_STORAGE,
+  CRYPTO,
+} from "../utils/constants.ts";
+import { importCryptoKey } from "../core/storage/crypto.ts";
+import { loadStoredKeys } from "../core/storage/key-material.ts";
 import { useSyncStore } from "./sync-store.ts";
 
 interface AppStore {
@@ -32,25 +43,64 @@ export const useAppStore = create<AppStore>((set) => ({
 
   initializeReturningUser: async () => {
     const storageMode = localStorage.getItem(LOCAL_STORAGE.STORAGE_MODE);
-    const storedPassphrase = localStorage.getItem(
-      LOCAL_STORAGE.SYNC_PASSPHRASE,
-    );
-    const isSyncUser = storageMode === "sync" && storedPassphrase;
+    const storedKeys = loadStoredKeys();
+    const isSyncUser = storageMode === "sync";
 
-    const passphrase = storedPassphrase ?? DEFAULT_PASSPHRASE;
+    let result;
 
-    if (isSyncUser) {
-      useSyncStore.setState({ passphrase: storedPassphrase });
+    if (storedKeys) {
+      // Use pre-derived keys (no raw passphrase needed)
+      result = await openWithKeys(storedKeys.dbKeyJwk, storedKeys.hmacKeyJwk);
+
+      if (isSyncUser && storedKeys.vaultId && storedKeys.vaultKeyJwk) {
+        const vaultKey = await importCryptoKey(storedKeys.vaultKeyJwk, {
+          name: CRYPTO.ALGORITHM,
+          length: CRYPTO.KEY_LENGTH,
+        });
+        useSyncStore.setState({
+          credentials: { vaultId: storedKeys.vaultId, vaultKey },
+        });
+      }
+    } else {
+      // Legacy fallback: read passphrase from localStorage
+      const storedPassphrase = localStorage.getItem(
+        LOCAL_STORAGE.SYNC_PASSPHRASE,
+      );
+      const passphrase = storedPassphrase ?? DEFAULT_PASSPHRASE;
+      result = await open(passphrase);
+
+      if (isSyncUser && storedPassphrase) {
+        // Migrate: derive and store keys, remove raw passphrase
+        const { deriveAndStoreKeys } =
+          await import("../core/storage/key-material.ts");
+        const migrateResult = await deriveAndStoreKeys(
+          storedPassphrase,
+          undefined,
+          { includeVaultKeys: true },
+        );
+        if (migrateResult.ok) {
+          localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
+
+          const keys = migrateResult.value;
+          if (keys.vaultId && keys.vaultKeyJwk) {
+            const vaultKey = await importCryptoKey(keys.vaultKeyJwk, {
+              name: CRYPTO.ALGORITHM,
+              length: CRYPTO.KEY_LENGTH,
+            });
+            useSyncStore.setState({
+              credentials: { vaultId: keys.vaultId, vaultKey },
+            });
+          }
+        }
+      }
     }
 
-    const result = await open(passphrase);
     if (!result.ok) {
       set({ isDbReady: false, error: result.error });
       return;
     }
 
     // Validate that decryption works by attempting to read feeds
-    // This catches passphrase mismatches that would otherwise show an empty state
     const feedsResult = await getFeeds();
     if (!feedsResult.ok) {
       set({

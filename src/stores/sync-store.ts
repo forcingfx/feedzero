@@ -7,8 +7,14 @@ import {
   exportVault,
   mergeVaults,
 } from "../core/sync/sync-service";
+import type { SyncCredentials } from "../core/sync/sync-service";
+import { deriveVaultId, deriveVaultKey } from "../core/sync/vault-crypto.ts";
 import { deleteDatabase } from "../core/storage/db.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
+import {
+  deriveAndStoreKeys,
+  clearStoredKeys,
+} from "../core/storage/key-material.ts";
 import type { Result } from "../utils/result.ts";
 import { ok, err } from "../utils/result.ts";
 
@@ -23,13 +29,13 @@ interface SyncStore {
   status: SyncStatus;
   lastSyncedAt: number | null;
   error: string | null;
-  passphrase: string | null;
+  credentials: SyncCredentials | null;
   dialogOpen: boolean;
 
-  /** Enable sync: store passphrase, push vault, transition to synced. */
+  /** Enable sync: derive keys, push vault, transition to synced. */
   enableSync: (passphrase: string) => Promise<void>;
-  /** Restore sync state from a known passphrase without pushing (e.g., after recovery pull). */
-  restoreSync: (passphrase: string) => void;
+  /** Restore sync state from pre-derived credentials without pushing. */
+  restoreSync: (credentials: SyncCredentials) => void;
   /** Disable sync: delete server vault, reset state, clear persisted data. */
   disableSync: () => Promise<void>;
   /** Log out: clear local data and reset to onboarding. Cloud vault is preserved. */
@@ -66,19 +72,43 @@ function clearPendingTimers(): void {
   }
 }
 
+async function deriveSyncCredentials(
+  passphrase: string,
+): Promise<Result<SyncCredentials>> {
+  const [vaultIdResult, vaultKeyResult] = await Promise.all([
+    deriveVaultId(passphrase),
+    deriveVaultKey(passphrase),
+  ]);
+  if (!vaultIdResult.ok) return vaultIdResult;
+  if (!vaultKeyResult.ok) return vaultKeyResult;
+  return ok({ vaultId: vaultIdResult.value, vaultKey: vaultKeyResult.value });
+}
+
 export const useSyncStore = create<SyncStore>((set, get) => ({
   status: "local-only",
   lastSyncedAt: null,
   error: null,
-  passphrase: null,
+  credentials: null,
   dialogOpen: false,
 
   enableSync: async (passphrase) => {
-    set({ passphrase, status: "syncing", error: null });
-    localStorage.setItem(LOCAL_STORAGE.SYNC_PASSPHRASE, passphrase);
+    const credsResult = await deriveSyncCredentials(passphrase);
+    if (!credsResult.ok) {
+      set({ status: "error", error: credsResult.error });
+      return;
+    }
+    const credentials = credsResult.value;
+
+    set({ credentials, status: "syncing", error: null });
     localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
 
-    const result = await pushVault(passphrase);
+    // Store derived keys (including vault keys), remove raw passphrase
+    await deriveAndStoreKeys(passphrase, undefined, {
+      includeVaultKeys: true,
+    });
+    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
+
+    const result = await pushVault(credentials);
     if (result.ok) {
       set({ status: "synced", lastSyncedAt: result.value, error: null });
     } else {
@@ -86,11 +116,10 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     }
   },
 
-  restoreSync: (passphrase) => {
-    localStorage.setItem(LOCAL_STORAGE.SYNC_PASSPHRASE, passphrase);
+  restoreSync: (credentials) => {
     localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
     set({
-      passphrase,
+      credentials,
       status: "synced",
       lastSyncedAt: Date.now(),
       error: null,
@@ -99,23 +128,25 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
   disableSync: async () => {
     clearPendingTimers();
-    const { passphrase } = get();
-    if (passphrase) {
-      await deleteVault(passphrase);
+    const { credentials } = get();
+    if (credentials) {
+      await deleteVault(credentials);
     }
+    clearStoredKeys();
     localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
     set({
       status: "local-only",
       lastSyncedAt: null,
       error: null,
-      passphrase: null,
+      credentials: null,
     });
   },
 
   logout: async () => {
     clearPendingTimers();
     await deleteDatabase();
+    clearStoredKeys();
     localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
     localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
@@ -123,7 +154,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       status: "local-only",
       lastSyncedAt: null,
       error: null,
-      passphrase: null,
+      credentials: null,
     });
     // Lazy imports to avoid circular dependencies at module load time
     const { useAppStore } = await import("./app-store.ts");
@@ -137,10 +168,10 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   push: async () => {
-    const { passphrase } = get();
-    if (!passphrase) return;
+    const { credentials } = get();
+    if (!credentials) return;
 
-    const result = await pushVault(passphrase);
+    const result = await pushVault(credentials);
     if (result.ok) {
       set({ status: "synced", lastSyncedAt: result.value, error: null });
     } else {
@@ -149,11 +180,11 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   pull: async () => {
-    const { passphrase } = get();
-    if (!passphrase) return;
+    const { credentials } = get();
+    if (!credentials) return;
 
     set({ status: "syncing", error: null });
-    const pullResult = await pullVault(passphrase);
+    const pullResult = await pullVault(credentials);
     if (!pullResult.ok) {
       set({ status: "error", error: pullResult.error });
       return;
@@ -169,8 +200,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   scheduleSyncPush: () => {
-    const { passphrase } = get();
-    if (!passphrase) return;
+    const { credentials } = get();
+    if (!credentials) return;
 
     clearPendingTimers();
     debounceTimer = setTimeout(() => {
@@ -188,9 +219,15 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   switchToExistingCloud: async (passphrase, mode) => {
     set({ status: "syncing", error: null });
 
+    const credsResult = await deriveSyncCredentials(passphrase);
+    if (!credsResult.ok) {
+      set({ status: "error", error: credsResult.error });
+      return err(credsResult.error);
+    }
+    const credentials = credsResult.value;
+
     if (mode === "replace") {
-      // Replace mode: pull cloud vault, import it (clears local data)
-      const pullResult = await pullVault(passphrase);
+      const pullResult = await pullVault(credentials);
       if (!pullResult.ok) {
         set({ status: "error", error: pullResult.error });
         return pullResult;
@@ -202,11 +239,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         return importResult;
       }
 
-      // Store passphrase and transition to synced
-      localStorage.setItem(LOCAL_STORAGE.SYNC_PASSPHRASE, passphrase);
+      // Store derived keys, remove raw passphrase
+      await deriveAndStoreKeys(passphrase, undefined, {
+        includeVaultKeys: true,
+      });
+      localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
       localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
       set({
-        passphrase,
+        credentials,
         status: "synced",
         lastSyncedAt: Date.now(),
         error: null,
@@ -221,7 +261,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return exportResult;
     }
 
-    const pullResult = await pullVault(passphrase);
+    const pullResult = await pullVault(credentials);
     if (!pullResult.ok) {
       set({ status: "error", error: pullResult.error });
       return pullResult;
@@ -239,18 +279,20 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return importResult;
     }
 
-    // Push merged vault to cloud
-    const pushResult = await pushVault(passphrase);
+    const pushResult = await pushVault(credentials);
     if (!pushResult.ok) {
       set({ status: "error", error: pushResult.error });
       return err(pushResult.error);
     }
 
-    // Store passphrase and transition to synced
-    localStorage.setItem(LOCAL_STORAGE.SYNC_PASSPHRASE, passphrase);
+    // Store derived keys, remove raw passphrase
+    await deriveAndStoreKeys(passphrase, undefined, {
+      includeVaultKeys: true,
+    });
+    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
     set({
-      passphrase,
+      credentials,
       status: "synced",
       lastSyncedAt: pushResult.value,
       error: null,

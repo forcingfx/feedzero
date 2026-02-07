@@ -15,6 +15,20 @@ vi.mock("../../src/core/storage/db", () => ({
   deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
+vi.mock("../../src/core/sync/vault-crypto", () => ({
+  deriveVaultId: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-id" }),
+  deriveVaultKey: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
+}));
+
+vi.mock("../../src/core/storage/key-material", () => ({
+  deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  clearStoredKeys: vi.fn(),
+}));
+
 import {
   pushVault,
   pullVault,
@@ -72,7 +86,7 @@ describe("sync-store switchToExistingCloud", () => {
       status: "local-only",
       lastSyncedAt: null,
       error: null,
-      passphrase: null,
+      credentials: null,
       dialogOpen: false,
     });
     vi.clearAllMocks();
@@ -92,7 +106,6 @@ describe("sync-store switchToExistingCloud", () => {
         .getState()
         .switchToExistingCloud("cloud-passphrase", "replace");
 
-      expect(mockPullVault).toHaveBeenCalledWith("cloud-passphrase");
       expect(mockImportVault).toHaveBeenCalledWith(cloudVault);
     });
 
@@ -107,22 +120,29 @@ describe("sync-store switchToExistingCloud", () => {
 
       const state = useSyncStore.getState();
       expect(state.status).toBe("synced");
-      expect(state.passphrase).toBe("cloud-passphrase");
+      expect(state.credentials).not.toBeNull();
       expect(state.lastSyncedAt).toBeTypeOf("number");
       expect(state.error).toBeNull();
     });
 
-    it("persists passphrase and storage mode to localStorage", async () => {
+    it("stores derived keys and storage mode to localStorage", async () => {
       mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
+
+      const { deriveAndStoreKeys } =
+        await import("../../src/core/storage/key-material");
 
       await useSyncStore
         .getState()
         .switchToExistingCloud("cloud-passphrase", "replace");
 
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
+      expect(deriveAndStoreKeys).toHaveBeenCalledWith(
         "cloud-passphrase",
+        undefined,
+        { includeVaultKeys: true },
+      );
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:sync-passphrase",
       );
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
@@ -201,7 +221,6 @@ describe("sync-store switchToExistingCloud", () => {
         .switchToExistingCloud("cloud-passphrase", "merge");
 
       expect(mockExportVault).toHaveBeenCalled();
-      expect(mockPullVault).toHaveBeenCalledWith("cloud-passphrase");
       expect(mockMergeVaults).toHaveBeenCalledWith(localVault, cloudVault);
     });
 
@@ -221,7 +240,7 @@ describe("sync-store switchToExistingCloud", () => {
         .switchToExistingCloud("cloud-passphrase", "merge");
 
       expect(mockImportVault).toHaveBeenCalledWith(mergedVault);
-      expect(mockPushVault).toHaveBeenCalledWith("cloud-passphrase");
+      expect(mockPushVault).toHaveBeenCalled();
     });
 
     it("transitions to synced state on success", async () => {
@@ -237,7 +256,7 @@ describe("sync-store switchToExistingCloud", () => {
 
       const state = useSyncStore.getState();
       expect(state.status).toBe("synced");
-      expect(state.passphrase).toBe("cloud-passphrase");
+      expect(state.credentials).not.toBeNull();
     });
 
     it("returns error when export fails", async () => {

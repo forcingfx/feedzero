@@ -1,7 +1,7 @@
 import Dexie from "dexie";
 import { ok, err } from "../../utils/result.ts";
 import type { Result } from "../../utils/result.ts";
-import { DB_NAME, DB_VERSION } from "../../utils/constants.ts";
+import { DB_NAME, DB_VERSION, CRYPTO } from "../../utils/constants.ts";
 import {
   deriveKey,
   deriveHmacKey,
@@ -9,6 +9,7 @@ import {
   generateSalt,
   encrypt,
   decrypt,
+  importCryptoKey,
 } from "./crypto.ts";
 import type { Feed, Article } from "../../types/index.ts";
 
@@ -66,6 +67,45 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
     return ok(true);
   } catch (e) {
     return err(`Failed to open database: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Open the database using pre-derived key material (JWKs).
+ * Used by returning users who have exported keys stored in localStorage,
+ * avoiding the need to store the raw passphrase.
+ */
+export async function openWithKeys(
+  dbKeyJwk: JsonWebKey,
+  hmacKeyJwk: JsonWebKey,
+): Promise<Result<boolean>> {
+  try {
+    db = new Dexie(DB_NAME);
+    db.version(2).stores({
+      feeds: "id, &url",
+      articles: "id, feedId, publishedAt, [feedId+guid]",
+      meta: "key",
+    });
+    db.version(DB_VERSION).stores({
+      feeds: "id, &url",
+      articles: "id, feedId, [feedId+guid]",
+      meta: "key",
+    });
+
+    await db.open();
+
+    cryptoKey = await importCryptoKey(dbKeyJwk, {
+      name: CRYPTO.ALGORITHM,
+      length: CRYPTO.KEY_LENGTH,
+    });
+    hmacKey = await importCryptoKey(hmacKeyJwk, {
+      name: "HMAC",
+      hash: CRYPTO.HASH,
+    });
+
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to open database with keys: ${(e as Error).message}`);
   }
 }
 
