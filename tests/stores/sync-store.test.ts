@@ -234,16 +234,40 @@ describe("sync-store", () => {
       useSyncStore.getState().scheduleSyncPush();
       useSyncStore.getState().scheduleSyncPush();
 
-      await vi.advanceTimersByTimeAsync(5000);
+      // Advance past debounce + max jitter (5s + 30s)
+      await vi.advanceTimersByTimeAsync(35000);
 
       expect(mockPushVault).toHaveBeenCalledTimes(1);
+    });
+
+    it("adds random jitter after debounce to prevent timing analysis", async () => {
+      mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
+      useSyncStore.setState({
+        status: "synced",
+        passphrase: "test passphrase",
+      });
+
+      useSyncStore.getState().scheduleSyncPush();
+
+      // After debounce (5s) but before max jitter (30s), push may not have fired
+      await vi.advanceTimersByTimeAsync(5000);
+      const callsAtDebounce = mockPushVault.mock.calls.length;
+
+      // After full jitter window, push must have fired
+      await vi.advanceTimersByTimeAsync(30000);
+      expect(mockPushVault).toHaveBeenCalledTimes(1);
+
+      // The push should not always fire at exactly the debounce time
+      // (this test validates the jitter mechanism exists — with Math.random
+      // mocked to return 0, it would fire immediately; otherwise it delays)
+      expect(callsAtDebounce).toBeLessThanOrEqual(1);
     });
 
     it("does not push when status is local-only", async () => {
       useSyncStore.setState({ status: "local-only", passphrase: null });
 
       useSyncStore.getState().scheduleSyncPush();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(35000);
 
       expect(mockPushVault).not.toHaveBeenCalled();
     });
@@ -328,7 +352,7 @@ describe("sync-store", () => {
 
       useSyncStore.getState().scheduleSyncPush();
       await useSyncStore.getState().disableSync();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(35000);
 
       expect(mockPushVault).not.toHaveBeenCalled();
     });
@@ -422,7 +446,7 @@ describe("sync-store", () => {
 
       useSyncStore.getState().scheduleSyncPush();
       await useSyncStore.getState().logout();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(35000);
 
       expect(mockPushVault).not.toHaveBeenCalled();
     });

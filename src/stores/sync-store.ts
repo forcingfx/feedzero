@@ -15,6 +15,7 @@ import { ok, err } from "../utils/result.ts";
 export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 
 const DEBOUNCE_MS = 5000;
+const MAX_JITTER_MS = 30000;
 
 type SwitchMode = "replace" | "merge";
 
@@ -52,6 +53,18 @@ interface SyncStore {
 }
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let jitterTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearPendingTimers(): void {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  if (jitterTimer) {
+    clearTimeout(jitterTimer);
+    jitterTimer = null;
+  }
+}
 
 export const useSyncStore = create<SyncStore>((set, get) => ({
   status: "local-only",
@@ -85,10 +98,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   disableSync: async () => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
-    }
+    clearPendingTimers();
     const { passphrase } = get();
     if (passphrase) {
       await deleteVault(passphrase);
@@ -104,10 +114,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   logout: async () => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
-    }
+    clearPendingTimers();
     await deleteDatabase();
     localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
@@ -165,10 +172,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     const { passphrase } = get();
     if (!passphrase) return;
 
-    if (debounceTimer) clearTimeout(debounceTimer);
+    clearPendingTimers();
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
-      get().push();
+      const jitter = Math.floor(Math.random() * MAX_JITTER_MS);
+      jitterTimer = setTimeout(() => {
+        jitterTimer = null;
+        get().push();
+      }, jitter);
     }, DEBOUNCE_MS);
   },
 
