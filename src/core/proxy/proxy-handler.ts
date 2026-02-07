@@ -21,7 +21,9 @@ export async function handleProxyRequest(
   }
 
   try {
-    const response = await fetch(validation.value.href);
+    const response = await fetch(validation.value.href, {
+      headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
+    });
     const body = await response.text();
     return new Response(body, {
       status: response.status,
