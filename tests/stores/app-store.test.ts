@@ -6,6 +6,9 @@ vi.mock("../../src/core/storage/db.ts", () => ({
   openWithKeys: vi.fn(),
   deleteDatabase: vi.fn(),
   getFeeds: vi.fn(),
+  getSalt: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
 }));
 
 vi.mock("../../src/core/sync/sync-service", () => ({
@@ -36,7 +39,10 @@ vi.mock("../../src/core/storage/crypto.ts", () => ({
 import { open, openWithKeys, getFeeds } from "../../src/core/storage/db.ts";
 import { pullVault, importVault } from "../../src/core/sync/sync-service";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
-import { loadStoredKeys } from "../../src/core/storage/key-material";
+import {
+  loadStoredKeys,
+  clearStoredKeys,
+} from "../../src/core/storage/key-material";
 
 const ONBOARDING_KEY = "feedzero:onboarding-complete";
 
@@ -250,7 +256,7 @@ describe("app-store", () => {
       expect(open).toHaveBeenCalledWith("test phrase");
       expect(deriveAndStoreKeys).toHaveBeenCalledWith(
         "test phrase",
-        undefined,
+        new Uint8Array([1, 2, 3]),
         { includeVaultKeys: true },
       );
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(
@@ -325,6 +331,33 @@ describe("app-store", () => {
 
       expect(pullVault).not.toHaveBeenCalled();
       expect(useAppStore.getState().isDbReady).toBe(false);
+    });
+  });
+
+  describe("resetApp", () => {
+    it("clears all localStorage keys including storage mode and derived keys", async () => {
+      localStorageMock.setItem("feedzero:onboarding-complete", "true");
+      localStorageMock.setItem("feedzero:storage-mode", "sync");
+      localStorageMock.setItem("feedzero:sync-passphrase", "old passphrase");
+      localStorageMock.setItem(
+        "feedzero:derived-keys",
+        JSON.stringify({ dbKeyJwk: {}, hmacKeyJwk: {} }),
+      );
+
+      await useAppStore.getState().resetApp();
+
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:onboarding-complete",
+      );
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:storage-mode",
+      );
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        "feedzero:sync-passphrase",
+      );
+      expect(clearStoredKeys).toHaveBeenCalled();
+      expect(useAppStore.getState().isDbReady).toBe(false);
+      expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
     });
   });
 });

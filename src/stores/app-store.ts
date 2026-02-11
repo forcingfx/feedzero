@@ -4,6 +4,7 @@ import {
   openWithKeys,
   deleteDatabase,
   getFeeds,
+  getSalt,
 } from "../core/storage/db.ts";
 import {
   DEFAULT_PASSPHRASE,
@@ -11,7 +12,10 @@ import {
   CRYPTO,
 } from "../utils/constants.ts";
 import { importCryptoKey } from "../core/storage/crypto.ts";
-import { loadStoredKeys } from "../core/storage/key-material.ts";
+import {
+  loadStoredKeys,
+  clearStoredKeys,
+} from "../core/storage/key-material.ts";
 import { useSyncStore } from "./sync-store.ts";
 
 interface AppStore {
@@ -73,9 +77,11 @@ export const useAppStore = create<AppStore>((set) => ({
         // Migrate: derive and store keys, remove raw passphrase
         const { deriveAndStoreKeys } =
           await import("../core/storage/key-material.ts");
+        const saltResult = await getSalt();
+        const dbSalt = saltResult.ok ? saltResult.value : undefined;
         const migrateResult = await deriveAndStoreKeys(
           storedPassphrase,
-          undefined,
+          dbSalt,
           { includeVaultKeys: true },
         );
         if (migrateResult.ok) {
@@ -135,7 +141,10 @@ export const useAppStore = create<AppStore>((set) => ({
 
   resetApp: async () => {
     await deleteDatabase();
+    clearStoredKeys();
     localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
+    localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
+    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
   },
 }));
