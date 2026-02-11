@@ -8,6 +8,9 @@ import { useSyncStore } from "@/stores/sync-store";
 
 vi.mock("@/core/storage/db.ts", () => ({
   open: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  getSalt: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
 }));
 
 vi.mock("@/core/crypto/passphrase-generator", () => ({
@@ -238,9 +241,10 @@ describe("OnboardingModal", () => {
         expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
       });
 
-      // Should store derived keys, not raw passphrase
+      // Should store derived keys with the DB salt, not raw passphrase
       expect(deriveAndStoreKeys).toHaveBeenCalledWith(
         "carbon mango velvet prism",
+        new Uint8Array([1, 2, 3]),
       );
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",

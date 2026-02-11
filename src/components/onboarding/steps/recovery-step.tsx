@@ -12,7 +12,7 @@ import {
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
-import { open } from "@/core/storage/db";
+import { open, getSalt } from "@/core/storage/db";
 import { pullVault, importVault } from "@/core/sync/sync-service";
 import { deriveAndStoreKeys } from "@/core/storage/key-material";
 import { deriveVaultId, deriveVaultKey } from "@/core/sync/vault-crypto";
@@ -41,7 +41,9 @@ export function RecoveryStep() {
     }
 
     // Store derived keys, remove raw passphrase from persistence
-    await deriveAndStoreKeys(trimmed, undefined, { includeVaultKeys: true });
+    const saltResult = await getSalt();
+    const salt = saltResult.ok ? saltResult.value : undefined;
+    await deriveAndStoreKeys(trimmed, salt, { includeVaultKeys: true });
 
     // Attempt cloud pull — if vault exists on server, import it
     const [vaultIdResult, vaultKeyResult] = await Promise.all([

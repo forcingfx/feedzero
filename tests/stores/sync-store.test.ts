@@ -10,6 +10,9 @@ vi.mock("../../src/core/sync/sync-service", () => ({
 
 vi.mock("../../src/core/storage/db", () => ({
   deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  getSalt: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
 }));
 
 vi.mock("../../src/core/sync/vault-crypto", () => ({
@@ -128,7 +131,7 @@ describe("sync-store", () => {
 
       expect(deriveAndStoreKeys).toHaveBeenCalledWith(
         "test passphrase",
-        undefined,
+        new Uint8Array([1, 2, 3]),
         { includeVaultKeys: true },
       );
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(

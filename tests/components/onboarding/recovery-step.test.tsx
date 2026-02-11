@@ -9,6 +9,9 @@ import { useSyncStore } from "@/stores/sync-store";
 
 vi.mock("@/core/storage/db", () => ({
   open: vi.fn(),
+  getSalt: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
 }));
 
 vi.mock("@/core/sync/sync-service", () => ({
@@ -175,7 +178,7 @@ describe("RecoveryStep", () => {
 
     expect(deriveAndStoreKeys).toHaveBeenCalledWith(
       "carbon mango velvet prism",
-      undefined,
+      new Uint8Array([1, 2, 3]),
       { includeVaultKeys: true },
     );
   });

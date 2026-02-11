@@ -110,6 +110,21 @@ export async function openWithKeys(
 }
 
 /**
+ * Read the PBKDF2 salt stored in the meta table during open().
+ * Callers need this to derive keys that match the ones used for encryption.
+ */
+export async function getSalt(): Promise<Result<Uint8Array>> {
+  try {
+    if (!db) return err("Database not open");
+    const record = await db.table("meta").get("salt");
+    if (!record) return err("No salt found");
+    return ok(new Uint8Array(record.value));
+  } catch (e) {
+    return err(`Failed to read salt: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Close the database and clear key material.
  */
 export function close(): void {

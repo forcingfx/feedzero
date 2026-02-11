@@ -9,7 +9,7 @@ import {
 } from "../core/sync/sync-service";
 import type { SyncCredentials } from "../core/sync/sync-service";
 import { deriveVaultId, deriveVaultKey } from "../core/sync/vault-crypto.ts";
-import { deleteDatabase } from "../core/storage/db.ts";
+import { deleteDatabase, getSalt } from "../core/storage/db.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
 import {
   deriveAndStoreKeys,
@@ -103,7 +103,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
 
     // Store derived keys (including vault keys), remove raw passphrase
-    await deriveAndStoreKeys(passphrase, undefined, {
+    const saltResult = await getSalt();
+    const salt = saltResult.ok ? saltResult.value : undefined;
+    await deriveAndStoreKeys(passphrase, salt, {
       includeVaultKeys: true,
     });
     localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
@@ -240,7 +242,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       }
 
       // Store derived keys, remove raw passphrase
-      await deriveAndStoreKeys(passphrase, undefined, {
+      const saltResult = await getSalt();
+      const salt = saltResult.ok ? saltResult.value : undefined;
+      await deriveAndStoreKeys(passphrase, salt, {
         includeVaultKeys: true,
       });
       localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
@@ -286,7 +290,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     }
 
     // Store derived keys, remove raw passphrase
-    await deriveAndStoreKeys(passphrase, undefined, {
+    const saltResult = await getSalt();
+    const salt = saltResult.ok ? saltResult.value : undefined;
+    await deriveAndStoreKeys(passphrase, salt, {
       includeVaultKeys: true,
     });
     localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);

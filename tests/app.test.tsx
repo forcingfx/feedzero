@@ -8,6 +8,9 @@ vi.mock("@/core/storage/db.ts", () => ({
   open: vi.fn().mockResolvedValue({ ok: true, value: true }),
   openWithKeys: vi.fn().mockResolvedValue({ ok: true, value: true }),
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getSalt: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
   deleteDatabase: vi.fn().mockResolvedValue(undefined),
 }));
 

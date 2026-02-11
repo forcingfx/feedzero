@@ -4,6 +4,7 @@ import {
   open,
   openWithKeys,
   close,
+  getSalt,
   addFeed,
   getFeeds,
   getFeed,
@@ -535,6 +536,64 @@ describe("Database", () => {
       const result = await getAllArticles();
       expect(isOk(result)).toBe(true);
       expect(unwrap(result)).toEqual([]);
+    });
+  });
+
+  describe("getSalt", () => {
+    it("should return the salt stored during open()", async () => {
+      const result = await getSalt();
+      expect(isOk(result)).toBe(true);
+      const salt = unwrap(result);
+      expect(salt).toBeInstanceOf(Uint8Array);
+      expect(salt.length).toBe(16);
+    });
+
+    it("should return error when database is not open", async () => {
+      close();
+      const result = await getSalt();
+      expect(isErr(result)).toBe(true);
+      expect(result.error).toMatch(/not open/i);
+    });
+
+    it("should return the same salt across calls", async () => {
+      const salt1 = unwrap(await getSalt());
+      const salt2 = unwrap(await getSalt());
+      expect(salt1).toEqual(salt2);
+    });
+  });
+
+  describe("salt consistency: keys derived from getSalt() can decrypt data", () => {
+    it("should decrypt data when reopened with keys derived from the DB salt", async () => {
+      // Session 1: add data via passphrase-based open (already open from beforeEach)
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Salt Test" }),
+      );
+      await addFeed(feed);
+
+      // Read the salt from the open database
+      const salt = unwrap(await getSalt());
+
+      // Derive extractable keys using the SAME salt
+      const { deriveKey, deriveHmacKey, exportCryptoKey } =
+        await import("../../../src/core/storage/crypto.ts");
+      const dbKey = unwrap(
+        await deriveKey("test-passphrase", salt, { extractable: true }),
+      );
+      const hmac = unwrap(
+        await deriveHmacKey("test-passphrase", { extractable: true }),
+      );
+      const dbKeyJwk = await exportCryptoKey(dbKey);
+      const hmacKeyJwk = await exportCryptoKey(hmac);
+
+      // Close and reopen with the derived keys
+      close();
+      const result = await openWithKeys(dbKeyJwk, hmacKeyJwk);
+      expect(isOk(result)).toBe(true);
+
+      // Data should be readable
+      const feeds = unwrap(await getFeeds());
+      expect(feeds).toHaveLength(1);
+      expect(feeds[0].title).toBe("Salt Test");
     });
   });
 

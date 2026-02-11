@@ -5,6 +5,7 @@ import { useAppStore } from "@/stores/app-store";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useSyncStore } from "@/stores/sync-store";
 import { deriveAndStoreKeys } from "@/core/storage/key-material";
+import { getSalt } from "@/core/storage/db";
 import { WelcomeStep } from "./steps/welcome-step";
 import { StorageChoiceStep } from "./steps/storage-choice-step";
 import { PassphraseDisplayStep } from "./steps/passphrase-display-step";
@@ -37,7 +38,9 @@ export function OnboardingModal() {
         if (storageMode === "sync") {
           await enableSync(generatedPassphrase);
         } else {
-          await deriveAndStoreKeys(generatedPassphrase);
+          const saltResult = await getSalt();
+          const salt = saltResult.ok ? saltResult.value : undefined;
+          await deriveAndStoreKeys(generatedPassphrase, salt);
           localStorage.setItem("feedzero:storage-mode", "local");
         }
         completeOnboarding();
