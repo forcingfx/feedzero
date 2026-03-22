@@ -361,7 +361,7 @@ describe("sync-store", () => {
       );
     });
 
-    it("still clears local state even if server deletion fails", async () => {
+    it("sets error and does not transition to local-only if server deletion fails", async () => {
       mockDeleteVault.mockResolvedValue({ ok: false, error: "Network error" });
       useSyncStore.setState({
         status: "synced",
@@ -372,13 +372,10 @@ describe("sync-store", () => {
       await useSyncStore.getState().disableSync();
 
       const state = useSyncStore.getState();
-      expect(state.status).toBe("local-only");
-      expect(state.credentials).toBeNull();
-      // DB keys should still be re-persisted even if vault deletion fails
-      const stored = JSON.parse(
-        localStorageMock.getItem("feedzero:derived-keys") ?? "null",
-      );
-      expect(stored).not.toBeNull();
+      expect(state.status).toBe("error");
+      expect(state.error).toMatch(/could not delete server data/i);
+      // Credentials should be preserved so user can retry
+      expect(state.credentials).not.toBeNull();
     });
 
     it("cancels pending debounced push", async () => {

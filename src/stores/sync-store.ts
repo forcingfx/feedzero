@@ -153,8 +153,20 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   disableSync: async () => {
     clearPendingTimers();
     const { credentials } = get();
+
     if (credentials) {
-      await deleteVault(credentials);
+      const deleteResult = await deleteVault(credentials);
+      if (!deleteResult.ok) {
+        // Retry once — transient network failures shouldn't leave orphaned vaults
+        const retry = await deleteVault(credentials);
+        if (!retry.ok) {
+          set({
+            status: "error",
+            error: `Could not delete server data: ${retry.error}. Your cloud vault may still exist. Try again.`,
+          });
+          return;
+        }
+      }
     }
 
     // Re-persist current DB keys without vault keys so local data
