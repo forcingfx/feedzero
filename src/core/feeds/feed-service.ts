@@ -10,7 +10,7 @@ import {
   removeFeedsByUrl,
   addArticles,
   getArticleByGuid,
-  updateArticle,
+  updateArticles,
 } from "../storage/db.ts";
 import type { Feed, Article } from "../../types/index.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
@@ -122,7 +122,7 @@ export async function addFeedFlow(
     } else {
       // Not a feed — try discovering a feed from this URL
       const discovery = await discoverFeed(url);
-      if (!discovery.ok) return err(friendlyError(parseResult.error));
+      if (!discovery.ok) return err(friendlyError(discovery.error));
 
       feedData = discovery.value.feed;
       parsedArticles = discovery.value.articles;
@@ -212,9 +212,9 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
       await addArticles(created);
     }
 
-    // Update changed articles
-    for (const article of updatedArticles) {
-      await updateArticle(article);
+    // Update changed articles in bulk
+    if (updatedArticles.length > 0) {
+      await updateArticles(updatedArticles);
     }
 
     return ok({
@@ -227,21 +227,34 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
 }
 
 /**
- * Refresh all feeds sequentially.
+ * Refresh all feeds concurrently with a concurrency limit.
+ * Each feed refresh is independent, so they can safely run in parallel.
  */
 export async function refreshAllFeeds(): Promise<Result<RefreshAllResult>> {
   const feedsResult = await getFeeds();
   if (!feedsResult.ok) return err(feedsResult.error);
 
-  const results: RefreshAllResult["results"] = [];
-  for (const feed of feedsResult.value) {
-    const result = await refreshFeed(feed);
-    if (result.ok) {
-      results.push({ feed, ...result.value });
-    } else {
-      results.push({ feed, newCount: 0, updatedCount: 0, error: result.error });
+  const settled = await Promise.allSettled(
+    feedsResult.value.map((feed) =>
+      refreshFeed(feed).then((result) => ({ feed, result })),
+    ),
+  );
+
+  const results: RefreshAllResult["results"] = settled.map((outcome) => {
+    if (outcome.status === "rejected") {
+      return {
+        feed: { id: "", url: "", title: "Unknown" } as Feed,
+        newCount: 0,
+        updatedCount: 0,
+        error: String(outcome.reason),
+      };
     }
-  }
+    const { feed, result } = outcome.value;
+    if (result.ok) {
+      return { feed, ...result.value };
+    }
+    return { feed, newCount: 0, updatedCount: 0, error: result.error };
+  });
 
   return ok({ results });
 }

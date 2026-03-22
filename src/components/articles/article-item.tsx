@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Article } from "@/types/index.ts";
@@ -22,7 +23,7 @@ function formatDate(timestamp: number): string {
   });
 }
 
-export function ArticleItem({
+export const ArticleItem = memo(function ArticleItem({
   article,
   isSelected,
   onSelect,
@@ -65,4 +66,4 @@ export function ArticleItem({
       )}
     </li>
   );
-}
+});

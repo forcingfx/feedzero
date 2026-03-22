@@ -27,6 +27,16 @@ let db: Dexie | null = null;
 let cryptoKey: CryptoKey | null = null;
 let hmacKey: CryptoKey | null = null;
 
+/** Asserts the database is open and keys are available. */
+function requireOpen(): { db: Dexie; cryptoKey: CryptoKey; hmacKey: CryptoKey } {
+  if (!db || !cryptoKey || !hmacKey) {
+    throw new Error(
+      "Database not initialized. Call open() or openWithKeys() first.",
+    );
+  }
+  return { db, cryptoKey, hmacKey };
+}
+
 /**
  * Open the database and derive encryption key from passphrase.
  * Reuses the stored salt if one exists, so the same passphrase
@@ -35,11 +45,6 @@ let hmacKey: CryptoKey | null = null;
 export async function open(passphrase: string): Promise<Result<boolean>> {
   try {
     db = new Dexie(DB_NAME);
-    db.version(2).stores({
-      feeds: "id, &url",
-      articles: "id, feedId, publishedAt, [feedId+guid]",
-      meta: "key",
-    });
     db.version(DB_VERSION).stores({
       feeds: "id, &url",
       articles: "id, feedId, [feedId+guid]",
@@ -81,11 +86,6 @@ export async function openWithKeys(
 ): Promise<Result<boolean>> {
   try {
     db = new Dexie(DB_NAME);
-    db.version(2).stores({
-      feeds: "id, &url",
-      articles: "id, feedId, publishedAt, [feedId+guid]",
-      meta: "key",
-    });
     db.version(DB_VERSION).stores({
       feeds: "id, &url",
       articles: "id, feedId, [feedId+guid]",
@@ -156,8 +156,9 @@ export async function deleteDatabase(): Promise<Result<boolean>> {
  */
 export async function feedExistsByUrl(url: string): Promise<Result<boolean>> {
   try {
-    const hashedUrl = await hmacIndex(hmacKey!, url);
-    const count = await db!
+    const ctx = requireOpen();
+    const hashedUrl = await hmacIndex(ctx.hmacKey, url);
+    const count = await ctx.db
       .table("feeds")
       .where("url")
       .equals(hashedUrl)
@@ -207,21 +208,22 @@ export async function getFeed(id: string): Promise<Result<Feed>> {
  */
 export async function removeFeedsByUrl(url: string): Promise<Result<boolean>> {
   try {
-    const hashedUrl = await hmacIndex(hmacKey!, url);
-    const records = await db!
+    const ctx = requireOpen();
+    const hashedUrl = await hmacIndex(ctx.hmacKey, url);
+    const records = await ctx.db
       .table("feeds")
       .where("url")
       .equals(hashedUrl)
       .toArray();
     for (const record of records) {
-      const hashedFeedId = await hmacIndex(hmacKey!, record.id);
-      const articleKeys = await db!
+      const hashedFeedId = await hmacIndex(ctx.hmacKey, record.id);
+      const articleKeys = await ctx.db
         .table("articles")
         .where("feedId")
         .equals(hashedFeedId)
         .primaryKeys();
-      await db!.table("articles").bulkDelete(articleKeys);
-      await db!.table("feeds").delete(record.id);
+      await ctx.db.table("articles").bulkDelete(articleKeys);
+      await ctx.db.table("feeds").delete(record.id);
     }
     return ok(true);
   } catch (e) {
@@ -234,15 +236,15 @@ export async function removeFeedsByUrl(url: string): Promise<Result<boolean>> {
  */
 export async function removeFeed(id: string): Promise<Result<boolean>> {
   try {
-    await db!.table("feeds").delete(id);
-    // Delete associated articles by querying the HMAC-hashed feedId index
-    const hashedFeedId = await hmacIndex(hmacKey!, id);
-    const articleKeys = await db!
+    const ctx = requireOpen();
+    await ctx.db.table("feeds").delete(id);
+    const hashedFeedId = await hmacIndex(ctx.hmacKey, id);
+    const articleKeys = await ctx.db
       .table("articles")
       .where("feedId")
       .equals(hashedFeedId)
       .primaryKeys();
-    await db!.table("articles").bulkDelete(articleKeys);
+    await ctx.db.table("articles").bulkDelete(articleKeys);
     return ok(true);
   } catch (e) {
     return err(`Failed to remove feed: ${(e as Error).message}`);
@@ -251,14 +253,15 @@ export async function removeFeed(id: string): Promise<Result<boolean>> {
 
 /**
  * Add articles for a feed (encrypted at rest).
+ * Encrypts all articles then writes in a single bulk operation.
  */
 export async function addArticles(
   articles: Article[],
 ): Promise<Result<boolean>> {
   try {
-    for (const article of articles) {
-      await putEncrypted("articles", article.id, article);
-    }
+    const ctx = requireOpen();
+    const records = await encryptRecords(articles);
+    await ctx.db.table("articles").bulkPut(records);
     return ok(true);
   } catch (e) {
     return err(`Failed to add articles: ${(e as Error).message}`);
@@ -269,11 +272,12 @@ export async function addArticles(
  * Decrypt raw article records and sort by publishedAt descending.
  */
 async function decryptAndSortArticles(raws: DexieRecord[]): Promise<Article[]> {
+  const { cryptoKey: key } = requireOpen();
   const results: Article[] = [];
   for (const raw of raws) {
     if (!raw.iv || !raw.ciphertext) continue;
     const r = await decrypt(
-      cryptoKey!,
+      key,
       new Uint8Array(raw.iv),
       new Uint8Array(raw.ciphertext),
     );
@@ -288,8 +292,9 @@ async function decryptAndSortArticles(raws: DexieRecord[]): Promise<Article[]> {
  */
 export async function getArticles(feedId: string): Promise<Result<Article[]>> {
   try {
-    const hashedFeedId = await hmacIndex(hmacKey!, feedId);
-    const raws: DexieRecord[] = await db!
+    const ctx = requireOpen();
+    const hashedFeedId = await hmacIndex(ctx.hmacKey, feedId);
+    const raws: DexieRecord[] = await ctx.db
       .table("articles")
       .where("feedId")
       .equals(hashedFeedId)
@@ -305,7 +310,8 @@ export async function getArticles(feedId: string): Promise<Result<Article[]>> {
  */
 export async function getAllArticles(): Promise<Result<Article[]>> {
   try {
-    const raws: DexieRecord[] = await db!.table("articles").toArray();
+    const ctx = requireOpen();
+    const raws: DexieRecord[] = await ctx.db.table("articles").toArray();
     return ok(await decryptAndSortArticles(raws));
   } catch (e) {
     return err(`Failed to get all articles: ${(e as Error).message}`);
@@ -322,6 +328,23 @@ export async function updateArticle(
 }
 
 /**
+ * Update multiple articles in a single bulk operation.
+ */
+export async function updateArticles(
+  articles: Article[],
+): Promise<Result<boolean>> {
+  if (articles.length === 0) return ok(true);
+  try {
+    const ctx = requireOpen();
+    const records = await encryptRecords(articles);
+    await ctx.db.table("articles").bulkPut(records);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to update articles: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Find an article by its feedId + guid compound index.
  * Returns the decrypted article if found, or null.
  */
@@ -330,16 +353,17 @@ export async function getArticleByGuid(
   guid: string,
 ): Promise<Result<Article | null>> {
   try {
-    const hashedFeedId = await hmacIndex(hmacKey!, feedId);
-    const hashedGuid = await hmacIndex(hmacKey!, guid);
-    const raw: DexieRecord | undefined = await db!
+    const ctx = requireOpen();
+    const hashedFeedId = await hmacIndex(ctx.hmacKey, feedId);
+    const hashedGuid = await hmacIndex(ctx.hmacKey, guid);
+    const raw: DexieRecord | undefined = await ctx.db
       .table("articles")
       .where("[feedId+guid]")
       .equals([hashedFeedId, hashedGuid])
       .first();
     if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
     const result = await decrypt(
-      cryptoKey!,
+      ctx.cryptoKey,
       new Uint8Array(raw.iv),
       new Uint8Array(raw.ciphertext),
     );
@@ -351,6 +375,7 @@ export async function getArticleByGuid(
 
 /**
  * Export all feeds and articles (decrypted) for vault sync.
+ * Uses getAllArticles() for a single bulk query instead of per-feed queries.
  */
 export async function exportAll(): Promise<
   Result<{ feeds: Feed[]; articles: Article[] }>
@@ -359,15 +384,10 @@ export async function exportAll(): Promise<
     const feedsResult = await getFeeds();
     if (!feedsResult.ok) return feedsResult;
 
-    const allArticles: Article[] = [];
-    for (const feed of feedsResult.value) {
-      const articlesResult = await getArticles(feed.id);
-      if (articlesResult.ok) {
-        allArticles.push(...articlesResult.value);
-      }
-    }
+    const articlesResult = await getAllArticles();
+    if (!articlesResult.ok) return articlesResult;
 
-    return ok({ feeds: feedsResult.value, articles: allArticles });
+    return ok({ feeds: feedsResult.value, articles: articlesResult.value });
   } catch (e) {
     return err(`Failed to export data: ${(e as Error).message}`);
   }
@@ -375,24 +395,22 @@ export async function exportAll(): Promise<
 
 /**
  * Clear all feeds and articles, then import the provided data.
- * Used for vault sync restore.
+ * Uses bulk operations for performance.
  */
 export async function importAll(
   feeds: Feed[],
   articles: Article[],
 ): Promise<Result<boolean>> {
   try {
-    await db!.table("feeds").clear();
-    await db!.table("articles").clear();
+    const ctx = requireOpen();
+    await ctx.db.table("feeds").clear();
+    await ctx.db.table("articles").clear();
 
-    for (const feed of feeds) {
-      const result = await putEncrypted("feeds", feed.id, feed);
-      if (!result.ok) return result;
-    }
-    for (const article of articles) {
-      const result = await putEncrypted("articles", article.id, article);
-      if (!result.ok) return result;
-    }
+    const feedRecords = await encryptRecords(feeds);
+    await ctx.db.table("feeds").bulkPut(feedRecords);
+
+    const articleRecords = await encryptRecords(articles);
+    await ctx.db.table("articles").bulkPut(articleRecords);
 
     return ok(true);
   } catch (e) {
@@ -402,13 +420,43 @@ export async function importAll(
 
 // --- Internal helpers ---
 
+/** Encrypt an array of records into Dexie-ready objects with HMAC-hashed indexes. */
+async function encryptRecords(
+  items: Array<Feed | Article>,
+): Promise<DexieRecord[]> {
+  const ctx = requireOpen();
+  const records: DexieRecord[] = [];
+  for (const item of items) {
+    const encResult = await encrypt(ctx.cryptoKey, item);
+    if (!encResult.ok) continue;
+    const { iv, ciphertext } = encResult.value;
+
+    const record: DexieRecord = {
+      id: item.id,
+      iv: Array.from(iv),
+      ciphertext: Array.from(ciphertext),
+    };
+
+    if ("url" in item && item.url !== undefined)
+      record.url = await hmacIndex(ctx.hmacKey, item.url);
+    if ("feedId" in item && item.feedId !== undefined)
+      record.feedId = await hmacIndex(ctx.hmacKey, item.feedId);
+    if ("guid" in item && item.guid !== undefined)
+      record.guid = await hmacIndex(ctx.hmacKey, item.guid);
+
+    records.push(record);
+  }
+  return records;
+}
+
 async function putEncrypted(
   table: string,
   id: string,
   data: unknown,
 ): Promise<Result<boolean>> {
   try {
-    const encResult = await encrypt(cryptoKey!, data);
+    const ctx = requireOpen();
+    const encResult = await encrypt(ctx.cryptoKey, data);
     if (!encResult.ok) return encResult;
     const { iv, ciphertext } = encResult.value;
 
@@ -418,16 +466,15 @@ async function putEncrypted(
       ciphertext: Array.from(ciphertext),
     };
 
-    // HMAC-hash indexed fields for Dexie queries (hides plaintext values)
     const d = data as Record<string, unknown>;
     if (d.url !== undefined)
-      record.url = await hmacIndex(hmacKey!, d.url as string);
+      record.url = await hmacIndex(ctx.hmacKey, d.url as string);
     if (d.feedId !== undefined)
-      record.feedId = await hmacIndex(hmacKey!, d.feedId as string);
+      record.feedId = await hmacIndex(ctx.hmacKey, d.feedId as string);
     if (d.guid !== undefined)
-      record.guid = await hmacIndex(hmacKey!, d.guid as string);
+      record.guid = await hmacIndex(ctx.hmacKey, d.guid as string);
 
-    await db!.table(table).put(record);
+    await ctx.db.table(table).put(record);
     return ok(true);
   } catch (e) {
     return err(`Failed to store encrypted data: ${(e as Error).message}`);
@@ -436,12 +483,14 @@ async function putEncrypted(
 
 async function getDecrypted<T>(table: string, id: string): Promise<Result<T>> {
   try {
-    const raw: DexieRecord | undefined = await db!.table(table).get(id);
+    const ctx = requireOpen();
+    const raw: DexieRecord | undefined = await ctx.db.table(table).get(id);
     if (!raw) return err("Not found");
+    if (!raw.iv || !raw.ciphertext) return err("Record missing encrypted data");
     const result = await decrypt(
-      cryptoKey!,
-      new Uint8Array(raw.iv!),
-      new Uint8Array(raw.ciphertext!),
+      ctx.cryptoKey,
+      new Uint8Array(raw.iv),
+      new Uint8Array(raw.ciphertext),
     );
     if (!result.ok) return result;
     return ok(result.value as T);
@@ -452,14 +501,15 @@ async function getDecrypted<T>(table: string, id: string): Promise<Result<T>> {
 
 async function getAllDecrypted<T>(table: string): Promise<Result<T[]>> {
   try {
-    const raws: DexieRecord[] = await db!.table(table).toArray();
+    const ctx = requireOpen();
+    const raws: DexieRecord[] = await ctx.db.table(table).toArray();
     const results: T[] = [];
     let failedCount = 0;
 
     for (const raw of raws) {
       if (!raw.iv || !raw.ciphertext) continue;
       const r = await decrypt(
-        cryptoKey!,
+        ctx.cryptoKey,
         new Uint8Array(raw.iv),
         new Uint8Array(raw.ciphertext),
       );

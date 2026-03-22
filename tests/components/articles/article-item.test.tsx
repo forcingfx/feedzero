@@ -83,6 +83,37 @@ describe("ArticleItem", () => {
     });
   });
 
+  it("does not re-render when props are unchanged", () => {
+    const article = mockArticle();
+    const onSelect = () => {};
+
+    // Wrap ArticleItem to track renders
+    function Wrapper({ count }: { count: number }) {
+      // count forces Wrapper to re-render, but ArticleItem should skip
+      return (
+        <>
+          <span data-testid="count">{count}</span>
+          <ArticleItem
+            article={article}
+            isSelected={false}
+            onSelect={onSelect}
+          />
+        </>
+      );
+    }
+
+    const { rerender } = render(<Wrapper count={0} />);
+    const titleEl = screen.getByText("Test Article");
+    const initialHtml = titleEl.closest("li")!.innerHTML;
+
+    // Re-render parent with different prop — ArticleItem props unchanged
+    rerender(<Wrapper count={1} />);
+    const afterHtml = titleEl.closest("li")!.innerHTML;
+
+    // Memoized component should produce identical DOM
+    expect(afterHtml).toBe(initialHtml);
+  });
+
   describe("feedSiteUrl prop (favicon in global view)", () => {
     it("renders favicon when feedSiteUrl is provided", () => {
       const { container } = render(

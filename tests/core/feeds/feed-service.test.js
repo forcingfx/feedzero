@@ -107,6 +107,10 @@ vi.mock("../../../src/core/storage/db.ts", () => {
       articles.set(article.id, article);
       return { ok: true, value: true };
     }),
+    updateArticles: vi.fn(async (arts) => {
+      for (const a of arts) articles.set(a.id, a);
+      return { ok: true, value: true };
+    }),
     _reset: () => {
       feeds.clear();
       orphanUrls.clear();
@@ -267,8 +271,8 @@ describe("feed-service", () => {
       expect(result.error).not.toMatch(/parsererror/i);
       expect(result.error).not.toMatch(/Invalid XML/);
       expect(result.error).not.toMatch(/mismatched tag/i);
-      // Should be a clear, actionable message
-      expect(result.error).toMatch(/not a valid feed/i);
+      // Should be a clear, actionable message (either parse or discovery error)
+      expect(result.error).toMatch(/not a valid feed|no rss feed could be found/i);
     });
 
     it("should return user-friendly error for unrecognized XML format", async () => {
@@ -280,7 +284,7 @@ describe("feed-service", () => {
 
       const result = await addFeedFlow("https://example.com/page");
       expect(isErr(result)).toBe(true);
-      expect(result.error).toMatch(/not a valid feed/i);
+      expect(result.error).toMatch(/not a valid feed|no rss feed could be found/i);
       expect(result.error).not.toMatch(/Unrecognized feed format/);
     });
 
@@ -459,7 +463,7 @@ describe("refreshFeed", () => {
     expect(isOk(result)).toBe(true);
     expect(result.value.newCount).toBe(0);
     expect(result.value.updatedCount).toBe(1);
-    expect(db.updateArticle).toHaveBeenCalledOnce();
+    expect(db.updateArticles).toHaveBeenCalledOnce();
   });
 
   it("should return error when fetch fails", async () => {
@@ -496,5 +500,47 @@ describe("refreshAllFeeds", () => {
     const result = await refreshAllFeeds();
     expect(isOk(result)).toBe(true);
     expect(result.value.results.length).toBe(0);
+  });
+
+  it("should refresh multiple feeds concurrently using Promise.allSettled", async () => {
+    // Add 3 feeds
+    for (let i = 1; i <= 3; i++) {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            ATOM_XML.replace("Example Feed", `Feed ${i}`).replace(
+              "tag:example.com,2024:1",
+              `tag:example.com,2024:${i}`,
+            ),
+          ),
+      });
+      await addFeedFlow(`https://example.com/feed${i}.xml`);
+    }
+
+    // Track the order: all fetches should start before any completes
+    const callOrder = [];
+    globalThis.fetch = vi.fn().mockImplementation(() => {
+      callOrder.push("start");
+      return Promise.resolve({
+        ok: true,
+        text: () => {
+          callOrder.push("resolve");
+          return Promise.resolve(ATOM_XML);
+        },
+      });
+    });
+
+    const result = await refreshAllFeeds();
+    expect(isOk(result)).toBe(true);
+    expect(result.value.results.length).toBe(3);
+
+    // With Promise.allSettled, all 3 fetches are initiated before
+    // microtask resolution — all starts come before resolves
+    const firstResolveIndex = callOrder.indexOf("resolve");
+    const startCount = callOrder
+      .slice(0, firstResolveIndex)
+      .filter((e) => e === "start").length;
+    expect(startCount).toBe(3);
   });
 });
