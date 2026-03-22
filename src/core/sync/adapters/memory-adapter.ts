@@ -20,5 +20,8 @@ export function createMemoryAdapter(): SyncStorageAdapter {
       store.delete(vaultId);
       return ok(true);
     },
+    async count() {
+      return ok(store.size);
+    },
   };
 }

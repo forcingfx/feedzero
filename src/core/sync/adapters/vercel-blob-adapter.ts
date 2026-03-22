@@ -56,5 +56,27 @@ export function createVercelBlobAdapter(): SyncStorageAdapter {
         return err(`Vercel Blob delete failed: ${(e as Error).message}`);
       }
     },
+
+    async count() {
+      try {
+        const { list } = await import("@vercel/blob");
+        let total = 0;
+        let cursor: string | undefined;
+
+        do {
+          const result = await list({
+            prefix: "vaults/",
+            limit: 1000,
+            ...(cursor ? { cursor } : {}),
+          });
+          total += result.blobs.length;
+          cursor = result.hasMore ? result.cursor : undefined;
+        } while (cursor);
+
+        return ok(total);
+      } catch (e) {
+        return err(`Vercel Blob count failed: ${(e as Error).message}`);
+      }
+    },
   };
 }

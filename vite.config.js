@@ -85,6 +85,16 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
+      server.middlewares.use("/api/stats/sync", async (req, res) => {
+        const { syncAdapter } = await ensureSyncHandler();
+        const { handleSyncStatsRequest } = await import(
+          "./src/core/sync/sync-stats-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handleSyncStatsRequest(webReq, syncAdapter);
+        await sendWebResponse(webRes, res);
+      });
+
       server.middlewares.use("/api/sync", async (req, res) => {
         const { syncHandler, syncAdapter } = await ensureSyncHandler();
         const webReq = await toWebRequest(req);

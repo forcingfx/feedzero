@@ -88,4 +88,29 @@ describe("filesystem-adapter", () => {
     const result = await adapter.delete("../../../etc/passwd");
     expect(isErr(result)).toBe(true);
   });
+
+  describe("count", () => {
+    it("returns 0 when no vaults exist", async () => {
+      const adapter = createFilesystemAdapter(tmpDir);
+      const result = await adapter.count();
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result)).toBe(0);
+    });
+
+    it("returns correct count after storing vaults", async () => {
+      const adapter = createFilesystemAdapter(tmpDir);
+      await adapter.put("a".repeat(64), "data1");
+      await adapter.put("b".repeat(64), "data2");
+
+      const result = await adapter.count();
+      expect(unwrap(result)).toBe(2);
+    });
+
+    it("returns 0 when vaults directory does not exist", async () => {
+      const adapter = createFilesystemAdapter(path.join(tmpDir, "nonexistent"));
+      const result = await adapter.count();
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result)).toBe(0);
+    });
+  });
 });

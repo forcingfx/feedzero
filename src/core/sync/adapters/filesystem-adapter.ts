@@ -64,5 +64,17 @@ export function createFilesystemAdapter(dataDir: string): SyncStorageAdapter {
         return err(`Failed to delete vault: ${(e as Error).message}`);
       }
     },
+
+    async count() {
+      try {
+        const files = fs.readdirSync(vaultsDir).filter((f) => f.endsWith(".json"));
+        return ok(files.length);
+      } catch (e) {
+        if ((e as { code?: string }).code === "ENOENT") {
+          return ok(0);
+        }
+        return err(`Failed to count vaults: ${(e as Error).message}`);
+      }
+    },
   };
 }

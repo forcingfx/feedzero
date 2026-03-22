@@ -318,6 +318,36 @@ describe("server", () => {
     });
   });
 
+  describe("sync stats endpoint", () => {
+    it("GET /api/stats/sync returns vault count", async () => {
+      const app = createApp();
+
+      // Store a vault first
+      const vaultId = "a".repeat(64);
+      await app.request("/api/sync", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vaultId,
+          vault: { version: 1, iv: [1, 2, 3], ciphertext: "abc" },
+        }),
+      });
+
+      const res = await app.request("/api/stats/sync");
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toEqual({ ok: true, vaults: 1 });
+    });
+
+    it("GET /api/stats/sync returns zero with no vaults", async () => {
+      const app = createApp();
+      const res = await app.request("/api/stats/sync");
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toEqual({ ok: true, vaults: 0 });
+    });
+  });
+
   describe("proxy routing contract", () => {
     it("PROXY_SUPPORTED_METHODS lists GET and POST", () => {
       expect(PROXY_SUPPORTED_METHODS).toContain("GET");

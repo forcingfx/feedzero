@@ -6,11 +6,13 @@ import { isOk, isErr, unwrap } from "@/utils/result";
 const mockHead = vi.fn();
 const mockPut = vi.fn();
 const mockDel = vi.fn();
+const mockList = vi.fn();
 
 vi.mock("@vercel/blob", () => ({
   head: (...args: unknown[]) => mockHead(...args),
   put: (...args: unknown[]) => mockPut(...args),
   del: (...args: unknown[]) => mockDel(...args),
+  list: (...args: unknown[]) => mockList(...args),
 }));
 
 // Mock global fetch for the get() path (after head returns metadata)
@@ -126,6 +128,55 @@ describe("vercel-blob-adapter", () => {
       const adapter = createVercelBlobAdapter();
 
       const result = await adapter.delete("b".repeat(64));
+
+      expect(isErr(result)).toBe(true);
+    });
+  });
+
+  describe("count", () => {
+    it("returns total number of blobs in vaults/ prefix", async () => {
+      mockList.mockResolvedValue({
+        blobs: [{ pathname: "vaults/a.json" }, { pathname: "vaults/b.json" }],
+        hasMore: false,
+      });
+      const adapter = createVercelBlobAdapter();
+
+      const result = await adapter.count();
+
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result)).toBe(2);
+      expect(mockList).toHaveBeenCalledWith({ prefix: "vaults/", limit: 1000 });
+    });
+
+    it("paginates through all blobs when hasMore is true", async () => {
+      mockList
+        .mockResolvedValueOnce({
+          blobs: Array(1000).fill({ pathname: "vaults/x.json" }),
+          hasMore: true,
+          cursor: "cursor-1",
+        })
+        .mockResolvedValueOnce({
+          blobs: [{ pathname: "vaults/y.json" }],
+          hasMore: false,
+        });
+      const adapter = createVercelBlobAdapter();
+
+      const result = await adapter.count();
+
+      expect(unwrap(result)).toBe(1001);
+      expect(mockList).toHaveBeenCalledTimes(2);
+      expect(mockList).toHaveBeenLastCalledWith({
+        prefix: "vaults/",
+        limit: 1000,
+        cursor: "cursor-1",
+      });
+    });
+
+    it("returns error when list throws", async () => {
+      mockList.mockRejectedValue(new Error("Forbidden"));
+      const adapter = createVercelBlobAdapter();
+
+      const result = await adapter.count();
 
       expect(isErr(result)).toBe(true);
     });
