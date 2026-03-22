@@ -31,13 +31,17 @@ export function StorageChoiceStep() {
 
   // Handle 1, 2, 3 keyboard shortcuts to select options, Enter to submit
   useEffect(() => {
+    const keyToOption: Record<string, StorageOption> = {
+      "1": "local",
+      "2": "sync",
+      "3": "recovery",
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "1") {
-        setSelected("local");
-      } else if (e.key === "2") {
-        setSelected("sync");
-      } else if (e.key === "3") {
-        setSelected("recovery");
+      const option = keyToOption[e.key];
+      if (option) {
+        e.preventDefault();
+        setSelected(option);
       } else if (e.key === "Enter" && selected) {
         e.preventDefault();
         handleContinue();

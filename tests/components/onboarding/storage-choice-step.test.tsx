@@ -229,6 +229,22 @@ describe("StorageChoiceStep", () => {
     expect(screen.getByRole("radiogroup")).toBeInTheDocument();
   });
 
+  it.each(["1", "2", "3"])(
+    "pressing %s prevents default browser behavior",
+    (key) => {
+      renderInDialog(<StorageChoiceStep />);
+
+      const event = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        cancelable: true,
+      });
+      document.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+    },
+  );
+
   it("submits form with Enter key when option selected", async () => {
     const user = userEvent.setup();
     renderInDialog(<StorageChoiceStep />);
