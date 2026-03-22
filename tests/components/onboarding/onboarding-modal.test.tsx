@@ -8,6 +8,7 @@ import { useSyncStore } from "@/stores/sync-store";
 
 vi.mock("@/core/storage/db.ts", () => ({
   open: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
   getSalt: vi
     .fn()
     .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),

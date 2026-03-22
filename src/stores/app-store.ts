@@ -32,6 +32,10 @@ export const useAppStore = create<AppStore>((set) => ({
   hasCompletedOnboarding: null,
 
   initialize: async (passphrase) => {
+    // Delete any existing DB first to ensure a clean start for new users.
+    // This prevents stale encrypted data from a previous session leaking
+    // into a fresh onboarding flow.
+    await deleteDatabase();
     const result = await open(passphrase);
     if (result.ok) {
       set({ isDbReady: true, error: null });
@@ -109,6 +113,7 @@ export const useAppStore = create<AppStore>((set) => ({
     localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
     set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
+    await resetAllStores();
   },
 }));
 
