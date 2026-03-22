@@ -319,7 +319,7 @@ describe("server", () => {
   });
 
   describe("sync stats endpoint", () => {
-    it("GET /api/stats/sync returns vault count", async () => {
+    it("GET /api/stats-sync returns vault count", async () => {
       const app = createApp();
 
       // Store a vault first
@@ -333,15 +333,15 @@ describe("server", () => {
         }),
       });
 
-      const res = await app.request("/api/stats/sync");
+      const res = await app.request("/api/stats-sync");
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data).toEqual({ ok: true, vaults: 1 });
     });
 
-    it("GET /api/stats/sync returns zero with no vaults", async () => {
+    it("GET /api/stats-sync returns zero with no vaults", async () => {
       const app = createApp();
-      const res = await app.request("/api/stats/sync");
+      const res = await app.request("/api/stats-sync");
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data).toEqual({ ok: true, vaults: 0 });

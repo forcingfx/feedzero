@@ -111,7 +111,7 @@ export function createApp(
     handleProxyRequest(c.req.raw, "image/x-icon", cacheOpts),
   );
   app.all("/api/sync", (c) => handleSyncRequest(c.req.raw, syncAdapter));
-  app.get("/api/stats/sync", (c) => handleSyncStatsRequest(c.req.raw, syncAdapter));
+  app.get("/api/stats-sync", (c) => handleSyncStatsRequest(c.req.raw, syncAdapter));
   app.post("/api/feedback", (c) => handleFeedbackRequest(c.req.raw));
 
   return app;

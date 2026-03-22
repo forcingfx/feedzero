@@ -43,6 +43,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { SyncStatusChip } from "@/components/sync/sync-status-chip.tsx";
 import { AddFeedForm } from "@/components/feeds/add-feed-form.tsx";
@@ -63,6 +64,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
 
+  const { isMobile } = useSidebar();
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
 
@@ -113,7 +115,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         <span className="sr-only">Refresh</span>
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
+                    <TooltipContent hidden={isMobile}>
                       Refresh <Kbd className="ml-1">R</Kbd>
                     </TooltipContent>
                   </Tooltip>
@@ -129,7 +131,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       </PopoverTrigger>
                     </TooltipTrigger>
                     {!addFormOpen && (
-                      <TooltipContent>
+                      <TooltipContent hidden={isMobile}>
                         Add Feed <Kbd className="ml-1">N</Kbd>
                       </TooltipContent>
                     )}
