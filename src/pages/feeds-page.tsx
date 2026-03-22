@@ -204,18 +204,29 @@ export function FeedsPage() {
             <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
           </header>
           <main role="main" className="flex-1 flex flex-col min-h-0">
-            {feedId && (
+            {(feedId || articleId) && (
               <Button
                 variant="link"
                 size="sm"
-                onClick={handleBack}
+                onClick={() => {
+                  if (articleId && feedId) {
+                    // Viewing article → go back to article list
+                    skipAutoSelectRef.current = true;
+                    navigate(`/feeds/${feedId}`);
+                  } else {
+                    // Viewing article list → go back to feeds
+                    handleBack();
+                  }
+                }}
                 className="justify-start"
               >
                 ← Back
               </Button>
             )}
             <div className="flex-1 overflow-y-auto">
-              {feedId ? (
+              {articleId ? (
+                <ReaderPanel />
+              ) : feedId ? (
                 <ArticleList onArticleSelect={handleArticleSelect} />
               ) : (
                 <EmptyFeedsState />
