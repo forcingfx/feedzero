@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
 import { Layers, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
@@ -236,6 +237,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
               </span>
             </div>
           )}
+          <FeedbackDialog />
           <SyncStatusChip />
         </SidebarFooter>
 

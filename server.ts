@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { handleProxyRequest } from "./src/core/proxy/proxy-handler";
+import { handleFeedbackRequest } from "./src/core/feedback/feedback-handler";
 import { handleSyncRequest } from "./src/core/sync/sync-handler";
 import { createMemoryAdapter } from "./src/core/sync/adapters/memory-adapter";
 import { resolveAdapter } from "./src/core/sync/adapters/resolve-adapter";
@@ -109,6 +110,7 @@ export function createApp(
     handleProxyRequest(c.req.raw, "image/x-icon", cacheOpts),
   );
   app.all("/api/sync", (c) => handleSyncRequest(c.req.raw, syncAdapter));
+  app.post("/api/feedback", (c) => handleFeedbackRequest(c.req.raw));
 
   return app;
 }

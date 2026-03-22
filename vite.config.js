@@ -91,6 +91,15 @@ function apiProxyPlugin() {
         const webRes = await syncHandler(webReq, syncAdapter);
         await sendWebResponse(webRes, res);
       });
+
+      server.middlewares.use("/api/feedback", async (req, res) => {
+        const { handleFeedbackRequest } = await import(
+          "./src/core/feedback/feedback-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handleFeedbackRequest(webReq);
+        await sendWebResponse(webRes, res);
+      });
     },
   };
 }
