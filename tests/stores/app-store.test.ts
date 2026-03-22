@@ -171,13 +171,14 @@ describe("app-store", () => {
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
 
-    it("sets error when no stored keys exist", async () => {
+    it("forces re-onboarding when no stored keys exist", async () => {
       vi.mocked(loadStoredKeys).mockReturnValue(null);
 
       await useAppStore.getState().initializeReturningUser();
 
       expect(useAppStore.getState().isDbReady).toBe(false);
-      expect(useAppStore.getState().error).toMatch(/no stored keys/i);
+      expect(useAppStore.getState().error).toBeNull();
+      expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
     });
 
     it("restores sync credentials from stored keys for sync users", async () => {
@@ -256,7 +257,7 @@ describe("app-store", () => {
       expect(syncState.error).toBe("Sync pull failed (404): Vault not found");
     });
 
-    it("sets error when decryption validation fails after opening DB", async () => {
+    it("forces re-onboarding when decryption validation fails after opening DB", async () => {
       const mockKeys = {
         dbKeyJwk: { kty: "oct" } as JsonWebKey,
         hmacKeyJwk: { kty: "oct" } as JsonWebKey,
@@ -274,9 +275,8 @@ describe("app-store", () => {
 
       const state = useAppStore.getState();
       expect(state.isDbReady).toBe(false);
-      expect(state.error).toBe(
-        "Failed to decrypt 5 records. This may indicate an incorrect passphrase.",
-      );
+      expect(state.error).toBeNull();
+      expect(state.hasCompletedOnboarding).toBe(false);
     });
 
     it("does not proceed to sync pull when decryption validation fails", async () => {

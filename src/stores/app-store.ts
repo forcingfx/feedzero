@@ -13,6 +13,21 @@ import {
 } from "../core/storage/key-material.ts";
 import { useSyncStore } from "./sync-store.ts";
 
+type AppStoreSetter = (partial: Partial<AppStore>) => void;
+
+/**
+ * Clear all persisted state and redirect to onboarding.
+ * Called when returning-user initialization fails (missing keys, DB gone,
+ * decryption mismatch). Avoids showing an error wall — just re-onboard.
+ */
+async function forceReOnboarding(set: AppStoreSetter): Promise<void> {
+  await deleteDatabase();
+  clearStoredKeys();
+  localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
+  localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
+  set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
+}
+
 interface AppStore {
   isDbReady: boolean;
   error: string | null;
@@ -50,11 +65,8 @@ export const useAppStore = create<AppStore>((set) => ({
     const isSyncUser = storageMode === "sync";
 
     if (!storedKeys) {
-      set({
-        isDbReady: false,
-        error:
-          "No stored keys found. Please reset the app and set up again.",
-      });
+      // No keys — force re-onboarding instead of showing an error
+      await forceReOnboarding(set);
       return;
     }
 
@@ -62,6 +74,12 @@ export const useAppStore = create<AppStore>((set) => ({
       storedKeys.dbKeyJwk,
       storedKeys.hmacKeyJwk,
     );
+
+    if (!result.ok) {
+      // DB open failed (deleted, corrupted, etc.) — force re-onboarding
+      await forceReOnboarding(set);
+      return;
+    }
 
     if (isSyncUser && storedKeys.vaultId && storedKeys.vaultKeyJwk) {
       const vaultKey = await importCryptoKey(storedKeys.vaultKeyJwk, {
@@ -73,14 +91,10 @@ export const useAppStore = create<AppStore>((set) => ({
       });
     }
 
-    if (!result.ok) {
-      set({ isDbReady: false, error: result.error });
-      return;
-    }
-
     const feedsResult = await getFeeds();
     if (!feedsResult.ok) {
-      set({ isDbReady: false, error: feedsResult.error });
+      // Decryption failed — keys don't match data, force re-onboarding
+      await forceReOnboarding(set);
       return;
     }
 
