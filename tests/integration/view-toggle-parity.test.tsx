@@ -48,7 +48,7 @@ describe("view toggle behavior parity", () => {
     useExtractionStore.setState({
       cache: {},
       viewMode: "feed",
-      isExtracting: false,
+      statusMap: {},
     });
     useArticleStore.setState({
       articles: [testArticle],
@@ -102,7 +102,7 @@ describe("view toggle behavior parity", () => {
     useExtractionStore.setState({
       cache: { [testArticle.link]: "<p>Cached</p>" },
       viewMode: "feed",
-      isExtracting: false,
+      statusMap: {},
     });
 
     // Keyboard path

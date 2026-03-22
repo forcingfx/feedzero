@@ -23,6 +23,7 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
 
 vi.mock("@/core/extractor/extractor.ts", () => ({
   extract: vi.fn(),
+  needsExtraction: vi.fn().mockReturnValue(false),
 }));
 
 let mockIsDesktop = true;

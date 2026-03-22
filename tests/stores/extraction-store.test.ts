@@ -12,7 +12,7 @@ describe("extraction-store", () => {
     useExtractionStore.setState({
       cache: {},
       viewMode: "feed",
-      isExtracting: false,
+      statusMap: {},
     });
     vi.clearAllMocks();
   });
@@ -21,7 +21,7 @@ describe("extraction-store", () => {
     const s = useExtractionStore.getState();
     expect(s.viewMode).toBe("feed");
     expect(s.cache).toEqual({});
-    expect(s.isExtracting).toBe(false);
+    expect(Object.keys(s.statusMap).length).toBe(0);
   });
 
   describe("setViewMode", () => {
@@ -54,14 +54,14 @@ describe("extraction-store", () => {
 
       const s = useExtractionStore.getState();
       expect(s.cache["https://example.com/post"]).toBe("<p>Full article</p>");
-      expect(s.isExtracting).toBe(false);
+      expect(s.statusMap["https://example.com/post"]).toBe("available");
     });
 
     it("returns cached content without refetching", async () => {
       useExtractionStore.setState({
         cache: { "https://example.com/post": "<p>cached</p>" },
         viewMode: "feed",
-        isExtracting: false,
+        statusMap: {},
       });
 
       await useExtractionStore
@@ -84,7 +84,7 @@ describe("extraction-store", () => {
 
       const s = useExtractionStore.getState();
       expect(s.cache["https://example.com/bad"]).toBeUndefined();
-      expect(s.isExtracting).toBe(false);
+      expect(s.statusMap["https://example.com/bad"]).toBe("failed");
     });
 
     it("handles extraction failure gracefully", async () => {
@@ -109,7 +109,7 @@ describe("extraction-store", () => {
       useExtractionStore.setState({
         cache: { "https://a.com": "<p>a</p>" },
         viewMode: "extracted",
-        isExtracting: false,
+        statusMap: {},
       });
 
       useExtractionStore.getState().resetForArticle();
@@ -152,7 +152,7 @@ describe("extraction-store", () => {
       useExtractionStore.setState({
         cache: { "https://example.com/post": "<p>Cached</p>" },
         viewMode: "feed",
-        isExtracting: false,
+        statusMap: {},
       });
 
       useExtractionStore
@@ -197,7 +197,7 @@ describe("extraction-store", () => {
       useExtractionStore.setState({
         cache: {},
         viewMode: "extracted",
-        isExtracting: false,
+        statusMap: {},
       });
 
       useExtractionStore.getState().toggleViewMode("https://example.com/post");

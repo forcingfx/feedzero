@@ -4,10 +4,8 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
-import {
-  getAvailableModes,
-  hasSummarySubheading,
-} from "@/lib/content-modes.ts";
+import { hasSummarySubheading } from "@/lib/content-modes.ts";
+import { needsExtraction } from "@/core/extractor/extractor.ts";
 import { ArticleContent } from "./article-content.tsx";
 import { ViewToggle, type ViewMode } from "./view-toggle.tsx";
 
@@ -28,18 +26,25 @@ export function ReaderPanel() {
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const cache = useExtractionStore((s) => s.cache);
   const viewMode = useExtractionStore((s) => s.viewMode);
-  const isExtracting = useExtractionStore((s) => s.isExtracting);
   const setViewMode = useExtractionStore((s) => s.setViewMode);
   const switchToExtracted = useExtractionStore((s) => s.switchToExtracted);
+  const extractInBackground = useExtractionStore((s) => s.extractInBackground);
   const resetForArticle = useExtractionStore((s) => s.resetForArticle);
+  const statusMap = useExtractionStore((s) => s.statusMap);
 
   // Reset view mode when article changes
   useEffect(() => {
     resetForArticle();
   }, [article?.id, resetForArticle]);
 
+  // Auto-extract teaser articles in background
+  useEffect(() => {
+    if (article && needsExtraction(article)) {
+      extractInBackground(article.link);
+    }
+  }, [article?.id, article?.link, extractInBackground]);
+
   // Defensive: don't render article if it doesn't belong to current feed
-  // (skip check for global view where articles from any feed are allowed)
   if (
     article &&
     selectedFeedId &&
@@ -62,15 +67,13 @@ export function ReaderPanel() {
   }
 
   const cachedExtraction = article.link ? cache[article.link] : undefined;
-  const modes = getAvailableModes({
-    content: article.content,
-    summary: article.summary,
-    link: article.link,
-    cachedExtraction,
-  });
+  const extractionStatus = article.link
+    ? cachedExtraction
+      ? "available" as const
+      : statusMap[article.link] || "idle"
+    : ("idle" as const);
 
   function handleModeChange(mode: ViewMode) {
-    // "original" is handled by the link itself (opens in new tab)
     if (mode === "original") return;
     if (mode === "extracted") {
       switchToExtracted(article?.link);
@@ -108,14 +111,16 @@ export function ReaderPanel() {
       </div>
 
       <ViewToggle
-        modes={modes}
         activeMode={viewMode}
         articleLink={article.link}
+        extractionStatus={extractionStatus}
         onModeChange={handleModeChange}
       />
 
-      {isExtracting ? (
-        <p className="italic text-muted-foreground">Extracting full article…</p>
+      {viewMode === "extracted" && extractionStatus === "extracting" ? (
+        <p className="italic text-muted-foreground">
+          Extracting full article…
+        </p>
       ) : (
         <ArticleContent html={getContent()} />
       )}

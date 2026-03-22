@@ -2,24 +2,27 @@ import { create } from "zustand";
 import { extract } from "../core/extractor/extractor.ts";
 import { registry } from "../core/extractor/adapters/index.ts";
 import { proxyFetch } from "../core/proxy/proxy-fetch.ts";
+import type { ExtractionStatus } from "../components/reader/view-toggle.tsx";
 
 interface ExtractionStore {
   cache: Record<string, string>;
+  /** Per-URL extraction status: idle → extracting → available / failed */
+  statusMap: Record<string, ExtractionStatus>;
   viewMode: "feed" | "extracted";
-  isExtracting: boolean;
   setViewMode: (mode: "feed" | "extracted") => void;
-  /** Toggle between feed and extracted modes, fetching content if needed. */
   toggleViewMode: (articleLink: string | undefined) => void;
-  /** Switch to extracted mode and fetch content if not cached. */
   switchToExtracted: (articleLink: string | undefined) => void;
+  /** Start extraction in background without switching view mode. */
+  extractInBackground: (articleLink: string | undefined) => void;
   fetchExtracted: (url: string) => Promise<void>;
   resetForArticle: () => void;
+  getStatus: (url: string | undefined) => ExtractionStatus;
 }
 
 export const useExtractionStore = create<ExtractionStore>((set, get) => ({
   cache: {},
+  statusMap: {},
   viewMode: "feed",
-  isExtracting: false,
 
   setViewMode: (mode) => set({ viewMode: mode }),
 
@@ -38,29 +41,55 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
     }
   },
 
+  extractInBackground: (articleLink) => {
+    if (!articleLink) return;
+    if (get().cache[articleLink]) return;
+    if (get().statusMap[articleLink] === "extracting") return;
+    get().fetchExtracted(articleLink);
+  },
+
   fetchExtracted: async (url) => {
     if (get().cache[url]) return;
 
-    set({ isExtracting: true });
+    set({
+      statusMap: { ...get().statusMap, [url]: "extracting" },
+    });
+
     try {
-      // Check if a site adapter wants to remap the URL
       const adapter = registry.findAdapter(url);
       const sourceUrl = adapter?.getSourceUrl?.(url) ?? url;
 
       const response = await proxyFetch("/api/page", sourceUrl);
       if (!response.ok) {
-        set({ isExtracting: false });
+        set({
+          statusMap: { ...get().statusMap, [url]: "failed" },
+        });
         return;
       }
       const text = await response.text();
       const result = extract(text, url);
       if (result.ok && result.value.content) {
-        set({ cache: { ...get().cache, [url]: result.value.content } });
+        set({
+          cache: { ...get().cache, [url]: result.value.content },
+          statusMap: { ...get().statusMap, [url]: "available" },
+        });
+      } else {
+        set({
+          statusMap: { ...get().statusMap, [url]: "failed" },
+        });
       }
-    } finally {
-      set({ isExtracting: false });
+    } catch {
+      set({
+        statusMap: { ...get().statusMap, [url]: "failed" },
+      });
     }
   },
 
   resetForArticle: () => set({ viewMode: "feed" }),
+
+  getStatus: (url) => {
+    if (!url) return "idle";
+    if (get().cache[url]) return "available";
+    return get().statusMap[url] || "idle";
+  },
 }));

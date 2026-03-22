@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -14,6 +14,7 @@ vi.mock("@/core/storage/db.ts", () => ({
 
 vi.mock("@/core/extractor/extractor.ts", () => ({
   extract: vi.fn(),
+  needsExtraction: vi.fn().mockReturnValue(false),
 }));
 
 const mockArticle = (overrides = {}) => ({
@@ -40,8 +41,8 @@ describe("ReaderPanel", () => {
     });
     useExtractionStore.setState({
       cache: {},
+      statusMap: {},
       viewMode: "feed",
-      isExtracting: false,
     });
   });
 
@@ -64,7 +65,20 @@ describe("ReaderPanel", () => {
     expect(screen.getByText("Full article content here.")).toBeInTheDocument();
   });
 
-  it("shows author and original link", () => {
+  it("always shows all three buttons", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+    expect(screen.getByText("Feed")).toBeInTheDocument();
+    expect(screen.getByText("Extracted")).toBeInTheDocument();
+    expect(screen.getByText("Original")).toBeInTheDocument();
+  });
+
+  it("shows Original button as link when article has a link", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -77,19 +91,23 @@ describe("ReaderPanel", () => {
     expect(link).toHaveAttribute("target", "_blank");
   });
 
-  it("shows extracting state", () => {
+  it("shows extracting state when viewing extracted and extracting", async () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
       isLoading: false,
     });
-    useExtractionStore.setState({
-      cache: {},
-      viewMode: "extracted",
-      isExtracting: true,
-    });
 
     render(<ReaderPanel />);
+
+    // After initial render (which resets viewMode to "feed"), switch to extracting state
+    act(() => {
+      useExtractionStore.setState({
+        statusMap: { "https://example.com/post": "extracting" },
+        viewMode: "extracted",
+      });
+    });
+
     expect(screen.getByText(/Extracting full article/)).toBeInTheDocument();
   });
 
@@ -105,34 +123,15 @@ describe("ReaderPanel", () => {
       articles: [],
       isLoading: false,
     });
-    // Pre-populate cache so click immediately shows content
     useExtractionStore.setState({
       cache: { "https://example.com/post": `<p>${longWords}</p>` },
+      statusMap: { "https://example.com/post": "available" },
       viewMode: "feed",
-      isExtracting: false,
     });
 
     const { container } = render(<ReaderPanel />);
-    // Click "Extracted" button to switch mode
     await user.click(screen.getByRole("radio", { name: "Extracted" }));
     expect(container.textContent).toContain("expanded");
-  });
-
-  it("shows view toggle when extraction mode available", () => {
-    useArticleStore.setState({
-      selectedArticle: mockArticle({
-        content: "<p>short</p>",
-        summary: "<p>short</p>",
-      }),
-      articles: [],
-      isLoading: false,
-    });
-
-    render(<ReaderPanel />);
-    expect(screen.getByRole("radio", { name: "Feed" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("radio", { name: "Extracted" }),
-    ).toBeInTheDocument();
   });
 
   it("shows Kbd O hint next to the Original link", () => {
@@ -151,7 +150,6 @@ describe("ReaderPanel", () => {
 
   describe("timestamp display (006-S11)", () => {
     it("shows date and time with minutes, but not seconds", () => {
-      // Create article with a specific timestamp: Jan 15, 2024 at 14:30:45
       const timestamp = new Date(2024, 0, 15, 14, 30, 45).getTime();
       useArticleStore.setState({
         selectedArticle: mockArticle({ publishedAt: timestamp }),
@@ -161,14 +159,9 @@ describe("ReaderPanel", () => {
 
       render(<ReaderPanel />);
 
-      // The formatted date should include hour and minute
       const metaLine = screen.getByText(/Jan.*15.*2024/);
       expect(metaLine).toBeInTheDocument();
-
-      // Should show time (hour:minute)
       expect(metaLine.textContent).toMatch(/\d{1,2}:\d{2}/);
-
-      // Should NOT show seconds (:45)
       expect(metaLine.textContent).not.toMatch(/:45/);
     });
   });

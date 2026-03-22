@@ -82,7 +82,7 @@ describe("keyboard-UI behavior parity", () => {
     useExtractionStore.setState({
       cache: {},
       viewMode: "feed",
-      isExtracting: false,
+      statusMap: {},
     });
   });
 

@@ -1,24 +1,29 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 
 export type ViewMode = "feed" | "extracted" | "original";
+export type ExtractionStatus = "idle" | "extracting" | "available" | "failed";
 
 interface ViewToggleProps {
-  modes: string[];
   activeMode: string;
   articleLink?: string;
+  extractionStatus: ExtractionStatus;
   onModeChange: (mode: ViewMode) => void;
 }
 
+/**
+ * Always-visible toolbar for switching between content modes.
+ * All three buttons are always rendered — never hidden.
+ */
 export function ViewToggle({
-  modes,
   activeMode,
   articleLink,
+  extractionStatus,
   onModeChange,
 }: ViewToggleProps) {
-  // Always show if there's a link (for Original) or multiple content modes
-  if (modes.length <= 1 && !articleLink) return null;
+  const extractedDisabled =
+    extractionStatus === "extracting" || extractionStatus === "failed";
 
   return (
     <div className="flex items-center gap-2 mb-4">
@@ -31,21 +36,46 @@ export function ViewToggle({
         }}
         className="shadow-sm"
       >
-        {modes.map((mode) => (
-          <ToggleGroupItem key={mode} value={mode}>
-            {mode === "feed" ? "Feed" : "Extracted"}
-            {mode === "extracted" && <Kbd className="ml-1.5">E</Kbd>}
-          </ToggleGroupItem>
-        ))}
-        {articleLink && (
-          <ToggleGroupItem value="original" asChild>
+        <ToggleGroupItem value="feed">Feed</ToggleGroupItem>
+
+        <ToggleGroupItem
+          value="extracted"
+          disabled={extractedDisabled}
+          title={
+            extractionStatus === "failed"
+              ? "Extraction didn't find additional content"
+              : extractionStatus === "extracting"
+                ? "Extracting full article…"
+                : undefined
+          }
+        >
+          {extractionStatus === "extracting" ? (
+            <Loader2 className="size-3 animate-spin mr-1" />
+          ) : null}
+          Extracted
+          <Kbd className="ml-1.5">E</Kbd>
+        </ToggleGroupItem>
+
+        <ToggleGroupItem
+          value="original"
+          disabled={!articleLink}
+          title={!articleLink ? "No link available" : undefined}
+          asChild={!!articleLink}
+        >
+          {articleLink ? (
             <a href={articleLink} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="size-3" />
               Original
               <Kbd className="ml-1.5">O</Kbd>
             </a>
-          </ToggleGroupItem>
-        )}
+          ) : (
+            <>
+              <ExternalLink className="size-3" />
+              Original
+              <Kbd className="ml-1.5">O</Kbd>
+            </>
+          )}
+        </ToggleGroupItem>
       </ToggleGroup>
     </div>
   );
