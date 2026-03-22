@@ -91,6 +91,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold tracking-tight">
                 FeedZero
+                <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-700">
+                  Alpha
+                </span>
               </span>
               <div className="flex items-center gap-1">
                 {feeds.length > 0 && (

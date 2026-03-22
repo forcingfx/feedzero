@@ -57,6 +57,12 @@ export function WelcomeStep() {
         ))}
       </div>
 
+      <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+        <strong>Alpha:</strong> FeedZero is in early development. Your data is
+        stored locally and encrypted, but may be lost during updates. Cloud
+        sync is experimental.
+      </div>
+
       <DialogFooter className="sm:justify-center">
         <Button size="lg" onClick={() => setStep("storage-choice")} autoFocus>
           Get Started

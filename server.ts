@@ -85,6 +85,7 @@ export function createApp(
   app.get("/api/diagnostics", (c) =>
     c.json({
       status: "ok",
+      version: "0.1.0-alpha",
       timestamp: new Date().toISOString(),
       cache: feedCache ? { entries: feedCache.size } : null,
     }),
