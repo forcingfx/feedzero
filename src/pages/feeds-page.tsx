@@ -29,6 +29,11 @@ import {
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.tsx";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 
@@ -188,8 +193,14 @@ export function FeedsPage() {
         <AppSidebar onFeedSelect={handleFeedSelect} />
         <SidebarInset>
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-            <SidebarTrigger />
-            <Kbd>[</Kbd>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SidebarTrigger />
+              </TooltipTrigger>
+              <TooltipContent>
+                Toggle Sidebar <Kbd className="ml-1">[</Kbd>
+              </TooltipContent>
+            </Tooltip>
             <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
           </header>
           <main role="main" className="flex-1 flex flex-col min-h-0">
