@@ -13,6 +13,17 @@ vi.mock("../../src/core/storage/db", () => ({
   getSalt: vi
     .fn()
     .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
+  exportCurrentKeys: vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      dbKeyJwk: { kty: "oct", k: "db-key" },
+      hmacKeyJwk: { kty: "oct", k: "hmac-key" },
+    },
+  }),
+}));
+
+vi.mock("../../src/core/storage/crypto", () => ({
+  exportCryptoKey: vi.fn().mockResolvedValue({ kty: "oct", k: "vault-key" }),
 }));
 
 vi.mock("../../src/core/sync/vault-crypto", () => ({
@@ -37,10 +48,7 @@ import {
 } from "../../src/core/sync/sync-service";
 import { deleteDatabase } from "../../src/core/storage/db";
 import { useAppStore } from "../../src/stores/app-store";
-import {
-  deriveAndStoreKeys,
-  clearStoredKeys,
-} from "../../src/core/storage/key-material";
+import { clearStoredKeys } from "../../src/core/storage/key-material";
 
 const mockPushVault = vi.mocked(pushVault);
 const mockPullVault = vi.mocked(pullVault);
@@ -124,16 +132,20 @@ describe("sync-store", () => {
       expect(state.error).toBeNull();
     });
 
-    it("stores derived keys in localStorage", async () => {
+    it("persists current DB keys with vault keys in localStorage", async () => {
       mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
 
       await useSyncStore.getState().enableSync("test passphrase");
 
-      expect(deriveAndStoreKeys).toHaveBeenCalledWith(
-        "test passphrase",
-        new Uint8Array([1, 2, 3]),
-        { includeVaultKeys: true },
+      // Should store current DB keys + new vault keys (not re-derived DB keys)
+      const stored = JSON.parse(
+        localStorageMock.getItem("feedzero:derived-keys") ?? "null",
       );
+      expect(stored).not.toBeNull();
+      expect(stored.dbKeyJwk).toBeDefined();
+      expect(stored.hmacKeyJwk).toBeDefined();
+      expect(stored.vaultId).toBeDefined();
+      expect(stored.vaultKeyJwk).toBeDefined();
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
         "sync",
@@ -320,7 +332,7 @@ describe("sync-store", () => {
   });
 
   describe("disableSync", () => {
-    it("deletes server vault, resets state, and clears localStorage", async () => {
+    it("deletes server vault, re-stores DB keys without vault keys, and resets state", async () => {
       mockDeleteVault.mockResolvedValue({ ok: true, value: true });
       useSyncStore.setState({
         status: "synced",
@@ -336,7 +348,14 @@ describe("sync-store", () => {
       expect(state.credentials).toBeNull();
       expect(state.lastSyncedAt).toBeNull();
       expect(state.error).toBeNull();
-      expect(clearStoredKeys).toHaveBeenCalled();
+      // Should re-persist DB keys (without vault keys) for future sessions
+      const stored = JSON.parse(
+        localStorageMock.getItem("feedzero:derived-keys") ?? "null",
+      );
+      expect(stored).not.toBeNull();
+      expect(stored.dbKeyJwk).toBeDefined();
+      expect(stored.hmacKeyJwk).toBeDefined();
+      expect(stored.vaultId).toBeUndefined();
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
       );
@@ -355,7 +374,11 @@ describe("sync-store", () => {
       const state = useSyncStore.getState();
       expect(state.status).toBe("local-only");
       expect(state.credentials).toBeNull();
-      expect(clearStoredKeys).toHaveBeenCalled();
+      // DB keys should still be re-persisted even if vault deletion fails
+      const stored = JSON.parse(
+        localStorageMock.getItem("feedzero:derived-keys") ?? "null",
+      );
+      expect(stored).not.toBeNull();
     });
 
     it("cancels pending debounced push", async () => {

@@ -102,12 +102,35 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     set({ credentials, status: "syncing", error: null });
     localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
 
-    // Store derived keys (including vault keys)
-    const saltResult = await getSalt();
-    const salt = saltResult.ok ? saltResult.value : undefined;
-    await deriveAndStoreKeys(passphrase, salt, {
-      includeVaultKeys: true,
-    });
+    // Persist the current in-memory DB keys (which can decrypt local data)
+    // alongside the new vault keys derived from the sync passphrase.
+    // We must NOT re-derive DB keys from the new passphrase — local data
+    // is encrypted with the original onboarding passphrase's keys.
+    const { exportCurrentKeys } = await import("../core/storage/db.ts");
+    const currentKeys = await exportCurrentKeys();
+    if (currentKeys.ok) {
+      const saltResult = await getSalt();
+      const dbSalt = saltResult.ok ? Array.from(saltResult.value) : [];
+      const vaultIdResult = await deriveVaultId(passphrase);
+      const vaultKeyResult = await deriveVaultKey(passphrase, {
+        extractable: true,
+      });
+      if (vaultIdResult.ok && vaultKeyResult.ok) {
+        const { exportCryptoKey } = await import("../core/storage/crypto.ts");
+        const vaultKeyJwk = await exportCryptoKey(vaultKeyResult.value);
+        const material = {
+          dbKeyJwk: currentKeys.value.dbKeyJwk,
+          hmacKeyJwk: currentKeys.value.hmacKeyJwk,
+          dbSalt,
+          vaultId: vaultIdResult.value,
+          vaultKeyJwk,
+        };
+        localStorage.setItem(
+          LOCAL_STORAGE.DERIVED_KEYS,
+          JSON.stringify(material),
+        );
+      }
+    }
 
     const result = await pushVault(credentials);
     if (result.ok) {
@@ -133,7 +156,25 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     if (credentials) {
       await deleteVault(credentials);
     }
-    clearStoredKeys();
+
+    // Re-persist current DB keys without vault keys so local data
+    // remains accessible in future sessions after switching to local-only.
+    const { exportCurrentKeys } = await import("../core/storage/db.ts");
+    const currentKeys = await exportCurrentKeys();
+    if (currentKeys.ok) {
+      const saltResult = await getSalt();
+      const dbSalt = saltResult.ok ? Array.from(saltResult.value) : [];
+      const material = {
+        dbKeyJwk: currentKeys.value.dbKeyJwk,
+        hmacKeyJwk: currentKeys.value.hmacKeyJwk,
+        dbSalt,
+      };
+      localStorage.setItem(
+        LOCAL_STORAGE.DERIVED_KEYS,
+        JSON.stringify(material),
+      );
+    }
+
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
     set({
       status: "local-only",

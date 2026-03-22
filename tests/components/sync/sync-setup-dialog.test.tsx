@@ -7,6 +7,20 @@ import { useAppStore } from "@/stores/app-store";
 
 vi.mock("@/core/storage/db", () => ({
   deleteDatabase: vi.fn().mockResolvedValue({ ok: true }),
+  getSalt: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
+  exportCurrentKeys: vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      dbKeyJwk: { kty: "oct", k: "db-key" },
+      hmacKeyJwk: { kty: "oct", k: "hmac-key" },
+    },
+  }),
+}));
+
+vi.mock("@/core/storage/crypto", () => ({
+  exportCryptoKey: vi.fn().mockResolvedValue({ kty: "oct", k: "vault-key" }),
 }));
 
 vi.mock("@/core/sync/sync-service", () => ({

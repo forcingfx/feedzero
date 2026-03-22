@@ -125,6 +125,25 @@ export async function getSalt(): Promise<Result<Uint8Array>> {
 }
 
 /**
+ * Export the current in-memory keys as JWKs.
+ * Used when transitioning from sync to local-only to re-persist keys
+ * without the original passphrase.
+ */
+export async function exportCurrentKeys(): Promise<
+  Result<{ dbKeyJwk: JsonWebKey; hmacKeyJwk: JsonWebKey }>
+> {
+  try {
+    const ctx = requireOpen();
+    const { exportCryptoKey } = await import("./crypto.ts");
+    const dbKeyJwk = await exportCryptoKey(ctx.cryptoKey);
+    const hmacKeyJwk = await exportCryptoKey(ctx.hmacKey);
+    return ok({ dbKeyJwk, hmacKeyJwk });
+  } catch (e) {
+    return err(`Failed to export keys: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Close the database and clear key material.
  */
 export function close(): void {
