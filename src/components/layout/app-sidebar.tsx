@@ -132,7 +132,16 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                   </Tooltip>
                   <PopoverContent align="start" variant="form" className="w-80">
                     <AddFeedForm
-                      onAdded={() => setAddFormOpen(false)}
+                      onAdded={() => {
+                        setAddFormOpen(false);
+                        // Move focus away from the trigger button so the
+                        // tooltip doesn't activate on popover close.
+                        requestAnimationFrame(() => {
+                          if (document.activeElement instanceof HTMLElement) {
+                            document.activeElement.blur();
+                          }
+                        });
+                      }}
                       onCancel={() => setAddFormOpen(false)}
                       onFeedSelect={onFeedSelect}
                     />
