@@ -12,9 +12,8 @@ import {
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
-import { initFresh } from "@/core/storage/key-manager";
+import { initFresh, rekeyFromPassphrase } from "@/core/storage/key-manager";
 import { pullVault, importVault } from "@/core/sync/sync-service";
-import { rekeyFromPassphrase } from "@/core/storage/key-manager";
 
 export function RecoveryStep() {
   const [passphrase, setPassphrase] = useState("");
@@ -32,8 +31,19 @@ export function RecoveryStep() {
 
     const trimmed = passphrase.trim();
 
-    // Initialize fresh with the recovery passphrase (sync enabled)
-    const initResult = await initFresh(trimmed, { sync: true });
+    // 1. Pull vault FIRST — before any destructive operations.
+    //    This ensures the vault data is safely in memory before we
+    //    touch local state or risk deleting the server vault.
+    const pullResult = await pullVault(trimmed);
+    if (!pullResult.ok) {
+      setError("Could not find a vault for this passphrase. Please check and try again.");
+      setIsLoading(false);
+      return;
+    }
+
+    // 2. Now that vault data is safely in hand, initialize local DB.
+    //    skipServerCleanup prevents deleting the vault we just pulled from.
+    const initResult = await initFresh(trimmed, { sync: true, skipServerCleanup: true });
     if (!initResult.ok) {
       setError("Could not initialize. Please check your passphrase.");
       setIsLoading(false);
@@ -42,15 +52,11 @@ export function RecoveryStep() {
 
     const credentials = initResult.value.credentials;
 
-    // Attempt cloud pull — if vault exists on server, import and rekey
+    // 3. Import the pulled vault data and restore sync state
     if (credentials) {
-      const pullResult = await pullVault(credentials);
-      if (pullResult.ok) {
-        await importVault(pullResult.value);
-        // After importAll, re-derive keys since data is now re-encrypted
-        await rekeyFromPassphrase(trimmed, { sync: true });
-        useSyncStore.getState().restoreSync(credentials);
-      }
+      await importVault(pullResult.value);
+      await rekeyFromPassphrase(trimmed, { sync: true });
+      useSyncStore.getState().restoreSync(credentials);
     }
 
     useAppStore.setState({ isDbReady: true });

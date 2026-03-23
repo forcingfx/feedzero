@@ -29,8 +29,10 @@ Feature: Zero-knowledge cloud sync
   Scenario: Recovering on a new device
     Given a user with an empty browser and a valid passphrase
     When they enter their passphrase in the recovery step
-    Then the app pulls and decrypts the vault from the server
+    Then the app pulls and decrypts the vault from the server FIRST
+    And only then initializes a fresh local database (with skipServerCleanup)
     And imports all feeds and articles locally
+    And if the pull fails, no local state is modified and the error is shown
 
   Scenario: Data changes trigger sync
     Given a sync-enabled user

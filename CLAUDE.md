@@ -302,6 +302,7 @@ FeedZero exists to protect its users. It is used by journalists, activists, and 
 - Feed format detection tries JSON parse first (for JSON Feed), then XML (for RSS/Atom)
 - XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector`
 - **Key-data coupling invariant:** Stored derived keys (`feedzero:derived-keys` in localStorage) must always be able to decrypt local IndexedDB data. Only two operations may break this coupling: `open(passphrase)` (which derives fresh keys and re-opens the DB) and `importAll()` (which clears and re-encrypts all data). Any operation that modifies stored keys without re-encrypting data, or re-encrypts data without updating stored keys, is a bug. When transitioning between sync modes, use `exportCurrentKeys()` to persist the in-memory keys rather than deriving new ones.
+- **Pull-before-mutate invariant:** Any flow that reads remote state and then modifies local state must fetch the remote data **before** any destructive local operations (`deleteDatabase`, `tryDeleteServerVault`). The recovery flow calls `pullVault()` first, then `initFresh(skipServerCleanup: true)`. This prevents destroying the vault you're trying to recover. Workflows with destructive + read operations on shared remote state need integration tests — mocked unit tests cannot catch temporal coupling bugs across module boundaries.
 
 ---
 

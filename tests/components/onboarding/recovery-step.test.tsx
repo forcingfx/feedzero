@@ -108,6 +108,10 @@ describe("RecoveryStep", () => {
 
   it("shows error when db open fails", async () => {
     const user = userEvent.setup();
+    vi.mocked(pullVault).mockResolvedValue({
+      ok: true,
+      value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+    });
     vi.mocked(initFresh).mockResolvedValue({
       ok: false,
       error: "Invalid passphrase",
@@ -126,14 +130,19 @@ describe("RecoveryStep", () => {
     });
   });
 
-  it("completes onboarding when passphrase is valid (local-only)", async () => {
+  it("completes onboarding when passphrase is valid and vault exists", async () => {
     const user = userEvent.setup();
+    vi.mocked(pullVault).mockResolvedValue({
+      ok: true,
+      value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+    });
     vi.mocked(initFresh).mockResolvedValue({
       ok: true,
       value: {
         credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
       },
     });
+    vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
 
     renderInDialog(<RecoveryStep />);
 
@@ -150,12 +159,17 @@ describe("RecoveryStep", () => {
 
   it("stores derived keys on recovery", async () => {
     const user = userEvent.setup();
+    vi.mocked(pullVault).mockResolvedValue({
+      ok: true,
+      value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+    });
     vi.mocked(initFresh).mockResolvedValue({
       ok: true,
       value: {
         credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
       },
     });
+    vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
 
     renderInDialog(<RecoveryStep />);
 
@@ -171,7 +185,7 @@ describe("RecoveryStep", () => {
 
     expect(initFresh).toHaveBeenCalledWith(
       "carbon mango velvet prism",
-      { sync: true },
+      { sync: true, skipServerCleanup: true },
     );
   });
 
@@ -257,14 +271,80 @@ describe("RecoveryStep", () => {
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
-    it("initializes with sync mode for cloud recovery", async () => {
+    it("pulls vault BEFORE calling initFresh (no destructive ops before read)", async () => {
+      const user = userEvent.setup();
+      const callOrder: string[] = [];
+      vi.mocked(pullVault).mockImplementation(async () => {
+        callOrder.push("pullVault");
+        return {
+          ok: true,
+          value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+        };
+      });
+      vi.mocked(initFresh).mockImplementation(async () => {
+        callOrder.push("initFresh");
+        return {
+          ok: true,
+          value: {
+            credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+          },
+        };
+      });
+      vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
+
+      renderInDialog(<RecoveryStep />);
+
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+      });
+
+      expect(callOrder).toEqual(["pullVault", "initFresh"]);
+    });
+
+    it("calls initFresh with skipServerCleanup during recovery", async () => {
+      const user = userEvent.setup();
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: true,
+        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      });
+      vi.mocked(initFresh).mockResolvedValue({
+        ok: true,
+        value: {
+          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+        },
+      });
+      vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
+
+      renderInDialog(<RecoveryStep />);
+
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(initFresh).toHaveBeenCalledWith(
+          "carbon mango velvet prism",
+          { sync: true, skipServerCleanup: true },
+        );
+      });
+    });
+
+    it("initializes with sync mode and skipServerCleanup for cloud recovery", async () => {
       const user = userEvent.setup();
       vi.mocked(initFresh).mockResolvedValue({
-      ok: true,
-      value: {
-        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
-      },
-    });
+        ok: true,
+        value: {
+          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+        },
+      });
       vi.mocked(pullVault).mockResolvedValue({
         ok: true,
         value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
@@ -282,7 +362,7 @@ describe("RecoveryStep", () => {
       await waitFor(() => {
         expect(initFresh).toHaveBeenCalledWith(
           "carbon mango velvet prism",
-          { sync: true },
+          { sync: true, skipServerCleanup: true },
         );
       });
     });
@@ -295,12 +375,17 @@ describe("RecoveryStep", () => {
 
     it("submits on Enter key in input field", async () => {
       const user = userEvent.setup();
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: true,
+        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      });
       vi.mocked(initFresh).mockResolvedValue({
-      ok: true,
-      value: {
-        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
-      },
-    });
+        ok: true,
+        value: {
+          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+        },
+      });
+      vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
 
       renderInDialog(<RecoveryStep />);
 
@@ -314,17 +399,11 @@ describe("RecoveryStep", () => {
       });
     });
 
-    it("completes onboarding even if pull fails (falls back to local)", async () => {
+    it("shows error and does not complete onboarding when pull fails", async () => {
       const user = userEvent.setup();
-      vi.mocked(initFresh).mockResolvedValue({
-      ok: true,
-      value: {
-        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
-      },
-    });
       vi.mocked(pullVault).mockResolvedValue({
         ok: false,
-        error: "Not found",
+        error: "Sync pull failed (404): Not found",
       });
 
       renderInDialog(<RecoveryStep />);
@@ -336,8 +415,15 @@ describe("RecoveryStep", () => {
       await user.click(screen.getByRole("button", { name: /recover/i }));
 
       await waitFor(() => {
-        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+        expect(
+          screen.getByText(/could not find a vault/i),
+        ).toBeInTheDocument();
       });
+
+      // Onboarding should NOT complete — no silent data loss
+      expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
+      // initFresh should NOT have been called — no destructive action taken
+      expect(initFresh).not.toHaveBeenCalled();
     });
   });
 });

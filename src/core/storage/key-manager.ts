@@ -115,11 +115,13 @@ async function deriveVaultMaterial(
  */
 export async function initFresh(
   passphrase: string,
-  options?: { sync: boolean },
+  options?: { sync: boolean; skipServerCleanup?: boolean },
 ): Promise<Result<{ credentials: SyncCredentials | null }>> {
   try {
     // 1. Clean up any previous session
-    await tryDeleteServerVault();
+    if (!options?.skipServerCleanup) {
+      await tryDeleteServerVault();
+    }
     await deleteDatabase();
 
     // 2. Open fresh DB
