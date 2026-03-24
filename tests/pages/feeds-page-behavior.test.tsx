@@ -322,4 +322,13 @@ describe("FeedsPage behavior — mobile", () => {
     );
     expect(backBtn).toBeUndefined();
   });
+
+  it("mobile header has sticky positioning", () => {
+    const { container } = renderPage("/feeds");
+
+    const header = container.querySelector("header");
+    expect(header).not.toBeNull();
+    expect(header!.className).toMatch(/\bsticky\b/);
+    expect(header!.className).toMatch(/\btop-0\b/);
+  });
 });

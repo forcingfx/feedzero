@@ -64,7 +64,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
 
-  const { isMobile } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
 
@@ -76,6 +76,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   }, []);
 
   function handleSelect(feedId: string) {
+    if (isMobile) setOpenMobile(false);
     if (onFeedSelect) onFeedSelect(feedId);
   }
 

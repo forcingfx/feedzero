@@ -220,4 +220,57 @@ test.describe("Layout — mobile", () => {
     // Should contain the app name
     await expect(page.getByText("FeedZero")).toBeVisible();
   });
+
+  test("sidebar closes when a feed is tapped", async ({ feedPage: page }) => {
+    await setupFeed(page);
+
+    // Open the sidebar
+    await page.getByRole("button", { name: /toggle sidebar/i }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+
+    // Tap the feed in the sidebar
+    await dialog.getByRole("button", { name: "Test Feed" }).click();
+
+    // Sidebar should close automatically
+    await expect(dialog).toBeHidden({ timeout: 5000 });
+
+    // Article list should be visible
+    await expect(articleOption(page, "First Article")).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  test("header stays visible when scrolling article list", async ({
+    feedPage: page,
+  }) => {
+    await setupFeed(page);
+
+    // Inject many items to force scroll in the content area
+    await page.evaluate(() => {
+      const scrollContainer = document.querySelector(
+        'main [class*="overflow-y-auto"]',
+      );
+      if (scrollContainer) {
+        const tall = document.createElement("div");
+        tall.style.height = "5000px";
+        tall.textContent = "Tall spacer for scroll testing";
+        scrollContainer.appendChild(tall);
+      }
+    });
+
+    // Scroll the content area
+    await page.evaluate(() => {
+      const scrollContainer = document.querySelector(
+        'main [class*="overflow-y-auto"]',
+      );
+      if (scrollContainer) scrollContainer.scrollTop = 1000;
+    });
+
+    // Header should still be visible at the top
+    const header = page.locator("header").first();
+    const headerBox = await header.boundingBox();
+    expect(headerBox).toBeTruthy();
+    expect(headerBox!.y).toBeLessThanOrEqual(5);
+  });
 });

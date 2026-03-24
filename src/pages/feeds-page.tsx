@@ -196,7 +196,7 @@ export function FeedsPage() {
         <SidebarAddFeedOpener />
         <AppSidebar onFeedSelect={handleFeedSelect} />
         <SidebarInset>
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 sticky top-0 z-10 bg-background">
             <Tooltip>
               <TooltipTrigger asChild>
                 <SidebarTrigger />
