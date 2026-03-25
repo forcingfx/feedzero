@@ -12,8 +12,6 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group.tsx";
 import { SettingsDialog } from "@/components/settings/settings-dialog.tsx";
-import { FeedPackCard } from "@/components/feeds/feed-pack-card.tsx";
-import { feedPacks } from "@/lib/feed-packs.ts";
 
 interface AddFeedFormProps {
   onAdded: () => void;
@@ -119,15 +117,6 @@ export function AddFeedForm({
           <FileUp className="mr-2 size-4" />
           Import / Export OPML
         </Button>
-
-        <div className="space-y-2 mt-3">
-          <p className="text-xs text-muted-foreground text-center">
-            Starter packs
-          </p>
-          {feedPacks.map((pack) => (
-            <FeedPackCard key={pack.id} pack={pack} onComplete={onAdded} />
-          ))}
-        </div>
 
         {onCancel && (
           <button

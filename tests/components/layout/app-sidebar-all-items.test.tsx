@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import userEvent from "@testing-library/user-event";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
@@ -30,9 +31,11 @@ const mockFeed = (id: string, title: string) => ({
 
 function renderSidebar(onFeedSelect?: (feedId: string) => void) {
   return render(
-    <SidebarProvider>
-      <AppSidebar onFeedSelect={onFeedSelect} />
-    </SidebarProvider>,
+    <MemoryRouter>
+      <SidebarProvider>
+        <AppSidebar onFeedSelect={onFeedSelect} />
+      </SidebarProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -62,8 +65,10 @@ describe("AppSidebar All items entry", () => {
     );
     const texts = Array.from(menuButtons).map((btn) => btn.textContent);
 
-    expect(texts[0]).toContain("All items");
-    expect(texts[1]).toContain("Tech News");
+    // Discover group comes first, then Feeds group
+    expect(texts[0]).toContain("Explore feeds");
+    expect(texts[1]).toContain("All items");
+    expect(texts[2]).toContain("Tech News");
   });
 
   it("calls onFeedSelect with ALL_FEEDS_ID when clicked", async () => {

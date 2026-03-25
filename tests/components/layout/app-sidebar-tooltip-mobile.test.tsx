@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -85,10 +86,12 @@ describe("AppSidebar tooltip on mobile", () => {
   it("refresh tooltip is hidden on mobile", async () => {
     setViewportWidth(400);
     render(
-      <SidebarProvider>
-        <SidebarOpener />
-        <AppSidebar />
-      </SidebarProvider>,
+      <MemoryRouter>
+        <SidebarProvider>
+          <SidebarOpener />
+          <AppSidebar />
+        </SidebarProvider>
+      </MemoryRouter>,
     );
 
     // Open the mobile sidebar sheet

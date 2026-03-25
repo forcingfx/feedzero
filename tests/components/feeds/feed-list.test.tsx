@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import userEvent from "@testing-library/user-event";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
@@ -29,9 +30,11 @@ const mockFeed = (id: string, title: string) => ({
 
 function renderSidebar(props: { onFeedSelect?: (id: string) => void } = {}) {
   return render(
-    <SidebarProvider>
-      <AppSidebar {...props} />
-    </SidebarProvider>,
+    <MemoryRouter>
+      <SidebarProvider>
+        <AppSidebar {...props} />
+      </SidebarProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -45,11 +48,10 @@ describe("AppSidebar", () => {
     });
   });
 
-  it("shows no Feeds group when no feeds exist", () => {
-    const { container } = renderSidebar();
-    expect(
-      container.querySelector("[data-sidebar='group-label']"),
-    ).not.toBeInTheDocument();
+  it("shows no Feeds group label when no feeds exist", () => {
+    renderSidebar();
+    expect(screen.queryByText("Feeds")).not.toBeInTheDocument();
+    expect(screen.getByText("Discover")).toBeInTheDocument();
   });
 
   it("renders feed items", () => {

@@ -160,6 +160,59 @@ export async function addFeedFlow(
   }
 }
 
+interface PreviewArticle {
+  title: string;
+  link: string;
+  summary: string;
+  publishedAt: number | null;
+}
+
+interface PreviewResult {
+  title: string;
+  siteUrl: string;
+  articles: PreviewArticle[];
+}
+
+/**
+ * Fetch and parse a feed for preview without persisting anything.
+ * Returns the feed title and a list of articles with titles and summaries.
+ */
+export async function previewFeed(
+  rawUrl: string,
+): Promise<Result<PreviewResult>> {
+  const url = normalizeUrl(rawUrl);
+  try {
+    const response = await proxyFetch("/api/feed", url);
+    if (!response.ok) {
+      return err(
+        `The feed at this URL could not be reached (HTTP ${response.status}).`,
+      );
+    }
+    const text = await response.text();
+
+    const parseResult = parse(text, url);
+    if (!parseResult.ok) {
+      return err(friendlyError(parseResult.error));
+    }
+
+    const { feed, articles } = parseResult.value;
+    return ok({
+      title: feed.title,
+      siteUrl: feed.siteUrl,
+      articles: articles.map((a) => ({
+        title: a.title,
+        link: a.link,
+        summary: a.summary || a.content.replace(/<[^>]*>/g, "").slice(0, 200),
+        publishedAt: a.publishedAt,
+      })),
+    });
+  } catch {
+    return err(
+      "The feed could not be reached. Please check your connection and try again.",
+    );
+  }
+}
+
 /**
  * Refresh a single feed: fetch latest XML, add new articles, update changed ones.
  */

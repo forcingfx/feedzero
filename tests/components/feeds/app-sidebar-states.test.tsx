@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import userEvent from "@testing-library/user-event";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
@@ -29,9 +30,11 @@ const mockFeed = (id: string, title: string) => ({
 
 function renderSidebar(props: { onFeedSelect?: (id: string) => void } = {}) {
   return render(
-    <SidebarProvider>
-      <AppSidebar {...props} />
-    </SidebarProvider>,
+    <MemoryRouter>
+      <SidebarProvider>
+        <AppSidebar {...props} />
+      </SidebarProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -47,11 +50,11 @@ describe("AppSidebar states", () => {
     });
   });
 
-  it("hides Feeds group when no feeds exist", () => {
-    const { container } = renderSidebar();
-    expect(
-      container.querySelector("[data-sidebar='group-label']"),
-    ).not.toBeInTheDocument();
+  it("hides Feeds group label when no feeds exist", () => {
+    renderSidebar();
+    // Feeds group hidden, only Discover group visible
+    expect(screen.queryByText("Feeds")).not.toBeInTheDocument();
+    expect(screen.getByText("Discover")).toBeInTheDocument();
   });
 
   it("renders feed items with titles", () => {
@@ -155,34 +158,9 @@ describe("AppSidebar states", () => {
     );
   });
 
-  it("shows u/i keyboard hints when 2+ feeds are present", () => {
-    useFeedStore.setState({
-      feeds: [mockFeed("a", "Alpha Feed"), mockFeed("b", "Beta Feed")],
-    });
-    const { container } = renderSidebar();
-    const kbds = container.querySelectorAll("kbd");
-    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).toContain("U");
-    expect(keys).toContain("I");
-  });
-
-  it("hides u/i hints when only 1 feed exists", () => {
-    useFeedStore.setState({
-      feeds: [mockFeed("a", "Alpha Feed")],
-    });
-    const { container } = renderSidebar();
-    const kbds = container.querySelectorAll("kbd");
-    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).not.toContain("U");
-    expect(keys).not.toContain("I");
-  });
-
-  it("hides u/i hints when no feeds exist", () => {
-    const { container } = renderSidebar();
-    const kbds = container.querySelectorAll("kbd");
-    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).not.toContain("U");
-    expect(keys).not.toContain("I");
+  it("shows settings menu in footer", () => {
+    renderSidebar();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
   it("hides R kbd hint while refreshing", () => {

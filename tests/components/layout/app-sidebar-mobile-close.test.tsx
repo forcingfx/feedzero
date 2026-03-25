@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -90,10 +91,12 @@ describe("AppSidebar closes on mobile feed select", () => {
     const onFeedSelect = vi.fn();
 
     render(
-      <SidebarProvider>
-        <SidebarStateCapture />
-        <AppSidebar onFeedSelect={onFeedSelect} />
-      </SidebarProvider>,
+      <MemoryRouter>
+        <SidebarProvider>
+          <SidebarStateCapture />
+          <AppSidebar onFeedSelect={onFeedSelect} />
+        </SidebarProvider>
+      </MemoryRouter>,
     );
 
     // Open the mobile sidebar

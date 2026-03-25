@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router";
-import { Rss } from "lucide-react";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
@@ -8,13 +7,6 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  EmptyDescription,
-} from "@/components/ui/empty.tsx";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import {
   ResizablePanelGroup,
@@ -35,9 +27,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
 import { ArticleList } from "@/components/articles/article-list.tsx";
-import { FeedPackCard } from "@/components/feeds/feed-pack-card.tsx";
-import { feedPacks } from "@/lib/feed-packs.ts";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
+import { ExploreCatalog } from "@/components/explore/explore-catalog.tsx";
 
 /**
  * Returns the default feed ID to show when no feed is selected.
@@ -87,31 +78,6 @@ function SidebarAddFeedOpener() {
   return null;
 }
 
-/** Shown when the user has no feeds yet. */
-function EmptyFeedsState() {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6 max-w-md mx-auto">
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <Rss />
-          </EmptyMedia>
-          <EmptyTitle>No feeds yet</EmptyTitle>
-          <EmptyDescription>
-            Add a feed with the <Kbd>N</Kbd> key, or get started with a
-            starter pack below.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-      <div className="w-full space-y-3">
-        {feedPacks.map((pack) => (
-          <FeedPackCard key={pack.id} pack={pack} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /**
  * Main page component.
  * Desktop: sidebar (feeds) + article list + reader pane.
@@ -120,6 +86,8 @@ function EmptyFeedsState() {
 export function FeedsPage() {
   const { feedId, articleId } = useParams();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const isExplorePage = pathname === "/explore";
   const isDesktop = useIsDesktop();
   useKeyboardNav();
   const feeds = useFeedStore((s) => s.feeds);
@@ -131,15 +99,18 @@ export function FeedsPage() {
   // Track whether user explicitly navigated back (to suppress auto-select)
   const skipAutoSelectRef = useRef(false);
 
-  // Auto-navigate to default feed when no feed is selected and feeds exist
+  // Auto-navigate to explore when no feeds exist, or to default feed when feeds exist
   useEffect(() => {
-    if (!feedId && feeds.length > 0) {
+    if (isExplorePage) return;
+    if (feeds.length === 0 && !feedId) {
+      navigate("/explore", { replace: true });
+    } else if (!feedId && feeds.length > 0) {
       const defaultFeedId = getDefaultFeedId(feeds);
       if (defaultFeedId) {
         navigate(`/feeds/${defaultFeedId}`, { replace: true });
       }
     }
-  }, [feedId, feeds, navigate]);
+  }, [isExplorePage, feedId, feeds, navigate]);
 
   useEffect(() => {
     if (feedId) {
@@ -151,6 +122,9 @@ export function FeedsPage() {
 
   useEffect(() => {
     if (articleId && articles.length > 0) {
+      // Skip if already selected (avoids redundant work on URL sync)
+      const current = useArticleStore.getState().selectedArticle;
+      if (current?.id === articleId) return;
       const article = articles.find((a) => a.id === articleId);
       if (article) selectArticle(article);
     }
@@ -183,9 +157,11 @@ export function FeedsPage() {
   }
 
   function handleArticleSelect(article: { id: string }) {
-    if (feedId) {
-      navigate(`/feeds/${feedId}/articles/${article.id}`);
-    }
+    if (!feedId) return;
+    // Select article immediately for instant UI response, then sync URL
+    const fullArticle = articles.find((a) => a.id === article.id);
+    if (fullArticle) selectArticle(fullArticle);
+    navigate(`/feeds/${feedId}/articles/${article.id}`);
   }
 
   // Mobile: sidebar is offcanvas, show one content panel at a time
@@ -222,12 +198,14 @@ export function FeedsPage() {
               </Button>
             )}
             <div className="flex-1 overflow-y-auto">
-              {articleId ? (
+              {isExplorePage ? (
+                <ExploreCatalog />
+              ) : articleId ? (
                 <ReaderPanel />
               ) : feedId ? (
                 <ArticleList onArticleSelect={handleArticleSelect} />
               ) : (
-                <EmptyFeedsState />
+                <ExploreCatalog />
               )}
             </div>
           </main>
@@ -254,8 +232,14 @@ export function FeedsPage() {
           </Tooltip>
           <HeaderBreadcrumbs />
         </header>
-        {feeds.length === 0 ? (
-          <EmptyFeedsState />
+        {isExplorePage ? (
+          <ScrollArea className="flex-1 min-h-0">
+            <ExploreCatalog />
+          </ScrollArea>
+        ) : feeds.length === 0 ? (
+          <ScrollArea className="flex-1 min-h-0">
+            <ExploreCatalog />
+          </ScrollArea>
         ) : (
           <ResizablePanelGroup
             direction="horizontal"

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -16,11 +17,13 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
   refreshAllFeeds: vi.fn(),
 }));
 
-function renderSidebar() {
+function renderSidebar(route = "/feeds") {
   return render(
-    <SidebarProvider>
-      <AppSidebar />
-    </SidebarProvider>,
+    <MemoryRouter initialEntries={[route]}>
+      <SidebarProvider>
+        <AppSidebar />
+      </SidebarProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -83,92 +86,44 @@ describe("AppSidebar layout structure", () => {
     ).toBeInTheDocument();
   });
 
-  it("SidebarContent is empty when no feeds exist", () => {
+  it("SidebarContent has only Discover group when no feeds exist", () => {
     const { container } = renderSidebar();
     const content = container.querySelector("[data-sidebar='content']");
     expect(content).not.toBeNull();
-    // No Feeds group when empty
-    expect(
-      content!.querySelector("[data-sidebar='group']"),
-    ).not.toBeInTheDocument();
+    // Discover group always present, Feeds group absent
+    const groups = content!.querySelectorAll("[data-sidebar='group']");
+    expect(groups).toHaveLength(1);
+    expect(screen.getByText("Discover")).toBeInTheDocument();
   });
 
-  it("SidebarFooter contains SyncStatusChip", () => {
+  it("SidebarFooter contains settings menu button", () => {
     const { container } = renderSidebar();
     const footer = container.querySelector("[data-sidebar='footer']");
     expect(footer).not.toBeNull();
-    // SyncStatusChip renders a button with status text
-    expect(footer!.textContent).toContain("Local");
+    expect(footer!.textContent).toContain("Settings");
   });
 
-  it("hides keyboard hints when no feeds exist", () => {
-    const { container } = renderSidebar();
-    const header = container.querySelector("[data-sidebar='header']");
-    // No J/K hints (no articles to navigate)
-    expect(header!.textContent).not.toMatch(/articles/i);
-    // No U/I hints (no feeds to navigate between) - check header only to avoid matching "Feeds" group label
-    expect(header!.textContent).not.toMatch(/\bfeeds\b/i);
+  it("renders Discover group with Explore feeds entry", () => {
+    renderSidebar();
+
+    expect(screen.getByText("Discover")).toBeInTheDocument();
+    expect(screen.getByText("Explore feeds")).toBeInTheDocument();
   });
 
-  it("shows J/K hints but not U/I hints when only one feed exists", () => {
-    useFeedStore.setState({
-      feeds: [
-        {
-          id: "feed-1",
-          url: "https://example.com/rss",
-          title: "Example Feed",
-          description: "",
-          siteUrl: "https://example.com",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-      ],
-      selectedFeedId: null,
-      isLoading: false,
-      error: null,
-      isRefreshingAll: false,
-      refreshingFeedIds: new Set(),
+  it("shows Discover group even when no feeds exist", () => {
+    useFeedStore.setState({ feeds: [] });
+    renderSidebar();
+
+    expect(screen.getByText("Discover")).toBeInTheDocument();
+    expect(screen.getByText("Explore feeds")).toBeInTheDocument();
+  });
+
+  it("marks Explore feeds as active on /explore route", () => {
+    renderSidebar("/explore");
+
+    const exploreButton = screen.getByRole("button", {
+      name: /explore feeds/i,
     });
-    const { container } = renderSidebar();
-    const footer = container.querySelector("[data-sidebar='footer']");
-    // J/K hints shown in footer (can navigate articles)
-    expect(footer!.textContent).toMatch(/article/i);
-    // U/I hints hidden (only one feed, no need to switch)
-    expect(footer!.textContent).not.toMatch(/previous feed/i);
-  });
-
-  it("shows both U/I and J/K hints when multiple feeds exist", () => {
-    useFeedStore.setState({
-      feeds: [
-        {
-          id: "feed-1",
-          url: "https://a.com/rss",
-          title: "Feed A",
-          description: "",
-          siteUrl: "https://a.com",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-        {
-          id: "feed-2",
-          url: "https://b.com/rss",
-          title: "Feed B",
-          description: "",
-          siteUrl: "https://b.com",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-      ],
-      selectedFeedId: null,
-      isLoading: false,
-      error: null,
-      isRefreshingAll: false,
-      refreshingFeedIds: new Set(),
-    });
-    const { container } = renderSidebar();
-    const footer = container.querySelector("[data-sidebar='footer']");
-    // Both hints shown in footer
-    expect(footer!.textContent).toMatch(/article/i);
-    expect(footer!.textContent).toMatch(/previous feed/i);
+    expect(exploreButton.dataset.active).toBe("true");
   });
 });

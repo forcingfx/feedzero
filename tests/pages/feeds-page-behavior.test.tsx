@@ -104,6 +104,15 @@ function renderPage(route = "/feeds") {
             </>
           }
         />
+        <Route
+          path="/explore"
+          element={
+            <>
+              <FeedsPage />
+              <LocationCapture />
+            </>
+          }
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -132,13 +141,11 @@ describe("FeedsPage behavior — desktop", () => {
     resetStores();
   });
 
-  it("shows empty state when there are no feeds", () => {
-    const { container } = renderPage("/feeds");
+  it("shows explore catalog when there are no feeds", () => {
+    renderPage("/feeds");
 
-    expect(screen.getByText("No feeds yet")).toBeInTheDocument();
-    expect(
-      container.querySelector("[data-slot='resizable-panel-group']"),
-    ).toBeNull();
+    // With no feeds, auto-redirects to /explore which shows the catalog
+    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
   });
 
   it("shows panels instead of empty state when feeds exist", () => {
@@ -264,11 +271,10 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
-  it("shows empty state when there are no feeds", () => {
+  it("shows explore catalog when there are no feeds", () => {
     renderPage("/feeds");
 
-    expect(screen.getByText("No feeds yet")).toBeInTheDocument();
-    expect(screen.queryByText(/open the sidebar/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
   });
 
   it("Back button navigates from article to article list and stays there", async () => {
@@ -330,5 +336,39 @@ describe("FeedsPage behavior — mobile", () => {
     expect(header).not.toBeNull();
     expect(header!.className).toMatch(/\bsticky\b/);
     expect(header!.className).toMatch(/\btop-0\b/);
+  });
+});
+
+describe("FeedsPage — explore route", () => {
+  beforeEach(() => {
+    currentUrl = "";
+    resetStores();
+  });
+
+  it("shows explore catalog at /explore on desktop", () => {
+    mockIsDesktop = true;
+    renderPage("/explore");
+
+    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(screen.queryByText("No feeds yet")).not.toBeInTheDocument();
+  });
+
+  it("shows explore catalog at /explore on mobile", () => {
+    mockIsDesktop = false;
+    renderPage("/explore");
+
+    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+  });
+
+  it("does not show article list or reader at /explore", () => {
+    mockIsDesktop = true;
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+
+    const { container } = renderPage("/explore");
+
+    expect(
+      container.querySelector("[data-slot='resizable-panel-group']"),
+    ).toBeNull();
+    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
   });
 });

@@ -42,6 +42,7 @@ function renderPage(route = "/feeds") {
           path="/feeds/:feedId/articles/:articleId"
           element={<FeedsPage />}
         />
+        <Route path="/explore" element={<FeedsPage />} />
       </Routes>
     </MemoryRouter>,
   );

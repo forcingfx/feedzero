@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSquare, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,15 +7,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 const MAX_LENGTH = 2000;
 
-export function FeedbackDialog() {
-  const [open, setOpen] = useState(false);
+interface FeedbackDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
 
@@ -36,7 +39,7 @@ export function FeedbackDialog() {
       if (data.ok) {
         toast.success("Thanks for your feedback!");
         setMessage("");
-        setOpen(false);
+        onOpenChange(false);
       } else {
         toast.error(data.error || "Could not send feedback");
       }
@@ -48,13 +51,7 @@ export function FeedbackDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="w-full justify-start">
-          <MessageSquare className="mr-2 size-4" />
-          Send Feedback
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send Feedback</DialogTitle>
