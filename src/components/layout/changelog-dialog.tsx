@@ -33,7 +33,7 @@ const CHANGELOG: ReleaseNote[] = [
   },
   {
     version: "0.1.0",
-    date: "2026-03-24",
+    date: "2026-01-31",
     title: "Initial Alpha",
     items: [
       "Add and read RSS, Atom, and JSON Feed sources",
