@@ -8,7 +8,7 @@ import { XIcon, Search, CheckCheck, Zap, Shield, ArrowDownToLine, ArrowUpFromLin
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 
-export const APP_VERSION = "0.2.0";
+export const APP_VERSION = "0.2.1";
 
 const STORAGE_KEY = "feedzero:last-seen-version";
 
@@ -339,6 +339,80 @@ function OPMLTile() {
   );
 }
 
+// --- v0.2.1 tiles ---
+
+function V021Content() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-stretch">
+      <div className="flex flex-col gap-3 [&>*]:flex-1">
+        <BentoTile className="sm:col-span-1">
+          <TileLabel isNew>Warm palette</TileLabel>
+          <TileDesc>Subtle warm background tint and blue-indigo accents. Easier on the eyes.</TileDesc>
+          <div className="mt-3 flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="size-4 rounded" style={{ background: "oklch(0.995 0.003 80)" }} />
+              <span className="text-muted-foreground">Warm background</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="size-4 rounded" style={{ background: "oklch(0.96 0.012 270)" }} />
+              <span className="text-muted-foreground">Indigo accent</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="size-4 rounded" style={{ background: "oklch(0.55 0.15 270)" }} />
+              <span className="text-muted-foreground">Focus ring</span>
+            </div>
+          </div>
+        </BentoTile>
+        <BentoTile>
+          <TileLabel isNew>Smooth transitions</TileLabel>
+          <TileDesc>Hover, select, and sidebar collapse all animate smoothly. Buttons press in on click.</TileDesc>
+        </BentoTile>
+      </div>
+      <div className="flex flex-col gap-3 [&>*]:flex-1">
+        <BentoTile>
+          <TileLabel isNew>Reader polish</TileLabel>
+          <TileDesc>Refined blockquotes, framed images, gradient rules, and elegant link underlines.</TileDesc>
+          <div className="mt-3 rounded-md border border-border/30 overflow-hidden">
+            <div className="px-3 py-2 text-xs">
+              <div className="border-l-3 border-primary/30 bg-muted/20 pl-3 py-1 italic text-muted-foreground rounded-r text-[11px]">
+                &ldquo;The details are not the details. They make the design.&rdquo;
+              </div>
+            </div>
+          </div>
+        </BentoTile>
+        <BentoTile>
+          <TileLabel isNew>Read vs unread</TileLabel>
+          <TileDesc>Unread titles are bold. Read titles dim. Selected articles get an accent bar.</TileDesc>
+          <div className="mt-3 rounded-md border border-border/30 overflow-hidden">
+            <div className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs border-l-2 border-l-primary bg-accent">
+              <span className="rounded-full size-1.5 bg-blue-400" />
+              <span className="font-medium">New article (unread)</span>
+            </div>
+            <div className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs border-t border-border/20">
+              <span className="rounded-full size-1.5 bg-transparent" />
+              <span className="text-foreground/70">Yesterday&apos;s news (read)</span>
+            </div>
+          </div>
+        </BentoTile>
+      </div>
+      <div className="flex flex-col gap-3 [&>*]:flex-1">
+        <BentoTile>
+          <TileLabel isNew>Editorial typography</TileLabel>
+          <TileDesc>Tighter tracking on titles, relaxed line-height for reading, refined metadata.</TileDesc>
+          <div className="mt-3 text-center">
+            <div className="text-lg font-semibold tracking-tight">Headline</div>
+            <div className="text-[10px] tracking-wide text-muted-foreground mt-1">Author &bull; Mar 28, 2026</div>
+          </div>
+        </BentoTile>
+        <BentoTile>
+          <TileLabel isNew>Accessibility</TileLabel>
+          <TileDesc>Softer focus rings, reduced-motion support, and better contrast for read states.</TileDesc>
+        </BentoTile>
+      </div>
+    </div>
+  );
+}
+
 // --- v0.1.0 tiles ---
 
 function V010Content() {
@@ -470,6 +544,12 @@ function TileDesc({ children }: { children: React.ReactNode }) {
 
 const releases = [
   {
+    version: "0.2.1",
+    date: "2026-03-28",
+    title: "Visual polish",
+    subtitle: "Warmer palette, smooth transitions, and a refined reading experience.",
+  },
+  {
     version: "0.2.0",
     date: "2026-03-28",
     title: "Find your next read",
@@ -534,6 +614,8 @@ export function ChangelogBentoDialog({
         </div>
 
         {releaseIndex === 0 ? (
+          <V021Content />
+        ) : releaseIndex === 1 ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-stretch">
             <div className="flex flex-col gap-3 [&>*]:flex-1">
               <ExploreTile />
@@ -554,12 +636,12 @@ export function ChangelogBentoDialog({
         )}
 
         <div className="flex items-center justify-between mt-5">
-          {releaseIndex === 0 && releases.length > 1 ? (
+          {releaseIndex < releases.length - 1 ? (
             <button
-              onClick={() => setReleaseIndex(1)}
+              onClick={() => setReleaseIndex(releaseIndex + 1)}
               className="text-xs text-muted-foreground hover:text-foreground underline"
             >
-              Previous release: v{releases[1].version}
+              Previous release: v{releases[releaseIndex + 1].version}
             </button>
           ) : (
             <div />

@@ -50,10 +50,15 @@ describe("ChangelogBentoDialog", () => {
     const user = userEvent.setup();
     render(<ChangelogBentoDialog open={true} onOpenChange={vi.fn()} />);
 
+    // v0.2.1 → v0.2.0
+    await user.click(screen.getByText(/previous release/i));
+    expect(screen.getByText(/Find your next read/)).toBeInTheDocument();
+
+    // v0.2.0 → v0.1.0
     await user.click(screen.getByText(/previous release/i));
     expect(screen.getByText(/A private RSS reader/)).toBeInTheDocument();
 
     await user.click(screen.getByText(/back to latest/i));
-    expect(screen.getByText(/Find your next read/)).toBeInTheDocument();
+    expect(screen.getByText(/Visual polish/)).toBeInTheDocument();
   });
 });

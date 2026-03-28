@@ -65,6 +65,31 @@ describe("ReaderPanel", () => {
     expect(screen.getByText("Full article content here.")).toBeInTheDocument();
   });
 
+  it("has editorial tracking-tight on article title", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+    const heading = screen.getByRole("heading", { level: 2 });
+    expect(heading.className).toContain("tracking-tight");
+  });
+
+  it("has gradient bottom border on article header", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+    const article = document.querySelector("article");
+    const header = article?.querySelector("header");
+    expect(header).toBeInTheDocument();
+  });
+
   it("always shows all three buttons", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),

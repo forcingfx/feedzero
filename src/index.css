@@ -56,11 +56,11 @@
     --color-sync-error-bg: var(--sync-error-bg);
 }
 
-/* FeedZero light theme — shadcn slate palette */
+/* FeedZero light theme — warm slate palette with depth */
 :root {
-    --background: oklch(1 0 0);
+    --background: oklch(0.995 0.003 80);
     --foreground: oklch(0.145 0.014 285.823);
-    --card: oklch(1 0 0);
+    --card: oklch(0.995 0.003 80);
     --card-foreground: oklch(0.145 0.014 285.823);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0.014 285.823);
@@ -70,20 +70,20 @@
     --secondary-foreground: oklch(0.205 0.024 285.823);
     --muted: oklch(0.965 0.005 285.823);
     --muted-foreground: oklch(0.556 0.022 285.823);
-    --accent: oklch(0.965 0.005 285.823);
+    --accent: oklch(0.96 0.012 270);
     --accent-foreground: oklch(0.205 0.024 285.823);
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.917 0.007 285.823);
     --input: oklch(0.917 0.007 285.823);
-    --ring: oklch(0.205 0.024 285.823);
-    --sidebar: oklch(0.985 0.002 285.823);
+    --ring: oklch(0.55 0.15 270);
+    --sidebar: oklch(0.988 0.002 285.823);
     --sidebar-foreground: oklch(0.145 0.014 285.823);
     --sidebar-primary: oklch(0.205 0.024 285.823);
     --sidebar-primary-foreground: oklch(0.985 0.002 285.823);
-    --sidebar-accent: oklch(0.965 0.005 285.823);
+    --sidebar-accent: oklch(0.96 0.012 270);
     --sidebar-accent-foreground: oklch(0.205 0.024 285.823);
     --sidebar-border: oklch(0.917 0.007 285.823);
-    --sidebar-ring: oklch(0.205 0.024 285.823);
+    --sidebar-ring: oklch(0.55 0.15 270);
 
     /* Sync status colors */
     --sync-local: oklch(0.75 0.15 85);
@@ -110,6 +110,21 @@
         min-height: 100vh;
         display: flex;
         flex-direction: column;
+    }
+}
+
+/* Shimmer animation for skeleton loading */
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
     }
 }
 

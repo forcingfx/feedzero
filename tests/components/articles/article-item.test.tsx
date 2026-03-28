@@ -114,6 +114,56 @@ describe("ArticleItem", () => {
     expect(afterHtml).toBe(initialHtml);
   });
 
+  describe("visual polish", () => {
+    it("has transition-colors for smooth hover effect", () => {
+      const { container } = render(
+        <ArticleItem
+          article={mockArticle()}
+          isSelected={false}
+          onSelect={() => {}}
+        />,
+      );
+      const li = container.querySelector("li");
+      expect(li?.className).toContain("transition-colors");
+    });
+
+    it("shows accent bar on selected item", () => {
+      const { container } = render(
+        <ArticleItem
+          article={mockArticle()}
+          isSelected={true}
+          onSelect={() => {}}
+        />,
+      );
+      const li = container.querySelector("li");
+      expect(li?.className).toContain("aria-selected:border-l-2");
+    });
+
+    it("dims read article titles", () => {
+      const { container } = render(
+        <ArticleItem
+          article={mockArticle({ read: true })}
+          isSelected={false}
+          onSelect={() => {}}
+        />,
+      );
+      const titleDiv = container.querySelector(".text-foreground\\/70");
+      expect(titleDiv).toBeInTheDocument();
+    });
+
+    it("shows full contrast for unread article titles", () => {
+      const { container } = render(
+        <ArticleItem
+          article={mockArticle({ read: false })}
+          isSelected={false}
+          onSelect={() => {}}
+        />,
+      );
+      const titleDiv = container.querySelector(".text-foreground");
+      expect(titleDiv).toBeInTheDocument();
+    });
+  });
+
   describe("feedSiteUrl prop (favicon in global view)", () => {
     it("renders favicon when feedSiteUrl is provided", () => {
       const { container } = render(

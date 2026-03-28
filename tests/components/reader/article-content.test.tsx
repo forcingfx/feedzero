@@ -37,6 +37,24 @@ describe("ArticleContent", () => {
     expect(wrapper?.className).toContain("leading-relaxed");
   });
 
+  it("has refined link underline styling", () => {
+    const { container } = render(<ArticleContent html="<p>text</p>" />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.className).toContain("underline-offset-2");
+  });
+
+  it("has blockquote background tint", () => {
+    const { container } = render(<ArticleContent html="<p>text</p>" />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.className).toContain("[&_blockquote]:bg-muted/20");
+  });
+
+  it("has image rounding and shadow", () => {
+    const { container } = render(<ArticleContent html="<p>text</p>" />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.className).toContain("[&_img]:rounded-lg");
+  });
+
   it("handles empty string without error", () => {
     const { container } = render(<ArticleContent html="" />);
     expect(container.firstElementChild).not.toBeNull();

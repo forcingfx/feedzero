@@ -105,14 +105,16 @@ export function ReaderPanel() {
 
   return (
     <article className="p-4 px-6">
-      <h2 className="text-xl font-semibold mb-2">
-        {decodeEntities(article.title)}
-      </h2>
+      <header className="mb-6 pb-4 border-b border-border/50">
+        <h2 className="text-2xl font-semibold tracking-tight mb-2">
+          {decodeEntities(article.title)}
+        </h2>
 
-      <div className="text-sm text-muted-foreground mb-4">
-        {article.author && <>{article.author} &bull; </>}
-        {formatDate(article.publishedAt)}
-      </div>
+        <div className="text-xs tracking-wide text-muted-foreground">
+          {article.author && <>{article.author} &bull; </>}
+          {formatDate(article.publishedAt)}
+        </div>
+      </header>
 
       <ViewToggle
         activeMode={viewMode}

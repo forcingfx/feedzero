@@ -89,7 +89,7 @@ function FeedRow({
         role="option"
         aria-selected={isSelected}
         onClick={() => onSelectRow?.(rowId)}
-        className="flex items-start gap-3 py-2 px-2 -mx-2 rounded cursor-pointer aria-selected:bg-accent"
+        className="flex items-start gap-3 py-2 px-2 -mx-2 rounded cursor-pointer hover:bg-accent aria-selected:bg-accent transition-colors duration-150"
       >
         <FeedFavicon siteUrl={siteUrl} />
         <button
@@ -219,7 +219,7 @@ function FeaturedCategorySection({
     <div>
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h2 className="text-lg font-medium">{category.name}</h2>
+          <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{category.name}</h2>
           <p className="text-sm text-muted-foreground">{category.description}</p>
         </div>
         <Button variant="outline" size="sm" disabled={allSubscribed || isAdding} onClick={handleAddAll} className="shrink-0">
