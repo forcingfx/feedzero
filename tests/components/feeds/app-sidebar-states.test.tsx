@@ -52,7 +52,6 @@ describe("AppSidebar states", () => {
 
   it("shows Feeds group with Explore even when no feeds exist", () => {
     renderSidebar();
-    expect(screen.getByText("Feeds")).toBeInTheDocument();
     expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 

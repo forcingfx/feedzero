@@ -86,7 +86,6 @@ describe("AppSidebar layout structure", () => {
     // Single Feeds group with Explore at top
     const groups = content!.querySelectorAll("[data-sidebar='group']");
     expect(groups).toHaveLength(1);
-    expect(screen.getByText("Feeds")).toBeInTheDocument();
     expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 
@@ -100,7 +99,6 @@ describe("AppSidebar layout structure", () => {
   it("renders Explore entry inside Feeds group", () => {
     renderSidebar();
 
-    expect(screen.getByText("Feeds")).toBeInTheDocument();
     expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 
@@ -108,7 +106,6 @@ describe("AppSidebar layout structure", () => {
     useFeedStore.setState({ feeds: [] });
     renderSidebar();
 
-    expect(screen.getByText("Feeds")).toBeInTheDocument();
     expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 

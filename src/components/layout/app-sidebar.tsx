@@ -45,13 +45,13 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { useSyncStore } from "@/stores/sync-store.ts";
@@ -326,7 +326,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Feeds</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -354,6 +353,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         <span>All items</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+                    <SidebarSeparator className="my-1" />
                     {feeds.map((feed) => (
                       <SidebarMenuItem key={feed.id}>
                         <SidebarMenuButton
