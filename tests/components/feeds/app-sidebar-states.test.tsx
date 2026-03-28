@@ -50,11 +50,10 @@ describe("AppSidebar states", () => {
     });
   });
 
-  it("hides Feeds group label when no feeds exist", () => {
+  it("shows Feeds group with Explore even when no feeds exist", () => {
     renderSidebar();
-    // Feeds group hidden, only Discover group visible
-    expect(screen.queryByText("Feeds")).not.toBeInTheDocument();
-    expect(screen.getByText("Discover")).toBeInTheDocument();
+    expect(screen.getByText("Feeds")).toBeInTheDocument();
+    expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 
   it("renders feed items with titles", () => {

@@ -83,10 +83,11 @@ describe("AppSidebar layout structure", () => {
     const { container } = renderSidebar();
     const content = container.querySelector("[data-sidebar='content']");
     expect(content).not.toBeNull();
-    // Discover group always present, Feeds group absent
+    // Single Feeds group with Explore at top
     const groups = content!.querySelectorAll("[data-sidebar='group']");
     expect(groups).toHaveLength(1);
-    expect(screen.getByText("Discover")).toBeInTheDocument();
+    expect(screen.getByText("Feeds")).toBeInTheDocument();
+    expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 
   it("SidebarFooter contains settings menu button", () => {
@@ -96,26 +97,26 @@ describe("AppSidebar layout structure", () => {
     expect(footer!.textContent).toContain("Settings");
   });
 
-  it("renders Discover group with Explore feeds entry", () => {
+  it("renders Explore entry inside Feeds group", () => {
     renderSidebar();
 
-    expect(screen.getByText("Discover")).toBeInTheDocument();
-    expect(screen.getByText("Explore feeds")).toBeInTheDocument();
+    expect(screen.getByText("Feeds")).toBeInTheDocument();
+    expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 
-  it("shows Discover group even when no feeds exist", () => {
+  it("shows Explore even when no feeds exist", () => {
     useFeedStore.setState({ feeds: [] });
     renderSidebar();
 
-    expect(screen.getByText("Discover")).toBeInTheDocument();
-    expect(screen.getByText("Explore feeds")).toBeInTheDocument();
+    expect(screen.getByText("Feeds")).toBeInTheDocument();
+    expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 
-  it("marks Explore feeds as active on /explore route", () => {
+  it("marks Explore as active on /explore route", () => {
     renderSidebar("/explore");
 
     const exploreButton = screen.getByRole("button", {
-      name: /explore feeds/i,
+      name: /explore/i,
     });
     expect(exploreButton.dataset.active).toBe("true");
   });

@@ -147,7 +147,7 @@ describe("FeedsPage behavior — desktop", () => {
     renderPage("/feeds");
 
     // With no feeds, auto-redirects to /explore which shows the catalog
-    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
   });
 
   it("shows panels instead of empty state when feeds exist", () => {
@@ -276,7 +276,7 @@ describe("FeedsPage behavior — mobile", () => {
   it("shows explore catalog when there are no feeds", async () => {
     renderPage("/feeds");
 
-    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
   });
 
   it("Back button navigates from article to article list and stays there", async () => {
@@ -351,7 +351,7 @@ describe("FeedsPage — explore route", () => {
     mockIsDesktop = true;
     renderPage("/explore");
 
-    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
     expect(screen.queryByText("No feeds yet")).not.toBeInTheDocument();
   });
 
@@ -359,7 +359,7 @@ describe("FeedsPage — explore route", () => {
     mockIsDesktop = false;
     renderPage("/explore");
 
-    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
   });
 
   it("does not show article list or reader at /explore", async () => {
@@ -371,6 +371,6 @@ describe("FeedsPage — explore route", () => {
     expect(
       container.querySelector("[data-slot='resizable-panel-group']"),
     ).toBeNull();
-    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
   });
 });

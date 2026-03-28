@@ -65,8 +65,8 @@ describe("AppSidebar All items entry", () => {
     );
     const texts = Array.from(menuButtons).map((btn) => btn.textContent);
 
-    // Discover group comes first, then Feeds group
-    expect(texts[0]).toContain("Explore feeds");
+    // Explore at top of Feeds group, then All items
+    expect(texts[0]).toContain("Explore");
     expect(texts[1]).toContain("All items");
     expect(texts[2]).toContain("Tech News");
   });

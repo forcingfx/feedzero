@@ -48,10 +48,10 @@ describe("AppSidebar", () => {
     });
   });
 
-  it("shows no Feeds group label when no feeds exist", () => {
+  it("shows Feeds group with Explore when no feeds exist", () => {
     renderSidebar();
-    expect(screen.queryByText("Feeds")).not.toBeInTheDocument();
-    expect(screen.getByText("Discover")).toBeInTheDocument();
+    expect(screen.getByText("Feeds")).toBeInTheDocument();
+    expect(screen.getByText("Explore")).toBeInTheDocument();
   });
 
   it("renders feed items", () => {

@@ -326,7 +326,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Discover</SidebarGroupLabel>
+            <SidebarGroupLabel>Feeds</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -336,72 +336,67 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       if (isMobile) setOpenMobile(false);
                       navigate("/explore");
                     }}
-                    tooltip="Explore feeds"
+                    tooltip="Explore"
                   >
                     <Compass className="size-4" />
-                    <span>Explore feeds</span>
+                    <span>Explore</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {feeds.length > 0 && (
+                  <>
+                    <SidebarMenuItem key="all-items">
+                      <SidebarMenuButton
+                        isActive={selectedFeedId === ALL_FEEDS_ID}
+                        onClick={() => handleSelect(ALL_FEEDS_ID)}
+                        tooltip="All items"
+                      >
+                        <Layers className="size-4" />
+                        <span>All items</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    {feeds.map((feed) => (
+                      <SidebarMenuItem key={feed.id}>
+                        <SidebarMenuButton
+                          isActive={feed.id === selectedFeedId}
+                          onClick={() => handleSelect(feed.id)}
+                          tooltip={feed.title}
+                        >
+                          <FeedFavicon siteUrl={feed.siteUrl} />
+                          <span className="truncate">{feed.title}</span>
+                          {refreshingFeedIds.has(feed.id) && (
+                            <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
+                          )}
+                        </SidebarMenuButton>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <SidebarMenuAction showOnHover>
+                              <MoreHorizontal />
+                              <span className="sr-only">More</span>
+                            </SidebarMenuAction>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent side="right" align="start">
+                            <DropdownMenuItem
+                              onClick={() => refreshSingleFeed(feed.id)}
+                            >
+                              <RefreshCw className="size-4" />
+                              Refresh
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setFeedToRemove(feed)}
+                            >
+                              <Trash2 className="size-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </SidebarMenuItem>
+                    ))}
+                  </>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-          {feeds.length > 0 && (
-            <SidebarGroup>
-              <SidebarGroupLabel>Feeds</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem key="all-items">
-                    <SidebarMenuButton
-                      isActive={selectedFeedId === ALL_FEEDS_ID}
-                      onClick={() => handleSelect(ALL_FEEDS_ID)}
-                      tooltip="All items"
-                    >
-                      <Layers className="size-4" />
-                      <span>All items</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  {feeds.map((feed) => (
-                    <SidebarMenuItem key={feed.id}>
-                      <SidebarMenuButton
-                        isActive={feed.id === selectedFeedId}
-                        onClick={() => handleSelect(feed.id)}
-                        tooltip={feed.title}
-                      >
-                        <FeedFavicon siteUrl={feed.siteUrl} />
-                        <span className="truncate">{feed.title}</span>
-                        {refreshingFeedIds.has(feed.id) && (
-                          <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
-                        )}
-                      </SidebarMenuButton>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <SidebarMenuAction showOnHover>
-                            <MoreHorizontal />
-                            <span className="sr-only">More</span>
-                          </SidebarMenuAction>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" align="start">
-                          <DropdownMenuItem
-                            onClick={() => refreshSingleFeed(feed.id)}
-                          >
-                            <RefreshCw className="size-4" />
-                            Refresh
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setFeedToRemove(feed)}
-                          >
-                            <Trash2 className="size-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
         </SidebarContent>
 
         <SidebarFooter>
