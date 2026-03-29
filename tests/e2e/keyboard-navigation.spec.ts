@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
 import { SAMPLE_RSS, mockFeedEndpoint } from "./feed-fixtures";
 
 /** Scoped selector for an article in the list. */
@@ -9,14 +9,8 @@ function articleOption(page: import("@playwright/test").Page, text: string) {
 /** Adds a feed, selects it, and waits for articles to load. */
 async function setupFeed(page: import("@playwright/test").Page) {
   await mockFeedEndpoint(page, SAMPLE_RSS);
-  await page.getByRole("button", { name: "Add feed" }).click();
-  await page
-    .getByPlaceholder("Feed or site URL")
-    .fill("https://example.com/feed");
-  await page.getByRole("button", { name: "Add" }).click();
-  const sidebarFeed = page.getByRole("button", { name: "Test Feed" });
-  await expect(sidebarFeed).toBeVisible({ timeout: 10000 });
-  await sidebarFeed.click();
+  await addFeedViaUI(page, "https://example.com/feed");
+  await selectFeedInSidebar(page, "Test Feed");
   await expect(articleOption(page, "First Article")).toBeVisible({
     timeout: 10000,
   });
@@ -66,9 +60,13 @@ test.describe("Keyboard navigation", () => {
   test("keys are ignored in input fields", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // Open add feed form
-    await page.getByRole("button", { name: "Add feed" }).click();
-    const input = page.getByPlaceholder("Feed or site URL");
+    // Navigate to explore page where the search input lives
+    await page.goto("/explore");
+    await page.waitForFunction(
+      () => !document.body.textContent?.includes("Loading"),
+      { timeout: 10000 },
+    );
+    const input = page.getByPlaceholder("Search feeds or paste a URL...");
     await input.focus();
 
     // Type 'j' — should go into input, not navigate articles
@@ -109,17 +107,14 @@ test.describe("Keyboard navigation", () => {
     expect(popup.url()).toContain("example.com/first");
   });
 
-  test("n opens add feed form", async ({ feedPage: page }) => {
+  test("n navigates to explore page", async ({ feedPage: page }) => {
     await setupFeed(page);
-
-    // Ensure add form is not open
-    await expect(page.getByPlaceholder("Feed or site URL")).not.toBeVisible();
 
     // Press n
     await page.keyboard.press("n");
 
-    // Add form should be open
-    await expect(page.getByPlaceholder("Feed or site URL")).toBeVisible({
+    // Should navigate to explore page with search input
+    await expect(page.getByPlaceholder("Search feeds or paste a URL...")).toBeVisible({
       timeout: 5000,
     });
   });

@@ -186,6 +186,12 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 - Bad: `useFeedStore.setState({ selectFeed: mockSelectFeed }); expect(mockSelectFeed).toHaveBeenCalledWith("feed-1");`
 - Good: `renderPage("/feeds/feed-1"); expect(useFeedStore.getState().selectedFeedId).toBe("feed-1");`
 
+**Playwright gotchas:**
+- CSS `transition-all` on interactive elements (buttons, sidebar items) causes Playwright to consider them "not stable" during transitions. Use `transition-colors` or scoped transition properties instead. If forced, use `{ force: true }` on clicks after confirming visibility.
+- The sidebar uses `duration-200 ease-in-out` transitions. After toggling, wait for the `data-state` attribute to change, not `waitForTimeout`.
+- `selectFeedInSidebar(page, name)` (from `fixtures.ts`) handles opening the sidebar on mobile before clicking. Use it instead of direct `.click()` on feed buttons.
+- The changelog dialog (`feedzero:last-seen-version`) must match `APP_VERSION` exactly in test fixtures. Update it when bumping the version.
+
 **happy-dom gotchas:**
 - DOMPurify + happy-dom executes inline scripts during sanitization. Use non-callable code in test fixtures (e.g., `var x = 1;` not `alert(1)`).
 - `querySelector` with CSS-escaped colons (e.g. `content\\:encoded`) may work in happy-dom but fail in browsers. Always use `getElementsByTagName` for XML namespace-prefixed elements.
@@ -263,8 +269,9 @@ This project follows **Red-Green-Refactor (RGR)** — the TDD cycle where you wr
 3. **GREEN** — Write the minimum code to make the tests pass. Nothing more. Add JSDoc to all public functions. Add inline comments where intent or "why" is not obvious from the code itself. Do not comment the obvious.
    - ⛔ **STOP: Do not refactor yet. First verify all tests pass.**
 
-4. **VERIFY** — Run full test suite (`npm test`) AND type check (`npx tsc --noEmit`). Confirm zero failures, zero regressions, zero type errors.
+4. **VERIFY** — Run full test suite (`npm test`), type check (`npx tsc --noEmit`), AND E2E tests (`npm run test:e2e`). Confirm zero failures, zero regressions, zero type errors.
    - ⛔ **STOP: Do not proceed if any test fails or types error. Fix first.**
+   - E2E tests are the final safety net for user-facing behavior. Unit tests passing while E2E tests fail means the feature is broken for users.
 
    **4a. VERIFY DEPLOYMENT ARTIFACTS** — If you changed any API endpoint (request format, HTTP method, URL structure, headers), verify:
    - The shared handler accepts the new format (check `proxy-handler.ts` or `sync-handler.ts`)

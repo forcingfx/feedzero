@@ -1,16 +1,10 @@
-import { test, expect } from "./fixtures";
+import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
 import { SAMPLE_RSS, mockFeedEndpoint } from "./feed-fixtures";
 
 async function setupFeed(page: import("@playwright/test").Page) {
   await mockFeedEndpoint(page, SAMPLE_RSS);
-  await page.getByRole("button", { name: "Add feed" }).click();
-  await page
-    .getByPlaceholder("Feed or site URL")
-    .fill("https://example.com/feed");
-  await page.getByRole("button", { name: "Add" }).click();
-  const sidebarFeed = page.getByRole("button", { name: "Test Feed" });
-  await expect(sidebarFeed).toBeVisible({ timeout: 10000 });
-  await sidebarFeed.click();
+  await addFeedViaUI(page, "https://example.com/feed");
+  await selectFeedInSidebar(page, "Test Feed");
   await expect(
     page.locator('[role="option"]', { hasText: "First Article" }),
   ).toBeVisible({ timeout: 10000 });

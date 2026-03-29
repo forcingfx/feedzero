@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
 import {
   SAMPLE_RSS,
   SAMPLE_RSS_UPDATED,
@@ -25,13 +25,8 @@ test.describe("Feed refresh", () => {
     });
 
     // Add feed with initial RSS
-    await page.getByRole("button", { name: "Add feed" }).click();
-    await page
-      .getByPlaceholder("Feed or site URL")
-      .fill("https://example.com/feed");
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await addFeedViaUI(page, "https://example.com/feed");
+    await selectFeedInSidebar(page, "Test Feed");
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
@@ -40,13 +35,17 @@ test.describe("Feed refresh", () => {
     feedResponse = SAMPLE_RSS_UPDATED;
 
     // Click refresh all
-    await page.getByRole("button", { name: "Refresh all feeds" }).click();
+    await page.getByRole("button", { name: "Refresh" }).click({ force: true });
     await page.waitForTimeout(2000);
 
     // After refresh, articles in DB are updated but the article store
     // doesn't auto-reload. Navigate away and back to trigger loadArticles.
     await page.goto("/feeds");
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await page.waitForFunction(
+      () => !document.body.textContent?.includes("Loading"),
+      { timeout: 10000 },
+    );
+    await selectFeedInSidebar(page, "Test Feed");
 
     // New article should appear
     await expect(articleOption(page, "Brand New Article")).toBeVisible({
@@ -56,12 +55,7 @@ test.describe("Feed refresh", () => {
 
   test("refresh shows spinner", async ({ feedPage: page }) => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
-    await page.getByRole("button", { name: "Add feed" }).click();
-    await page
-      .getByPlaceholder("Feed or site URL")
-      .fill("https://example.com/feed");
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
+    await addFeedViaUI(page, "https://example.com/feed");
 
     // Add a delay to the feed response so we can observe the spinner
     await page.unroute("**/api/feed*");
@@ -75,16 +69,16 @@ test.describe("Feed refresh", () => {
     });
 
     // Click refresh
-    await page.getByRole("button", { name: "Refresh all feeds" }).click();
+    await page.getByRole("button", { name: "Refresh" }).click({ force: true });
 
     // Refresh button should be disabled during refresh
     await expect(
-      page.getByRole("button", { name: "Refresh all feeds" }),
+      page.getByRole("button", { name: "Refresh" }),
     ).toBeDisabled({ timeout: 2000 });
 
     // The icon inside the button should have animate-spin
     const svg = page
-      .getByRole("button", { name: "Refresh all feeds" })
+      .getByRole("button", { name: "Refresh" })
       .locator("svg");
     await expect(svg).toHaveClass(/animate-spin/, { timeout: 2000 });
   });
@@ -93,13 +87,8 @@ test.describe("Feed refresh", () => {
     feedPage: page,
   }) => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
-    await page.getByRole("button", { name: "Add feed" }).click();
-    await page
-      .getByPlaceholder("Feed or site URL")
-      .fill("https://example.com/feed");
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await addFeedViaUI(page, "https://example.com/feed");
+    await selectFeedInSidebar(page, "Test Feed");
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
@@ -108,7 +97,7 @@ test.describe("Feed refresh", () => {
     const countBefore = await page.locator('[role="option"]').count();
 
     // Refresh with the same feed content
-    await page.getByRole("button", { name: "Refresh all feeds" }).click();
+    await page.getByRole("button", { name: "Refresh" }).click({ force: true });
     await page.waitForTimeout(2000);
 
     // Count after refresh — should be the same (no duplicates)

@@ -1,22 +1,44 @@
-import { test, expect } from "./fixtures";
+import { test, expect, addFeedViaUI } from "./fixtures";
+import { SAMPLE_RSS, mockFeedEndpoint } from "./feed-fixtures";
 import type { Page } from "@playwright/test";
 
-/** Helper to open the sync dialog, handling mobile sidebar toggle */
+/**
+ * Helper to open the sync dialog via the Settings dropdown in the sidebar.
+ * On mobile, opens the sidebar first if needed.
+ */
 async function openSyncDialog(page: Page) {
-  const syncChip = page.getByText("Local only");
-
-  // On mobile, the sidebar starts closed. Check if sync chip is visible.
-  // If not, open the sidebar first.
-  if (!(await syncChip.isVisible())) {
+  // On mobile, the sidebar may need to be opened first
+  const settingsBtn = page.locator('[data-sidebar="menu-button"]', {
+    hasText: "Settings",
+  });
+  if (!(await settingsBtn.isVisible())) {
     const sidebarTrigger = page
       .getByRole("main")
       .getByRole("button", { name: /toggle sidebar/i });
     await sidebarTrigger.click();
-    await syncChip.waitFor({ state: "visible" });
+    await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
   }
 
-  await syncChip.click();
+  // Click the Settings button to open dropdown
+  await settingsBtn.click();
+
+  // Click "Cloud sync" in the dropdown menu
+  await page.getByRole("menuitem", { name: "Cloud sync" }).click();
+
   await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
+}
+
+/**
+ * Helper to add a feed so the "Cloud sync" menu item is enabled.
+ * Sync requires at least one feed. Works on both desktop and mobile.
+ */
+async function addFeedForSync(page: Page) {
+  await mockFeedEndpoint(page, SAMPLE_RSS);
+  await addFeedViaUI(page, "https://example.com/feed");
+  // Wait for the app to navigate to the feed page (works on both viewports)
+  await page.waitForURL(/\/feeds\//, { timeout: 10000 });
+  // Also wait for the success toast to confirm the feed was added
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 10000 });
 }
 
 test.describe("Sync", () => {
@@ -24,6 +46,7 @@ test.describe("Sync", () => {
     test("shows 'Use existing cloud account' button for local-only users", async ({
       feedPage: page,
     }) => {
+      await addFeedForSync(page);
       await openSyncDialog(page);
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible({ timeout: 5000 });
@@ -36,6 +59,7 @@ test.describe("Sync", () => {
     test("clicking 'Use existing cloud account' shows passphrase entry", async ({
       feedPage: page,
     }) => {
+      await addFeedForSync(page);
       await openSyncDialog(page);
       const dialog = page.getByRole("dialog");
 
@@ -57,6 +81,7 @@ test.describe("Sync", () => {
     test("connect button is disabled when passphrase is empty", async ({
       feedPage: page,
     }) => {
+      await addFeedForSync(page);
       await openSyncDialog(page);
       const dialog = page.getByRole("dialog");
 
@@ -71,6 +96,7 @@ test.describe("Sync", () => {
     test("connect button is enabled when passphrase is entered", async ({
       feedPage: page,
     }) => {
+      await addFeedForSync(page);
       await openSyncDialog(page);
       const dialog = page.getByRole("dialog");
 
@@ -87,6 +113,7 @@ test.describe("Sync", () => {
     });
 
     test("cancel returns to status view", async ({ feedPage: page }) => {
+      await addFeedForSync(page);
       await openSyncDialog(page);
       const dialog = page.getByRole("dialog");
 
@@ -110,6 +137,7 @@ test.describe("Sync", () => {
     test("shows error when cloud account not found", async ({
       feedPage: page,
     }) => {
+      await addFeedForSync(page);
       await openSyncDialog(page);
       const dialog = page.getByRole("dialog");
 
@@ -138,6 +166,7 @@ test.describe("Sync", () => {
     test("try again returns to passphrase entry", async ({
       feedPage: page,
     }) => {
+      await addFeedForSync(page);
       await openSyncDialog(page);
       const dialog = page.getByRole("dialog");
 
@@ -164,25 +193,30 @@ test.describe("Sync", () => {
     });
   });
 
-  test("sync chip shows Local only after local-only onboarding", async ({
+  test("sync badge shows Local in settings footer", async ({
     feedPage: page,
   }) => {
     // feedPage fixture sets storage-mode to "local"
-    // The sync status chip should show "Local only"
+    // The sync status badge should show "Local" in the Settings footer
     // On mobile, need to open sidebar first
-    const syncChip = page.getByText("Local only");
-    if (!(await syncChip.isVisible())) {
+    const settingsBtn = page.locator('[data-sidebar="menu-button"]', {
+      hasText: "Settings",
+    });
+    if (!(await settingsBtn.isVisible())) {
       const sidebarTrigger = page
         .getByRole("main")
         .getByRole("button", { name: /toggle sidebar/i });
       await sidebarTrigger.click();
     }
-    await expect(syncChip).toBeVisible({ timeout: 10000 });
+    await expect(settingsBtn).toBeVisible({ timeout: 10000 });
+    // The Settings button contains the SyncBadge with "Local" text
+    await expect(settingsBtn.getByText("Local")).toBeVisible();
   });
 
-  test("clicking chip opens data & storage dialog", async ({
+  test("clicking Cloud sync opens data & storage dialog", async ({
     feedPage: page,
   }) => {
+    await addFeedForSync(page);
     await openSyncDialog(page);
 
     const dialog = page.getByRole("dialog");
@@ -195,6 +229,7 @@ test.describe("Sync", () => {
   test("enable sync shows passphrase in setup dialog", async ({
     feedPage: page,
   }) => {
+    await addFeedForSync(page);
     await openSyncDialog(page);
     const dialog = page.getByRole("dialog");
 
@@ -214,6 +249,7 @@ test.describe("Sync", () => {
   test("enable sync: save checkbox → continue → confirm → done", async ({
     feedPage: page,
   }) => {
+    await addFeedForSync(page);
     await openSyncDialog(page);
     const dialog = page.getByRole("dialog");
 
@@ -262,7 +298,8 @@ test.describe("Sync", () => {
     });
   });
 
-  test("delete all data returns to onboarding", async ({ feedPage: page }) => {
+  test("delete all data resets to explore page", async ({ feedPage: page }) => {
+    await addFeedForSync(page);
     await openSyncDialog(page);
     const dialog = page.getByRole("dialog");
 
@@ -277,9 +314,9 @@ test.describe("Sync", () => {
     // Confirm deletion
     await dialog.getByRole("button", { name: "Delete everything" }).click();
 
-    // Should return to onboarding
-    await expect(page.getByText("Welcome to FeedZero")).toBeVisible({
-      timeout: 10000,
+    // Should reset the app — after auto-init, user lands on Explore page
+    await expect(page.getByText("Explore")).toBeVisible({
+      timeout: 15000,
     });
   });
 });

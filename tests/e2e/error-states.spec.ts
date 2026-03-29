@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
 import {
   mockFeedEndpointError,
   mockFeedEndpointHtml,
@@ -18,11 +18,7 @@ test.describe("Error states", () => {
   }) => {
     await mockFeedEndpointError(page);
 
-    await page.getByRole("button", { name: "Add feed" }).click();
-    await page
-      .getByPlaceholder("Feed or site URL")
-      .fill("https://example.com/feed");
-    await page.getByRole("button", { name: "Add" }).click();
+    await addFeedViaUI(page, "https://example.com/feed");
 
     // Should show an error toast
     const toast = page.locator("[data-sonner-toast][data-type='error']");
@@ -32,11 +28,7 @@ test.describe("Error states", () => {
   test("non-feed URL shows error toast", async ({ feedPage: page }) => {
     await mockFeedEndpointHtml(page);
 
-    await page.getByRole("button", { name: "Add feed" }).click();
-    await page
-      .getByPlaceholder("Feed or site URL")
-      .fill("https://example.com/page");
-    await page.getByRole("button", { name: "Add" }).click();
+    await addFeedViaUI(page, "https://example.com/page");
 
     // Should show an error toast indicating it's not a valid feed
     const toast = page.locator("[data-sonner-toast][data-type='error']");
@@ -50,23 +42,18 @@ test.describe("Error states", () => {
     await mockPageEndpointError(page);
 
     // Add feed and select it
-    await page.getByRole("button", { name: "Add feed" }).click();
-    await page
-      .getByPlaceholder("Feed or site URL")
-      .fill("https://example.com/feed");
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await addFeedViaUI(page, "https://example.com/feed");
+    await selectFeedInSidebar(page, "Test Feed");
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
 
-    // Try to extract — should fail
-    await page.getByRole("radio", { name: "Extracted" }).click();
-    await page.waitForTimeout(2000);
+    // The auto-extract triggers in background for short content articles.
+    // Since the mock returns 500, extraction fails and disables the Full text toggle.
+    const fullTextToggle = page.getByRole("radio", { name: /Full text/ });
+    await expect(fullTextToggle).toBeDisabled({ timeout: 10000 });
 
-    // Should be able to fall back to feed content
-    await page.getByRole("radio", { name: "Feed" }).click();
+    // Feed content should still be visible despite extraction failure
     await expect(page.getByText("Short description only.")).toBeVisible({
       timeout: 5000,
     });

@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
 import {
   SAMPLE_RSS,
   SAMPLE_PAGE_HTML,
@@ -15,13 +15,8 @@ function articleOption(page: import("@playwright/test").Page, text: string) {
 /** Adds a feed and selects it, waiting for articles to load. */
 async function setupFeed(page: import("@playwright/test").Page) {
   await mockFeedEndpoint(page, SAMPLE_RSS);
-  await page.getByRole("button", { name: "Add feed" }).click();
-  await page
-    .getByPlaceholder("Feed or site URL")
-    .fill("https://example.com/feed");
-  await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
-  await page.getByRole("button", { name: "Test Feed" }).click();
+  await addFeedViaUI(page, "https://example.com/feed");
+  await selectFeedInSidebar(page, "Test Feed");
   await expect(articleOption(page, "First Article")).toBeVisible({
     timeout: 10000,
   });
@@ -40,26 +35,22 @@ test.describe("Content viewing", () => {
   test("view toggle shows for short content", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // First article has short content — "Extracted" option should be available
-    const extractedRadio = page.getByRole("radio", { name: "Extracted" });
-    await expect(extractedRadio).toBeVisible({ timeout: 10000 });
+    // First article has short content — "Full text" option should be available
+    const fullTextToggle = page.getByRole("radio", { name: /Full text/ });
+    await expect(fullTextToggle).toBeVisible({ timeout: 10000 });
   });
 
-  test("clicking Extracted triggers fetch and shows content", async ({
+  test("clicking Full text triggers fetch and shows content", async ({
     feedPage: page,
   }) => {
     await mockPageEndpoint(page, SAMPLE_PAGE_HTML);
     await setupFeed(page);
 
-    // Click Extracted to fetch full article
-    await page.getByRole("radio", { name: "Extracted" }).click();
+    // Click Full text to fetch full article
+    await page.getByRole("radio", { name: /Full text/ }).click();
 
-    // Should show "Extracting full article…" loading state
-    await expect(page.getByText("Extracting full article")).toBeVisible({
-      timeout: 5000,
-    });
-
-    // Then the extracted content should appear
+    // The extracted content should appear (mock returns instantly, so loading
+    // state may flash too fast to assert on)
     await expect(
       page.getByText("Full Article Title"),
     ).toBeVisible({ timeout: 10000 });
@@ -72,7 +63,7 @@ test.describe("Content viewing", () => {
     await setupFeed(page);
 
     // Fetch extracted content
-    await page.getByRole("radio", { name: "Extracted" }).click();
+    await page.getByRole("radio", { name: /Full text/ }).click();
     await expect(page.getByText("Full Article Title")).toBeVisible({
       timeout: 10000,
     });
@@ -83,9 +74,9 @@ test.describe("Content viewing", () => {
       timeout: 5000,
     });
 
-    // Toggle back to Extracted — should show cached content immediately
+    // Toggle back to Full text — should show cached content immediately
     // (no loading indicator)
-    await page.getByRole("radio", { name: "Extracted" }).click();
+    await page.getByRole("radio", { name: /Full text/ }).click();
     await expect(page.getByText("Full Article Title")).toBeVisible({
       timeout: 5000,
     });
@@ -94,10 +85,11 @@ test.describe("Content viewing", () => {
   test("original link has correct href", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // The "Original" link should point to the article URL
-    const originalLink = page.getByRole("link", { name: "Original" });
-    await expect(originalLink).toBeVisible({ timeout: 10000 });
-    await expect(originalLink).toHaveAttribute(
+    // The "Original" is rendered as an <a> inside a ToggleGroupItem with asChild,
+    // so it has role="radio" (from Radix) rather than role="link".
+    const originalToggle = page.getByRole("radio", { name: /Original/ });
+    await expect(originalToggle).toBeVisible({ timeout: 10000 });
+    await expect(originalToggle).toHaveAttribute(
       "href",
       "https://example.com/first",
     );
@@ -121,15 +113,12 @@ test.describe("Content viewing", () => {
     await mockPageEndpointError(page);
     await setupFeed(page);
 
-    // Click Extracted — should show loading then error
-    await page.getByRole("radio", { name: "Extracted" }).click();
+    // The auto-extract triggers in background for short content articles.
+    // Since the mock returns 500, extraction fails and disables the Full text toggle.
+    const fullTextToggle = page.getByRole("radio", { name: /Full text/ });
+    await expect(fullTextToggle).toBeDisabled({ timeout: 10000 });
 
-    // After the fetch fails, should show an error indication or stay on feed content
-    // The extraction store sets isExtracting=false on error, so the feed content
-    // should remain visible or an error message appears
-    await page.waitForTimeout(2000);
-    // Feed content should still be accessible (user can switch back)
-    await page.getByRole("radio", { name: "Feed" }).click();
+    // Feed content should still be visible despite extraction failure
     await expect(page.getByText("Short description only.")).toBeVisible({
       timeout: 5000,
     });

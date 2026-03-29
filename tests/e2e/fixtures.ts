@@ -16,13 +16,47 @@ export async function skipOnboarding(page: Page) {
 }
 
 /**
- * Adds a feed via the sidebar UI. Assumes onboarding is already skipped
- * and the page is on /feeds.
+ * Adds a feed via the Explore page search input.
+ * Navigates to /explore, pastes the URL, and submits.
  */
 export async function addFeedViaUI(page: Page, url: string) {
-  await page.getByRole("button", { name: "Add feed" }).click();
-  await page.getByPlaceholder("Feed or site URL").fill(url);
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.goto("/explore");
+  await page.waitForFunction(
+    () => !document.body.textContent?.includes("Loading"),
+    { timeout: 10000 },
+  );
+  const searchInput = page.getByPlaceholder("Search feeds or paste a URL...");
+  await searchInput.fill(url);
+  await searchInput.press("Enter");
+  // Wait for the feed to be added — either success toast or sidebar button
+  await page
+    .locator("[data-sonner-toast]")
+    .or(
+      page
+        .locator('[data-sidebar="menu-button"]')
+        .filter({ hasNotText: /Explore|All items/ }),
+    )
+    .first()
+    .waitFor({ timeout: 15000 });
+}
+
+/**
+ * Selects a feed in the sidebar. On mobile, opens the sidebar first.
+ */
+export async function selectFeedInSidebar(page: Page, feedName: string) {
+  const feedButton = page.locator('[data-sidebar="menu-button"]', {
+    hasText: feedName,
+  });
+  if (!(await feedButton.isVisible({ timeout: 1000 }).catch(() => false))) {
+    const trigger = page.locator('[data-sidebar="trigger"]');
+    if (await trigger.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await trigger.click();
+    }
+  }
+  await feedButton.waitFor({ state: "visible", timeout: 10000 });
+  // Force click — sidebar buttons have CSS transitions that Playwright
+  // considers "not stable", causing actionability timeouts
+  await feedButton.click({ force: true });
 }
 
 /**
@@ -33,8 +67,6 @@ export const test = base.extend<{ feedPage: Page }>({
   feedPage: async ({ page }, use) => {
     await skipOnboarding(page);
     await page.goto("/feeds");
-    // Wait for the app to finish loading — the "Loading…" text should disappear.
-    // On desktop, "FeedZero" is in the sidebar. On mobile, the sidebar is collapsed.
     await page.waitForFunction(
       () => !document.body.textContent?.includes("Loading"),
       { timeout: 10000 },

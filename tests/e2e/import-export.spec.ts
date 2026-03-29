@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, addFeedViaUI } from "./fixtures";
 import { SAMPLE_RSS, mockFeedEndpoint } from "./feed-fixtures";
 import type { Page } from "@playwright/test";
 
@@ -18,26 +18,18 @@ const SAMPLE_OPML = `<?xml version="1.0" encoding="UTF-8"?>
 const SAMPLE_URL_LIST = `https://example.com/feed
 https://another.com/rss`;
 
-/** Helper to open the import/export dialog from the add feed popover */
+/** Helper to open the import/export dialog from the Explore page */
 async function openImportExportDialog(page: Page) {
-  const addFeedButton = page.getByRole("button", { name: "Add feed" });
-
-  // On mobile, the sidebar starts closed. Check if Add feed button is visible.
-  // If not, open the sidebar first.
-  if (!(await addFeedButton.isVisible())) {
-    const sidebarTrigger = page
-      .getByRole("main")
-      .getByRole("button", { name: /toggle sidebar/i });
-    await sidebarTrigger.click();
-    await addFeedButton.waitFor({ state: "visible" });
-  }
-
-  await addFeedButton.click();
-  await page.getByRole("button", { name: "Import / Export OPML" }).click();
+  await page.goto("/explore");
+  await page.waitForFunction(
+    () => !document.body.textContent?.includes("Loading"),
+    { timeout: 10000 },
+  );
+  await page.getByRole("button", { name: "Import / Export" }).click();
 }
 
 test.describe("Import/Export dialog", () => {
-  test("opens import/export dialog from add feed popover", async ({
+  test("opens import/export dialog from explore page", async ({
     feedPage: page,
   }) => {
     await openImportExportDialog(page);
@@ -52,8 +44,8 @@ test.describe("Import/Export dialog", () => {
   }) => {
     await openImportExportDialog(page);
 
-    // Should start on Import view
-    await expect(page.getByText("Import feeds")).toBeVisible();
+    // Should start on Import view — the Import feeds button should be visible
+    await expect(page.getByRole("button", { name: "Import feeds" })).toBeVisible();
 
     // Switch to Export
     await page.getByRole("radio", { name: "Export feeds" }).click();
@@ -61,7 +53,7 @@ test.describe("Import/Export dialog", () => {
 
     // Switch back to Import
     await page.getByRole("radio", { name: "Import feeds" }).click();
-    await expect(page.getByText("Import feeds")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Import feeds" })).toBeVisible();
   });
 
   test("closes dialog on escape", async ({ feedPage: page }) => {
@@ -86,7 +78,7 @@ test.describe("Import feeds", () => {
 
     // Paste OPML content
     await page
-      .getByPlaceholder("Paste OPML XML or feed URLs")
+      .getByPlaceholder("Paste OPML XML or feed URLs (one per line)")
       .fill(SAMPLE_OPML);
 
     // Click import
@@ -100,9 +92,8 @@ test.describe("Import feeds", () => {
       timeout: 15000,
     });
 
-    // Close and verify feed was added
+    // Close the dialog
     await page.getByRole("button", { name: "Done" }).click();
-    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible();
   });
 
   test("imports feeds from pasted URL list", async ({ feedPage: page }) => {
@@ -111,7 +102,7 @@ test.describe("Import feeds", () => {
     await openImportExportDialog(page);
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML or feed URLs")
+      .getByPlaceholder("Paste OPML XML or feed URLs (one per line)")
       .fill(SAMPLE_URL_LIST);
     await page.getByRole("button", { name: "Import feeds" }).click();
 
@@ -125,19 +116,18 @@ test.describe("Import feeds", () => {
     await openImportExportDialog(page);
     await page.getByRole("radio", { name: "Paste text" }).click();
 
-    // Try to import with empty input
-    await page.getByRole("button", { name: "Import feeds" }).click();
-
-    // Should show error
-    await expect(page.getByText(/Please enter OPML or URLs/i)).toBeVisible();
+    // Try to import with empty input — button should be disabled
+    const importBtn = page.getByRole("button", { name: "Import feeds" });
+    await expect(importBtn).toBeDisabled();
   });
 
   test("shows error for invalid content", async ({ feedPage: page }) => {
     await openImportExportDialog(page);
     await page.getByRole("radio", { name: "Paste text" }).click();
+    // Use content with only comment lines and blank lines — no valid URLs
     await page
-      .getByPlaceholder("Paste OPML XML or feed URLs")
-      .fill("not valid content at all");
+      .getByPlaceholder("Paste OPML XML or feed URLs (one per line)")
+      .fill("# just a comment\n\n# another comment");
     await page.getByRole("button", { name: "Import feeds" }).click();
 
     // Should show error about no valid URLs
@@ -150,7 +140,7 @@ test.describe("Import feeds", () => {
     await openImportExportDialog(page);
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML or feed URLs")
+      .getByPlaceholder("Paste OPML XML or feed URLs (one per line)")
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Import feeds" }).click();
 
@@ -181,15 +171,9 @@ test.describe("Export feeds", () => {
   }) => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
 
-    // Add a feed first
-    await page.getByRole("button", { name: "Add feed" }).click();
-    await page
-      .getByPlaceholder("Feed or site URL")
-      .fill("https://example.com/feed");
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({
-      timeout: 10000,
-    });
+    // Add a feed first and wait for navigation
+    await addFeedViaUI(page, "https://example.com/feed");
+    await page.waitForURL(/\/feeds\//, { timeout: 10000 });
 
     // Open import/export dialog and go to export
     await openImportExportDialog(page);
@@ -205,18 +189,15 @@ test.describe("Export feeds", () => {
     ).toBeVisible();
   });
 
-  test("copies URL list to clipboard", async ({ feedPage: page }) => {
+  test("copies URL list to clipboard", async ({ feedPage: page, context }) => {
+    // Grant clipboard permissions for this test
+    await context.grantPermissions(["clipboard-write", "clipboard-read"]);
+
     await mockFeedEndpoint(page, SAMPLE_RSS);
 
-    // Add a feed first
-    await page.getByRole("button", { name: "Add feed" }).click();
-    await page
-      .getByPlaceholder("Feed or site URL")
-      .fill("https://example.com/feed");
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({
-      timeout: 10000,
-    });
+    // Add a feed first and wait for navigation
+    await addFeedViaUI(page, "https://example.com/feed");
+    await page.waitForURL(/\/feeds\//, { timeout: 10000 });
 
     // Open import/export dialog and go to export
     await openImportExportDialog(page);

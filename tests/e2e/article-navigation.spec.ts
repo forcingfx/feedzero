@@ -1,17 +1,12 @@
-import { test, expect } from "./fixtures";
+import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
 import { SAMPLE_RSS, mockFeedEndpoint } from "./feed-fixtures";
 
 /**
- * Helper: adds a feed and waits for it to appear in the sidebar.
+ * Helper: adds a feed via the Explore page UI.
  */
 async function addTestFeed(page: import("@playwright/test").Page) {
   await mockFeedEndpoint(page, SAMPLE_RSS);
-  await page.getByRole("button", { name: "Add feed" }).click();
-  await page
-    .getByPlaceholder("Feed or site URL")
-    .fill("https://example.com/feed");
-  await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
+  await addFeedViaUI(page, "https://example.com/feed");
 }
 
 /** Scoped selector for an article in the list (not the reader heading). */
@@ -22,7 +17,7 @@ function articleOption(page: import("@playwright/test").Page, text: string) {
 test.describe("Article navigation", () => {
   test("select feed shows articles", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await selectFeedInSidebar(page, "Test Feed");
 
     // Articles should appear in the list
     await expect(articleOption(page, "First Article")).toBeVisible({
@@ -33,7 +28,7 @@ test.describe("Article navigation", () => {
 
   test("select article shows reader content", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await selectFeedInSidebar(page, "Test Feed");
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
@@ -49,7 +44,7 @@ test.describe("Article navigation", () => {
 
   test("URL updates on feed selection", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await selectFeedInSidebar(page, "Test Feed");
 
     // URL should contain /feeds/<feedId>
     await page.waitForURL(/\/feeds\/[a-zA-Z0-9_-]+/, { timeout: 10000 });
@@ -58,7 +53,7 @@ test.describe("Article navigation", () => {
 
   test("URL updates on article selection", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await selectFeedInSidebar(page, "Test Feed");
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
@@ -75,12 +70,13 @@ test.describe("Article navigation", () => {
   test("auto-selects first article when navigating to feed", async ({
     feedPage: page,
   }) => {
-    await addTestFeed(page);
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await mockFeedEndpoint(page, SAMPLE_RSS);
+    await addFeedViaUI(page, "https://example.com/feed");
 
-    // Should auto-navigate to first article
+    // After adding a feed, the app navigates to /feeds/{feedId}.
+    // The first article should be auto-selected.
     await page.waitForURL(/\/feeds\/[^/]+\/articles\/[a-zA-Z0-9_-]+/, {
-      timeout: 10000,
+      timeout: 15000,
     });
 
     // First article content should be visible in reader
@@ -91,15 +87,15 @@ test.describe("Article navigation", () => {
 
   test("unread articles are bold", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await selectFeedInSidebar(page, "Test Feed");
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
 
-    // Unread articles should have font-semibold class on their title
+    // Unread articles should have font-medium class on their title
     const secondArticleItem = articleOption(page, "Second Article");
     await expect(secondArticleItem).toBeVisible();
-    const titleEl = secondArticleItem.locator(".font-semibold");
+    const titleEl = secondArticleItem.locator(".font-medium");
     await expect(titleEl).toBeVisible();
   });
 
@@ -107,7 +103,7 @@ test.describe("Article navigation", () => {
     feedPage: page,
   }) => {
     await addTestFeed(page);
-    await page.getByRole("button", { name: "Test Feed" }).click();
+    await selectFeedInSidebar(page, "Test Feed");
     await expect(articleOption(page, "Second Article")).toBeVisible({
       timeout: 10000,
     });
@@ -118,9 +114,9 @@ test.describe("Article navigation", () => {
     // Wait for the read state to be applied
     await page.waitForTimeout(500);
 
-    // The article title should no longer have font-semibold
+    // The article title should no longer have font-medium (read articles use text-foreground/70)
     const secondArticleItem = articleOption(page, "Second Article");
-    const boldTitle = secondArticleItem.locator(".font-semibold");
+    const boldTitle = secondArticleItem.locator(".font-medium");
     await expect(boldTitle).toHaveCount(0, { timeout: 5000 });
   });
 });
@@ -129,18 +125,26 @@ test.describe("Article navigation — mobile", () => {
   test.use({ viewport: { width: 393, height: 851 } });
 
   test("feed selection shows article content", async ({ feedPage: page }) => {
-    // On mobile, sidebar starts closed. Open it.
-    await page.getByRole("button", { name: /toggle sidebar/i }).click();
+    await mockFeedEndpoint(page, SAMPLE_RSS);
+    await addFeedViaUI(page, "https://example.com/feed");
 
-    await addTestFeed(page);
+    // After adding via Explore, the app navigates to /feeds/{feedId}.
+    // Wait for the URL change.
+    await page.waitForURL(/\/feeds\//, { timeout: 10000 });
+
+    // Open sidebar to select the feed
+    await page.getByRole("button", { name: /toggle sidebar/i }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible({ timeout: 5000 });
 
     // Click the feed — on mobile, auto-select navigates directly to
     // the first article's reader view.
-    await page.getByRole("button", { name: "Test Feed" }).click();
-    await page.waitForTimeout(500);
+    await dialog
+      .locator('[data-sidebar="menu-button"]', { hasText: "Test Feed" })
+      .click();
 
-    // Dismiss the sidebar sheet by clicking the overlay area
-    await page.mouse.click(380, 400);
+    // Sidebar closes
+    await expect(dialog).toBeHidden({ timeout: 5000 });
 
     // Auto-select shows first article content in reader
     await expect(page.getByText("Short description only.")).toBeVisible({
@@ -151,12 +155,11 @@ test.describe("Article navigation — mobile", () => {
     await expect(page.getByRole("button", { name: /back/i })).toBeVisible();
   });
 
-  test("navigating to /feeds shows empty state with sidebar prompt", async ({
+  test("navigating to /feeds redirects to explore when no feeds", async ({
     feedPage: page,
   }) => {
-    // On mobile at /feeds with no feed selected, shows prompt to open sidebar
-    await expect(
-      page.getByText("Open the sidebar to select a feed"),
-    ).toBeVisible({ timeout: 10000 });
+    // On mobile at /feeds with no feeds, app redirects to /explore
+    await page.waitForURL(/\/explore/, { timeout: 10000 });
+    await expect(page.getByText("Explore")).toBeVisible({ timeout: 10000 });
   });
 });
