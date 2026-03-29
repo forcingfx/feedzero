@@ -64,6 +64,7 @@ import {
 } from "@/components/layout/changelog-bento.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
+import { useIsOnline } from "@/hooks/use-online.ts";
 import type { Feed } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -73,7 +74,15 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
 const settingsShortcutLabel = isMac ? "⌘," : "Ctrl+,";
 
-function SyncBadge({ status }: { status: string }) {
+function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) {
+  if (!isOnline) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+        <span className="rounded-full size-1.5 bg-muted-foreground/50" />
+        Offline
+      </span>
+    );
+  }
   if (status === "synced" || status === "syncing") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
@@ -101,6 +110,7 @@ function SyncBadge({ status }: { status: string }) {
 function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
   const syncStatus = useSyncStore((s) => s.status);
   const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
+  const isOnline = useIsOnline();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
@@ -132,7 +142,7 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-semibold">Settings</span>
               <span className="flex items-center gap-1.5 mt-0.5">
-                <SyncBadge status={syncStatus} />
+                <SyncBadge status={syncStatus} isOnline={isOnline} />
                 <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
               </span>
             </div>
@@ -272,6 +282,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
+  const [changelogOpen, setChangelogOpen] = useState(false);
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
@@ -293,9 +304,12 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold tracking-tight">
                 FeedZero
-                <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-700">
+                <button
+                  onClick={() => setChangelogOpen(true)}
+                  className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-700 hover:bg-amber-200 transition-colors cursor-pointer"
+                >
                   v{APP_VERSION}
-                </span>
+                </button>
               </span>
               <div className="flex items-center gap-1">
                 {feeds.length > 0 && (
@@ -436,6 +450,11 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ChangelogBentoDialog
+        open={changelogOpen}
+        onOpenChange={setChangelogOpen}
+      />
     </>
   );
 }
