@@ -168,7 +168,7 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 - Two viewport projects: `desktop` (1280x720) and `mobile` (Pixel 5, 393x851).
 - Test dir: `tests/e2e/`. Dev server on port 3001 (separate from dev on 3000).
 - Feed responses mocked via `page.route()` with fixtures in `tests/e2e/feed-fixtures.ts`.
-- Onboarding bypassed via `localStorage` in `tests/e2e/fixtures.ts`.
+- Onboarding and changelog dialog bypassed via `localStorage` in `tests/e2e/fixtures.ts`. The changelog version key must match `APP_VERSION` exactly (not a "large" version) because `shouldShowChangelog()` uses `!==`.
 
 **Coverage thresholds (enforced by `npm run test:coverage`):**
 - Statements/Lines/Functions: 90%. Branches: 83%.
@@ -192,6 +192,17 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 - `CDATA` sections with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead of `<![CDATA[<p>]]>`.
 - `isContentEditable` may not behave identically to browsers. Dispatch keyboard events from the target element, not `document`.
 - Radix UI `AlertDialog` renders curly quotes (`\u201C`/`\u201D`). Use flexible regex matchers (e.g., `/Remove.*Feed Name/`).
+
+**Smoke tests against real external services (Tier 2.5 — integration truth):**
+- When a feature depends on external data (favicons, feed parsing, extraction), mocked tests alone are insufficient. At least one test must hit the real external service to validate assumptions.
+- Mocks encode your *belief* about what the external service returns. If that belief is wrong (e.g., "TechCrunch serves a usable favicon.ico" — it doesn't, it's a 198-byte placeholder), all mocked tests pass while the feature is broken for users.
+- **Rule: Before deploying a feature that fetches from external services, `curl` the real endpoint and verify the response matches your mocked test fixtures.** If they diverge, your mocks are lying. Fix the mocks or fix the code.
+- For features with fallback chains (A → B → C), test that the *first* strategy produces the right result for the specific sites users care about, not just that the chain eventually produces *something*.
+
+**Multi-layer caching (Tier 2.5 — cache interaction testing):**
+- Features with multiple caching layers (browser HTTP cache, localStorage, in-memory Map) must have their invalidation paths tested end-to-end. A unit test that clears one cache while another layer still serves stale data is a false green.
+- **Rule: New endpoints start with `Cache-Control: no-cache`.** Add caching only after the endpoint is verified correct in production. Aggressive caching on an unvalidated endpoint locks in bad responses and makes debugging nearly impossible.
+- **Rule: When adding a "clear cache" user action, verify it clears ALL caching layers** — in-memory, localStorage, and browser HTTP cache (via hard reload guidance or cache-busting query params).
 
 **Contract tests (Tier 1.5 — boundary verification):**
 - Every client-server boundary must have a contract test that validates the client's request shape is accepted by the server's handler.
@@ -311,9 +322,14 @@ FeedZero exists to protect its users. It is used by journalists, activists, and 
 - Feed format detection tries JSON parse first (for JSON Feed), then XML (for RSS/Atom)
 - XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector`
 - **Key-data coupling invariant:** Stored derived keys (`feedzero:derived-keys` in localStorage) must always be able to decrypt local IndexedDB data. Only two operations may break this coupling: `open(passphrase)` (which derives fresh keys and re-opens the DB) and `importAll()` (which clears and re-encrypts all data). Any operation that modifies stored keys without re-encrypting data, or re-encrypts data without updating stored keys, is a bug. When transitioning between sync modes, use `exportCurrentKeys()` to persist the in-memory keys rather than deriving new ones.
+- **Quality-first fallback chains:** When a feature has multiple strategies (e.g., favicon discovery: smart resolver → well-known paths → third-party service), put the highest-quality source first, not the fastest. A fast bad result that gets cached is worse than a slow good result. If the client and server can both validate quality (e.g., icon size thresholds), they must agree on thresholds — or only one layer should validate. A dumb proxy that passes through garbage defeats a smart resolver that runs after it.
+- **Trace the full request path before deploying:** For any feature that spans client → server → external service → response → cache → render, trace every step with real data before considering it done. Mocked unit tests prove logic; only end-to-end traces prove the system works. Specifically: (1) what does the external service actually return? (2) which caching layer stores it first? (3) does the cached result survive the user's "clear/retry" action?
+- **Core modules must not import from UI components.** Stores (`src/stores/`) and core modules (`src/core/`) are the shared backend. They must never import from `src/components/`. If a store needs to trigger a UI-side effect (like clearing a component's cache), use an event, a shared utility in `src/utils/` or `src/core/`, or let the UI layer call the function in response to store state changes.
 - **Pull-before-mutate invariant:** Any flow that reads remote state and then modifies local state must fetch the remote data **before** any destructive local operations (`deleteDatabase`, `tryDeleteServerVault`). The recovery flow calls `pullVault()` first, then `initFresh(skipServerCleanup: true)`. This prevents destroying the vault you're trying to recover. Workflows with destructive + read operations on shared remote state need integration tests — mocked unit tests cannot catch temporal coupling bugs across module boundaries.
 
 ---
+
+**Visual changes must be visually verified.** CSS, layout, and rendering changes must be verified in a real browser — not just by checking class names in unit tests. Use Playwright screenshots or the dev server. If a user would notice the change, a human (or a Playwright screenshot assertion) must verify it looks right before it ships.
 
 **Every code change follows Red-Green-Refactor. No test, no code. No refactor, no commit.**
 
