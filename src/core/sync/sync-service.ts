@@ -85,7 +85,11 @@ export async function exportVault(): Promise<Result<VaultData>> {
     version: SYNC.FORMAT_VERSION,
     exportedAt: Date.now(),
     feeds: result.value.feeds,
-    articles: result.value.articles,
+    articles: result.value.articles.map((a) => ({
+      ...a,
+      content: "",
+      summary: "",
+    })),
   });
 }
 

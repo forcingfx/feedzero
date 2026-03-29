@@ -52,6 +52,29 @@ describe("sync-service", () => {
       expect(vault.exportedAt).toBeGreaterThan(0);
     });
 
+    it("strips article content and summary to reduce vault size", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Example" }),
+      );
+      await addFeed(feed);
+      const article = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post",
+          link: "https://example.com/1",
+          content: "<p>Very long article content here</p>",
+          summary: "A summary of the article",
+        }),
+      );
+      await addArticles([article]);
+
+      const vault = unwrap(await exportVault());
+      expect(vault.articles[0].content).toBe("");
+      expect(vault.articles[0].summary).toBe("");
+      expect(vault.articles[0].title).toBe("Post");
+      expect(vault.articles[0].read).toBeDefined();
+    });
+
     it("returns empty arrays for an empty database", async () => {
       const vault = unwrap(await exportVault());
       expect(vault.feeds).toEqual([]);

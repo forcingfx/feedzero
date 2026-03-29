@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
-import { FeedFavicon, clearFaviconCache } from "@/components/feeds/feed-favicon";
+import {
+  FeedFavicon,
+  clearFaviconCache,
+  setFaviconCacheEntry,
+} from "@/components/feeds/feed-favicon";
 
 describe("FeedFavicon", () => {
   beforeEach(() => {
@@ -72,5 +76,23 @@ describe("FeedFavicon", () => {
     fireEvent.load(img);
     expect(container.querySelector("svg")).toBeNull();
     expect(img.classList.contains("hidden")).toBe(false);
+  });
+
+  it("has visible border on loaded favicon for contrast against white backgrounds", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    const img = container.querySelector("img")!;
+    fireEvent.load(img);
+    expect(img.className).toContain("ring-1");
+  });
+
+  it("retries after cached failure once TTL expires", () => {
+    // Inject a stale failure (timestamp 0 = expired)
+    setFaviconCacheEntry("https://stale.example.com", -1, 0);
+
+    const { container } = render(
+      <FeedFavicon siteUrl="https://stale.example.com" />,
+    );
+    // Expired failure should be ignored — component retries (img present)
+    expect(container.querySelector("img")).toBeTruthy();
   });
 });

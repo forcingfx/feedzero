@@ -14,20 +14,38 @@ const FAVICON_PATHS = [
 ];
 
 const STORAGE_KEY = "feedzero:favicon-cache";
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CacheEntry {
+  index: number;
+  ts: number;
+}
 
 /**
- * Persistent favicon cache: origin → resolved path index (or -1 for "all failed").
+ * Persistent favicon cache: origin → { index, ts }.
  * Loaded from localStorage on startup, written back on every resolution.
- * Eliminates all favicon retry requests on page reload.
+ * Failed entries (index === -1) expire after 24 hours to allow retry.
  */
-const resolvedCache: Map<string, number> = (() => {
+const resolvedCache: Map<string, CacheEntry> = (() => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return new Map(JSON.parse(stored));
+    if (!stored) return new Map();
+    const entries: [string, number | CacheEntry][] = JSON.parse(stored);
+    const now = Date.now();
+    const map = new Map<string, CacheEntry>();
+    for (const [key, val] of entries) {
+      // Migrate legacy format (plain number) to new format
+      const entry: CacheEntry =
+        typeof val === "number" ? { index: val, ts: now } : val;
+      // Skip expired failures
+      if (entry.index < 0 && now - entry.ts > CACHE_TTL_MS) continue;
+      map.set(key, entry);
+    }
+    return map;
   } catch {
     // localStorage unavailable or corrupt
+    return new Map();
   }
-  return new Map();
 })();
 
 function persistCache() {
@@ -46,6 +64,15 @@ export function clearFaviconCache() {
   resolvedCache.clear();
 }
 
+/** Inject a cache entry directly (used by tests). */
+export function setFaviconCacheEntry(
+  origin: string,
+  index: number,
+  ts: number,
+) {
+  resolvedCache.set(origin, { index, ts });
+}
+
 /** Displays a feed's favicon with fallback chain, proxied through /api/icon. */
 export function FeedFavicon({
   siteUrl,
@@ -59,7 +86,13 @@ export function FeedFavicon({
   }
 
   const cached = resolvedCache.get(origin);
-  const [pathIndex, setPathIndex] = useState(cached !== undefined ? cached : 0);
+  const isExpired =
+    cached !== undefined &&
+    cached.index < 0 &&
+    Date.now() - cached.ts > CACHE_TTL_MS;
+  const initialIndex =
+    cached !== undefined && !isExpired ? cached.index : 0;
+  const [pathIndex, setPathIndex] = useState(initialIndex);
   const [loaded, setLoaded] = useState(false);
 
   if (!siteUrl || pathIndex < 0) {
@@ -76,9 +109,9 @@ export function FeedFavicon({
       <img
         src={faviconUrl}
         alt=""
-        className={`${className} shrink-0 rounded-sm ${loaded ? "" : "hidden"}`}
+        className={`${className} shrink-0 rounded-sm ring-1 ring-border/50 ${loaded ? "" : "hidden"}`}
         onLoad={() => {
-          resolvedCache.set(origin, pathIndex);
+          resolvedCache.set(origin, { index: pathIndex, ts: Date.now() });
           persistCache();
           setLoaded(true);
         }}
@@ -88,7 +121,7 @@ export function FeedFavicon({
             setPathIndex(next);
             setLoaded(false);
           } else {
-            resolvedCache.set(origin, -1);
+            resolvedCache.set(origin, { index: -1, ts: Date.now() });
             persistCache();
             setPathIndex(-1);
           }
