@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ChangelogBentoDialog } from "@/components/layout/changelog-bento.tsx";
+import { ChangelogBentoDialog, releases } from "@/components/layout/changelog-bento.tsx";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -40,25 +40,55 @@ describe("ChangelogBentoDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("shows previous release link", () => {
-    render(<ChangelogBentoDialog open={true} onOpenChange={vi.fn()} />);
-
-    expect(screen.getByText(/previous release/i)).toBeInTheDocument();
+  it("every release has a type field", () => {
+    for (const release of releases) {
+      expect(release.type).toBeDefined();
+      expect(["feature", "minor"]).toContain(release.type);
+    }
   });
 
-  it("navigates to previous release and back", async () => {
+  it("shows latest release on open", () => {
+    render(<ChangelogBentoDialog open={true} onOpenChange={vi.fn()} />);
+
+    expect(screen.getByText(releases[0].title)).toBeInTheDocument();
+    expect(screen.getByText(releases[0].subtitle)).toBeInTheDocument();
+  });
+
+  it("navigates to older release via left arrow button", async () => {
     const user = userEvent.setup();
     render(<ChangelogBentoDialog open={true} onOpenChange={vi.fn()} />);
 
-    // v0.2.1 → v0.2.0
-    await user.click(screen.getByText(/previous release/i));
-    expect(screen.getByText(/Find your next read/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /older release/i }));
+    expect(screen.getByText(releases[1].title)).toBeInTheDocument();
+  });
 
-    // v0.2.0 → v0.1.0
-    await user.click(screen.getByText(/previous release/i));
-    expect(screen.getByText(/A private RSS reader/)).toBeInTheDocument();
+  it("navigates back to newer release via right arrow button", async () => {
+    const user = userEvent.setup();
+    render(<ChangelogBentoDialog open={true} onOpenChange={vi.fn()} />);
 
-    await user.click(screen.getByText(/back to latest/i));
-    expect(screen.getByText(/Visual polish/)).toBeInTheDocument();
+    // Go to second release
+    await user.click(screen.getByRole("button", { name: /older release/i }));
+    expect(screen.getByText(releases[1].title)).toBeInTheDocument();
+
+    // Go back
+    await user.click(screen.getByRole("button", { name: /newer release/i }));
+    expect(screen.getByText(releases[0].title)).toBeInTheDocument();
+  });
+
+  it("shows page indicator", () => {
+    render(<ChangelogBentoDialog open={true} onOpenChange={vi.fn()} />);
+
+    expect(screen.getByText(/1 \/ \d+/)).toBeInTheDocument();
+  });
+
+  it("renders minor release bullet items", () => {
+    render(<ChangelogBentoDialog open={true} onOpenChange={vi.fn()} />);
+
+    const latest = releases[0];
+    if (latest.type !== "minor") return;
+
+    for (const item of latest.items) {
+      expect(screen.getByText(item)).toBeInTheDocument();
+    }
   });
 });

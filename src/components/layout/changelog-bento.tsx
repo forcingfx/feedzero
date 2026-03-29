@@ -4,11 +4,11 @@ import {
   DialogClose,
   DialogContent,
 } from "@/components/ui/dialog.tsx";
-import { XIcon, Search, CheckCheck, Zap, Shield, ArrowDownToLine, ArrowUpFromLine, Rss, Moon, BookOpen, ArrowLeft } from "lucide-react";
+import { XIcon, Search, CheckCheck, Zap, Shield, ArrowDownToLine, ArrowUpFromLine, Rss, Moon, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 
-export const APP_VERSION = "0.2.1";
+export const APP_VERSION = "0.2.2";
 
 const STORAGE_KEY = "feedzero:last-seen-version";
 
@@ -540,28 +540,111 @@ function TileDesc({ children }: { children: React.ReactNode }) {
   );
 }
 
-// --- Dialog ---
+// --- Types ---
 
-const releases = [
+type FeatureRelease = {
+  version: string;
+  date: string;
+  title: string;
+  subtitle: string;
+  type: "feature";
+};
+
+type MinorRelease = {
+  version: string;
+  date: string;
+  title: string;
+  subtitle: string;
+  type: "minor";
+  items: string[];
+};
+
+export type Release = FeatureRelease | MinorRelease;
+
+// --- Release data ---
+
+export const releases: Release[] = [
+  {
+    version: "0.2.2",
+    date: "2026-03-29",
+    title: "Bug fixes",
+    subtitle: "Small improvements and fixes.",
+    type: "minor",
+    items: [
+      "Fixed favicon loading for sites with non-standard icon paths",
+      "Improved feed refresh reliability",
+      "Better error messages when adding invalid URLs",
+    ],
+  },
   {
     version: "0.2.1",
     date: "2026-03-28",
     title: "Visual polish",
     subtitle: "Warmer palette, smooth transitions, and a refined reading experience.",
+    type: "feature",
   },
   {
     version: "0.2.0",
     date: "2026-03-28",
     title: "Find your next read",
     subtitle: "Discover feeds, navigate by keyboard, and keep your reading private.",
+    type: "feature",
   },
   {
     version: "0.1.0",
     date: "2026-01-31",
     title: "A private RSS reader",
     subtitle: "Read feeds with end-to-end encryption. No accounts, no tracking.",
+    type: "feature",
   },
 ];
+
+const featureContentMap: Record<string, React.FC> = {
+  "0.2.1": V021Content,
+  "0.2.0": V020Content,
+  "0.1.0": V010Content,
+};
+
+function V020Content() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-stretch">
+      <div className="flex flex-col gap-3 [&>*]:flex-1">
+        <ExploreTile />
+        <SyncTile />
+      </div>
+      <div className="flex flex-col gap-3 [&>*]:flex-1">
+        <UnreadTile />
+        <MarkAllReadTile />
+        <InstantSwitchTile />
+      </div>
+      <div className="flex flex-col gap-3 [&>*]:flex-1">
+        <KeyboardTile />
+        <OPMLTile />
+      </div>
+    </div>
+  );
+}
+
+function MinorReleaseContent({ items }: { items: string[] }) {
+  return (
+    <ul className="space-y-1.5">
+      {items.map((item) => (
+        <li key={item} className="flex items-start gap-2 text-xs text-muted-foreground">
+          <span className="rounded-full size-1.5 bg-primary/40 mt-1 shrink-0" />
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ReleaseContent({ release }: { release: Release }) {
+  if (release.type === "minor") return <MinorReleaseContent items={release.items} />;
+  const Content = featureContentMap[release.version];
+  return Content ? <Content /> : null;
+}
+
+// --- Dialog ---
 
 export function ChangelogBentoDialog({
   open,
@@ -569,6 +652,9 @@ export function ChangelogBentoDialog({
 }: ChangelogBentoProps) {
   const [releaseIndex, setReleaseIndex] = useState(0);
   const release = releases[releaseIndex];
+
+  const hasPrev = releaseIndex < releases.length - 1;
+  const hasNext = releaseIndex > 0;
 
   function handleOpenChange(value: boolean) {
     if (!value) {
@@ -578,11 +664,20 @@ export function ChangelogBentoDialog({
     onOpenChange(value);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowLeft" && hasPrev) {
+      setReleaseIndex(releaseIndex + 1);
+    } else if (e.key === "ArrowRight" && hasNext) {
+      setReleaseIndex(releaseIndex - 1);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-5 sm:p-8"
         showCloseButton={false}
+        onKeyDown={handleKeyDown}
       >
         <DialogClose
           tabIndex={-1}
@@ -593,15 +688,6 @@ export function ChangelogBentoDialog({
         </DialogClose>
 
         <div className="text-center mb-5 sm:mb-6">
-          {releaseIndex > 0 && (
-            <button
-              onClick={() => setReleaseIndex(0)}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
-            >
-              <ArrowLeft className="size-3" />
-              Back to latest
-            </button>
-          )}
           <p className="text-xs font-medium text-muted-foreground mb-1">
             v{release.version} &middot; {release.date}
           </p>
@@ -613,42 +699,32 @@ export function ChangelogBentoDialog({
           </p>
         </div>
 
-        {releaseIndex === 0 ? (
-          <V021Content />
-        ) : releaseIndex === 1 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-stretch">
-            <div className="flex flex-col gap-3 [&>*]:flex-1">
-              <ExploreTile />
-              <SyncTile />
-            </div>
-            <div className="flex flex-col gap-3 [&>*]:flex-1">
-              <UnreadTile />
-              <MarkAllReadTile />
-              <InstantSwitchTile />
-            </div>
-            <div className="flex flex-col gap-3 [&>*]:flex-1">
-              <KeyboardTile />
-              <OPMLTile />
-            </div>
-          </div>
-        ) : (
-          <V010Content />
-        )}
+        <ReleaseContent release={release} />
 
-        <div className="flex items-center justify-between mt-5">
-          {releaseIndex < releases.length - 1 ? (
-            <button
-              onClick={() => setReleaseIndex(releaseIndex + 1)}
-              className="text-xs text-muted-foreground hover:text-foreground underline"
-            >
-              Previous release: v{releases[releaseIndex + 1].version}
-            </button>
-          ) : (
-            <div />
-          )}
+        <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/30">
+          <button
+            onClick={() => setReleaseIndex(releaseIndex + 1)}
+            disabled={!hasPrev}
+            aria-label="Older release"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-0 disabled:pointer-events-none transition-opacity"
+          >
+            <ChevronLeft className="size-3.5" />
+            <span>{hasPrev ? `v${releases[releaseIndex + 1].version}` : ""}</span>
+          </button>
+
           <span className="text-xs text-muted-foreground">
-            <Kbd>Esc</Kbd> to dismiss
+            {releaseIndex + 1} / {releases.length} &middot; <Kbd>Esc</Kbd> to dismiss
           </span>
+
+          <button
+            onClick={() => setReleaseIndex(releaseIndex - 1)}
+            disabled={!hasNext}
+            aria-label="Newer release"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-0 disabled:pointer-events-none transition-opacity"
+          >
+            <span>v{hasNext ? releases[releaseIndex - 1].version : ""}</span>
+            <ChevronRight className="size-3.5" />
+          </button>
         </div>
       </DialogContent>
     </Dialog>
