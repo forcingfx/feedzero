@@ -5,6 +5,7 @@ import {
   Cloud,
   Compass,
   Keyboard,
+  Pencil,
   Layers,
   Loader2,
   MessageSquare,
@@ -272,6 +273,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
   const reloadSingleFeed = useFeedStore((s) => s.reloadSingleFeed);
+  const renameFeed = useFeedStore((s) => s.renameFeed);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
 
@@ -283,6 +285,8 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const isExplorePage = pathname === "/explore";
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
   const [feedToReload, setFeedToReload] = useState<Feed | null>(null);
+  const [renamingFeedId, setRenamingFeedId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
@@ -387,6 +391,28 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                     <SidebarSeparator className="mx-0 my-1" />
                     {feeds.map((feed) => (
                       <SidebarMenuItem key={feed.id}>
+                        {renamingFeedId === feed.id ? (
+                          <form
+                            className="flex items-center gap-2 px-2 py-1"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              if (renameValue.trim()) {
+                                renameFeed(feed.id, renameValue.trim());
+                              }
+                              setRenamingFeedId(null);
+                            }}
+                          >
+                            <FeedFavicon siteUrl={feed.siteUrl} />
+                            <input
+                              autoFocus
+                              className="flex-1 bg-transparent text-sm outline-none border-b border-primary min-w-0"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onBlur={() => setRenamingFeedId(null)}
+                              onKeyDown={(e) => { if (e.key === "Escape") setRenamingFeedId(null); }}
+                            />
+                          </form>
+                        ) : (
                         <SidebarMenuButton
                           isActive={feed.id === selectedFeedId}
                           onClick={() => handleSelect(feed.id)}
@@ -398,6 +424,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                             <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
                           )}
                         </SidebarMenuButton>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <SidebarMenuAction showOnHover className="focus-visible:ring-0">
@@ -406,6 +433,15 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                             </SidebarMenuAction>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent side="right" align="start">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setRenameValue(feed.title);
+                                setRenamingFeedId(feed.id);
+                              }}
+                            >
+                              <Pencil className="size-4" />
+                              Rename
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => refreshSingleFeed(feed.id)}
                             >

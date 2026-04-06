@@ -3,6 +3,7 @@ import {
   getFeeds,
   getFeed,
   removeFeed as dbRemoveFeed,
+  updateFeed as dbUpdateFeed,
 } from "../core/storage/db.ts";
 import {
   addFeedFlow,
@@ -36,6 +37,7 @@ interface FeedStore {
   loadFeeds: () => Promise<void>;
   addFeed: (url: string, prefetchedContent?: string) => Promise<Result<void>>;
   removeFeed: (feedId: string) => Promise<void>;
+  renameFeed: (feedId: string, newTitle: string) => Promise<void>;
   reloadSingleFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
@@ -85,6 +87,16 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       feeds: allFeeds.ok ? sortFeeds(allFeeds.value) : [],
       selectedFeedId: currentSelection === feedId ? null : currentSelection,
     });
+    useSyncStore.getState().scheduleSyncPush();
+  },
+
+  renameFeed: async (feedId, newTitle) => {
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return;
+    const updated = { ...feedResult.value, title: newTitle, updatedAt: Date.now() };
+    await dbUpdateFeed(updated);
+    const allFeeds = await getFeeds();
+    set({ feeds: allFeeds.ok ? sortFeeds(allFeeds.value) : get().feeds });
     useSyncStore.getState().scheduleSyncPush();
   },
 

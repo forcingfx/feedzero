@@ -207,6 +207,11 @@ export async function addFeed(feed: Feed): Promise<Result<boolean>> {
   }
 }
 
+/** Update an existing feed (e.g., rename). */
+export async function updateFeed(feed: Feed): Promise<Result<boolean>> {
+  return putEncrypted("feeds", feed.id, feed);
+}
+
 /**
  * Get all feeds (decrypted).
  */
