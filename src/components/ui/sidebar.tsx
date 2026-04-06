@@ -303,15 +303,21 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   );
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="contents">{rail}</span>
-      </TooltipTrigger>
-      <TooltipContent side="right" className="flex items-center gap-1.5">
-        Toggle sidebar
-        <kbd className="rounded border border-border/50 bg-muted px-1.5 py-0.5 text-[10px] font-mono">[</kbd>
-      </TooltipContent>
-    </Tooltip>
+    <>
+      {rail}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            aria-hidden
+            className="absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex"
+          />
+        </TooltipTrigger>
+        <TooltipContent side="right" className="flex items-center gap-1.5">
+          Toggle sidebar
+          <kbd className="rounded border border-border/50 bg-muted px-1.5 py-0.5 text-[10px] font-mono">[</kbd>
+        </TooltipContent>
+      </Tooltip>
+    </>
   );
 }
 

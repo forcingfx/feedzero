@@ -47,11 +47,14 @@ describe("AppSidebar layout structure", () => {
     expect(rail!.getAttribute("aria-label")).toBe("Toggle Sidebar");
   });
 
-  it("SidebarRail is wrapped in a tooltip", () => {
+  it("SidebarRail has a sibling tooltip trigger for keyboard hint", () => {
     const { container } = renderSidebar();
     const rail = container.querySelector("[data-sidebar='rail']");
-    // Rail should be inside a tooltip trigger (span.contents wrapper)
-    expect(rail!.parentElement?.tagName).toBe("SPAN");
+    expect(rail).not.toBeNull();
+    // A sibling div acts as the tooltip trigger, positioned identically to the rail
+    const sibling = rail!.nextElementSibling?.querySelector("[aria-hidden]")
+      ?? rail!.parentElement?.querySelector("[aria-hidden]");
+    expect(sibling).not.toBeNull();
   });
 
   it("SidebarHeader hides refresh when no feeds exist", () => {
