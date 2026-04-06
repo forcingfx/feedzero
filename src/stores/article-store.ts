@@ -14,6 +14,10 @@ interface ArticleStore {
   articles: Article[];
   selectedArticle: Article | null;
   isLoading: boolean;
+  /** Unread count per feedId — updated on preload and mark-as-read. */
+  unreadCounts: Record<string, number>;
+  /** Preload all articles into cache and compute unread counts. */
+  preloadAll: () => Promise<void>;
   loadArticles: (feedId: string) => Promise<void>;
   selectArticle: (article: Article | null) => Promise<void>;
   markAsRead: (articleId: string) => Promise<void>;
@@ -52,10 +56,40 @@ function updateCachedArticle(article: Article) {
   }
 }
 
+/** Recompute unread counts from the article cache. */
+function computeUnreadCounts(): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const [feedId, articles] of articleCache) {
+    if (feedId === ALL_FEEDS_ID) continue;
+    counts[feedId] = articles.filter((a) => !a.read).length;
+  }
+  return counts;
+}
+
 export const useArticleStore = create<ArticleStore>((set, get) => ({
   articles: [],
   selectedArticle: null,
   isLoading: false,
+  unreadCounts: {},
+
+  preloadAll: async () => {
+    const result = await getAllArticles();
+    if (!result.ok) return;
+
+    const all = result.value;
+    // Group by feedId and populate cache
+    const byFeed = new Map<string, Article[]>();
+    for (const article of all) {
+      const list = byFeed.get(article.feedId);
+      if (list) list.push(article);
+      else byFeed.set(article.feedId, [article]);
+    }
+    for (const [feedId, articles] of byFeed) {
+      articleCache.set(feedId, articles.slice(0, PAGE_SIZE));
+    }
+    articleCache.set(ALL_FEEDS_ID, all.slice(0, PAGE_SIZE));
+    set({ unreadCounts: computeUnreadCounts() });
+  },
 
   loadArticles: async (feedId) => {
     // Show cached articles instantly if available (no loading state)
@@ -128,6 +162,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
           articles: get().articles.map((a) =>
             a.id === article.id ? updated : a,
           ),
+          unreadCounts: computeUnreadCounts(),
         });
         updateArticle(updated).then(() => {
           useSyncStore.getState().scheduleSyncPush();
@@ -147,6 +182,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       articles: get().articles.map((a) =>
         a.id === articleId ? { ...a, read: true } : a,
       ),
+      unreadCounts: computeUnreadCounts(),
     });
   },
 
@@ -167,6 +203,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       updateCachedArticle(readArticle);
       await updateArticle(readArticle);
     }
+    set({ unreadCounts: computeUnreadCounts() });
     useSyncStore.getState().scheduleSyncPush();
   },
 }));

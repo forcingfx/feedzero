@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { useArticleStore } from "@/stores/article-store.ts";
 import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
@@ -23,6 +24,7 @@ function AppInit({ children }: { children: React.ReactNode }) {
   const resetApp = useAppStore((s) => s.resetApp);
   const loadFeeds = useFeedStore((s) => s.loadFeeds);
   const refreshAll = useFeedStore((s) => s.refreshAll);
+  const preloadArticles = useArticleStore((s) => s.preloadAll);
   const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
@@ -59,10 +61,10 @@ function AppInit({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isDbReady) {
-      loadFeeds();
+      loadFeeds().then(() => preloadArticles());
       refreshAll();
     }
-  }, [isDbReady, loadFeeds, refreshAll]);
+  }, [isDbReady, loadFeeds, refreshAll, preloadArticles]);
 
   const handleReset = async () => {
     setIsResetting(true);

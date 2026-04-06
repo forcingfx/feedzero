@@ -53,9 +53,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarMenuBadge,
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
+import { useArticleStore } from "@/stores/article-store.ts";
 import { useSyncStore } from "@/stores/sync-store.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
@@ -283,6 +285,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const removeFeed = useFeedStore((s) => s.removeFeed);
+  const unreadCounts = useArticleStore((s) => s.unreadCounts);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
@@ -392,6 +395,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                             <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
                           )}
                         </SidebarMenuButton>
+                        {(unreadCounts[feed.id] ?? 0) > 0 && (
+                          <SidebarMenuBadge>{unreadCounts[feed.id]}</SidebarMenuBadge>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <SidebarMenuAction showOnHover>
