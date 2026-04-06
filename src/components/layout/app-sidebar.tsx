@@ -301,6 +301,8 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [folderRenameValue, setFolderRenameValue] = useState("");
   const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
 
   const unfiledFeeds = useMemo(() => feeds.filter((f) => !f.folderId), [feeds]);
   const feedsByFolder = useMemo(() => {
@@ -319,9 +321,11 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
     if (onFeedSelect) onFeedSelect(feedId);
   }
 
-  function renderFeedItem(feed: Feed) {
+  function renderFeedItem(feed: Feed, inFolder = false) {
+    const Wrapper = inFolder ? SidebarMenuSubItem : SidebarMenuItem;
+    const ButtonComp = inFolder ? SidebarMenuSubButton : SidebarMenuButton;
     return (
-      <SidebarMenuItem key={feed.id}>
+      <Wrapper key={feed.id}>
         {renamingFeedId === feed.id ? (
           <form
             className="flex items-center gap-2 px-2 py-1"
@@ -342,17 +346,16 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
             />
           </form>
         ) : (
-          <SidebarMenuButton
+          <ButtonComp
             isActive={feed.id === selectedFeedId}
             onClick={() => handleSelect(feed.id)}
-            tooltip={feed.title}
           >
             <FeedFavicon siteUrl={feed.siteUrl} />
             <span className="truncate">{feed.title}</span>
             {refreshingFeedIds.has(feed.id) && (
               <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
             )}
-          </SidebarMenuButton>
+          </ButtonComp>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -397,7 +400,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
             {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
           </SidebarMenuBadge>
         )}
-      </SidebarMenuItem>
+      </Wrapper>
     );
   }
 
@@ -551,17 +554,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                             </DropdownMenu>
                             <Collapsible.Content>
                               <SidebarMenuSub>
-                                {folderFeeds.map((feed) => (
-                                  <SidebarMenuSubItem key={feed.id}>
-                                    <SidebarMenuSubButton
-                                      isActive={feed.id === selectedFeedId}
-                                      onClick={() => handleSelect(feed.id)}
-                                    >
-                                      <FeedFavicon siteUrl={feed.siteUrl} />
-                                      <span className="truncate">{feed.title}</span>
-                                    </SidebarMenuSubButton>
-                                  </SidebarMenuSubItem>
-                                ))}
+                                {folderFeeds.map((feed) => renderFeedItem(feed, true))}
                               </SidebarMenuSub>
                             </Collapsible.Content>
                           </Collapsible.Root>
@@ -570,16 +563,36 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                     })}
                     <SidebarSeparator className="mx-0 my-1" />
                     <SidebarMenuItem>
-                      <SidebarMenuButton
-                        className="text-muted-foreground"
-                        onClick={() => {
-                          const name = prompt("Folder name:");
-                          if (name?.trim()) createFolder(name.trim());
-                        }}
-                      >
-                        <FolderPlus className="size-4" />
-                        <span>New folder</span>
-                      </SidebarMenuButton>
+                      {creatingFolder ? (
+                        <form
+                          className="flex items-center gap-2 px-2 py-1"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (newFolderName.trim()) createFolder(newFolderName.trim());
+                            setCreatingFolder(false);
+                            setNewFolderName("");
+                          }}
+                        >
+                          <FolderPlus className="size-4 text-muted-foreground" />
+                          <input
+                            autoFocus
+                            placeholder="Folder name"
+                            className="flex-1 bg-transparent text-sm outline-none border-b border-primary min-w-0"
+                            value={newFolderName}
+                            onChange={(e) => setNewFolderName(e.target.value)}
+                            onBlur={() => { setCreatingFolder(false); setNewFolderName(""); }}
+                            onKeyDown={(e) => { if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); } }}
+                          />
+                        </form>
+                      ) : (
+                        <SidebarMenuButton
+                          className="text-muted-foreground"
+                          onClick={() => setCreatingFolder(true)}
+                        >
+                          <FolderPlus className="size-4" />
+                          <span>New folder</span>
+                        </SidebarMenuButton>
+                      )}
                     </SidebarMenuItem>
                   </>
                 )}
