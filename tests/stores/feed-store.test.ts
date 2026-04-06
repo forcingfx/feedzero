@@ -6,6 +6,7 @@ vi.mock("../../src/core/storage/db.ts", () => ({
   getFeeds: vi.fn(),
   getFeed: vi.fn(),
   removeFeed: vi.fn(),
+  updateFeed: vi.fn(),
 }));
 
 vi.mock("../../src/core/feeds/feed-service.ts", () => ({
@@ -20,7 +21,7 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
-import { getFeeds, getFeed, removeFeed } from "../../src/core/storage/db.ts";
+import { getFeeds, getFeed, removeFeed, updateFeed } from "../../src/core/storage/db.ts";
 import {
   addFeedFlow,
   refreshFeed,
@@ -134,6 +135,22 @@ describe("feed-store", () => {
       expect(removeFeed).toHaveBeenCalledWith("x");
       expect(useFeedStore.getState().feeds).toEqual([]);
       expect(useFeedStore.getState().selectedFeedId).toBeNull();
+    });
+  });
+
+  describe("renameFeed", () => {
+    it("updates the feed title and reloads feeds", async () => {
+      const feed = mockFeed("f1", "Old Title");
+      useFeedStore.setState({ feeds: [feed] });
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      const renamed = { ...feed, title: "New Title" };
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [renamed] });
+
+      await useFeedStore.getState().renameFeed("f1", "New Title");
+
+      expect(updateFeed).toHaveBeenCalledWith(expect.objectContaining({ title: "New Title" }));
+      expect(useFeedStore.getState().feeds[0].title).toBe("New Title");
     });
   });
 
