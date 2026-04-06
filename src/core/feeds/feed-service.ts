@@ -84,6 +84,7 @@ export function normalizeUrl(url: string): string {
  */
 export async function addFeedFlow(
   rawUrl: string,
+  options?: { prefetchedContent?: string },
 ): Promise<Result<AddFeedResult>> {
   const url = normalizeUrl(rawUrl);
   try {
@@ -100,14 +101,19 @@ export async function addFeedFlow(
       await removeFeedsByUrl(url);
     }
 
-    // Fetch feed content via CORS proxy
-    const response = await proxyFetch("/api/feed", url);
-    if (!response.ok) {
-      return err(
-        `The feed at this URL could not be reached (HTTP ${response.status}).`,
-      );
+    // Use prefetched content or fetch via CORS proxy
+    let text: string;
+    if (options?.prefetchedContent) {
+      text = options.prefetchedContent;
+    } else {
+      const response = await proxyFetch("/api/feed", url);
+      if (!response.ok) {
+        return err(
+          `The feed at this URL could not be reached (HTTP ${response.status}).`,
+        );
+      }
+      text = await response.text();
     }
-    const text = await response.text();
 
     // Parse feed content — if it fails, try feed discovery (maybe it's a website)
     const parseResult = parse(text, url);

@@ -21,7 +21,7 @@ interface FeedStore {
   refreshingFeedIds: Set<string>;
   error: string | null;
   loadFeeds: () => Promise<void>;
-  addFeed: (url: string) => Promise<Result<void>>;
+  addFeed: (url: string, prefetchedContent?: string) => Promise<Result<void>>;
   removeFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
@@ -45,9 +45,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
   },
 
-  addFeed: async (url) => {
+  addFeed: async (url, prefetchedContent) => {
     set({ isLoading: true, error: null });
-    const result = await addFeedFlow(url);
+    const result = await addFeedFlow(url, prefetchedContent ? { prefetchedContent } : undefined);
     if (!result.ok) {
       set({ isLoading: false, error: result.error });
       return { ok: false, error: result.error } as const;

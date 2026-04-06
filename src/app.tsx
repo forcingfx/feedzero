@@ -64,8 +64,14 @@ function AppInit({ children }: { children: React.ReactNode }) {
         // Auto-subscribe to changelog feed on first launch
         const { feeds } = useFeedStore.getState();
         if (feeds.length === 0) {
-          const changelogUrl = `${window.location.origin}${CHANGELOG_FEED_PATH}`;
-          await addFeed(changelogUrl).catch(() => {});
+          try {
+            const res = await fetch(CHANGELOG_FEED_PATH);
+            if (res.ok) {
+              const xml = await res.text();
+              const changelogUrl = `${window.location.origin}${CHANGELOG_FEED_PATH}`;
+              await addFeed(changelogUrl, xml);
+            }
+          } catch { /* noop */ }
         }
         preloadArticles();
       });

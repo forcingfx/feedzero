@@ -287,20 +287,26 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   }
 
   async function handleWhatsNew() {
-    const changelogUrl = `${window.location.origin}${CHANGELOG_FEED_PATH}`;
     const existing = feeds.find((f) => f.url.includes(CHANGELOG_FEED_PATH));
     if (existing) {
       handleSelect(existing.id);
       navigate(`/feeds/${existing.id}`);
-    } else {
-      await addFeed(changelogUrl).catch(() => {});
+      return;
+    }
+    // Subscribe by fetching XML directly (same origin, no proxy needed)
+    try {
+      const res = await fetch(CHANGELOG_FEED_PATH);
+      if (!res.ok) return;
+      const xml = await res.text();
+      const changelogUrl = `${window.location.origin}${CHANGELOG_FEED_PATH}`;
+      await addFeed(changelogUrl, xml);
       const { feeds: updated } = useFeedStore.getState();
       const added = updated.find((f) => f.url.includes(CHANGELOG_FEED_PATH));
       if (added) {
         handleSelect(added.id);
         navigate(`/feeds/${added.id}`);
       }
-    }
+    } catch { /* noop */ }
   }
 
   function handleConfirmRemove() {
