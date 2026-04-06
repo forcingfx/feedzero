@@ -52,6 +52,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarMenuBadge,
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
@@ -383,11 +384,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                           {refreshingFeedIds.has(feed.id) && (
                             <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
                           )}
-                          {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
-                            <span className="ml-auto shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary">
-                              {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
-                            </span>
-                          )}
                         </SidebarMenuButton>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -412,6 +408,11 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
+                          <SidebarMenuBadge>
+                            {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
+                          </SidebarMenuBadge>
+                        )}
                       </SidebarMenuItem>
                     ))}
                   </>
