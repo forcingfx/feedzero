@@ -1,4 +1,4 @@
-// api/favicon.ts
+// src/core/favicon/favicon-resolver.ts
 var WELL_KNOWN_PATHS = [
   "/favicon.ico",
   "/favicon.png",
@@ -29,10 +29,13 @@ async function tryWellKnownPaths(origin) {
   }
   return null;
 }
+var MIN_ICON_BYTES = 500;
 function isImageResponse(res) {
   const ct = res.headers.get("content-type") ?? "";
   const cl = res.headers.get("content-length");
-  return ct.startsWith("image/") && (!cl || parseInt(cl) > 0);
+  if (!ct.startsWith("image/")) return false;
+  if (cl && parseInt(cl) < MIN_ICON_BYTES) return false;
+  return true;
 }
 async function tryHtmlParsing(origin) {
   try {
@@ -80,12 +83,16 @@ function duckDuckGoFallback(origin) {
   const host = new URL(origin).host;
   return `https://icons.duckduckgo.com/ip3/${host}.ico`;
 }
+
+// src/utils/result.ts
 function ok(value) {
   return { ok: true, value };
 }
 function err(error) {
   return { ok: false, error };
 }
+
+// src/core/proxy/validate-url.ts
 var BLOCKED_HOSTNAMES = /* @__PURE__ */ new Set([
   "localhost",
   "127.0.0.1",
@@ -134,6 +141,8 @@ function validateProxyUrl(url) {
   }
   return ok(parsed);
 }
+
+// src/core/favicon/favicon-handler.ts
 async function handleFaviconRequest(req) {
   const url = new URL(req.url, "http://localhost");
   const domain = url.searchParams.get("domain");
@@ -160,13 +169,15 @@ async function handleFaviconRequest(req) {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400"
+        "Cache-Control": "no-cache"
       }
     });
   } catch {
     return new Response("Favicon fetch failed", { status: 502 });
   }
 }
+
+// api/favicon.ts
 async function GET(req) {
   return handleFaviconRequest(req);
 }
