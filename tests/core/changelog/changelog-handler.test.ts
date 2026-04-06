@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { handleChangelogRequest } from "@/core/changelog/changelog-handler.ts";
 import { releases } from "@/core/changelog/releases.ts";
+import { parse } from "@/core/parser/parser.ts";
 
 function request(path: string): Request {
   return new Request(`http://localhost${path}`);
@@ -58,5 +59,24 @@ describe("changelog-handler", () => {
   it("has no user-identifying headers", async () => {
     const res = await handleChangelogRequest(request("/api/changelog.xml"));
     expect(res.headers.get("Set-Cookie")).toBeNull();
+  });
+
+  it("parses correctly through the feed parser", async () => {
+    const res = await handleChangelogRequest(request("/api/changelog.xml"));
+    const xml = await res.text();
+    const result = parse(xml, "/api/changelog.xml");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.feed.title).toBe("FeedZero Release Notes");
+    expect(result.value.articles.length).toBe(releases.length);
+
+    // Each article should have content and a guid
+    for (const article of result.value.articles) {
+      expect(article.guid).toBeTruthy();
+      expect(article.content).toBeTruthy();
+      expect(article.title).toBeTruthy();
+    }
   });
 });

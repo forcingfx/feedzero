@@ -34,9 +34,12 @@ function buildEntry(release: ChangelogRelease): string {
   return `  <entry>
     <id>feedzero:release:${escapeXml(release.version)}</id>
     <title>v${escapeXml(release.version)} — ${escapeXml(release.title)}</title>
+    <link rel="alternate" href="/api/changelog.xml#v${escapeXml(release.version)}" />
+    <published>${release.date}T00:00:00Z</published>
     <updated>${release.date}T00:00:00Z</updated>
     <summary>${escapeXml(release.subtitle)}</summary>
     <content type="html"><![CDATA[${content}]]></content>
+    <author><name>FeedZero</name></author>
   </entry>`;
 }
 
