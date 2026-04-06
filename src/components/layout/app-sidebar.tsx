@@ -72,7 +72,7 @@ import { CHANGELOG_FEED_PATH } from "@/utils/constants.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
-import type { Feed } from "@/types/index.ts";
+import type { Feed, Folder } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
@@ -282,6 +282,8 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const renameFeed = useFeedStore((s) => s.renameFeed);
   const folders = useFeedStore((s) => s.folders);
   const createFolder = useFeedStore((s) => s.createFolder);
+  const renameFolder = useFeedStore((s) => s.renameFolder);
+  const deleteFolder = useFeedStore((s) => s.deleteFolder);
   const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
@@ -296,6 +298,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const [feedToReload, setFeedToReload] = useState<Feed | null>(null);
   const [renamingFeedId, setRenamingFeedId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [folderRenameValue, setFolderRenameValue] = useState("");
+  const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
 
   const unfiledFeeds = useMemo(() => feeds.filter((f) => !f.folderId), [feeds]);
   const feedsByFolder = useMemo(() => {
@@ -498,13 +503,52 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       return (
                         <SidebarMenuItem key={folder.id}>
                           <Collapsible.Root className="group/folder" defaultOpen>
-                            <Collapsible.Trigger asChild>
-                              <SidebarMenuButton className="font-medium">
-                                <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
-                                <span className="truncate">{folder.name}</span>
-                                <span className="ml-auto text-[10px] text-muted-foreground">{folderFeeds.length}</span>
-                              </SidebarMenuButton>
-                            </Collapsible.Trigger>
+                            {renamingFolderId === folder.id ? (
+                              <form
+                                className="flex items-center gap-2 px-2 py-1"
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  if (folderRenameValue.trim()) renameFolder(folder.id, folderRenameValue.trim());
+                                  setRenamingFolderId(null);
+                                }}
+                              >
+                                <ChevronRight className="size-3.5" />
+                                <input
+                                  autoFocus
+                                  className="flex-1 bg-transparent text-sm font-medium outline-none border-b border-primary min-w-0"
+                                  value={folderRenameValue}
+                                  onChange={(e) => setFolderRenameValue(e.target.value)}
+                                  onBlur={() => setRenamingFolderId(null)}
+                                  onKeyDown={(e) => { if (e.key === "Escape") setRenamingFolderId(null); }}
+                                />
+                              </form>
+                            ) : (
+                              <Collapsible.Trigger asChild>
+                                <SidebarMenuButton className="font-medium">
+                                  <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
+                                  <span className="truncate">{folder.name}</span>
+                                  <span className="ml-auto text-[10px] text-muted-foreground">{folderFeeds.length}</span>
+                                </SidebarMenuButton>
+                              </Collapsible.Trigger>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <SidebarMenuAction showOnHover className="focus-visible:ring-0">
+                                  <MoreHorizontal />
+                                  <span className="sr-only">Folder options</span>
+                                </SidebarMenuAction>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent side="right" align="start">
+                                <DropdownMenuItem onClick={() => { setFolderRenameValue(folder.name); setRenamingFolderId(folder.id); }}>
+                                  <Pencil className="size-4" />
+                                  Rename folder
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setFolderToDelete(folder)}>
+                                  <Trash2 className="size-4" />
+                                  Delete folder
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             <Collapsible.Content>
                               <SidebarMenuSub>
                                 {folderFeeds.map((feed) => (
@@ -608,6 +652,35 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
               }}
             >
               Clear and reload
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={folderToDelete !== null}
+        onOpenChange={(open) => { if (!open) setFolderToDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete &ldquo;{folderToDelete?.name}&rdquo;? Feeds in this folder
+              will be moved to the top level, not deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (folderToDelete) {
+                  deleteFolder(folderToDelete.id);
+                  setFolderToDelete(null);
+                }
+              }}
+            >
+              Delete folder
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
