@@ -408,7 +408,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                           </DropdownMenuContent>
                         </DropdownMenu>
                         {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
-                          <SidebarMenuBadge className="group-hover/menu-item:md:opacity-0 transition-opacity">
+                          <SidebarMenuBadge className="group-hover/menu-item:md:opacity-0 group-has-[[data-state=open]]/menu-item:md:opacity-0 transition-opacity">
                             {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
                           </SidebarMenuBadge>
                         )}
