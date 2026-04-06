@@ -452,14 +452,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
           </SidebarMenu>
         </SidebarFooter>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <SidebarRail />
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            Toggle sidebar <Kbd className="ml-1">[</Kbd>
-          </TooltipContent>
-        </Tooltip>
+        <SidebarRail />
       </Sidebar>
 
       <AlertDialog
