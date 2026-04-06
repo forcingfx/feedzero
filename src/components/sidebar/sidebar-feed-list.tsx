@@ -6,6 +6,9 @@ import { SidebarSeparator } from "@/components/ui/sidebar.tsx";
 import { FeedItem } from "./feed-item.tsx";
 import { FolderItem } from "./folder-item.tsx";
 import { NewFolderInput } from "./new-folder-input.tsx";
+import { FeedRemoveDialog } from "./feed-remove-dialog.tsx";
+import { FeedReloadDialog } from "./feed-reload-dialog.tsx";
+import { FolderDeleteDialog } from "./folder-delete-dialog.tsx";
 import type { Feed, Folder } from "@/types/index.ts";
 
 interface SidebarFeedListProps {
@@ -54,8 +57,10 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
     moveFeedToFolder(feedId, targetFolderId);
   }
 
-  // Expose dialog state for parent to render dialogs
-  // (dialogs rendered by parent AppSidebar to avoid portal issues inside sidebar)
+  const removeFeed = useFeedStore((s) => s.removeFeed);
+  const reloadSingleFeed = useFeedStore((s) => s.reloadSingleFeed);
+  const deleteFolder = useFeedStore((s) => s.deleteFolder);
+
   return (
     <>
       <DndContext sensors={sensors} onDragStart={(e) => setActiveDragId(e.active.id as string)} onDragEnd={handleDragEnd}>
@@ -99,6 +104,25 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
       </DndContext>
       <SidebarSeparator className="mx-0 my-1" />
       <NewFolderInput />
+
+      <FeedRemoveDialog
+        feedTitle={feedToRemove?.title ?? ""}
+        open={feedToRemove !== null}
+        onOpenChange={(open) => { if (!open) setFeedToRemove(null); }}
+        onConfirm={() => { if (feedToRemove) { removeFeed(feedToRemove.id); setFeedToRemove(null); } }}
+      />
+      <FeedReloadDialog
+        feedTitle={feedToReload?.title ?? ""}
+        open={feedToReload !== null}
+        onOpenChange={(open) => { if (!open) setFeedToReload(null); }}
+        onConfirm={() => { if (feedToReload) { reloadSingleFeed(feedToReload.id); setFeedToReload(null); } }}
+      />
+      <FolderDeleteDialog
+        folderName={folderToDelete?.name ?? ""}
+        open={folderToDelete !== null}
+        onOpenChange={(open) => { if (!open) setFolderToDelete(null); }}
+        onConfirm={() => { if (folderToDelete) { deleteFolder(folderToDelete.id); setFolderToDelete(null); } }}
+      />
     </>
   );
 }
