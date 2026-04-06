@@ -579,8 +579,8 @@ function V030Content() {
         <TileDesc>fbclid, gclid, utm_source and 20+ tracking parameters scrubbed from every link.</TileDesc>
       </BentoTile>
       <BentoTile>
-        <TileLabel isNew>Feed catalog</TileLabel>
-        <TileDesc>A global, anonymous index of feeds — powering future recommendations, search, and health monitoring.</TileDesc>
+        <TileLabel isNew>Smarter feeds ahead</TileLabel>
+        <TileDesc>Laying the groundwork for feed recommendations, health checks, and AI summaries — all without knowing who you are.</TileDesc>
       </BentoTile>
       <BentoTile>
         <TileLabel isNew>Improved changelog</TileLabel>
