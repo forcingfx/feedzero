@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
+import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useNavigate, useLocation } from "react-router";
 import {
   ChevronsUpDown,
@@ -271,6 +272,74 @@ function LocalStorageWarning() {
   );
 }
 
+function DraggableFeedItem({ feed, inFolder, isActive, isRenaming, renameValue, isRefreshing, unreadCount, folders: folderList, onSelect, onRename, onStartRename, onCancelRename, onRenameChange, onRefresh, onReload, onDelete, onMoveToFolder }: {
+  feed: Feed; inFolder: boolean; isActive: boolean; isRenaming: boolean; renameValue: string;
+  isRefreshing: boolean; unreadCount: number; folders: Folder[];
+  onSelect: () => void; onRename: (name: string) => void; onStartRename: () => void;
+  onCancelRename: () => void; onRenameChange: (v: string) => void;
+  onRefresh: () => void; onReload: () => void; onDelete: () => void;
+  onMoveToFolder: (folderId: string | null) => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: feed.id });
+  const Wrapper = inFolder ? SidebarMenuSubItem : SidebarMenuItem;
+  const ButtonComp = inFolder ? SidebarMenuSubButton : SidebarMenuButton;
+
+  return (
+    <Wrapper ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...listeners}>
+      {isRenaming ? (
+        <form className="flex items-center gap-2 px-2 py-1" onSubmit={(e) => { e.preventDefault(); if (renameValue.trim()) onRename(renameValue.trim()); }}>
+          <FeedFavicon siteUrl={feed.siteUrl} />
+          <input autoFocus className="flex-1 bg-transparent text-sm outline-none border-b border-primary min-w-0"
+            value={renameValue} onChange={(e) => onRenameChange(e.target.value)}
+            onBlur={onCancelRename} onKeyDown={(e) => { if (e.key === "Escape") onCancelRename(); }} />
+        </form>
+      ) : (
+        <ButtonComp isActive={isActive} onClick={onSelect}>
+          <FeedFavicon siteUrl={feed.siteUrl} />
+          <span className="truncate">{feed.title}</span>
+          {isRefreshing && <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />}
+        </ButtonComp>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuAction showOnHover className="focus-visible:ring-0">
+            <MoreHorizontal />
+            <span className="sr-only">More</span>
+          </SidebarMenuAction>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" align="start">
+          <DropdownMenuItem onClick={onStartRename}><Pencil className="size-4" /> Rename</DropdownMenuItem>
+          {folderList.length > 0 && (
+            <>
+              <DropdownMenuItem onClick={() => onMoveToFolder(null)} disabled={!feed.folderId}>Unfiled</DropdownMenuItem>
+              {folderList.map((f) => (
+                <DropdownMenuItem key={f.id} onClick={() => onMoveToFolder(f.id)} disabled={feed.folderId === f.id}>→ {f.name}</DropdownMenuItem>
+              ))}
+            </>
+          )}
+          <DropdownMenuItem onClick={onRefresh}><RefreshCw className="size-4" /> Refresh</DropdownMenuItem>
+          <DropdownMenuItem onClick={onReload}><RotateCcw className="size-4" /> Clear cached articles</DropdownMenuItem>
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {!isRefreshing && unreadCount > 0 && (
+        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:md:opacity-0 group-focus-within/menu-item:md:opacity-0 group-has-[[data-state=open]]/menu-item:md:opacity-0 transition-opacity">
+          {unreadCount > 99 ? "99+" : unreadCount}
+        </SidebarMenuBadge>
+      )}
+    </Wrapper>
+  );
+}
+
+function DroppableFolder({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={isOver ? "bg-accent/50 rounded-md transition-colors" : "transition-colors"}>
+      {children}
+    </div>
+  );
+}
+
 export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
@@ -321,87 +390,36 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
     if (onFeedSelect) onFeedSelect(feedId);
   }
 
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over) return;
+    const feedId = active.id as string;
+    const targetFolderId = over.id === "unfiled" ? null : (over.id as string);
+    moveFeedToFolder(feedId, targetFolderId);
+  }
+
   function renderFeedItem(feed: Feed, inFolder = false) {
-    const Wrapper = inFolder ? SidebarMenuSubItem : SidebarMenuItem;
-    const ButtonComp = inFolder ? SidebarMenuSubButton : SidebarMenuButton;
-    return (
-      <Wrapper key={feed.id}>
-        {renamingFeedId === feed.id ? (
-          <form
-            className="flex items-center gap-2 px-2 py-1"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (renameValue.trim()) renameFeed(feed.id, renameValue.trim());
-              setRenamingFeedId(null);
-            }}
-          >
-            <FeedFavicon siteUrl={feed.siteUrl} />
-            <input
-              autoFocus
-              className="flex-1 bg-transparent text-sm outline-none border-b border-primary min-w-0"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onBlur={() => setRenamingFeedId(null)}
-              onKeyDown={(e) => { if (e.key === "Escape") setRenamingFeedId(null); }}
-            />
-          </form>
-        ) : (
-          <ButtonComp
-            isActive={feed.id === selectedFeedId}
-            onClick={() => handleSelect(feed.id)}
-          >
-            <FeedFavicon siteUrl={feed.siteUrl} />
-            <span className="truncate">{feed.title}</span>
-            {refreshingFeedIds.has(feed.id) && (
-              <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
-            )}
-          </ButtonComp>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuAction showOnHover className="focus-visible:ring-0">
-              <MoreHorizontal />
-              <span className="sr-only">More</span>
-            </SidebarMenuAction>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start">
-            <DropdownMenuItem onClick={() => { setRenameValue(feed.title); setRenamingFeedId(feed.id); }}>
-              <Pencil className="size-4" />
-              Rename
-            </DropdownMenuItem>
-            {folders.length > 0 && (
-              <>
-                <DropdownMenuItem onClick={() => moveFeedToFolder(feed.id, null)} disabled={!feed.folderId}>
-                  Unfiled
-                </DropdownMenuItem>
-                {folders.map((f) => (
-                  <DropdownMenuItem key={f.id} onClick={() => moveFeedToFolder(feed.id, f.id)} disabled={feed.folderId === f.id}>
-                    → {f.name}
-                  </DropdownMenuItem>
-                ))}
-              </>
-            )}
-            <DropdownMenuItem onClick={() => refreshSingleFeed(feed.id)}>
-              <RefreshCw className="size-4" />
-              Refresh
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setFeedToReload(feed)}>
-              <RotateCcw className="size-4" />
-              Clear cached articles
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setFeedToRemove(feed)}>
-              <Trash2 className="size-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
-          <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:md:opacity-0 group-focus-within/menu-item:md:opacity-0 group-has-[[data-state=open]]/menu-item:md:opacity-0 transition-opacity">
-            {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
-          </SidebarMenuBadge>
-        )}
-      </Wrapper>
-    );
+    return <DraggableFeedItem key={feed.id} feed={feed} inFolder={inFolder}
+      isActive={feed.id === selectedFeedId}
+      isRenaming={renamingFeedId === feed.id}
+      renameValue={renameValue}
+      isRefreshing={refreshingFeedIds.has(feed.id)}
+      unreadCount={unreadCounts[feed.id] ?? 0}
+      folders={folders}
+      onSelect={() => handleSelect(feed.id)}
+      onRename={(name) => { renameFeed(feed.id, name); setRenamingFeedId(null); }}
+      onStartRename={() => { setRenameValue(feed.title); setRenamingFeedId(feed.id); }}
+      onCancelRename={() => setRenamingFeedId(null)}
+      onRenameChange={setRenameValue}
+      onRefresh={() => refreshSingleFeed(feed.id)}
+      onReload={() => setFeedToReload(feed)}
+      onDelete={() => setFeedToRemove(feed)}
+      onMoveToFolder={(folderId) => moveFeedToFolder(feed.id, folderId)}
+    />;
   }
 
   async function handleWhatsNew() {
@@ -500,11 +518,15 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarSeparator className="mx-0 my-1" />
+                    <DndContext sensors={sensors} onDragStart={(e) => setActiveDragId(e.active.id as string)} onDragEnd={handleDragEnd}>
+                    <DroppableFolder id="unfiled">
                     {unfiledFeeds.map((feed) => renderFeedItem(feed))}
+                    </DroppableFolder>
                     {folders.map((folder) => {
                       const folderFeeds = feedsByFolder.get(folder.id) ?? [];
                       return (
-                        <SidebarMenuItem key={folder.id}>
+                        <DroppableFolder key={folder.id} id={folder.id}>
+                        <SidebarMenuItem>
                           <Collapsible.Root className="group/folder" defaultOpen>
                             {renamingFolderId === folder.id ? (
                               <form
@@ -559,8 +581,17 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                             </Collapsible.Content>
                           </Collapsible.Root>
                         </SidebarMenuItem>
+                        </DroppableFolder>
                       );
                     })}
+                    <DragOverlay>
+                      {activeDragId ? (
+                        <div className="rounded-md bg-card border shadow-lg px-3 py-1.5 text-sm">
+                          {feeds.find((f) => f.id === activeDragId)?.title}
+                        </div>
+                      ) : null}
+                    </DragOverlay>
+                    </DndContext>
                     <SidebarSeparator className="mx-0 my-1" />
                     <SidebarMenuItem>
                       {creatingFolder ? (
