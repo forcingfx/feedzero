@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import * as Collapsible from "@radix-ui/react-collapsible";
 import { useNavigate, useLocation } from "react-router";
 import {
   ChevronsUpDown,
   Cloud,
+  ChevronRight,
   Compass,
+  FolderPlus,
   Keyboard,
   Pencil,
   Layers,
@@ -54,6 +57,9 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarMenuBadge,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
@@ -66,7 +72,7 @@ import { CHANGELOG_FEED_PATH } from "@/utils/constants.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
-import type { Feed } from "@/types/index.ts";
+import type { Feed, Folder } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
@@ -274,6 +280,11 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
   const reloadSingleFeed = useFeedStore((s) => s.reloadSingleFeed);
   const renameFeed = useFeedStore((s) => s.renameFeed);
+  const folders = useFeedStore((s) => s.folders);
+  const createFolder = useFeedStore((s) => s.createFolder);
+  const renameFolder = useFeedStore((s) => s.renameFolder);
+  const deleteFolder = useFeedStore((s) => s.deleteFolder);
+  const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
 
@@ -287,10 +298,107 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const [feedToReload, setFeedToReload] = useState<Feed | null>(null);
   const [renamingFeedId, setRenamingFeedId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [folderRenameValue, setFolderRenameValue] = useState("");
+  const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
+
+  const unfiledFeeds = useMemo(() => feeds.filter((f) => !f.folderId), [feeds]);
+  const feedsByFolder = useMemo(() => {
+    const map = new Map<string, typeof feeds>();
+    for (const feed of feeds) {
+      if (!feed.folderId) continue;
+      const list = map.get(feed.folderId);
+      if (list) list.push(feed);
+      else map.set(feed.folderId, [feed]);
+    }
+    return map;
+  }, [feeds]);
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
     if (onFeedSelect) onFeedSelect(feedId);
+  }
+
+  function renderFeedItem(feed: Feed) {
+    return (
+      <SidebarMenuItem key={feed.id}>
+        {renamingFeedId === feed.id ? (
+          <form
+            className="flex items-center gap-2 px-2 py-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (renameValue.trim()) renameFeed(feed.id, renameValue.trim());
+              setRenamingFeedId(null);
+            }}
+          >
+            <FeedFavicon siteUrl={feed.siteUrl} />
+            <input
+              autoFocus
+              className="flex-1 bg-transparent text-sm outline-none border-b border-primary min-w-0"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={() => setRenamingFeedId(null)}
+              onKeyDown={(e) => { if (e.key === "Escape") setRenamingFeedId(null); }}
+            />
+          </form>
+        ) : (
+          <SidebarMenuButton
+            isActive={feed.id === selectedFeedId}
+            onClick={() => handleSelect(feed.id)}
+            tooltip={feed.title}
+          >
+            <FeedFavicon siteUrl={feed.siteUrl} />
+            <span className="truncate">{feed.title}</span>
+            {refreshingFeedIds.has(feed.id) && (
+              <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
+            )}
+          </SidebarMenuButton>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuAction showOnHover className="focus-visible:ring-0">
+              <MoreHorizontal />
+              <span className="sr-only">More</span>
+            </SidebarMenuAction>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start">
+            <DropdownMenuItem onClick={() => { setRenameValue(feed.title); setRenamingFeedId(feed.id); }}>
+              <Pencil className="size-4" />
+              Rename
+            </DropdownMenuItem>
+            {folders.length > 0 && (
+              <>
+                <DropdownMenuItem onClick={() => moveFeedToFolder(feed.id, null)} disabled={!feed.folderId}>
+                  Unfiled
+                </DropdownMenuItem>
+                {folders.map((f) => (
+                  <DropdownMenuItem key={f.id} onClick={() => moveFeedToFolder(feed.id, f.id)} disabled={feed.folderId === f.id}>
+                    → {f.name}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
+            <DropdownMenuItem onClick={() => refreshSingleFeed(feed.id)}>
+              <RefreshCw className="size-4" />
+              Refresh
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setFeedToReload(feed)}>
+              <RotateCcw className="size-4" />
+              Clear cached articles
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setFeedToRemove(feed)}>
+              <Trash2 className="size-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
+          <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:md:opacity-0 group-focus-within/menu-item:md:opacity-0 group-has-[[data-state=open]]/menu-item:md:opacity-0 transition-opacity">
+            {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
+          </SidebarMenuBadge>
+        )}
+      </SidebarMenuItem>
+    );
   }
 
   async function handleWhatsNew() {
@@ -389,87 +497,90 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarSeparator className="mx-0 my-1" />
-                    {feeds.map((feed) => (
-                      <SidebarMenuItem key={feed.id}>
-                        {renamingFeedId === feed.id ? (
-                          <form
-                            className="flex items-center gap-2 px-2 py-1"
-                            onSubmit={(e) => {
-                              e.preventDefault();
-                              if (renameValue.trim()) {
-                                renameFeed(feed.id, renameValue.trim());
-                              }
-                              setRenamingFeedId(null);
-                            }}
-                          >
-                            <FeedFavicon siteUrl={feed.siteUrl} />
-                            <input
-                              autoFocus
-                              className="flex-1 bg-transparent text-sm outline-none border-b border-primary min-w-0"
-                              value={renameValue}
-                              onChange={(e) => setRenameValue(e.target.value)}
-                              onBlur={() => setRenamingFeedId(null)}
-                              onKeyDown={(e) => { if (e.key === "Escape") setRenamingFeedId(null); }}
-                            />
-                          </form>
-                        ) : (
-                        <SidebarMenuButton
-                          isActive={feed.id === selectedFeedId}
-                          onClick={() => handleSelect(feed.id)}
-                          tooltip={feed.title}
-                        >
-                          <FeedFavicon siteUrl={feed.siteUrl} />
-                          <span className="truncate">{feed.title}</span>
-                          {refreshingFeedIds.has(feed.id) && (
-                            <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
-                          )}
-                        </SidebarMenuButton>
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <SidebarMenuAction showOnHover className="focus-visible:ring-0">
-                              <MoreHorizontal />
-                              <span className="sr-only">More</span>
-                            </SidebarMenuAction>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent side="right" align="start">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setRenameValue(feed.title);
-                                setRenamingFeedId(feed.id);
-                              }}
-                            >
-                              <Pencil className="size-4" />
-                              Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => refreshSingleFeed(feed.id)}
-                            >
-                              <RefreshCw className="size-4" />
-                              Refresh
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => setFeedToReload(feed)}
-                            >
-                              <RotateCcw className="size-4" />
-                              Clear cached articles
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setFeedToRemove(feed)}
-                            >
-                              <Trash2 className="size-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
-                          <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:md:opacity-0 group-focus-within/menu-item:md:opacity-0 group-has-[[data-state=open]]/menu-item:md:opacity-0 transition-opacity">
-                            {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
-                          </SidebarMenuBadge>
-                        )}
-                      </SidebarMenuItem>
-                    ))}
+                    {unfiledFeeds.map((feed) => renderFeedItem(feed))}
+                    {folders.map((folder) => {
+                      const folderFeeds = feedsByFolder.get(folder.id) ?? [];
+                      return (
+                        <SidebarMenuItem key={folder.id}>
+                          <Collapsible.Root className="group/folder" defaultOpen>
+                            {renamingFolderId === folder.id ? (
+                              <form
+                                className="flex items-center gap-2 px-2 py-1"
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  if (folderRenameValue.trim()) renameFolder(folder.id, folderRenameValue.trim());
+                                  setRenamingFolderId(null);
+                                }}
+                              >
+                                <ChevronRight className="size-3.5" />
+                                <input
+                                  autoFocus
+                                  className="flex-1 bg-transparent text-sm font-medium outline-none border-b border-primary min-w-0"
+                                  value={folderRenameValue}
+                                  onChange={(e) => setFolderRenameValue(e.target.value)}
+                                  onBlur={() => setRenamingFolderId(null)}
+                                  onKeyDown={(e) => { if (e.key === "Escape") setRenamingFolderId(null); }}
+                                />
+                              </form>
+                            ) : (
+                              <Collapsible.Trigger asChild>
+                                <SidebarMenuButton className="font-medium">
+                                  <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
+                                  <span className="truncate">{folder.name}</span>
+                                  <span className="ml-auto text-[10px] text-muted-foreground">{folderFeeds.length}</span>
+                                </SidebarMenuButton>
+                              </Collapsible.Trigger>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <SidebarMenuAction showOnHover className="focus-visible:ring-0">
+                                  <MoreHorizontal />
+                                  <span className="sr-only">Folder options</span>
+                                </SidebarMenuAction>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent side="right" align="start">
+                                <DropdownMenuItem onClick={() => { setFolderRenameValue(folder.name); setRenamingFolderId(folder.id); }}>
+                                  <Pencil className="size-4" />
+                                  Rename folder
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setFolderToDelete(folder)}>
+                                  <Trash2 className="size-4" />
+                                  Delete folder
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            <Collapsible.Content>
+                              <SidebarMenuSub>
+                                {folderFeeds.map((feed) => (
+                                  <SidebarMenuSubItem key={feed.id}>
+                                    <SidebarMenuSubButton
+                                      isActive={feed.id === selectedFeedId}
+                                      onClick={() => handleSelect(feed.id)}
+                                    >
+                                      <FeedFavicon siteUrl={feed.siteUrl} />
+                                      <span className="truncate">{feed.title}</span>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                ))}
+                              </SidebarMenuSub>
+                            </Collapsible.Content>
+                          </Collapsible.Root>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                    <SidebarSeparator className="mx-0 my-1" />
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        className="text-muted-foreground"
+                        onClick={() => {
+                          const name = prompt("Folder name:");
+                          if (name?.trim()) createFolder(name.trim());
+                        }}
+                      >
+                        <FolderPlus className="size-4" />
+                        <span>New folder</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   </>
                 )}
               </SidebarMenu>
@@ -541,6 +652,35 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
               }}
             >
               Clear and reload
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={folderToDelete !== null}
+        onOpenChange={(open) => { if (!open) setFolderToDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete &ldquo;{folderToDelete?.name}&rdquo;? Feeds in this folder
+              will be moved to the top level, not deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (folderToDelete) {
+                  deleteFolder(folderToDelete.id);
+                  setFolderToDelete(null);
+                }
+              }}
+            >
+              Delete folder
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

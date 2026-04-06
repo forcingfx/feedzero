@@ -11,7 +11,7 @@ import {
   decrypt,
   importCryptoKey,
 } from "./crypto.ts";
-import type { Feed, Article } from "../../types/index.ts";
+import type { Feed, Article, Folder } from "../../types/index.ts";
 
 interface DexieRecord {
   id: string;
@@ -48,6 +48,7 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
     db.version(DB_VERSION).stores({
       feeds: "id, &url",
       articles: "id, feedId, [feedId+guid]",
+      folders: "id",
       meta: "key",
     });
 
@@ -89,6 +90,7 @@ export async function openWithKeys(
     db.version(DB_VERSION).stores({
       feeds: "id, &url",
       articles: "id, feedId, [feedId+guid]",
+      folders: "id",
       meta: "key",
     });
 
@@ -464,6 +466,30 @@ export async function importAll(
     return ok(true);
   } catch (e) {
     return err(`Failed to import data: ${(e as Error).message}`);
+  }
+}
+
+// --- Folder operations ---
+
+export async function addFolder(folder: Folder): Promise<Result<boolean>> {
+  return putEncrypted("folders", folder.id, folder);
+}
+
+export async function getFolders(): Promise<Result<Folder[]>> {
+  return getAllDecrypted<Folder>("folders");
+}
+
+export async function updateFolder(folder: Folder): Promise<Result<boolean>> {
+  return putEncrypted("folders", folder.id, folder);
+}
+
+export async function removeFolder(id: string): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    await ctx.db.table("folders").delete(id);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove folder: ${(e as Error).message}`);
   }
 }
 

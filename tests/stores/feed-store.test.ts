@@ -7,6 +7,10 @@ vi.mock("../../src/core/storage/db.ts", () => ({
   getFeed: vi.fn(),
   removeFeed: vi.fn(),
   updateFeed: vi.fn(),
+  getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  addFolder: vi.fn(),
+  updateFolder: vi.fn(),
+  removeFolder: vi.fn(),
 }));
 
 vi.mock("../../src/core/feeds/feed-service.ts", () => ({
