@@ -12,10 +12,10 @@ export interface ChangelogRelease {
 // --- Rich content blocks ---
 
 const v031RichContent = `
-<h2>We killed the header bar</h2>
-<p>There was a bar at the top of the screen that had… a sidebar toggle icon. That's it. It was eating 40 pixels on every page. It's gone now. The sidebar rail (that thin line on the left edge) still works for toggling, and <code>[</code> on the keyboard still works too.</p>
+<h2>Less Chrome, More Reading</h2>
+<p>There was a 40-pixel bar at the top of the screen whose sole purpose in life was to house a sidebar toggle icon. Forty pixels. For one icon. It's gone.</p>
 
-<p>While we were at it, we also killed the toolbar above the article list — the one with "12 unread" and a mark-all-read button. Replaced it with a floating pill that shows up only when you have unread articles:</p>
+<p>The toolbar above the article list — "12 unread" plus a mark-all-read button — is also gone. In its place, a little floating pill that appears at the bottom only when there's something to mark:</p>
 
 <div class="flex justify-center my-6">
   <div class="rounded-full bg-gray-100 border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-600 shadow-sm flex items-center gap-1.5">
@@ -23,8 +23,10 @@ const v031RichContent = `
   </div>
 </div>
 
-<h3>You can now see which feed an article is from</h3>
-<p>This sounds obvious but it wasn't there before. When you're reading an article, the feed's favicon and name now show up right below the title. Here's what it looks like:</p>
+<p>Tap it, unread articles go away, pill disappears. That's the whole interaction.</p>
+
+<h3>Source Attribution</h3>
+<p>It always bugged me that you'd be reading an article and have no idea which feed it came from. Now the feed's favicon and name sit right under the headline:</p>
 
 <div class="rounded-lg border bg-white p-3 my-6">
   <div class="text-lg font-semibold tracking-tight mb-1">Scientists Find New Signal from Deep Space</div>
@@ -36,8 +38,10 @@ const v031RichContent = `
   </div>
 </div>
 
-<h3>Unread badges in the sidebar</h3>
-<p>Each feed now shows how many unread articles it has. The count comes from all your articles, not just the first 25. When you hover over a feed to get the action menu, the badge fades out so they don't overlap.</p>
+<p>Small thing. Should have been there from day one.</p>
+
+<h3>Unread Counts</h3>
+<p>The sidebar now shows a per-feed unread count. The numbers come from the full article set, not just the first page. When you hover to get the context menu, the badge politely fades out of the way.</p>
 
 <div class="flex-1 rounded-xl border bg-white p-3 my-6">
   <div class="flex items-center gap-2 mb-2">
@@ -57,45 +61,45 @@ const v031RichContent = `
   </div>
 </div>
 
-<h3>Switching feeds is instant now</h3>
-<p>We preload all your articles into memory when the app starts. So when you click a feed, the articles are already there — no spinner, no delay. If a feed has more than 25 articles, there's a "Load more" button at the bottom to get older stuff.</p>
+<h3>No More Spinners</h3>
+<p>All articles now load into memory at startup. Click a feed and the articles are just <em>there</em>. No spinner, no flash of empty state. For feeds with more than 25 articles, there's a "Load more" button at the bottom.</p>
 
-<h3>Favicons refresh themselves</h3>
-<p>Previously you had to go into settings and click "Reload favicons" if an icon was broken. Now the cache expires automatically — successes after 7 days, failures after 24 hours. The menu item is gone.</p>
+<p>Also: favicons now refresh themselves on a 7-day cycle. The manual "Reload favicons" menu item is gone because you shouldn't have to think about favicons.</p>
 `;
 
 const v030RichContent = `
-<h2>So, RSS feeds are full of trackers</h2>
-<p>You probably didn't know this. Most RSS feeds embed invisible 1×1 pixel images that phone home to Facebook, Google Analytics, and other tracking services. Every link has <code>utm_source</code>, <code>fbclid</code>, and other junk appended. You're being tracked even in your RSS reader.</p>
+<h2>The Tracking Problem</h2>
+<p>Here's something most people don't realize: RSS feeds are <em>full</em> of tracking junk. Invisible 1×1 pixel images that ping Facebook and Google every time you open an article. Links stuffed with <code>utm_source</code> and <code>fbclid</code> parameters so the publisher can track exactly which link you clicked and where you came from.</p>
 
-<p>We now strip all of that out before the content reaches your browser. Here's what gets removed:</p>
+<p>RSS was supposed to be the open, decentralized alternative. Instead it became another vector for the same surveillance apparatus that ruined the web. So we decided to do something about it.</p>
+
+<p>Starting with this release, FeedZero strips all of it out before the content reaches your browser:</p>
 
 <div class="space-y-2 my-6">
   <div class="flex items-center gap-3 rounded-lg border p-2.5">
     <span class="text-sm">🔍</span>
     <div class="flex-1">
       <div class="text-xs font-semibold">Tracking pixels</div>
-      <div class="text-[10px] text-gray-500">1×1 images from Facebook, Google Analytics, Quantserve, Feedburner, etc.</div>
+      <div class="text-[10px] text-gray-500">1×1 images from Facebook, Google Analytics, Quantserve, Feedburner, and friends</div>
     </div>
   </div>
   <div class="flex items-center gap-3 rounded-lg border p-2.5">
     <span class="text-sm">🔗</span>
     <div class="flex-1">
-      <div class="text-xs font-semibold">URL tracking params</div>
-      <div class="text-[10px] text-gray-500">utm_source, utm_medium, utm_campaign, fbclid, gclid, msclkid, and 20+ others</div>
+      <div class="text-xs font-semibold">URL tracking parameters</div>
+      <div class="text-[10px] text-gray-500">utm_source, utm_medium, utm_campaign, fbclid, gclid, and 20+ others</div>
     </div>
   </div>
   <div class="flex items-center gap-3 rounded-lg border p-2.5">
     <span class="text-sm">🛡️</span>
     <div class="flex-1">
       <div class="text-xs font-semibold">Ad click IDs</div>
-      <div class="text-[10px] text-gray-500">From Microsoft, Snapchat, Twitter, Pinterest — all gone</div>
+      <div class="text-[10px] text-gray-500">Microsoft, Snapchat, Twitter, Pinterest click tracking — all of it</div>
     </div>
   </div>
 </div>
 
-<h3>What a link looks like now</h3>
-<p>Here's an actual before/after:</p>
+<p>Here's what a typical link looks like before and after:</p>
 
 <div class="grid gap-3 my-6">
   <div class="rounded-lg border p-3">
@@ -108,22 +112,22 @@ const v030RichContent = `
   </div>
 </div>
 
-<p>This happens transparently — you don't have to do anything. Every feed you read is cleaned before it reaches you.</p>
+<p>You don't have to do anything. It just happens.</p>
 
-<h3>We also started tracking which feeds exist (not who reads them)</h3>
-<p>When anyone fetches a feed through our proxy, we now record that the feed URL exists and how many times it's been requested — but not by whom. No user IDs, no sessions, no cookies. The server knows "BBC News exists." It has no idea that you read it.</p>
+<h3>The Feed Catalog</h3>
+<p>We also started building something interesting on the server side. When anyone fetches a feed, we now record that the feed <em>exists</em> — but not who fetched it. No user IDs, no sessions, no cookies.</p>
 
-<p>This catalog is the foundation for future stuff — feed health monitoring, popularity rankings, maybe AI summaries someday. All built on the principle that knowing a feed exists is public information, but knowing who reads it is private.</p>
+<p>Think of it this way: the server knows "BBC News is a feed that exists and gets fetched a lot." It has absolutely no idea that <em>you</em> read BBC News. That distinction matters, and it's the foundation for everything we want to build next — feed health monitoring, popularity data, maybe recommendations. All without ever knowing who reads what.</p>
 `;
 
 const v020RichContent = `
-<h2>This is the one where FeedZero became actually useful</h2>
-<p>Up to now it was basically "paste a feed URL and read it." With 0.2, we added the stuff that makes it a real daily-driver reader.</p>
+<h2>Now We're Cooking</h2>
+<p>Version 0.1 was a proof of concept. You could paste a URL and read articles. Fine. But nobody's going to switch to that from whatever they're already using. Version 0.2 is the one that makes FeedZero a real reader.</p>
 
-<h3>Explore tab</h3>
-<p>There's now a catalog of 1,000+ feeds you can browse by topic or country. Or just paste any URL — it'll figure out if there's a feed there. The search box is in the sidebar under "Explore."</p>
+<h3>Explore</h3>
+<p>We built a catalog of over a thousand feeds, organized by topic and country. Click "Explore" in the sidebar and browse, or just type a URL into the search box — if there's a feed there, we'll find it.</p>
 
-<div class="rounded-lg border bg-white p-2.5 my-6">
+<div class="rounded-lg border p-2.5 my-6">
   <div class="flex items-center gap-2 mb-2 rounded-md border bg-gray-50 px-2 py-1 text-xs text-gray-400">
     <span>🔍</span> nytimes.com
     <span class="ml-auto text-[10px] text-blue-500">Enter to add</span>
@@ -136,8 +140,8 @@ const v020RichContent = `
   </div>
 </div>
 
-<h3>Keyboard shortcuts</h3>
-<p>If you're a keyboard person, you can now do everything without touching the mouse. The main ones:</p>
+<h3>Keyboard Shortcuts</h3>
+<p>The whole point of a desktop reader is that you can fly through articles without reaching for the mouse. So:</p>
 
 <div class="grid grid-cols-2 gap-2 my-6">
   <div class="rounded-lg border p-2.5 text-center">
@@ -158,8 +162,10 @@ const v020RichContent = `
   </div>
 </div>
 
-<h3>Cloud sync</h3>
-<p>You can now sync your feeds across devices. It works with a 4-word passphrase — the server stores an encrypted blob and has no idea what's inside it. Even if someone hacks the server, they get a pile of encrypted noise.</p>
+<p>Vim-style <code>j</code>/<code>k</code> for article navigation, because if you know you know.</p>
+
+<h3>Cloud Sync</h3>
+<p>Here's how sync works: you get a four-word passphrase. That passphrase is used to derive an encryption key. Your feeds and article metadata are encrypted with that key and uploaded as an opaque blob. The server has no idea what's inside.</p>
 
 <div class="flex justify-center gap-2 my-6">
   <span class="rounded bg-emerald-100 text-emerald-700 px-2.5 py-1 text-xs font-mono">oak</span>
@@ -168,14 +174,18 @@ const v020RichContent = `
   <span class="rounded bg-emerald-100 text-emerald-700 px-2.5 py-1 text-xs font-mono">bell</span>
 </div>
 
-<p>Also in this release: OPML import/export (so you can bring your feeds from other readers), unread dots, and mark-all-read.</p>
+<p>Type those four words on another device and your feeds appear. That's it. No account, no email, no password reset flow. If you lose the passphrase, the data is gone — by design.</p>
+
+<p>This release also adds OPML import and export, unread indicators, and mark-all-read.</p>
 `;
 
 const v010RichContent = `
-<h2>Why we built this</h2>
-<p>Most RSS readers either died, got acquired and ruined, or quietly started collecting your data. We wanted something simple: paste a feed URL, read the articles, and have nobody watching over your shoulder.</p>
+<h2>Hello, World</h2>
+<p>Google killed Google Reader in 2013. That was over a decade ago. In the time since, RSS didn't die — it just stopped being convenient. Every reader that popped up to fill the void either got acqui-hired into oblivion, pivoted to "AI-powered news curation" (read: tracking), or just quietly started selling your reading habits to advertisers.</p>
 
-<p>So we built FeedZero. Everything you add is encrypted with AES-256 before it touches storage. There's no account to create, no email to provide, no analytics running in the background. Here's how it works:</p>
+<p>FeedZero is the reader I wanted to exist. You paste a URL, you read the articles. That's it. No account. No email. No "Sign in with Google." The whole thing runs in your browser, and everything is encrypted before it touches disk.</p>
+
+<p>Here's the actual data flow:</p>
 
 <div class="rounded-xl border bg-gray-50 p-4 my-6">
   <div class="space-y-2 text-xs">
@@ -185,24 +195,24 @@ const v010RichContent = `
     </div>
     <div class="flex items-center gap-2">
       <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold shrink-0">2</span>
-      <span>We fetch it through a proxy (so the feed publisher doesn't see your IP)</span>
+      <span>Content fetched through our proxy (publisher sees our server, not you)</span>
     </div>
     <div class="flex items-center gap-2">
       <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold shrink-0">3</span>
-      <span>Content gets sanitized to remove any scripts or XSS attempts</span>
+      <span>HTML sanitized — no scripts, no XSS, no funny business</span>
     </div>
     <div class="flex items-center gap-2">
       <span class="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold shrink-0">4</span>
-      <span>Everything is encrypted in your browser before being saved</span>
+      <span>Encrypted with AES-256 right in your browser</span>
     </div>
     <div class="flex items-center gap-2">
       <span class="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold shrink-0">5</span>
-      <span>Data lives in your browser's IndexedDB — we never see it</span>
+      <span>Stored locally in IndexedDB — never leaves your machine unencrypted</span>
     </div>
   </div>
 </div>
 
-<p>This first release supports RSS 2.0, Atom, and JSON Feed. There's dark mode, keyboard navigation (j/k/o), and a full-text extraction feature for feeds that only give you summaries.</p>
+<p>This first version handles RSS 2.0, Atom, and JSON Feed. There's dark mode, vim-style keyboard navigation, and a full-text extractor for feeds that only ship summaries.</p>
 
 <div class="grid grid-cols-3 gap-2 my-6">
   <div class="rounded-xl border p-3 text-center">
@@ -213,16 +223,16 @@ const v010RichContent = `
   <div class="rounded-xl border p-3 text-center">
     <div class="text-2xl mb-1">🌙</div>
     <div class="text-xs font-semibold">Dark mode</div>
-    <div class="text-[10px] text-gray-500">Easier on the eyes</div>
+    <div class="text-[10px] text-gray-500">Because of course</div>
   </div>
   <div class="rounded-xl border p-3 text-center">
     <div class="text-2xl mb-1">📖</div>
     <div class="text-xs font-semibold">Full text</div>
-    <div class="text-[10px] text-gray-500">Extract full articles</div>
+    <div class="text-[10px] text-gray-500">Extract the whole article</div>
   </div>
 </div>
 
-<p>We're building this for people who care about their privacy — journalists, researchers, activists, or just anyone who's tired of being the product. It's open source, there's no telemetry, and there never will be.</p>
+<p>This is for anyone who wants to read the web without being watched. Journalists, researchers, activists, or just people who remember when the internet wasn't trying to sell them something every three seconds. It's open source, there's no telemetry, and there never will be.</p>
 `;
 
 // --- Release data ---
