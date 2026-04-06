@@ -8,7 +8,7 @@ import { XIcon, Search, CheckCheck, Zap, Shield, ShieldOff, Link2, EyeOff, Arrow
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.3.1";
 
 const STORAGE_KEY = "feedzero:last-seen-version";
 
@@ -614,6 +614,22 @@ export type Release = FeatureRelease | MinorRelease;
 // --- Release data ---
 
 export const releases: Release[] = [
+  {
+    version: "0.3.1",
+    date: "2026-04-06",
+    title: "More space to read",
+    subtitle: "Reclaimed vertical space, unread badges, instant feed switching, and infinite scroll.",
+    type: "minor",
+    items: [
+      "Feed source now shown in reader with favicon and name",
+      "Removed desktop header bar — full vertical space for content",
+      "Unread count badges in the sidebar per feed",
+      "Preload all articles at startup — instant feed switching",
+      "\"Load more\" button for feeds with 25+ articles",
+      "Floating \"Mark N read\" pill replaces toolbar",
+      "Favicons auto-refresh weekly, no manual reload needed",
+    ],
+  },
   {
     version: "0.3.0",
     date: "2026-04-06",

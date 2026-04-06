@@ -11,7 +11,7 @@ export async function skipOnboarding(page: Page) {
     localStorage.setItem("feedzero:onboarding-complete", "true");
     localStorage.setItem("feedzero:storage-mode", "local");
     // Suppress changelog dialog (must match APP_VERSION in changelog-bento.tsx)
-    localStorage.setItem("feedzero:last-seen-version", "0.3.0");
+    localStorage.setItem("feedzero:last-seen-version", "0.3.1");
   });
 }
 
