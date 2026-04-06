@@ -415,7 +415,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                               onClick={() => reloadSingleFeed(feed.id)}
                             >
                               <RotateCcw className="size-4" />
-                              Reload from scratch
+                              Clear cached articles
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
