@@ -16,9 +16,13 @@ interface ArticleStore {
   isLoading: boolean;
   /** Unread count per feedId — updated on preload and mark-as-read. */
   unreadCounts: Record<string, number>;
+  /** Whether more articles exist beyond what's currently displayed. */
+  hasMore: boolean;
   /** Preload all articles into cache and compute unread counts. */
   preloadAll: () => Promise<void>;
   loadArticles: (feedId: string) => Promise<void>;
+  /** Load the next page of articles for the current feed. */
+  loadMore: () => void;
   selectArticle: (article: Article | null) => Promise<void>;
   markAsRead: (articleId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
@@ -29,8 +33,11 @@ const MARK_AS_READ_DELAY = 1000;
 const PAGE_SIZE = 25;
 let markAsReadTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Per-feed article cache — instant switching, no flicker. */
+/** Per-feed article cache (full set) — instant switching, no flicker. */
 const articleCache = new Map<string, Article[]>();
+
+/** How many articles are currently shown for the active feed. */
+let displayLimit = PAGE_SIZE;
 
 /** Clear the article cache (used by tests). */
 export function clearArticleCache() {
@@ -71,6 +78,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   selectedArticle: null,
   isLoading: false,
   unreadCounts: {},
+  hasMore: false,
 
   preloadAll: async () => {
     const result = await getAllArticles();
@@ -87,30 +95,54 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     }
     for (const [feedId, articles] of byFeed) {
       counts[feedId] = articles.filter((a) => !a.read).length;
-      articleCache.set(feedId, articles.slice(0, PAGE_SIZE));
+      articleCache.set(feedId, articles);
     }
-    articleCache.set(ALL_FEEDS_ID, all.slice(0, PAGE_SIZE));
+    articleCache.set(ALL_FEEDS_ID, all);
     set({ unreadCounts: counts });
   },
 
   loadArticles: async (feedId) => {
+    displayLimit = PAGE_SIZE;
+
     // Show cached articles instantly if available (no loading state)
     const cached = articleCache.get(feedId);
     if (cached) {
-      set({ articles: cached, selectedArticle: null, isLoading: false });
+      set({
+        articles: cached.slice(0, displayLimit),
+        hasMore: cached.length > displayLimit,
+        selectedArticle: null,
+        isLoading: false,
+      });
     } else {
-      set({ articles: [], selectedArticle: null, isLoading: true });
+      set({ articles: [], hasMore: false, selectedArticle: null, isLoading: true });
     }
 
     // Fetch fresh data in background
     const result =
       feedId === ALL_FEEDS_ID
-        ? await getAllArticles(PAGE_SIZE)
-        : await getArticles(feedId, PAGE_SIZE);
+        ? await getAllArticles()
+        : await getArticles(feedId);
 
     const fresh = result.ok ? result.value : [];
     articleCache.set(feedId, fresh);
-    set({ articles: fresh, isLoading: false });
+    set({
+      articles: fresh.slice(0, displayLimit),
+      hasMore: fresh.length > displayLimit,
+      isLoading: false,
+    });
+  },
+
+  loadMore: () => {
+    const feedId = useFeedStore.getState().selectedFeedId;
+    if (!feedId) return;
+    const cached = articleCache.get(feedId);
+    if (!cached) return;
+
+    displayLimit += PAGE_SIZE;
+    set({
+      articles: cached.slice(0, displayLimit),
+      hasMore: cached.length > displayLimit,
+    });
   },
 
   selectArticle: async (article) => {

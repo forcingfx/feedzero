@@ -18,6 +18,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectedArticle = useArticleStore((s) => s.selectedArticle);
   const selectArticle = useArticleStore((s) => s.selectArticle);
   const markAllAsRead = useArticleStore((s) => s.markAllAsRead);
+  const loadMore = useArticleStore((s) => s.loadMore);
+  const hasMore = useArticleStore((s) => s.hasMore);
   const isLoading = useArticleStore((s) => s.isLoading);
   const isGlobalView = selectedFeedId === ALL_FEEDS_ID;
   const unreadCount = articles.filter((a) => !a.read).length;
@@ -64,6 +66,18 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
               }
             />
           ))}
+          {hasMore && (
+            <li className="p-3 text-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground"
+                onClick={loadMore}
+              >
+                Load more articles
+              </Button>
+            </li>
+          )}
         </ul>
       )}
       {unreadCount > 0 && (

@@ -53,7 +53,7 @@ describe("article-store", () => {
 
       await useArticleStore.getState().loadArticles("f1");
 
-      expect(getArticles).toHaveBeenCalledWith("f1", 25);
+      expect(getArticles).toHaveBeenCalledWith("f1");
       expect(useArticleStore.getState().articles).toEqual(articles);
     });
 
