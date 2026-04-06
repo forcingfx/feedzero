@@ -28,15 +28,20 @@ function buildEntryContent(release: ChangelogRelease): string {
   return parts.join("\n");
 }
 
+function toTimestamp(date: string): string {
+  return date.includes("T") ? date : `${date}T00:00:00Z`;
+}
+
 function buildEntry(release: ChangelogRelease): string {
   const content = buildEntryContent(release);
+  const ts = toTimestamp(release.date);
 
   return `  <entry>
     <id>feedzero:release:${escapeXml(release.version)}</id>
     <title>v${escapeXml(release.version)} — ${escapeXml(release.title)}</title>
     <link rel="alternate" href="/api/changelog.xml#v${escapeXml(release.version)}" />
-    <published>${release.date}T00:00:00Z</published>
-    <updated>${release.date}T00:00:00Z</updated>
+    <published>${ts}</published>
+    <updated>${ts}</updated>
     <summary>${escapeXml(release.subtitle)}</summary>
     <content type="html"><![CDATA[${content}]]></content>
     <author><name>FeedZero</name></author>
@@ -44,7 +49,7 @@ function buildEntry(release: ChangelogRelease): string {
 }
 
 function buildFeed(): string {
-  const updated = releases[0]?.date ?? new Date().toISOString().slice(0, 10);
+  const updated = toTimestamp(releases[0]?.date ?? new Date().toISOString());
 
   const entries = releases.map(buildEntry).join("\n");
 
@@ -53,7 +58,7 @@ function buildFeed(): string {
   <title>FeedZero Release Notes</title>
   <subtitle>What's new in FeedZero</subtitle>
   <id>feedzero:changelog</id>
-  <updated>${updated}T00:00:00Z</updated>
+  <updated>${updated}</updated>
   <link rel="self" href="/api/changelog.xml" />
   <author>
     <name>FeedZero</name>

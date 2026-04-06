@@ -11,6 +11,24 @@ export interface ChangelogRelease {
 
 // --- Rich content blocks ---
 
+const v040RichContent = `
+<h2>Eating Our Own Dog Food</h2>
+<p>You're reading this in FeedZero's own release notes feed. That's new. We deleted the old changelog dialog — 700 lines of custom UI — and replaced it with a real Atom feed at <code>/api/changelog.xml</code>. Any RSS reader can subscribe to it. We subscribe to it ourselves.</p>
+
+<p>The first time you open FeedZero, it automatically adds this feed. If you removed it, you can get it back from Settings → "What's new." It works like any other feed — unread badges, mark as read, the whole thing.</p>
+
+<h3>Clear Cached Articles</h3>
+<p>The three-dot menu on every feed now has "Clear cached articles." It does what it says: deletes all stored articles for that feed and re-fetches from the source. Useful when a feed updates its content (like, say, when we rewrite these release notes three times in one day).</p>
+
+<p>There's a confirmation dialog because this is destructive — your read/unread status is gone, and older articles might not come back if the feed no longer publishes them.</p>
+
+<h3>Headings Work Now</h3>
+<p>Article content now renders h1–h4 headings with proper sizing and spacing. Lists get markers. It sounds basic — it was. We also fixed it.</p>
+
+<h3>Feeds Are Sorted</h3>
+<p>The sidebar used to show feeds in whatever order IndexedDB felt like returning them. Now it's alphabetical, with the release notes feed pinned to the top. Small thing, but it was bothering us.</p>
+`;
+
 const v031RichContent = `
 <h2>Less Chrome, More Reading</h2>
 <p>There was a 40-pixel bar at the top of the screen whose sole purpose in life was to house a sidebar toggle icon. Forty pixels. For one icon. It's gone.</p>
@@ -239,8 +257,23 @@ const v010RichContent = `
 
 export const releases: ChangelogRelease[] = [
   {
+    version: "0.4.0",
+    date: "2026-04-06T18:00:00Z",
+    title: "Release notes as a feed",
+    subtitle: "The changelog is now a real Atom feed. Also: clear cached articles, heading styles, sorted feeds.",
+    items: [
+      "Changelog is now a real Atom feed at /api/changelog.xml",
+      "Auto-subscribes on first launch, manual subscribe via Settings → What's new",
+      "\"Clear cached articles\" in feed context menu with confirmation dialog",
+      "Headings (h1–h4) and lists styled in article content",
+      "Feeds sorted alphabetically with release notes pinned first",
+      "Squircle unread badges with subtle background",
+    ],
+    richContent: v040RichContent,
+  },
+  {
     version: "0.3.1",
-    date: "2026-04-06",
+    date: "2026-04-06T12:00:00Z",
     title: "More space to read",
     subtitle: "Reclaimed vertical space, unread badges, instant feed switching, and infinite scroll.",
     items: [
@@ -256,7 +289,7 @@ export const releases: ChangelogRelease[] = [
   },
   {
     version: "0.3.0",
-    date: "2026-04-06",
+    date: "2026-04-06T06:00:00Z",
     title: "Cleaner feeds",
     subtitle: "Tracking pixels, ad click IDs, and UTM parameters stripped automatically. Your feeds, without the surveillance.",
     items: [
