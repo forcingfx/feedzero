@@ -386,7 +386,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         </SidebarMenuButton>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <SidebarMenuAction showOnHover>
+                            <SidebarMenuAction showOnHover className="focus-visible:ring-0">
                               <MoreHorizontal />
                               <span className="sr-only">More</span>
                             </SidebarMenuAction>
