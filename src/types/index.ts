@@ -4,8 +4,16 @@ export interface Feed {
   title: string;
   description: string;
   siteUrl: string;
+  /** Folder this feed belongs to. Null/undefined = unfiled (top level). */
+  folderId?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
 }
 
 export interface Article {

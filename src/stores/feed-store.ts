@@ -4,6 +4,10 @@ import {
   getFeed,
   removeFeed as dbRemoveFeed,
   updateFeed as dbUpdateFeed,
+  addFolder as dbAddFolder,
+  getFolders as dbGetFolders,
+  updateFolder as dbUpdateFolder,
+  removeFolder as dbRemoveFolder,
 } from "../core/storage/db.ts";
 import {
   addFeedFlow,
@@ -13,7 +17,7 @@ import {
 } from "../core/feeds/feed-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { CHANGELOG_FEED_PATH } from "../utils/constants.ts";
-import type { Feed } from "../types/index.ts";
+import type { Feed, Folder } from "../types/index.ts";
 import type { Result } from "../utils/result.ts";
 
 /** Sort feeds: changelog first, then alphabetical by title. */
@@ -29,6 +33,7 @@ function sortFeeds(feeds: Feed[]): Feed[] {
 
 interface FeedStore {
   feeds: Feed[];
+  folders: Folder[];
   selectedFeedId: string | null;
   isLoading: boolean;
   isRefreshingAll: boolean;
@@ -42,10 +47,15 @@ interface FeedStore {
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
   refreshSingleFeed: (feedId: string) => Promise<void>;
+  createFolder: (name: string) => Promise<void>;
+  renameFolder: (folderId: string, name: string) => Promise<void>;
+  deleteFolder: (folderId: string) => Promise<void>;
+  moveFeedToFolder: (feedId: string, folderId: string | null) => Promise<void>;
 }
 
 export const useFeedStore = create<FeedStore>((set, get) => ({
   feeds: [],
+  folders: [],
   selectedFeedId: null,
   isLoading: false,
   isRefreshingAll: false,
@@ -53,12 +63,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   error: null,
 
   loadFeeds: async () => {
-    const result = await getFeeds();
-    if (result.ok) {
-      set({ feeds: sortFeeds(result.value) });
-    } else {
-      set({ feeds: [], error: result.error });
-    }
+    const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
+    set({
+      feeds: feedsResult.ok ? sortFeeds(feedsResult.value) : [],
+      folders: foldersResult.ok ? foldersResult.value.sort((a, b) => a.name.localeCompare(b.name)) : [],
+      error: feedsResult.ok ? null : feedsResult.error,
+    });
   },
 
   addFeed: async (url, prefetchedContent) => {
@@ -167,6 +177,48 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       ids.delete(feedId);
       set({ refreshingFeedIds: ids });
     }
+  },
+
+  createFolder: async (name) => {
+    const folder: Folder = { id: crypto.randomUUID(), name, createdAt: Date.now() };
+    await dbAddFolder(folder);
+    const result = await dbGetFolders();
+    if (result.ok) set({ folders: result.value.sort((a, b) => a.name.localeCompare(b.name)) });
+    useSyncStore.getState().scheduleSyncPush();
+  },
+
+  renameFolder: async (folderId, name) => {
+    const folders = get().folders;
+    const folder = folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    await dbUpdateFolder({ ...folder, name });
+    const result = await dbGetFolders();
+    if (result.ok) set({ folders: result.value.sort((a, b) => a.name.localeCompare(b.name)) });
+    useSyncStore.getState().scheduleSyncPush();
+  },
+
+  deleteFolder: async (folderId) => {
+    // Unfiled all feeds in this folder
+    const feeds = get().feeds.filter((f) => f.folderId === folderId);
+    for (const feed of feeds) {
+      await dbUpdateFeed({ ...feed, folderId: undefined, updatedAt: Date.now() });
+    }
+    await dbRemoveFolder(folderId);
+    const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
+    set({
+      feeds: feedsResult.ok ? sortFeeds(feedsResult.value) : get().feeds,
+      folders: foldersResult.ok ? foldersResult.value.sort((a, b) => a.name.localeCompare(b.name)) : get().folders,
+    });
+    useSyncStore.getState().scheduleSyncPush();
+  },
+
+  moveFeedToFolder: async (feedId, folderId) => {
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return;
+    await dbUpdateFeed({ ...feedResult.value, folderId: folderId ?? undefined, updatedAt: Date.now() });
+    const allFeeds = await getFeeds();
+    if (allFeeds.ok) set({ feeds: sortFeeds(allFeeds.value) });
+    useSyncStore.getState().scheduleSyncPush();
   },
 }));
 
