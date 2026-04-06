@@ -15,6 +15,9 @@ export const SCHEMA_VERSION = 1;
 /** Special feed ID for the global "All items" view. */
 export const ALL_FEEDS_ID = "all";
 
+/** Path for the built-in changelog Atom feed. Resolve with window.location.origin at runtime. */
+export const CHANGELOG_FEED_PATH = "/api/changelog.xml";
+
 export const LOCAL_STORAGE = {
   ONBOARDING_COMPLETE: "feedzero:onboarding-complete",
   STORAGE_MODE: "feedzero:storage-mode",

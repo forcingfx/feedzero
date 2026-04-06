@@ -5,6 +5,7 @@ import { handleSyncRequest } from "./src/core/sync/sync-handler";
 import { handleSyncStatsRequest } from "./src/core/sync/sync-stats-handler";
 import { handleFaviconRequest } from "./src/core/favicon/favicon-handler";
 import { handleCatalogRequest } from "./src/core/catalog/catalog-handler";
+import { handleChangelogRequest } from "./src/core/changelog/changelog-handler";
 import { createMemoryAdapter } from "./src/core/sync/adapters/memory-adapter";
 import { createMemoryCatalogAdapter } from "./src/core/catalog/adapters/memory-adapter";
 import { resolveAdapter } from "./src/core/sync/adapters/resolve-adapter";
@@ -125,6 +126,7 @@ export function createApp(
   app.get("/api/stats-sync", (c) => handleSyncStatsRequest(c.req.raw, syncAdapter));
   app.post("/api/feedback", (c) => handleFeedbackRequest(c.req.raw));
   app.get("/api/catalog", (c) => handleCatalogRequest(c.req.raw, catalog));
+  app.get("/api/changelog.xml", (c) => handleChangelogRequest(c.req.raw));
 
   return app;
 }

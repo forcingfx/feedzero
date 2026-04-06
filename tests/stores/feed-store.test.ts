@@ -89,7 +89,7 @@ describe("feed-store", () => {
 
       await useFeedStore.getState().addFeed("https://new.com/feed");
 
-      expect(addFeedFlow).toHaveBeenCalledWith("https://new.com/feed");
+      expect(addFeedFlow).toHaveBeenCalledWith("https://new.com/feed", undefined);
       expect(useFeedStore.getState().feeds).toEqual([feed]);
       expect(useFeedStore.getState().selectedFeedId).toBe("new");
     });

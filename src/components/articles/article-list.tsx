@@ -43,7 +43,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   }
 
   return (
-    <div className="relative h-full">
+    <div className="relative min-h-full">
       {articles.length === 0 ? (
         isLoading ? null : (
           <div className="p-2 text-muted-foreground text-sm">
@@ -51,7 +51,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           </div>
         )
       ) : (
-        <ul role="listbox" aria-label="Articles" className="list-none m-0 p-0">
+        <ul role="listbox" aria-label="Articles" className="list-none m-0 p-0 pb-6">
           {articles.map((article) => (
             <ArticleItem
               key={article.id}

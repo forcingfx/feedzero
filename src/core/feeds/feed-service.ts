@@ -11,6 +11,7 @@ import {
   addArticles,
   getArticleByGuid,
   updateArticles,
+  removeArticlesByFeedId,
 } from "../storage/db.ts";
 import type { Feed, Article } from "../../types/index.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
@@ -84,6 +85,7 @@ export function normalizeUrl(url: string): string {
  */
 export async function addFeedFlow(
   rawUrl: string,
+  options?: { prefetchedContent?: string },
 ): Promise<Result<AddFeedResult>> {
   const url = normalizeUrl(rawUrl);
   try {
@@ -100,14 +102,19 @@ export async function addFeedFlow(
       await removeFeedsByUrl(url);
     }
 
-    // Fetch feed content via CORS proxy
-    const response = await proxyFetch("/api/feed", url);
-    if (!response.ok) {
-      return err(
-        `The feed at this URL could not be reached (HTTP ${response.status}).`,
-      );
+    // Use prefetched content or fetch via CORS proxy
+    let text: string;
+    if (options?.prefetchedContent) {
+      text = options.prefetchedContent;
+    } else {
+      const response = await proxyFetch("/api/feed", url);
+      if (!response.ok) {
+        return err(
+          `The feed at this URL could not be reached (HTTP ${response.status}).`,
+        );
+      }
+      text = await response.text();
     }
-    const text = await response.text();
 
     // Parse feed content — if it fails, try feed discovery (maybe it's a website)
     const parseResult = parse(text, url);
@@ -322,4 +329,62 @@ export async function refreshAllFeeds(): Promise<Result<RefreshAllResult>> {
   }
 
   return ok({ results });
+}
+
+/**
+ * Reload a feed from scratch: delete all articles, re-fetch, re-parse, re-store.
+ * Unlike refreshFeed, this doesn't do guid-based dedup — it replaces everything.
+ */
+export async function reloadFeed(
+  feed: Feed,
+  options?: { prefetchedContent?: string },
+): Promise<Result<{ articleCount: number }>> {
+  try {
+    // Delete all existing articles for this feed
+    const removeResult = await removeArticlesByFeedId(feed.id);
+    if (!removeResult.ok) return err(removeResult.error);
+
+    // Fetch fresh content
+    let text: string;
+    if (options?.prefetchedContent) {
+      text = options.prefetchedContent;
+    } else {
+      const response = await proxyFetch("/api/feed", feed.url);
+      if (!response.ok) {
+        return err(`Failed to fetch feed (HTTP ${response.status})`);
+      }
+      text = await response.text();
+    }
+
+    const parseResult = parse(text, feed.url);
+    if (!parseResult.ok) return err(parseResult.error);
+
+    // Store all articles fresh
+    const articles: Article[] = [];
+    for (const parsed of parseResult.value.articles) {
+      const guid = parsed.guid || parsed.link;
+      if (!guid) continue;
+
+      const articleResult = createArticle({
+        feedId: feed.id,
+        guid,
+        title: parsed.title,
+        link: parsed.link,
+        content: parsed.content,
+        summary: parsed.summary,
+        author: parsed.author,
+        publishedAt: parsed.publishedAt ?? Date.now(),
+      });
+      if (articleResult.ok) articles.push(articleResult.value);
+    }
+
+    if (articles.length > 0) {
+      const addResult = await addArticles(articles);
+      if (!addResult.ok) return err(addResult.error);
+    }
+
+    return ok({ articleCount: articles.length });
+  } catch (e) {
+    return err(`Reload failed: ${(e as Error).message}`);
+  }
 }

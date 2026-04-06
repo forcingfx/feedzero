@@ -114,6 +114,15 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
+      server.middlewares.use("/api/changelog.xml", async (req, res) => {
+        const { handleChangelogRequest } = await import(
+          "./src/core/changelog/changelog-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handleChangelogRequest(webReq);
+        await sendWebResponse(webRes, res);
+      });
+
       server.middlewares.use("/api/stats-sync", async (req, res) => {
         const { syncAdapter } = await ensureSyncHandler();
         const { handleSyncStatsRequest } = await import(

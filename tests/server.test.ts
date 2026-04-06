@@ -457,4 +457,21 @@ describe("server", () => {
       expect(body.count).toBe(0);
     });
   });
+
+  describe("changelog routing contract", () => {
+    it("Vercel api/changelog.xml.ts exports GET", async () => {
+      const exports = await import("../api/changelog.xml");
+      expect(typeof exports.GET).toBe("function");
+    });
+
+    it("Hono server serves Atom feed at /api/changelog.xml", async () => {
+      const app = createApp();
+      const res = await app.request("/api/changelog.xml");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toContain("atom+xml");
+      const xml = await res.text();
+      expect(xml).toContain("<feed");
+      expect(xml).toContain("FeedZero Release Notes");
+    });
+  });
 });

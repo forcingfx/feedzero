@@ -250,6 +250,23 @@ export async function removeFeedsByUrl(url: string): Promise<Result<boolean>> {
   }
 }
 
+/** Delete all articles for a feed without removing the feed itself. */
+export async function removeArticlesByFeedId(feedId: string): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    const hashedFeedId = await hmacIndex(ctx.hmacKey, feedId);
+    const articleKeys = await ctx.db
+      .table("articles")
+      .where("feedId")
+      .equals(hashedFeedId)
+      .primaryKeys();
+    await ctx.db.table("articles").bulkDelete(articleKeys);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove articles: ${(e as Error).message}`);
+  }
+}
+
 /**
  * Remove a feed and its articles.
  */

@@ -3,13 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
+import { CHANGELOG_FEED_PATH } from "@/utils/constants.ts";
 import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
-import {
-  ChangelogBentoDialog,
-  shouldShowChangelog,
-} from "@/components/layout/changelog-bento.tsx";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
@@ -59,12 +56,28 @@ function AppInit({ children }: { children: React.ReactNode }) {
     }
   }, [hasCompletedOnboarding, isDbReady, initialize, completeOnboarding]);
 
+  const addFeed = useFeedStore((s) => s.addFeed);
+
   useEffect(() => {
     if (isDbReady) {
-      loadFeeds().then(() => preloadArticles());
+      loadFeeds().then(async () => {
+        // Auto-subscribe to changelog feed on first launch
+        const { feeds } = useFeedStore.getState();
+        if (feeds.length === 0) {
+          try {
+            const res = await fetch(CHANGELOG_FEED_PATH);
+            if (res.ok) {
+              const xml = await res.text();
+              const changelogUrl = `${window.location.origin}${CHANGELOG_FEED_PATH}`;
+              await addFeed(changelogUrl, xml);
+            }
+          } catch { /* noop */ }
+        }
+        preloadArticles();
+      });
       refreshAll();
     }
-  }, [isDbReady, loadFeeds, refreshAll, preloadArticles]);
+  }, [isDbReady, loadFeeds, refreshAll, preloadArticles, addFeed]);
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -98,19 +111,6 @@ function AppInit({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function StartupChangelog() {
-  const isDbReady = useAppStore((s) => s.isDbReady);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (isDbReady && shouldShowChangelog()) {
-      setOpen(true);
-    }
-  }, [isDbReady]);
-
-  return <ChangelogBentoDialog open={open} onOpenChange={setOpen} />;
-}
-
 export function App() {
   return (
     <>
@@ -130,7 +130,6 @@ export function App() {
         <Toaster position="bottom-center" />
       </BrowserRouter>
       <SyncSetupDialog />
-      <StartupChangelog />
     </>
   );
 }

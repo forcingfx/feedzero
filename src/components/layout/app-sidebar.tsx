@@ -10,6 +10,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   RefreshCw,
+  RotateCcw,
   Settings,
   Sparkles,
   Trash2,
@@ -60,10 +61,7 @@ import { useSyncStore } from "@/stores/sync-store.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
-import {
-  ChangelogBentoDialog,
-  APP_VERSION,
-} from "@/components/layout/changelog-bento.tsx";
+import { CHANGELOG_FEED_PATH } from "@/utils/constants.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
@@ -109,14 +107,14 @@ function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) 
   );
 }
 
-function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
+function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhatsNew: () => void }) {
   const syncStatus = useSyncStore((s) => s.status);
   const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
   const isOnline = useIsOnline();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [changelogOpen, setChangelogOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const handleWhatsNew = onWhatsNew;
 
   const isSyncOn = syncStatus === "synced" || syncStatus === "syncing";
   const isSyncing = syncStatus === "syncing";
@@ -195,13 +193,13 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
             <Keyboard className="size-4" />
             <span>Keyboard shortcuts</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setChangelogOpen(true)}>
-            <Sparkles className="size-4" />
-            <span>What&apos;s new</span>
-          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}>
             <MessageSquare className="size-4" />
             <span>Send feedback</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleWhatsNew}>
+            <Sparkles className="size-4" />
+            <span>What&apos;s new</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -209,10 +207,6 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
       <KeyboardShortcutsDialog
         open={shortcutsOpen}
         onOpenChange={setShortcutsOpen}
-      />
-      <ChangelogBentoDialog
-        open={changelogOpen}
-        onOpenChange={setChangelogOpen}
       />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>
@@ -277,19 +271,45 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const unreadCounts = useArticleStore((s) => s.unreadCounts);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
+  const reloadSingleFeed = useFeedStore((s) => s.reloadSingleFeed);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
+
+  const addFeed = useFeedStore((s) => s.addFeed);
 
   const { isMobile, setOpenMobile } = useSidebar();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
-  const [changelogOpen, setChangelogOpen] = useState(false);
+  const [feedToReload, setFeedToReload] = useState<Feed | null>(null);
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
     if (onFeedSelect) onFeedSelect(feedId);
+  }
+
+  async function handleWhatsNew() {
+    const existing = feeds.find((f) => f.url.includes(CHANGELOG_FEED_PATH));
+    if (existing) {
+      handleSelect(existing.id);
+      navigate(`/feeds/${existing.id}`);
+      return;
+    }
+    // Subscribe by fetching XML directly (same origin, no proxy needed)
+    try {
+      const res = await fetch(CHANGELOG_FEED_PATH);
+      if (!res.ok) return;
+      const xml = await res.text();
+      const changelogUrl = `${window.location.origin}${CHANGELOG_FEED_PATH}`;
+      await addFeed(changelogUrl, xml);
+      const { feeds: updated } = useFeedStore.getState();
+      const added = updated.find((f) => f.url.includes(CHANGELOG_FEED_PATH));
+      if (added) {
+        handleSelect(added.id);
+        navigate(`/feeds/${added.id}`);
+      }
+    } catch { /* noop */ }
   }
 
   function handleConfirmRemove() {
@@ -307,12 +327,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold tracking-tight">
                 FeedZero
-                <button
-                  onClick={() => setChangelogOpen(true)}
-                  className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-700 hover:bg-amber-200 transition-colors cursor-pointer"
-                >
-                  v{APP_VERSION}
-                </button>
               </span>
               <div className="flex items-center gap-1">
                 {feeds.length > 0 && (
@@ -399,6 +413,12 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                               Refresh
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              onClick={() => setFeedToReload(feed)}
+                            >
+                              <RotateCcw className="size-4" />
+                              Clear cached articles
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => setFeedToRemove(feed)}
                             >
@@ -408,7 +428,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                           </DropdownMenuContent>
                         </DropdownMenu>
                         {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
-                          <SidebarMenuBadge className="group-hover/menu-item:md:opacity-0 group-focus-within/menu-item:md:opacity-0 group-has-[[data-state=open]]/menu-item:md:opacity-0 transition-opacity">
+                          <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:md:opacity-0 group-focus-within/menu-item:md:opacity-0 group-has-[[data-state=open]]/menu-item:md:opacity-0 transition-opacity">
                             {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
                           </SidebarMenuBadge>
                         )}
@@ -425,7 +445,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
           <LocalStorageWarning />
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarFooterMenu hasFeeds={feeds.length > 0} />
+              <SidebarFooterMenu hasFeeds={feeds.length > 0} onWhatsNew={handleWhatsNew} />
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
@@ -459,10 +479,37 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ChangelogBentoDialog
-        open={changelogOpen}
-        onOpenChange={setChangelogOpen}
-      />
+      <AlertDialog
+        open={feedToReload !== null}
+        onOpenChange={(open) => {
+          if (!open) setFeedToReload(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear cached articles</AlertDialogTitle>
+            <AlertDialogDescription>
+              All articles for &ldquo;{feedToReload?.title}&rdquo; will be deleted
+              and reloaded from the source. Read/unread status will be lost.
+              Older articles may not be available if the feed no longer provides them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (feedToReload) {
+                  reloadSingleFeed(feedToReload.id);
+                  setFeedToReload(null);
+                }
+              }}
+            >
+              Clear and reload
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </>
   );
 }
