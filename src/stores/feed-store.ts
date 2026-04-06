@@ -116,8 +116,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     try {
       const feedResult = await getFeed(feedId);
       if (!feedResult.ok) return;
-      await reloadFeed(feedResult.value);
-      // Reload articles into store
+      const feed = feedResult.value;
+
+      // For same-origin feeds (changelog), fetch directly to bypass proxy SSRF
+      let options: { prefetchedContent?: string } | undefined;
+      if (feed.url.includes(CHANGELOG_FEED_PATH)) {
+        try {
+          const res = await fetch(CHANGELOG_FEED_PATH);
+          if (res.ok) options = { prefetchedContent: await res.text() };
+        } catch { /* fall through to proxy */ }
+      }
+
+      await reloadFeed(feed, options);
       const { loadArticles, preloadAll } = await import("./article-store.ts").then(m => m.useArticleStore.getState());
       await preloadAll();
       const selectedFeedId = get().selectedFeedId;

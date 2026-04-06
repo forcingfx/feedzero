@@ -282,6 +282,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
+  const [feedToReload, setFeedToReload] = useState<Feed | null>(null);
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
@@ -412,7 +413,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                               Refresh
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => reloadSingleFeed(feed.id)}
+                              onClick={() => setFeedToReload(feed)}
                             >
                               <RotateCcw className="size-4" />
                               Clear cached articles
@@ -473,6 +474,37 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
               onClick={handleConfirmRemove}
             >
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={feedToReload !== null}
+        onOpenChange={(open) => {
+          if (!open) setFeedToReload(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear cached articles</AlertDialogTitle>
+            <AlertDialogDescription>
+              All articles for &ldquo;{feedToReload?.title}&rdquo; will be deleted
+              and reloaded from the source. Read/unread status will be lost.
+              Older articles may not be available if the feed no longer provides them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (feedToReload) {
+                  reloadSingleFeed(feedToReload.id);
+                  setFeedToReload(null);
+                }
+              }}
+            >
+              Clear and reload
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
