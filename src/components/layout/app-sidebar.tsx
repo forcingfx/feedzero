@@ -46,7 +46,7 @@ import { useSyncStore } from "@/stores/sync-store.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
-import { CHANGELOG_FEED_PATH } from "@/utils/constants.ts";
+import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
 
@@ -266,21 +266,19 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   }
 
   async function handleWhatsNew() {
-    const existing = feeds.find((f) => f.url.includes(CHANGELOG_FEED_PATH));
+    const existing = feeds.find((f) => f.url === CHANGELOG_FEED_URL);
     if (existing) {
       handleSelect(existing.id);
       navigate(`/feeds/${existing.id}`);
       return;
     }
-    // Subscribe by fetching XML directly (same origin, no proxy needed)
+    // Subscribe to the external release feed. addFeed goes through the feed
+    // service, which fetches via the proxy (or directly — CORS is open).
     try {
-      const res = await fetch(CHANGELOG_FEED_PATH);
-      if (!res.ok) return;
-      const xml = await res.text();
-      const changelogUrl = `${window.location.origin}${CHANGELOG_FEED_PATH}`;
-      await addFeed(changelogUrl, xml);
-      const { feeds: updated } = useFeedStore.getState();
-      const added = updated.find((f) => f.url.includes(CHANGELOG_FEED_PATH));
+      await addFeed(CHANGELOG_FEED_URL);
+      const added = useFeedStore.getState().feeds.find(
+        (f) => f.url === CHANGELOG_FEED_URL,
+      );
       if (added) {
         handleSelect(added.id);
         navigate(`/feeds/${added.id}`);

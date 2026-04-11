@@ -95,7 +95,7 @@ describe("feed-store", () => {
 
       await useFeedStore.getState().addFeed("https://new.com/feed");
 
-      expect(addFeedFlow).toHaveBeenCalledWith("https://new.com/feed", undefined);
+      expect(addFeedFlow).toHaveBeenCalledWith("https://new.com/feed");
       expect(useFeedStore.getState().feeds).toEqual([feed]);
       expect(useFeedStore.getState().selectedFeedId).toBe("new");
     });
@@ -429,6 +429,76 @@ describe("feed-store", () => {
       expect(useFeedStore.getState().feeds).toHaveLength(1);
       expect(useFeedStore.getState().folders).toHaveLength(1);
       expect(useFeedStore.getState().folders[0].name).toBe("Tech");
+    });
+  });
+
+  describe("release notes feed sorting", () => {
+    // The app auto-subscribes to https://feedzero.app/releases.xml and pins it
+    // to the top of the sidebar so users always see "What's new" first.
+    // This describes observable behavior: after loadFeeds, the release feed is
+    // always index 0 regardless of its position in the db result.
+    const releaseFeed = {
+      id: "release",
+      url: "https://feedzero.app/releases.xml",
+      title: "FeedZero Release Notes",
+      description: "",
+      siteUrl: "https://feedzero.app/releases/",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    it("pins the external release feed to index 0", async () => {
+      const a = mockFeed("a", "Ars Technica");
+      const z = mockFeed("z", "Zero Hedge");
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: true,
+        value: [a, z, releaseFeed],
+      });
+
+      await useFeedStore.getState().loadFeeds();
+
+      const feeds = useFeedStore.getState().feeds;
+      expect(feeds[0]?.url).toBe("https://feedzero.app/releases.xml");
+    });
+
+    it("keeps non-release feeds sorted alphabetically after the release feed", async () => {
+      const ars = mockFeed("ars", "Ars Technica");
+      const verge = mockFeed("verge", "The Verge");
+      const bbc = mockFeed("bbc", "BBC News");
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: true,
+        value: [verge, ars, releaseFeed, bbc],
+      });
+
+      await useFeedStore.getState().loadFeeds();
+
+      const titles = useFeedStore.getState().feeds.map((f) => f.title);
+      expect(titles).toEqual([
+        "FeedZero Release Notes",
+        "Ars Technica",
+        "BBC News",
+        "The Verge",
+      ]);
+    });
+
+    it("does not treat the legacy same-origin changelog path as a release feed", async () => {
+      // After the migration, /api/changelog.xml is a regular URL with no
+      // special meaning. A feed with that URL should sort alphabetically,
+      // not pin to top.
+      const legacy = {
+        ...mockFeed("legacy", "Legacy Changelog"),
+        url: "https://example.com/api/changelog.xml",
+      };
+      const ars = mockFeed("ars", "Ars Technica");
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: true,
+        value: [legacy, ars],
+      });
+
+      await useFeedStore.getState().loadFeeds();
+
+      const titles = useFeedStore.getState().feeds.map((f) => f.title);
+      expect(titles).toEqual(["Ars Technica", "Legacy Changelog"]);
     });
   });
 

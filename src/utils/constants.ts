@@ -15,8 +15,17 @@ export const SCHEMA_VERSION = 1;
 /** Special feed ID for the global "All items" view. */
 export const ALL_FEEDS_ID = "all";
 
-/** Path for the built-in changelog Atom feed. Resolve with window.location.origin at runtime. */
-export const CHANGELOG_FEED_PATH = "/api/changelog.xml";
+/**
+ * URL of the FeedZero release notes Atom feed, published by the landing site
+ * at feedzero.app. The feed has open CORS so the app can fetch it directly
+ * from my.feedzero.app without going through the proxy.
+ *
+ * Used for:
+ *  - auto-subscribing on first launch (src/app.tsx)
+ *  - the "What's new" button (src/components/layout/app-sidebar.tsx)
+ *  - pinning the release feed to the top of the sidebar (src/stores/feed-store.ts)
+ */
+export const CHANGELOG_FEED_URL = "https://feedzero.app/releases.xml";
 
 export const LOCAL_STORAGE = {
   ONBOARDING_COMPLETE: "feedzero:onboarding-complete",

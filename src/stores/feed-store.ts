@@ -16,17 +16,22 @@ import {
   reloadFeed,
 } from "../core/feeds/feed-service.ts";
 import { useSyncStore } from "./sync-store.ts";
-import { CHANGELOG_FEED_PATH } from "../utils/constants.ts";
+import { CHANGELOG_FEED_URL } from "../utils/constants.ts";
 import type { Feed, Folder } from "../types/index.ts";
 import type { Result } from "../utils/result.ts";
 
-/** Sort feeds: changelog first, then alphabetical by title. */
+/** Whether a feed is the official FeedZero release notes feed. */
+function isReleaseFeed(feed: Feed): boolean {
+  return feed.url === CHANGELOG_FEED_URL;
+}
+
+/** Sort feeds: release notes first, then alphabetical by title. */
 function sortFeeds(feeds: Feed[]): Feed[] {
   return [...feeds].sort((a, b) => {
-    const aIsChangelog = a.url.includes(CHANGELOG_FEED_PATH);
-    const bIsChangelog = b.url.includes(CHANGELOG_FEED_PATH);
-    if (aIsChangelog && !bIsChangelog) return -1;
-    if (!aIsChangelog && bIsChangelog) return 1;
+    const aIsRelease = isReleaseFeed(a);
+    const bIsRelease = isReleaseFeed(b);
+    if (aIsRelease && !bIsRelease) return -1;
+    if (!aIsRelease && bIsRelease) return 1;
     return a.title.localeCompare(b.title);
   });
 }
@@ -40,7 +45,7 @@ interface FeedStore {
   refreshingFeedIds: Set<string>;
   error: string | null;
   loadFeeds: () => Promise<void>;
-  addFeed: (url: string, prefetchedContent?: string) => Promise<Result<void>>;
+  addFeed: (url: string) => Promise<Result<void>>;
   removeFeed: (feedId: string) => Promise<void>;
   renameFeed: (feedId: string, newTitle: string) => Promise<void>;
   reloadSingleFeed: (feedId: string) => Promise<void>;
@@ -71,9 +76,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     });
   },
 
-  addFeed: async (url, prefetchedContent) => {
+  addFeed: async (url) => {
     set({ isLoading: true, error: null });
-    const result = await addFeedFlow(url, prefetchedContent ? { prefetchedContent } : undefined);
+    const result = await addFeedFlow(url);
     if (!result.ok) {
       set({ isLoading: false, error: result.error });
       return { ok: false, error: result.error } as const;
@@ -140,16 +145,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       if (!feedResult.ok) return;
       const feed = feedResult.value;
 
-      // For same-origin feeds (changelog), fetch directly to bypass proxy SSRF
-      let options: { prefetchedContent?: string } | undefined;
-      if (feed.url.includes(CHANGELOG_FEED_PATH)) {
-        try {
-          const res = await fetch(CHANGELOG_FEED_PATH);
-          if (res.ok) options = { prefetchedContent: await res.text() };
-        } catch { /* fall through to proxy */ }
-      }
-
-      await reloadFeed(feed, options);
+      await reloadFeed(feed);
       const { loadArticles, preloadAll } = await import("./article-store.ts").then(m => m.useArticleStore.getState());
       await preloadAll();
       const selectedFeedId = get().selectedFeedId;

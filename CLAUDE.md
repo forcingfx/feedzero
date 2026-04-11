@@ -168,7 +168,7 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 - Two viewport projects: `desktop` (1280x720) and `mobile` (Pixel 5, 393x851).
 - Test dir: `tests/e2e/`. Dev server on port 3001 (separate from dev on 3000).
 - Feed responses mocked via `page.route()` with fixtures in `tests/e2e/feed-fixtures.ts`.
-- Onboarding and changelog dialog bypassed via `localStorage` in `tests/e2e/fixtures.ts`. The changelog version key must match `APP_VERSION` exactly (not a "large" version) because `shouldShowChangelog()` uses `!==`.
+- Onboarding bypassed via `localStorage` in `tests/e2e/fixtures.ts`. On first launch the app auto-subscribes to the release notes feed at `https://feedzero.app/releases.xml`; in E2E this goes through the proxy and is best-effort (wrapped in try/catch), so a network miss is silent.
 
 **Coverage thresholds (enforced by `npm run test:coverage`):**
 - Statements/Lines/Functions: 90%. Branches: 83%.
@@ -190,7 +190,6 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 - CSS `transition-all` on interactive elements (buttons, sidebar items) causes Playwright to consider them "not stable" during transitions. Use `transition-colors` or scoped transition properties instead. If forced, use `{ force: true }` on clicks after confirming visibility.
 - The sidebar uses `duration-200 ease-in-out` transitions. After toggling, wait for the `data-state` attribute to change, not `waitForTimeout`.
 - `selectFeedInSidebar(page, name)` (from `fixtures.ts`) handles opening the sidebar on mobile before clicking. Use it instead of direct `.click()` on feed buttons.
-- The changelog dialog (`feedzero:last-seen-version`) must match `APP_VERSION` exactly in test fixtures. Update it when bumping the version.
 
 **happy-dom gotchas:**
 - DOMPurify + happy-dom executes inline scripts during sanitization. Use non-callable code in test fixtures (e.g., `var x = 1;` not `alert(1)`).
