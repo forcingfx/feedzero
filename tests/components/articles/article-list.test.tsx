@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -69,6 +69,30 @@ describe("ArticleList", () => {
     expect(
       screen.getByText("Select a feed to view articles."),
     ).toBeInTheDocument();
+  });
+
+  it("never renders a Load more button — the display cap has been removed", () => {
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    // Even with many articles the list renders them all — no pagination.
+    const articles = Array.from({ length: 120 }, (_, i) =>
+      mockArticle(`a${i}`, `Article ${i}`),
+    );
+    useArticleStore.setState({
+      articles,
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    render(<ArticleList />);
+
+    expect(
+      screen.queryByRole("button", { name: /load more/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders articles when feed is selected", () => {
@@ -224,6 +248,45 @@ describe("ArticleList", () => {
       const { container } = render(<ArticleList />);
 
       expect(container.querySelector("img")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("folder-aggregated view", () => {
+    it("shows feed title and favicon for each article when in a folder view", () => {
+      // Folder-aggregated view is a second kind of aggregated view alongside
+      // ALL_FEEDS_ID. It must show the same per-article provenance (feed
+      // title + favicon) so users can tell which feed each article belongs to.
+      useFeedStore.setState({
+        feeds: [
+          { ...mockFeed("f1", "Tech News"), folderId: "tech" },
+          { ...mockFeed("f2", "Gaming Daily"), folderId: "tech" },
+        ],
+        selectedFeedId: toFolderFeedId("tech"),
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles: [
+          mockArticle("a1", "Tech Article", false, "f1"),
+          mockArticle("a2", "Gaming Article", false, "f2"),
+        ],
+        selectedArticle: null,
+        isLoading: false,
+      });
+
+      const { container } = render(<ArticleList />);
+
+      expect(screen.getByText(/Tech News/)).toBeInTheDocument();
+      expect(screen.getByText(/Gaming Daily/)).toBeInTheDocument();
+
+      const favicons = container.querySelectorAll("img");
+      expect(favicons).toHaveLength(2);
+      expect(favicons[0].getAttribute("src")).toBe(
+        "/api/favicon?domain=f1.com",
+      );
+      expect(favicons[1].getAttribute("src")).toBe(
+        "/api/favicon?domain=f2.com",
+      );
     });
   });
 });

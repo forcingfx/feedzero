@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useArticleStore } from "../../src/stores/article-store.ts";
+import {
+  useArticleStore,
+  selectUnreadCount,
+} from "../../src/stores/article-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
@@ -20,7 +23,7 @@ import {
   updateArticle,
 } from "../../src/core/storage/db.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "../../src/utils/constants.ts";
+import { ALL_FEEDS_ID, toFolderFeedId } from "../../src/utils/constants.ts";
 
 const mockArticle = (id: string, read = false) => ({
   id,
@@ -40,10 +43,58 @@ describe("article-store", () => {
   beforeEach(() => {
     useArticleStore.setState({
       articles: [],
+      articlesByFeedId: {},
       selectedArticle: null,
       isLoading: false,
     });
     vi.clearAllMocks();
+  });
+
+  describe("unread count derivation (single source of truth)", () => {
+    it("selectUnreadCount derives from articlesByFeedId, not a stored counter", () => {
+      useArticleStore.setState({
+        articlesByFeedId: {
+          "f1": [
+            mockArticle("a1", false),
+            mockArticle("a2", false),
+            mockArticle("a3", true),
+          ],
+        },
+      });
+
+      expect(selectUnreadCount(useArticleStore.getState(), "f1")).toBe(2);
+    });
+
+    it("loadArticles immediately exposes a correct unread count for a freshly added feed", async () => {
+      // This is the system bug: adding a feed from Explore, then selecting
+      // it, triggered loadArticles but never updated unreadCounts. The
+      // badge stayed at 0 until some *other* mutation recomputed counts.
+      // With a derived count, loading the feed's articles is sufficient.
+      const articles = [
+        mockArticle("a1", false),
+        mockArticle("a2", false),
+        mockArticle("a3", true),
+      ];
+      vi.mocked(getArticles).mockResolvedValue({ ok: true, value: articles });
+
+      await useArticleStore.getState().loadArticles("new-feed");
+
+      expect(selectUnreadCount(useArticleStore.getState(), "new-feed")).toBe(2);
+    });
+
+    it("markAsRead decreases the derived unread count for the affected feed", async () => {
+      useArticleStore.setState({
+        articlesByFeedId: {
+          "f1": [mockArticle("a1", false), mockArticle("a2", false)],
+        },
+        articles: [mockArticle("a1", false), mockArticle("a2", false)],
+      });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().markAsRead("a1");
+
+      expect(selectUnreadCount(useArticleStore.getState(), "f1")).toBe(1);
+    });
   });
 
   describe("loadArticles", () => {
@@ -57,6 +108,20 @@ describe("article-store", () => {
       expect(useArticleStore.getState().articles).toEqual(articles);
     });
 
+    it("loads every cached article, not a paginated slice", async () => {
+      // Pagination cap (the former 25-article displayLimit) caused the
+      // visible list to disagree with the sidebar badge. loadArticles must
+      // expose every article the feed has, not just the first page.
+      const many = Array.from({ length: 120 }, (_, i) =>
+        mockArticle(`a${i}`),
+      );
+      vi.mocked(getArticles).mockResolvedValue({ ok: true, value: many });
+
+      await useArticleStore.getState().loadArticles("f1");
+
+      expect(useArticleStore.getState().articles).toHaveLength(120);
+    });
+
     it("clears articles on failure", async () => {
       useArticleStore.setState({ articles: [mockArticle("old")] });
       vi.mocked(getArticles).mockResolvedValue({ ok: false, error: "fail" });
@@ -64,6 +129,32 @@ describe("article-store", () => {
       await useArticleStore.getState().loadArticles("f1");
 
       expect(useArticleStore.getState().articles).toEqual([]);
+    });
+
+    it("loads only articles from feeds inside the folder for a folder-aggregated feed id", async () => {
+      const feed1 = { id: "f1", url: "https://a.com", title: "A", description: "", siteUrl: "https://a.com", createdAt: 0, updatedAt: 0, folderId: "tech" };
+      const feed2 = { id: "f2", url: "https://b.com", title: "B", description: "", siteUrl: "https://b.com", createdAt: 0, updatedAt: 0, folderId: "tech" };
+      const feed3 = { id: "f3", url: "https://c.com", title: "C", description: "", siteUrl: "https://c.com", createdAt: 0, updatedAt: 0 }; // unfiled
+      useFeedStore.setState({ feeds: [feed1, feed2, feed3], folders: [] });
+
+      const articleInFolder1 = { ...mockArticle("a1"), feedId: "f1" };
+      const articleInFolder2 = { ...mockArticle("a2"), feedId: "f2" };
+      const articleOutsideFolder = { ...mockArticle("a3"), feedId: "f3" };
+      vi.mocked(getAllArticles).mockResolvedValue({
+        ok: true,
+        value: [articleInFolder1, articleInFolder2, articleOutsideFolder],
+      });
+
+      await useArticleStore.getState().loadArticles(toFolderFeedId("tech"));
+
+      // Must hit the bulk path, not per-feed.
+      expect(getAllArticles).toHaveBeenCalled();
+      expect(getArticles).not.toHaveBeenCalled();
+
+      // Only articles from feeds whose folderId === "tech" are visible.
+      const visible = useArticleStore.getState().articles;
+      const visibleIds = visible.map((a) => a.id).sort();
+      expect(visibleIds).toEqual(["a1", "a2"]);
     });
 
     it("clears old articles immediately when switching feeds", async () => {
@@ -210,6 +301,26 @@ describe("article-store", () => {
       expect(updateArticle).toHaveBeenCalledTimes(2);
     });
 
+    it("marks every unread article in the feed, not just the first page", async () => {
+      // Previously markAllAsRead operated on the paginated visible slice,
+      // leaving hundreds of articles unread even though the pill said
+      // "Mark N read". After dropping the cap, every unread in the feed
+      // must be marked.
+      const many = Array.from({ length: 100 }, (_, i) =>
+        mockArticle(`a${i}`, false),
+      );
+      vi.mocked(getArticles).mockResolvedValue({ ok: true, value: many });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().loadArticles("f1");
+      await useArticleStore.getState().markAllAsRead();
+
+      expect(updateArticle).toHaveBeenCalledTimes(100);
+      const state = useArticleStore.getState().articles;
+      expect(state.every((a) => a.read)).toBe(true);
+      expect(state).toHaveLength(100);
+    });
+
     it("does nothing when all articles are read", async () => {
       const articles = [mockArticle("a1", true), mockArticle("a2", true)];
       useArticleStore.setState({ articles });
@@ -282,6 +393,23 @@ describe("article-store", () => {
       expect(useArticleStore.getState().selectedArticle).not.toBeNull();
       expect(useArticleStore.getState().selectedArticle?.feedId).toBe(
         "some-other-feed",
+      );
+    });
+  });
+
+  describe("folder-aggregated view", () => {
+    it("selectArticle allows any feedId when selectedFeedId is a folder feed", async () => {
+      useFeedStore.setState({ selectedFeedId: toFolderFeedId("tech") });
+      const articleFromFolderMember = {
+        ...mockArticle("a1"),
+        feedId: "feed-in-folder",
+      };
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().selectArticle(articleFromFolderMember);
+
+      expect(useArticleStore.getState().selectedArticle?.feedId).toBe(
+        "feed-in-folder",
       );
     });
   });

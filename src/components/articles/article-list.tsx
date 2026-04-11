@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { CheckCheck } from "lucide-react";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { ArticleItem } from "./article-item.tsx";
 import type { Article } from "@/types/index.ts";
@@ -18,10 +18,13 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectedArticle = useArticleStore((s) => s.selectedArticle);
   const selectArticle = useArticleStore((s) => s.selectArticle);
   const markAllAsRead = useArticleStore((s) => s.markAllAsRead);
-  const loadMore = useArticleStore((s) => s.loadMore);
-  const hasMore = useArticleStore((s) => s.hasMore);
   const isLoading = useArticleStore((s) => s.isLoading);
-  const isGlobalView = selectedFeedId === ALL_FEEDS_ID;
+  // True for ALL_FEEDS_ID and folder-aggregated feed ids. Both render
+  // articles from multiple feeds, so each article must show its own
+  // feed title + favicon.
+  const isAggregatedView = selectedFeedId
+    ? isAggregatedFeedId(selectedFeedId)
+    : false;
   const unreadCount = articles.filter((a) => !a.read).length;
 
   const feedsById = useMemo(
@@ -59,25 +62,13 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
               isSelected={article.id === selectedArticle?.id}
               onSelect={handleSelect}
               feedTitle={
-                isGlobalView ? feedsById[article.feedId]?.title : undefined
+                isAggregatedView ? feedsById[article.feedId]?.title : undefined
               }
               feedSiteUrl={
-                isGlobalView ? feedsById[article.feedId]?.siteUrl : undefined
+                isAggregatedView ? feedsById[article.feedId]?.siteUrl : undefined
               }
             />
           ))}
-          {hasMore && (
-            <li className="p-3 text-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground"
-                onClick={loadMore}
-              >
-                Load more articles
-              </Button>
-            </li>
-          )}
         </ul>
       )}
       <MarkReadPill unreadCount={unreadCount} onMarkAll={markAllAsRead} />

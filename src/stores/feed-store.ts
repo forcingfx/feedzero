@@ -16,6 +16,7 @@ import {
   reloadFeed,
 } from "../core/feeds/feed-service.ts";
 import { useSyncStore } from "./sync-store.ts";
+import { useArticleStore } from "./article-store.ts";
 import { CHANGELOG_FEED_URL } from "../utils/constants.ts";
 import type { Feed, Folder } from "../types/index.ts";
 import type { Result } from "../utils/result.ts";
@@ -83,6 +84,17 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       set({ isLoading: false, error: result.error });
       return { ok: false, error: result.error } as const;
     }
+    // Push the ingested articles into the article-store immediately so the
+    // sidebar badge reflects the true unread count without waiting for the
+    // user to click the feed. The article-store is the single source of
+    // truth; adding a feed is an article-ingestion event, so the two stores
+    // must update in the same transaction.
+    useArticleStore.setState((s) => ({
+      articlesByFeedId: {
+        ...s.articlesByFeedId,
+        [result.value.feed.id]: result.value.articles,
+      },
+    }));
     const allFeeds = await getFeeds();
     set({
       feeds: allFeeds.ok ? sortFeeds(allFeeds.value) : get().feeds,

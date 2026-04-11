@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MoreHorizontal, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
-import { useArticleStore } from "@/stores/article-store.ts";
+import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import {
@@ -30,7 +30,7 @@ interface FeedItemProps {
 export function FeedItem({ feed, isSelected, inFolder = false, onSelect, onRemove, onReload }: FeedItemProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
-  const unreadCount = useArticleStore((s) => s.unreadCounts[feed.id] ?? 0);
+  const unreadCount = useArticleStore((s) => selectUnreadCount(s, feed.id));
   const renameFeed = useFeedStore((s) => s.renameFeed);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
@@ -113,7 +113,7 @@ export function FeedItem({ feed, isSelected, inFolder = false, onSelect, onRemov
         </DropdownMenuContent>
       </DropdownMenu>
       {!isRefreshing && unreadCount > 0 && (
-        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold">
+        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:opacity-0 group-has-[[data-state=open]]/menu-item:opacity-0">
           {unreadCount > 99 ? "99+" : unreadCount}
         </SidebarMenuBadge>
       )}

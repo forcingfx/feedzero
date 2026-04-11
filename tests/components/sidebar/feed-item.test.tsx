@@ -45,10 +45,45 @@ const mockFeed = {
   updatedAt: Date.now(),
 };
 
+function articleFixture(id: string, read: boolean, feedId = "f1") {
+  return {
+    id,
+    feedId,
+    guid: id,
+    title: `Article ${id}`,
+    link: `https://example.com/${id}`,
+    content: "<p>content</p>",
+    summary: "",
+    author: "",
+    publishedAt: Date.now(),
+    read,
+    createdAt: Date.now(),
+  };
+}
+
 describe("FeedItem", () => {
   beforeEach(() => {
-    useArticleStore.setState({ unreadCounts: {} });
+    useArticleStore.setState({ articlesByFeedId: {}, articles: [] });
     useFeedStore.setState({ feeds: [mockFeed], folders: [], selectedFeedId: null });
+  });
+
+  it("derives unread count from articlesByFeedId, not a stored counter", () => {
+    // This is the architectural invariant: there is a single source of
+    // truth for unread-ness (the article set), and the badge reads it.
+    // Proving this at the component level prevents the regression class
+    // where a writer mutates the source and forgets to update a separate
+    // counter field.
+    useArticleStore.setState({
+      articlesByFeedId: {
+        f1: [
+          articleFixture("a1", false),
+          articleFixture("a2", false),
+          articleFixture("a3", true),
+        ],
+      },
+    });
+    renderFeedItem();
+    expect(screen.getByText("2")).toBeInTheDocument();
   });
 
   it("renders the feed title", () => {
@@ -57,13 +92,21 @@ describe("FeedItem", () => {
   });
 
   it("shows unread badge when count > 0", () => {
-    useArticleStore.setState({ unreadCounts: { f1: 5 } });
+    useArticleStore.setState({
+      articlesByFeedId: {
+        f1: Array.from({ length: 5 }, (_, i) => articleFixture(`a${i}`, false)),
+      },
+    });
     renderFeedItem();
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 
   it("does not show badge when unread count is 0", () => {
-    useArticleStore.setState({ unreadCounts: { f1: 0 } });
+    useArticleStore.setState({
+      articlesByFeedId: {
+        f1: [articleFixture("a1", true), articleFixture("a2", true)],
+      },
+    });
     renderFeedItem();
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
@@ -87,6 +130,38 @@ describe("FeedItem", () => {
     await user.type(input!, "New Name{Enter}");
 
     expect(renameFeed).toHaveBeenCalledWith("f1", "New Name");
+  });
+
+  it("unfiled feed renders unread count as SidebarMenuBadge that swaps with the action dots", () => {
+    useArticleStore.setState({
+      articlesByFeedId: {
+        f1: Array.from({ length: 5 }, (_, i) => articleFixture(`a${i}`, false)),
+      },
+    });
+    renderFeedItem();
+    const badge = screen.getByText("5").closest("[data-sidebar='menu-badge']");
+    expect(badge).not.toBeNull();
+    // Badge should hide on group hover (when action dots appear)
+    expect(badge!.className).toContain("group-hover/menu-item:opacity-0");
+    // Badge should also hide when dropdown menu is open (data-state=open)
+    expect(badge!.className).toContain("group-has-[[data-state=open]]/menu-item:opacity-0");
+  });
+
+  it("in-folder feed renders unread count as SidebarMenuBadge with identical swap behavior", () => {
+    useArticleStore.setState({
+      articlesByFeedId: {
+        f1: Array.from({ length: 5 }, (_, i) => articleFixture(`a${i}`, false)),
+      },
+    });
+    renderFeedItem({ inFolder: true });
+    // Badge should use the shadcn SidebarMenuBadge, not an inline span inside the button
+    const feedButton = screen.getByText("Example Feed").closest("[data-sidebar='menu-button']");
+    expect(feedButton!.textContent).not.toContain("5");
+    const badge = screen.getByText("5").closest("[data-sidebar='menu-badge']");
+    expect(badge).not.toBeNull();
+    // Same swap behavior as unfiled feeds — consistency across both contexts.
+    expect(badge!.className).toContain("group-hover/menu-item:opacity-0");
+    expect(badge!.className).toContain("group-has-[[data-state=open]]/menu-item:opacity-0");
   });
 
   it("calls onSelect when clicked", async () => {

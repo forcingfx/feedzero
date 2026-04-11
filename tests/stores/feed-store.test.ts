@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useFeedStore, selectFeedsById } from "../../src/stores/feed-store.ts";
+import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
@@ -98,6 +99,57 @@ describe("feed-store", () => {
       expect(addFeedFlow).toHaveBeenCalledWith("https://new.com/feed");
       expect(useFeedStore.getState().feeds).toEqual([feed]);
       expect(useFeedStore.getState().selectedFeedId).toBe("new");
+    });
+
+    it("populates the article-store with the new feed's articles so the sidebar badge is live immediately", async () => {
+      // Root cause of the "badge doesn't update after adding from Explore"
+      // bug: feed-store.addFeed threw away the articles returned by
+      // addFeedFlow, so article-store never learned about them. The user
+      // had to click the feed to trigger loadArticles, which finally wrote
+      // to the source of truth. Under the derived-unread-count model, the
+      // badge reflects whatever is in article-store, so addFeed must push
+      // the new articles through.
+      useArticleStore.setState({ articlesByFeedId: {}, articles: [] });
+      const feed = mockFeed("new", "New Feed");
+      const articles = [
+        {
+          id: "a1",
+          feedId: "new",
+          guid: "a1",
+          title: "A",
+          link: "https://new.com/a1",
+          content: "",
+          summary: "",
+          author: "",
+          publishedAt: Date.now(),
+          read: false,
+          createdAt: Date.now(),
+        },
+        {
+          id: "a2",
+          feedId: "new",
+          guid: "a2",
+          title: "B",
+          link: "https://new.com/a2",
+          content: "",
+          summary: "",
+          author: "",
+          publishedAt: Date.now(),
+          read: false,
+          createdAt: Date.now(),
+        },
+      ];
+      vi.mocked(addFeedFlow).mockResolvedValue({
+        ok: true,
+        value: { feed, articles },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
+
+      await useFeedStore.getState().addFeed("https://new.com/feed");
+
+      expect(
+        useArticleStore.getState().articlesByFeedId["new"],
+      ).toEqual(articles);
     });
 
     it("sets error on failure and returns error result", async () => {
