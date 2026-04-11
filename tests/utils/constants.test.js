@@ -6,6 +6,11 @@ import {
   SCHEMA_VERSION,
   LOCAL_STORAGE,
   ALL_FEEDS_ID,
+  FOLDER_FEED_PREFIX,
+  toFolderFeedId,
+  fromFolderFeedId,
+  isFolderFeedId,
+  isAggregatedFeedId,
 } from "../../src/utils/constants.ts";
 
 describe("Constants", () => {
@@ -33,5 +38,29 @@ describe("Constants", () => {
 
   it("should define ALL_FEEDS_ID for global feed view", () => {
     expect(ALL_FEEDS_ID).toBe("all");
+  });
+
+  describe("folder feed id helpers", () => {
+    it("toFolderFeedId prefixes the folder id", () => {
+      expect(toFolderFeedId("abc-123")).toBe(`${FOLDER_FEED_PREFIX}abc-123`);
+    });
+
+    it("isFolderFeedId detects the folder prefix", () => {
+      expect(isFolderFeedId("folder:abc")).toBe(true);
+      expect(isFolderFeedId("abc")).toBe(false);
+      expect(isFolderFeedId(ALL_FEEDS_ID)).toBe(false);
+    });
+
+    it("fromFolderFeedId extracts the folder id, or null for non-folder ids", () => {
+      expect(fromFolderFeedId("folder:abc-123")).toBe("abc-123");
+      expect(fromFolderFeedId("abc")).toBeNull();
+      expect(fromFolderFeedId(ALL_FEEDS_ID)).toBeNull();
+    });
+
+    it("isAggregatedFeedId is true for ALL_FEEDS_ID and folder ids, false otherwise", () => {
+      expect(isAggregatedFeedId(ALL_FEEDS_ID)).toBe(true);
+      expect(isAggregatedFeedId("folder:abc")).toBe(true);
+      expect(isAggregatedFeedId("feed-uuid")).toBe(false);
+    });
   });
 });

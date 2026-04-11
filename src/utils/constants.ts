@@ -16,6 +16,40 @@ export const SCHEMA_VERSION = 1;
 export const ALL_FEEDS_ID = "all";
 
 /**
+ * Prefix applied to a folder id to form an aggregated "folder feed" id.
+ * e.g. folder `abc-123` becomes the selected feed id `folder:abc-123`,
+ * which represents the aggregated stream of every feed in that folder.
+ */
+export const FOLDER_FEED_PREFIX = "folder:";
+
+/** Build a folder-aggregated feed id from a folder id. */
+export function toFolderFeedId(folderId: string): string {
+  return `${FOLDER_FEED_PREFIX}${folderId}`;
+}
+
+/** Whether the given feed id represents a folder-aggregated view. */
+export function isFolderFeedId(feedId: string): boolean {
+  return feedId.startsWith(FOLDER_FEED_PREFIX);
+}
+
+/** Extract the folder id from a folder-feed id, or null if not a folder feed. */
+export function fromFolderFeedId(feedId: string): string | null {
+  return isFolderFeedId(feedId)
+    ? feedId.slice(FOLDER_FEED_PREFIX.length)
+    : null;
+}
+
+/**
+ * Whether the given feed id represents an aggregated view across multiple
+ * feeds (global "All items" or a folder feed). Used by components that
+ * must show per-article provenance (feed title + favicon) when multiple
+ * feeds are displayed together.
+ */
+export function isAggregatedFeedId(feedId: string): boolean {
+  return feedId === ALL_FEEDS_ID || isFolderFeedId(feedId);
+}
+
+/**
  * URL of the FeedZero release notes Atom feed, published by the landing site
  * at feedzero.app. The feed has open CORS so the app can fetch it directly
  * from my.feedzero.app without going through the proxy.
