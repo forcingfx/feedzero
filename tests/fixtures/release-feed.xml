@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>FeedZero Release Notes</title>
+  <subtitle>What changed in FeedZero.</subtitle>
+  <id>feedzero:changelog</id>
+  <updated>2026-04-06T18:00:00Z</updated>
+  <link rel="self" href="https://feedzero.app/releases.xml" />
+  <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
+  <author>
+    <name>FeedZero</name>
+  </author>
+  <entry>
+    <id>feedzero:release:0.4.0</id>
+    <title>v0.4.0 — Release notes feed</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-04-06T18:00:00Z</published>
+    <updated>2026-04-06T18:00:00Z</updated>
+    <summary>The release notes are now an Atom feed that any RSS reader can subscribe to.</summary>
+    <content type="html"><![CDATA[<p>The release notes are now an Atom feed that any RSS reader can subscribe to.</p>
+<h3>Added</h3>
+<ul>
+  <li>Published the release notes as an Atom feed at feedzero.app/releases.xml. New installs auto-subscribe on first launch; existing users can subscribe via Settings → What's new.</li>
+  <li>Added a &quot;Clear cached articles&quot; action to the feed context menu. It deletes the feed's stored articles and re-fetches from source. Read/unread status is lost, and older articles may not reappear if the source no longer publishes them.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Article content now renders h1–h4 headings with appropriate sizing and spacing. Lists render with markers.</li>
+  <li>Feeds in the sidebar sort alphabetically, with the release notes feed pinned to the top.</li>
+  <li>Unread badges use a squircle shape with a subtle background.</li>
+</ul>
+<h3>Removed</h3>
+<ul>
+  <li>Removed the in-app changelog dialog (~700 lines of custom UI). The Atom feed replaces it.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+  <entry>
+    <id>feedzero:release:0.3.1</id>
+    <title>v0.3.1 — More vertical space</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-04-06T12:00:00Z</published>
+    <updated>2026-04-06T12:00:00Z</updated>
+    <summary>Removed the desktop header bar. Added per-feed unread counts and in-memory article preloading.</summary>
+    <content type="html"><![CDATA[<p>Removed the desktop header bar. Added per-feed unread counts and in-memory article preloading.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added per-feed unread count badges in the sidebar. The count is derived from the full article set, not just the current page.</li>
+  <li>Added source attribution in the reader panel. Each article shows the feed's favicon and title under the headline.</li>
+  <li>Added a &quot;Load more&quot; button for feeds with more than 25 articles.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Removed the 40-pixel desktop header bar. The sidebar toggle moved into the sidebar itself.</li>
+  <li>Articles preload into memory at startup, so switching feeds no longer shows a loading state.</li>
+  <li>Replaced the &quot;mark all read&quot; toolbar with a floating pill that appears at the bottom only when there are unread articles.</li>
+  <li>Favicons now refresh on a 7-day cycle. Removed the manual &quot;Reload favicons&quot; menu item.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+  <entry>
+    <id>feedzero:release:0.3.0</id>
+    <title>v0.3.0 — Tracker and link-param stripping</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-04-06T06:00:00Z</published>
+    <updated>2026-04-06T06:00:00Z</updated>
+    <summary>Tracking pixels and URL tracking parameters are removed from feed content before it reaches the browser.</summary>
+    <content type="html"><![CDATA[<p>Tracking pixels and URL tracking parameters are removed from feed content before it reaches the browser.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added tracking-pixel stripping. 1×1 images loaded from known tracker domains (Facebook, Google Analytics, Quantserve, Feedburner, and others) are removed from article HTML before render.</li>
+  <li>Added URL tracking-parameter stripping. <code>utm_*</code>, <code>fbclid</code>, <code>gclid</code>, and around 20 similar parameters are removed from links inside article content.</li>
+  <li>Added an anonymous feed catalog on the server. It records which feeds exist and how often they are fetched. No user-identifying information is stored.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>The changelog dialog supports arrow-key navigation between releases.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+  <entry>
+    <id>feedzero:release:0.2.2</id>
+    <title>v0.2.2 — Bug fixes</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-03-29T00:00:00Z</published>
+    <updated>2026-03-29T00:00:00Z</updated>
+    <summary>Fixes for favicon loading, feed refresh, and error messages.</summary>
+    <content type="html"><![CDATA[<p>Fixes for favicon loading, feed refresh, and error messages.</p>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed favicon loading for sites that serve icons at non-standard paths.</li>
+  <li>Improved feed refresh reliability.</li>
+  <li>Improved error messages when adding an invalid feed URL.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+  <entry>
+    <id>feedzero:release:0.2.1</id>
+    <title>v0.2.1 — Visual polish</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-03-28T00:00:00Z</published>
+    <updated>2026-03-28T00:00:00Z</updated>
+    <summary>Palette, transition, and typography adjustments.</summary>
+    <content type="html"><![CDATA[<p>Palette, transition, and typography adjustments.</p>
+<h3>Changed</h3>
+<ul>
+  <li>Warmed the background tint. Accent color is now blue-indigo.</li>
+  <li>Added CSS transitions for hover, selection, and sidebar open/close.</li>
+  <li>Reworked blockquotes, inline images, and editorial typography in article content.</li>
+  <li>Unread and read article states are now distinguished by bold titles and an accent bar.</li>
+  <li>Focus rings are softer, and the <code>prefers-reduced-motion</code> media query is honored.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+  <entry>
+    <id>feedzero:release:0.2.0</id>
+    <title>v0.2.0 — Explore, keyboard nav, sync, and OPML</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-03-28T00:00:00Z</published>
+    <updated>2026-03-28T00:00:00Z</updated>
+    <summary>A catalog of around 1,000 feeds, vim-style keyboard shortcuts, end-to-end encrypted sync, and OPML import/export.</summary>
+    <content type="html"><![CDATA[<p>A catalog of around 1,000 feeds, vim-style keyboard shortcuts, end-to-end encrypted sync, and OPML import/export.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added an Explore tab with around 1,000 feeds organized by topic and country. The search box accepts a URL, which is added directly as a feed.</li>
+  <li>Added vim-style keyboard navigation: <code>j</code>/<code>k</code> for next/previous article, <code>Enter</code> to add a feed, <code>Space</code> to scroll, <code>h</code> for full text view, <code>o</code> to open the original.</li>
+  <li>Added unread dots and a &quot;mark all read&quot; action.</li>
+  <li>Added optional end-to-end encrypted cloud sync. The encryption key is derived from a four-word passphrase generated from the EFF wordlist. Lost passphrase means lost data — by design.</li>
+  <li>Added OPML import and export.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Feed switching now reads from an in-memory cache instead of IndexedDB.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+  <entry>
+    <id>feedzero:release:0.1.0</id>
+    <title>v0.1.0 — First release</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-01-31T00:00:00Z</published>
+    <updated>2026-01-31T00:00:00Z</updated>
+    <summary>The initial alpha.</summary>
+    <content type="html"><![CDATA[<p>The initial alpha.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added RSS 2.0, Atom 1.0, and JSON Feed parsers.</li>
+  <li>Added AES-256 encryption of all stored data in IndexedDB.</li>
+  <li>Added optional cloud sync using a passphrase-derived encryption key.</li>
+  <li>Added full-text article extraction for feeds that publish only summaries.</li>
+  <li>Added dark mode.</li>
+  <li>Added vim-style keyboard navigation.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+</feed>
