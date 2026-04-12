@@ -43,10 +43,13 @@ vi.mock("@/core/sync/vault-crypto", () => ({
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
-import { refreshAllFeeds } from "@/core/feeds/feed-service";
+import { addFeedFlow, refreshAllFeeds } from "@/core/feeds/feed-service";
 import { restore } from "@/core/storage/key-manager";
+import { CHANGELOG_FEED_URL } from "@/utils/constants";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -174,6 +177,44 @@ describe("App sync-aware init", () => {
 
     await waitFor(() => {
       expect(useAppStore.getState().error).toBeTruthy();
+    });
+  });
+
+  it("auto-subscribes new users to the release notes feed on first launch", async () => {
+    // The app calls addFeed(CHANGELOG_FEED_URL) when isDbReady and
+    // feeds.length === 0. This is the first-launch auto-subscribe flow
+    // that populates the sidebar with the release notes feed so users
+    // see "What's new" immediately.
+    vi.mocked(restore).mockResolvedValue({
+      status: "ready",
+      isSyncUser: false,
+      credentials: null,
+    });
+    vi.mocked(addFeedFlow).mockResolvedValue({
+      ok: true,
+      value: {
+        feed: {
+          id: "release",
+          url: CHANGELOG_FEED_URL,
+          title: "FeedZero Release Notes",
+          description: "",
+          siteUrl: "https://feedzero.app/releases/",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        articles: [],
+      },
+    });
+    localStorageMock.setItem("feedzero:onboarding-complete", "true");
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().isDbReady).toBe(true);
+    });
+
+    await waitFor(() => {
+      expect(addFeedFlow).toHaveBeenCalledWith(CHANGELOG_FEED_URL);
     });
   });
 
