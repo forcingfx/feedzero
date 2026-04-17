@@ -7,6 +7,7 @@ import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
@@ -127,6 +128,7 @@ export function App() {
         <Toaster position="bottom-center" />
       </BrowserRouter>
       <SyncSetupDialog />
+      <SpeedInsights />
     </>
   );
 }
