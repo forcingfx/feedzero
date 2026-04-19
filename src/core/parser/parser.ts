@@ -2,6 +2,7 @@ import { parseFeed } from "feedsmith";
 import { ok, err } from "../../utils/result.ts";
 import type { Result } from "../../utils/result.ts";
 import { sanitize } from "./sanitizer.ts";
+import { cleanFeedContent } from "../extractor/cleanup.ts";
 
 interface ParsedFeed {
   title: string;
@@ -103,11 +104,12 @@ function mapRssFeed(
         : (authorFromList as { name?: string } | undefined)?.name) ||
       "";
 
+    const itemTitle = decodeEntities(item.title || "") || "Untitled";
     return {
-      title: decodeEntities(item.title || "") || "Untitled",
+      title: itemTitle,
       link: item.link || "",
-      content: sanitize(decodeEntities(fullContent)),
-      summary: sanitize(decodeEntities(summary)),
+      content: sanitize(cleanFeedContent(decodeEntities(fullContent), itemTitle)),
+      summary: sanitize(cleanFeedContent(decodeEntities(summary), itemTitle)),
       author: decodeEntities(author),
       publishedAt: parseDate(item.pubDate),
       guid: item.guid?.value || item.link || "",
@@ -130,15 +132,18 @@ function mapAtomFeed(
     url: feedUrl,
   };
 
-  const articles: ParsedArticle[] = (atomFeed.entries || []).map((entry) => ({
-    title: decodeEntities(entry.title || "") || "Untitled",
-    link: findLink(entry.links, "alternate") || findLink(entry.links) || "",
-    content: sanitize(decodeEntities(entry.content || entry.summary || "")),
-    summary: sanitize(decodeEntities(entry.summary || "")),
-    author: decodeEntities(entry.authors?.[0]?.name || ""),
-    publishedAt: parseDate(entry.published || entry.updated),
-    guid: entry.id || findLink(entry.links) || "",
-  }));
+  const articles: ParsedArticle[] = (atomFeed.entries || []).map((entry) => {
+    const entryTitle = decodeEntities(entry.title || "") || "Untitled";
+    return {
+      title: entryTitle,
+      link: findLink(entry.links, "alternate") || findLink(entry.links) || "",
+      content: sanitize(cleanFeedContent(decodeEntities(entry.content || entry.summary || ""), entryTitle)),
+      summary: sanitize(cleanFeedContent(decodeEntities(entry.summary || ""), entryTitle)),
+      author: decodeEntities(entry.authors?.[0]?.name || ""),
+      publishedAt: parseDate(entry.published || entry.updated),
+      guid: entry.id || findLink(entry.links) || "",
+    };
+  });
 
   return ok({ feed: parsedFeed, articles });
 }
@@ -160,13 +165,17 @@ function mapJsonFeed(
   const items = (jsonFeed.items as Array<Record<string, unknown>>) || [];
   const articles: ParsedArticle[] = items.map((item) => {
     const authors = item.authors as Array<{ name?: string }> | undefined;
+    const itemTitle = (item.title as string) || "Untitled";
     return {
-      title: (item.title as string) || "Untitled",
+      title: itemTitle,
       link: (item.url as string) || (item.external_url as string) || "",
       content: sanitize(
-        (item.content_html as string) || (item.content_text as string) || "",
+        cleanFeedContent(
+          (item.content_html as string) || (item.content_text as string) || "",
+          itemTitle,
+        ),
       ),
-      summary: sanitize((item.summary as string) || ""),
+      summary: sanitize(cleanFeedContent((item.summary as string) || "", itemTitle)),
       author: authors?.[0]?.name || "",
       publishedAt: parseDate(item.date_published as string),
       guid: (item.id as string) || (item.url as string) || "",

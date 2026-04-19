@@ -329,6 +329,103 @@ describe("Parser", () => {
     });
   });
 
+  describe("feed content cleanup", () => {
+    it("should strip boilerplate from RSS content", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Feed</title>
+    <link>https://example.com</link>
+    <description>Test</description>
+    <item>
+      <title>Breaking News</title>
+      <link>https://example.com/1</link>
+      <description>&lt;p&gt;Real article content.&lt;/p&gt;&lt;p&gt;Published On 6 Apr 2026&lt;/p&gt;&lt;p&gt;Save&lt;/p&gt;&lt;p&gt;Share&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://example.com/feed"));
+      expect(articles[0].content).toContain("Real article content");
+      expect(articles[0].content).not.toContain("Published On");
+      expect(articles[0].content).not.toContain(">Save<");
+      expect(articles[0].content).not.toContain(">Share<");
+    });
+
+    it("should strip duplicate title heading from RSS content", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Feed</title>
+    <link>https://example.com</link>
+    <description>Test</description>
+    <item>
+      <title>Article Title</title>
+      <link>https://example.com/1</link>
+      <description>&lt;h2&gt;Article Title&lt;/h2&gt;&lt;p&gt;Content here.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://example.com/feed"));
+      expect(articles[0].content).not.toContain("<h2>");
+      expect(articles[0].content).toContain("Content here");
+    });
+
+    it("should strip boilerplate from Atom content", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Test Feed</title>
+  <link href="https://example.com" rel="alternate"/>
+  <entry>
+    <title>Atom Article</title>
+    <link href="https://example.com/1" rel="alternate"/>
+    <id>tag:example.com,2024:1</id>
+    <content type="html">&lt;p&gt;Real content.&lt;/p&gt;&lt;a href="https://example.com"&gt;Read full article&lt;/a&gt;</content>
+  </entry>
+</feed>`;
+      const { articles } = unwrap(parse(feed, "https://example.com/atom"));
+      expect(articles[0].content).toContain("Real content");
+      expect(articles[0].content).not.toContain("Read full article");
+    });
+
+    it("should strip boilerplate from JSON Feed content", () => {
+      const feed = JSON.stringify({
+        version: "https://jsonfeed.org/version/1.1",
+        title: "Test",
+        items: [
+          {
+            id: "1",
+            url: "https://example.com/1",
+            title: "JSON Article",
+            content_html:
+              "<p>Article body.</p><a href=\"https://example.com\">Continue reading...</a>",
+          },
+        ],
+      });
+      const { articles } = unwrap(parse(feed, "https://example.com/feed.json"));
+      expect(articles[0].content).toContain("Article body");
+      expect(articles[0].content).not.toContain("Continue reading");
+    });
+
+    it("should strip tiny images from feed content", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Feed</title>
+    <link>https://example.com</link>
+    <description>Test</description>
+    <item>
+      <title>With Tiny Thumb</title>
+      <link>https://example.com/1</link>
+      <description>&lt;img src="thumb.jpg" width="80" height="60"&gt;&lt;p&gt;Content.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://example.com/feed"));
+      expect(articles[0].content).not.toContain("<img");
+      expect(articles[0].content).toContain("Content");
+    });
+  });
+
   describe("error handling", () => {
     it("should reject invalid XML", () => {
       const result = parse("<not-a-feed>", "https://example.com");

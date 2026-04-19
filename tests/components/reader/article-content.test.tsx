@@ -55,6 +55,12 @@ describe("ArticleContent", () => {
     expect(wrapper?.className).toContain("[&_img]:rounded-lg");
   });
 
+  it("has min-width on images to scale up tiny thumbnails", () => {
+    const { container } = render(<ArticleContent html="<p>text</p>" />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.className).toContain("[&_img]:min-w-[200px]");
+  });
+
   it("handles empty string without error", () => {
     const { container } = render(<ArticleContent html="" />);
     expect(container.firstElementChild).not.toBeNull();
