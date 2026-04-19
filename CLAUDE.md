@@ -24,7 +24,7 @@ npm run serve         # Standalone Hono server (self-hosting, requires build fir
 npx tsc --noEmit      # TypeScript type check (strict mode)
 ```
 
-Run a single test file: `npx vitest run tests/core/parser/parser.test.js`
+Run a single test file: `npx vitest run <path/to/file>` (e.g., `npx vitest run tests/core/parser/parser.test.ts`)
 
 ## Architecture
 
@@ -153,18 +153,18 @@ Single CSS entry point: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite`
 
 Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) for the full guide.
 
-**Tier 1 — Unit/Integration (Vitest + happy-dom, ~500+ tests):**
+**Tier 1 — Unit/Integration (Vitest + happy-dom):**
 - Core modules, stores, components, hooks. Test files mirror `src/` under `tests/`.
 - `fake-indexeddb` for db.ts tests. React Testing Library + userEvent for components.
 - Store tests use `getState()`/`setState()` directly — no React rendering needed.
 - Setup file: `tests/setup.ts`.
 
-**Tier 2 — Structural Assertions (Vitest + RTL, ~57 tests):**
+**Tier 2 — Structural Assertions (Vitest + RTL):**
 - Verify critical CSS classes (`overflow-hidden`, `min-h-0`, `h-svh`), ARIA attributes (`role="listbox"`, `aria-selected`), and DOM composition.
 - Catch layout regressions that happy-dom can't detect via computed styles but can detect via class presence.
 - Located in `tests/components/` alongside unit tests.
 
-**Tier 3 — E2E (Playwright + Chromium, 56 tests across 9 spec files):**
+**Tier 3 — E2E (Playwright + Chromium):**
 - Two viewport projects: `desktop` (1280x720) and `mobile` (Pixel 5, 393x851).
 - Test dir: `tests/e2e/`. Dev server on port 3001 (separate from dev on 3000).
 - Feed responses mocked via `page.route()` with fixtures in `tests/e2e/feed-fixtures.ts`.
@@ -309,7 +309,7 @@ Two or more agents may be in flight in parallel working trees. Uncommitted work 
 - **Before any destructive git operation** (`reset --hard`, `clean -fd`, `checkout .`, `stash drop`, force-push, branch deletion), run `git status` first and describe what you see. If the working tree contains modifications you did not author, stop and ask — do not assume they are stale. The default should be to preserve, not to clear.
 - **For tasks expected to run in parallel with other agents**, use a git worktree instead of sharing a single working tree:
   - Delegated subagents: use the `Agent` tool with `isolation: "worktree"`.
-  - Whole sessions: create a worktree manually at `~/builder/kindle/feedzero-wt-<feature>/` via `git worktree add ../feedzero-wt-<feature> -b feat/<feature>`. The `landing/` sister repo stays shared (runtime coupling only — the app fetches its feed over HTTP from the deployed URL, not from the filesystem).
+  - Whole sessions: create a worktree manually at `~/builder/feedzero-wt-<feature>/` via `git worktree add ../feedzero-wt-<feature> -b feat/<feature>`. The `feedzero-landing/` sister repo stays shared (runtime coupling only — the app fetches its feed over HTTP from the deployed URL, not from the filesystem).
 - **Landing/feedzero contract changes are serialized.** When a change spans both the landing repo (which serves `https://feedzero.app/releases.xml`) and the feedzero repo (which consumes it), land and deploy the landing-side change first, then do the feedzero-side consumer work. The first-launch auto-subscribe is wrapped in try/catch so a stale URL is non-fatal, but new users will silently miss the release feed until the next refresh.
 - **Do not touch code you did not author without understanding its scope.** If `git status` shows files modified by another agent (or pre-existing WIP from the user), do not stage them, do not revert them, do not include them in your commits. Leave them for their owner.
 - **When splitting one uncommitted working tree across multiple commits**, prefer `git add -p` over hand-edited patches. Always create a safety stash (`git stash push -u && git stash apply`) before starting a surgical split so you have a guaranteed rollback point.
