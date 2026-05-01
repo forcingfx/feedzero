@@ -10,6 +10,7 @@ import { NewFolderInput } from "./new-folder-input.tsx";
 import { FeedRemoveDialog } from "./feed-remove-dialog.tsx";
 import { FeedReloadDialog } from "./feed-reload-dialog.tsx";
 import { FolderDeleteDialog } from "./folder-delete-dialog.tsx";
+import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import type { Feed, Folder } from "@/types/index.ts";
 
 interface SidebarFeedListProps {
@@ -64,6 +65,7 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
 
   return (
     <>
+      <AutoOrganizePill />
       <DndContext sensors={sensors} onDragStart={(e) => setActiveDragId(e.active.id as string)} onDragEnd={handleDragEnd}>
         <UnfiledDropZone>
           {unfiledFeeds.map((feed) => (

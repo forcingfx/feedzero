@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Settings,
   Sparkles,
+  Wand2,
   X,
 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -46,6 +47,7 @@ import { useSyncStore } from "@/stores/sync-store.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
+import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog.tsx";
 import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
@@ -96,6 +98,7 @@ function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhat
   const isOnline = useIsOnline();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [autoOrganizeOpen, setAutoOrganizeOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const handleWhatsNew = onWhatsNew;
 
@@ -172,6 +175,12 @@ function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhat
               </TooltipContent>
             )}
           </Tooltip>
+          {hasFeeds && (
+            <DropdownMenuItem onSelect={() => setAutoOrganizeOpen(true)}>
+              <Wand2 className="size-4" />
+              <span>Auto-organize feeds</span>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onSelect={() => setShortcutsOpen(true)}>
             <Keyboard className="size-4" />
             <span>Keyboard shortcuts</span>
@@ -192,6 +201,10 @@ function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhat
         onOpenChange={setShortcutsOpen}
       />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <AutoOrganizeDialog
+        open={autoOrganizeOpen}
+        onOpenChange={setAutoOrganizeOpen}
+      />
     </>
   );
 }

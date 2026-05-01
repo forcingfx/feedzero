@@ -469,6 +469,85 @@ describe("feed-store", () => {
     });
   });
 
+  describe("applyAutoOrganize", () => {
+    it("creates a folder per non-empty topic and moves the feeds in", async () => {
+      const f1 = mockFeed("f1", "Hacker News");
+      const f2 = mockFeed("f2", "Bloomberg");
+      useFeedStore.setState({ feeds: [f1, f2], folders: [] });
+
+      vi.mocked(addFolder).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [] });
+      vi.mocked(getFeed).mockImplementation(async (id) => ({
+        ok: true,
+        value: id === "f1" ? f1 : f2,
+      }));
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1, f2] });
+
+      await useFeedStore.getState().applyAutoOrganize([
+        { folderName: "Tech", feedIds: ["f1"] },
+        { folderName: "Business", feedIds: ["f2"] },
+      ]);
+
+      // Two folders created, one per non-empty topic. Capture their generated ids.
+      const addFolderCalls = vi.mocked(addFolder).mock.calls;
+      expect(addFolderCalls).toHaveLength(2);
+      const techCall = addFolderCalls.find((c) => c[0].name === "Tech");
+      const bizCall = addFolderCalls.find((c) => c[0].name === "Business");
+      expect(techCall).toBeDefined();
+      expect(bizCall).toBeDefined();
+      const techId = techCall![0].id;
+      const bizId = bizCall![0].id;
+
+      // Each feed is moved into the folder created for its topic.
+      expect(updateFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "f1", folderId: techId }),
+      );
+      expect(updateFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "f2", folderId: bizId }),
+      );
+    });
+
+    it("reuses an existing folder with the same name (case-insensitive)", async () => {
+      const existing = { id: "fold-tech", name: "Tech", createdAt: 0 };
+      const f1 = mockFeed("f1", "Hacker News");
+      useFeedStore.setState({ feeds: [f1], folders: [existing] });
+
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: f1 });
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: true,
+        value: [{ ...f1, folderId: "fold-tech" }],
+      });
+      vi.mocked(getFolders).mockResolvedValue({
+        ok: true,
+        value: [existing],
+      });
+
+      await useFeedStore.getState().applyAutoOrganize([
+        { folderName: "tech", feedIds: ["f1"] },
+      ]);
+
+      // Reused — no new folder created.
+      expect(addFolder).not.toHaveBeenCalled();
+      expect(updateFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "f1", folderId: "fold-tech" }),
+      );
+    });
+
+    it("skips empty topics (no folder created, no feeds moved)", async () => {
+      useFeedStore.setState({ feeds: [], folders: [] });
+      vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().applyAutoOrganize([
+        { folderName: "Tech", feedIds: [] },
+      ]);
+
+      expect(addFolder).not.toHaveBeenCalled();
+      expect(updateFeed).not.toHaveBeenCalled();
+    });
+  });
+
   describe("loadFeeds loads folders too", () => {
     it("loads feeds and folders in parallel", async () => {
       const feed = mockFeed("f1", "Feed");

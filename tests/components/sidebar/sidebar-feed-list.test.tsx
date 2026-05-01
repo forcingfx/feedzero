@@ -137,6 +137,29 @@ describe("SidebarFeedList", () => {
     expect(folderButton?.getAttribute("data-active")).toBe("true");
   });
 
+  it("renders the auto-organize pill when there are many unfiled feeds", () => {
+    const feeds = Array.from({ length: 12 }, (_, i) =>
+      mockFeed(`f${i}`, `Feed ${i}`),
+    );
+    useFeedStore.setState({ feeds, folders: [], selectedFeedId: null });
+
+    renderList();
+
+    expect(screen.getByTestId("auto-organize-pill")).toBeInTheDocument();
+  });
+
+  it("does NOT render the auto-organize pill with few feeds", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("f1", "Only Feed")],
+      folders: [],
+      selectedFeedId: null,
+    });
+
+    renderList();
+
+    expect(screen.queryByTestId("auto-organize-pill")).toBeNull();
+  });
+
   describe("hover / badge invariants", () => {
     const folder = { id: "folder-1", name: "Tech", createdAt: Date.now() };
 

@@ -96,6 +96,32 @@ describe("AppSidebar layout structure", () => {
     expect(footer!.textContent).toContain("Settings");
   });
 
+  it("settings dropdown contains an Auto-organize menu item", async () => {
+    // Need at least one feed so the settings menu shows the relevant section.
+    useFeedStore.setState({
+      feeds: [
+        {
+          id: "f1",
+          url: "https://example.com/x.xml",
+          title: "Example",
+          description: "",
+          siteUrl: "https://example.com",
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
+    });
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+
+    renderSidebar();
+
+    await user.click(screen.getByRole("button", { name: /settings/i }));
+    expect(
+      await screen.findByText(/Auto-organize/i),
+    ).toBeInTheDocument();
+  });
+
   it("renders Explore entry inside Feeds group", () => {
     renderSidebar();
 

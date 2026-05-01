@@ -57,6 +57,9 @@ interface FeedStore {
   renameFolder: (folderId: string, name: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveFeedToFolder: (feedId: string, folderId: string | null) => Promise<void>;
+  applyAutoOrganize: (
+    plan: { folderName: string; feedIds: string[] }[],
+  ) => Promise<void>;
 }
 
 export const useFeedStore = create<FeedStore>((set, get) => ({
@@ -224,6 +227,69 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const feedResult = await getFeed(feedId);
     if (!feedResult.ok) return;
     await dbUpdateFeed({ ...feedResult.value, folderId: folderId ?? undefined, updatedAt: Date.now() });
+    const allFeeds = await getFeeds();
+    if (allFeeds.ok) set({ feeds: sortFeeds(allFeeds.value) });
+    useSyncStore.getState().scheduleSyncPush();
+  },
+
+  /**
+   * Bulk-apply an auto-organize plan: for each entry with feeds, create a
+   * folder (or reuse one with the same case-insensitive name) and move the
+   * listed feeds into it. Empty entries are skipped — we don't litter the
+   * sidebar with unused folders. One sync push at the end keeps writes cheap.
+   */
+  applyAutoOrganize: async (plan) => {
+    const nonEmpty = plan.filter((p) => p.feedIds.length > 0);
+    if (nonEmpty.length === 0) return;
+
+    // Map normalized name → folderId so reuse is case-insensitive.
+    const existingByName = new Map(
+      get().folders.map((f) => [f.name.toLowerCase(), f.id]),
+    );
+    const folderIdByPlan = new Map<string, string>();
+
+    for (const entry of nonEmpty) {
+      const key = entry.folderName.toLowerCase();
+      const existing = existingByName.get(key);
+      if (existing) {
+        folderIdByPlan.set(entry.folderName, existing);
+        continue;
+      }
+      const folder: Folder = {
+        id: crypto.randomUUID(),
+        name: entry.folderName,
+        createdAt: Date.now(),
+      };
+      await dbAddFolder(folder);
+      folderIdByPlan.set(entry.folderName, folder.id);
+      existingByName.set(key, folder.id);
+    }
+
+    // Refresh folders state once after all creates.
+    const foldersResult = await dbGetFolders();
+    if (foldersResult.ok) {
+      set({
+        folders: foldersResult.value.sort((a, b) =>
+          a.name.localeCompare(b.name),
+        ),
+      });
+    }
+
+    // Move every feed into its assigned folder.
+    for (const entry of nonEmpty) {
+      const folderId = folderIdByPlan.get(entry.folderName);
+      if (!folderId) continue;
+      for (const feedId of entry.feedIds) {
+        const feedResult = await getFeed(feedId);
+        if (!feedResult.ok) continue;
+        await dbUpdateFeed({
+          ...feedResult.value,
+          folderId,
+          updatedAt: Date.now(),
+        });
+      }
+    }
+
     const allFeeds = await getFeeds();
     if (allFeeds.ok) set({ feeds: sortFeeds(allFeeds.value) });
     useSyncStore.getState().scheduleSyncPush();
