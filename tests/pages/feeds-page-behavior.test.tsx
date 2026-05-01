@@ -280,32 +280,6 @@ describe("FeedsPage behavior — desktop", () => {
     });
   });
 
-  it("clicking the Next pill in the reader navigates to the next article", async () => {
-    const user = userEvent.setup();
-    const articles = [makeArticle("art-1"), makeArticle("art-2")];
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    // Seed both buckets and stub loadArticles so the in-flight reload
-    // doesn't blow away the test list before the pill is clicked.
-    useArticleStore.setState({
-      articlesByFeedId: { "feed-1": articles },
-      articles,
-      selectedArticle: articles[0],
-      loadArticles: async () => {},
-    });
-    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
-
-    renderPage("/feeds/feed-1/articles/art-1");
-
-    const pill = await screen.findByTestId("next-pill");
-    await user.click(pill);
-
-    // The pill must produce a URL change to the next article. Without the
-    // FeedsPage wiring, clicking is inert and the URL stays put.
-    await vi.waitFor(() => {
-      expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
-    });
-  });
-
   it("does not auto-navigate when articleId is already in URL", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({
@@ -368,72 +342,6 @@ describe("FeedsPage behavior — mobile", () => {
     expect(currentUrl).toBe("/feeds/feed-1");
   });
 
-  it("floating Next pill appears next to Back pill when there is a next article (mobile)", () => {
-    const articles = [makeArticle("art-1"), makeArticle("art-2")];
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    useArticleStore.setState({
-      articlesByFeedId: { "feed-1": articles },
-      articles,
-      selectedArticle: articles[0],
-      loadArticles: async () => {},
-    });
-    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
-
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
-
-    const nextPill = container.querySelector(
-      "[data-testid='next-pill-floating']",
-    );
-    expect(nextPill).not.toBeNull();
-    // Sits at the right edge to mirror the Back pill on the left.
-    expect(nextPill!.className).toMatch(/\bright-4\b/);
-    // Fades in on mount via tailwindcss-animate utilities.
-    expect(nextPill!.className).toMatch(/animate-in/);
-    expect(nextPill!.className).toMatch(/fade-in/);
-  });
-
-  it("floating Next pill is hidden when current article is the last (mobile)", () => {
-    const articles = [makeArticle("art-1")];
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    useArticleStore.setState({
-      articlesByFeedId: { "feed-1": articles },
-      articles,
-      selectedArticle: articles[0],
-      loadArticles: async () => {},
-    });
-    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
-
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
-
-    expect(
-      container.querySelector("[data-testid='next-pill-floating']"),
-    ).toBeNull();
-  });
-
-  it("clicking the floating Next pill navigates to the next article (mobile)", async () => {
-    const user = userEvent.setup();
-    const articles = [makeArticle("art-1"), makeArticle("art-2")];
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    useArticleStore.setState({
-      articlesByFeedId: { "feed-1": articles },
-      articles,
-      selectedArticle: articles[0],
-      loadArticles: async () => {},
-    });
-    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
-
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
-
-    const pill = container.querySelector(
-      "[data-testid='next-pill-floating']",
-    ) as HTMLElement;
-    await user.click(pill);
-
-    await vi.waitFor(() => {
-      expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
-    });
-  });
-
   it("floating back pill is present when viewing an article", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({ articles: [makeArticle("art-1")] });
@@ -442,6 +350,25 @@ describe("FeedsPage behavior — mobile", () => {
     const pill = container.querySelector("[data-testid='back-pill']");
     expect(pill).not.toBeNull();
     expect(pill!.textContent).toContain("Back");
+  });
+
+  it("pull zone is present at the bottom of the mobile reader", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({ articles: [makeArticle("art-1")] });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    const pullZone = container.querySelector("[data-testid='pull-zone-bottom']");
+    expect(pullZone).not.toBeNull();
+  });
+
+  it("no floating next-pill in mobile reader (replaced by pull-to-advance)", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    const a1 = makeArticle("art-1");
+    const a2 = makeArticle("art-2");
+    useArticleStore.setState({ articles: [a1, a2], selectedArticle: a1 });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    expect(container.querySelector("[data-testid='next-pill-floating']")).toBeNull();
   });
 
   it("reader scroll container reserves bottom space so the back pill does not cover content", () => {

@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { ChevronRight } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -8,22 +7,8 @@ import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { hasSummarySubheading } from "@/lib/content-modes.ts";
 import { needsExtraction } from "@/core/extractor/extractor.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { findNextArticle } from "@/lib/next-article.ts";
-import type { Article } from "@/types/index.ts";
 import { ArticleContent } from "./article-content.tsx";
 import { ViewToggle, type ViewMode } from "./view-toggle.tsx";
-
-interface ReaderPanelProps {
-  /** Called when the user picks the next article via the bottom pill. */
-  onArticleSelect?: (article: Article) => void;
-  /**
-   * Suppress the inline Next-article pill at the bottom of the article.
-   * Mobile sets this true because FeedsPage renders a floating pill next
-   * to the Back pill instead.
-   */
-  hideInlineNextPill?: boolean;
-}
 
 function formatDate(timestamp: number): string {
   if (!timestamp) return "";
@@ -37,12 +22,8 @@ function formatDate(timestamp: number): string {
   });
 }
 
-export function ReaderPanel({
-  onArticleSelect,
-  hideInlineNextPill = false,
-}: ReaderPanelProps = {}) {
+export function ReaderPanel() {
   const article = useArticleStore((s) => s.selectedArticle);
-  const articles = useArticleStore((s) => s.articles);
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
@@ -128,11 +109,6 @@ export function ReaderPanel({
 
   const feed = feeds.find((f) => f.id === article.feedId);
 
-  // The next article in the loaded list, if any. The article store keeps
-  // articles ordered the same way the article list panel renders them, so
-  // "next" here matches the j-key keyboard shortcut and the visual order.
-  const nextArticle = findNextArticle(articles, article);
-
   return (
     <article className="p-4 px-6">
       <header className="mb-4">
@@ -165,26 +141,6 @@ export function ReaderPanel({
         </p>
       ) : (
         <ArticleContent html={getContent()} />
-      )}
-
-      {nextArticle && !hideInlineNextPill && (
-        <div className="mt-8 max-w-180">
-          <Button
-            data-testid="next-pill"
-            variant="secondary"
-            onClick={() => onArticleSelect?.(nextArticle)}
-            className="w-full justify-between rounded-full shadow-sm h-10 px-4 text-left"
-          >
-            <span className="text-muted-foreground shrink-0">Next:</span>
-            <span
-              data-testid="next-pill-title"
-              className="flex-1 truncate text-foreground font-medium"
-            >
-              {decodeEntities(nextArticle.title)}
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </Button>
-        </div>
       )}
     </article>
   );
