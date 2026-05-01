@@ -127,7 +127,7 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
         </DropdownMenuContent>
       </DropdownMenu>
       {!isRefreshing && unreadCount > 0 && (
-        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:opacity-0 group-has-[[data-state=open]]/menu-item:opacity-0">
+        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:opacity-0 group-has-[[data-state=open]]/menu-item:opacity-0 max-md:hidden">
           {unreadCount > 99 ? "99+" : unreadCount}
         </SidebarMenuBadge>
       )}

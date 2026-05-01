@@ -58,6 +58,7 @@ interface FeedStore {
   refreshSingleFeed: (feedId: string) => Promise<void>;
   createFolder: (name: string) => Promise<void>;
   renameFolder: (folderId: string, name: string) => Promise<void>;
+  updateFolderColor: (folderId: string, color: string | undefined) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveFeedToFolder: (feedId: string, folderId: string | null) => Promise<void>;
   applyAutoOrganize: (
@@ -228,6 +229,16 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const folder = folders.find((f) => f.id === folderId);
     if (!folder) return;
     await dbUpdateFolder({ ...folder, name });
+    const result = await dbGetFolders();
+    if (result.ok) set({ folders: result.value.sort((a, b) => a.name.localeCompare(b.name)) });
+    useSyncStore.getState().scheduleSyncPush();
+  },
+
+  updateFolderColor: async (folderId, color) => {
+    const folders = get().folders;
+    const folder = folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    await dbUpdateFolder({ ...folder, color });
     const result = await dbGetFolders();
     if (result.ok) set({ folders: result.value.sort((a, b) => a.name.localeCompare(b.name)) });
     useSyncStore.getState().scheduleSyncPush();

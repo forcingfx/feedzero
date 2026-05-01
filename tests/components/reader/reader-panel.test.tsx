@@ -169,11 +169,11 @@ describe("ReaderPanel", () => {
     });
 
     const { container } = render(<ReaderPanel />);
-    await user.click(screen.getByRole("radio", { name: "Full text" }));
+    await user.click(screen.getByRole("button", { name: /Full text/ }));
     expect(container.textContent).toContain("expanded");
   });
 
-  it("shows a discreet external link icon near the title with o kbd hint", () => {
+  it("open-original-hint is a link to the article URL", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -182,8 +182,97 @@ describe("ReaderPanel", () => {
 
     render(<ReaderPanel />);
     const hint = screen.getByTestId("open-original-hint");
-    expect(hint).toBeInTheDocument();
-    expect(hint.querySelector("kbd")?.textContent).toBe("o");
+    expect(hint.tagName).toBe("A");
+    expect(hint).toHaveAttribute("href", "https://example.com/post");
+    expect(hint).toHaveAttribute("target", "_blank");
+  });
+
+  it("open-original-hint does not show kbd inline — hint is in tooltip on hover", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+    const hint = screen.getByTestId("open-original-hint");
+    // kbd should not be a permanent child — it lives in the tooltip content only
+    expect(hint.querySelector("kbd")).toBeNull();
+  });
+
+  it("view mode toggle is on its own line (not inline in meta), no ToggleGroup role", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+    // Toggle lives after the header, not inside the meta line
+    const metaLine = screen.getByTestId("article-meta-line");
+    expect(metaLine.textContent).not.toContain("Feed");
+    expect(metaLine.textContent).not.toContain("Full text");
+    // Both options are still present in the document
+    expect(screen.getByRole("button", { name: /Feed/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Full text/ })).toBeInTheDocument();
+    // No ToggleGroup (role="group") as sibling of header
+    const header = document.querySelector("article header");
+    expect(header?.nextElementSibling?.getAttribute("role")).not.toBe("group");
+  });
+
+  it("article content area has overflow-x-hidden to prevent horizontal scroll", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+    const { container } = render(<ReaderPanel />);
+    // A wrapper inside the article clips wide feed HTML (tables, pre blocks, etc.)
+    // so it never causes horizontal viewport overflow. The sticky nav bar must
+    // live OUTSIDE this wrapper so overflow-x-hidden doesn't trap sticky positioning.
+    const contentWrapper = container.querySelector("[data-testid='article-content-area']");
+    expect(contentWrapper).not.toBeNull();
+    expect(contentWrapper!.className).toContain("overflow-x-hidden");
+  });
+
+  it("sticky nav bar is not inside the overflow-x-hidden content area", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+    const nextArt = { ...mockArticle(), id: "a2", title: "Next Article" };
+    render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+    const contentArea = document.querySelector("[data-testid='article-content-area']");
+    const navBar = document.querySelector("[data-testid='nav-pills-bar']");
+    expect(contentArea).not.toBeNull();
+    expect(navBar).not.toBeNull();
+    // nav bar must not be a descendant of the overflow-x-hidden wrapper
+    expect(contentArea!.contains(navBar)).toBe(false);
+  });
+
+  it("nav pills are rounded-full for floating appearance", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+    const nextArt = { ...mockArticle(), id: "a2", title: "Next Article" };
+    render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+    const pill = screen.getByTestId("next-pill");
+    expect(pill.className).toContain("rounded-full");
+  });
+
+  it("nav pills bar has no border-t (floating, not a separator bar)", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+    const nextArt = { ...mockArticle(), id: "a2", title: "Next Article" };
+    render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+    const bar = screen.getByTestId("nav-pills-bar");
+    expect(bar.className).not.toContain("border-t");
   });
 
   describe("timestamp display (006-S11)", () => {
@@ -309,6 +398,43 @@ describe("ReaderPanel", () => {
       render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} />);
       expect(screen.queryByTestId("next-pill")).toBeNull();
       expect(screen.queryByTestId("prev-pill")).toBeNull();
+    });
+
+    it("prev pill is full width (flex-1)", () => {
+      render(<ReaderPanel prevArticle={prevArt} onNavigate={vi.fn()} />);
+      const pill = screen.getByTestId("prev-pill");
+      expect(pill.className).toContain("flex-1");
+    });
+
+    it("next pill is full width (flex-1)", () => {
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+      const pill = screen.getByTestId("next-pill");
+      expect(pill.className).toContain("flex-1");
+    });
+
+    it("prev pill text is left-aligned (justify-start)", () => {
+      render(<ReaderPanel prevArticle={prevArt} onNavigate={vi.fn()} />);
+      const pill = screen.getByTestId("prev-pill");
+      expect(pill.className).toContain("justify-start");
+    });
+
+    it("next pill text is right-aligned (justify-end)", () => {
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+      const pill = screen.getByTestId("next-pill");
+      expect(pill.className).toContain("justify-end");
+    });
+
+    it("nav bar is sticky at the bottom of the reader", () => {
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+      const bar = screen.getByTestId("nav-pills-bar");
+      expect(bar.className).toContain("sticky");
+      expect(bar.className).toContain("bottom-0");
+    });
+
+    it("pills have backdrop blur and bg for floaty contrast", () => {
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+      const pill = screen.getByTestId("next-pill");
+      expect(pill.className).toMatch(/backdrop-blur/);
     });
   });
 });

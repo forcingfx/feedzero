@@ -77,13 +77,13 @@ describe("FeedsPage layout — desktop", () => {
     });
   });
 
-  it("does not show panels when there are no feeds", () => {
+  it("shows only 2 panels (sidebar + explore) when there are no feeds", () => {
+    // When no feeds exist, the layout shows sidebar + explore, not sidebar +
+    // article list + reader. The panel group is still present for resizability.
     useFeedStore.setState({ feeds: [] });
     const { container } = renderPage();
-    const panelGroup = container.querySelector(
-      "[data-slot='resizable-panel-group']",
-    );
-    expect(panelGroup).toBeNull();
+    const panels = container.querySelectorAll("[data-panel]");
+    expect(panels).toHaveLength(2);
   });
 
   it("shows panels when feeds exist", () => {
@@ -102,30 +102,31 @@ describe("FeedsPage layout — desktop", () => {
     expect(wrapper!.className).toContain("overflow-hidden");
   });
 
-  it("SidebarInset has overflow-hidden", () => {
+  it("desktop view has no SidebarInset (sidebar is a ResizablePanel)", () => {
+    // The desktop layout uses a ResizablePanelGroup so the sidebar is inline,
+    // not wrapped in SidebarInset. SidebarInset is only used in the mobile path.
     const { container } = renderPage();
     const inset = container.querySelector("[data-slot='sidebar-inset']");
-    expect(inset).not.toBeNull();
-    expect(inset!.className).toContain("overflow-hidden");
+    expect(inset).toBeNull();
   });
 
   it("desktop view has no top header bar", () => {
+    // Desktop has no <header> bar above the content — the sidebar provides
+    // navigation context inline. The mobile path renders a sticky <header>.
     const { container } = renderPage();
-    const inset = container.querySelector("[data-slot='sidebar-inset']");
-    const header = inset?.querySelector(":scope > header");
-    expect(header).toBeNull();
+    const headers = container.querySelectorAll("header");
+    expect(headers).toHaveLength(0);
   });
 
-  it("ResizablePanelGroup has flex-1 and min-h-0", () => {
+  it("ResizablePanelGroup spans full viewport height (h-svh)", () => {
+    // The panel group fills the full viewport — no flex shrink needed since
+    // SidebarProvider itself is h-svh.
     const { container } = renderPage();
-    // The library renders data-group on the outer element; our wrapper adds
-    // data-slot="resizable-panel-group" and the className to it.
     const panelGroup = container.querySelector(
       "[data-slot='resizable-panel-group']",
     );
     expect(panelGroup).not.toBeNull();
-    expect(panelGroup!.className).toContain("flex-1");
-    expect(panelGroup!.className).toContain("min-h-0");
+    expect(panelGroup!.className).toContain("h-svh");
   });
 
   it("each ResizablePanel has overflow-hidden via className", () => {
@@ -136,7 +137,7 @@ describe("FeedsPage layout — desktop", () => {
     const panelSlots = container.querySelectorAll(
       "[data-slot='resizable-panel']",
     );
-    expect(panelSlots).toHaveLength(2);
+    expect(panelSlots).toHaveLength(3);
     for (const slot of panelSlots) {
       // The className is on the inner div (child of data-panel)
       const inner = slot.querySelector("div");
@@ -164,16 +165,35 @@ describe("FeedsPage layout — desktop", () => {
     }
   });
 
-  it("renders exactly 2 ResizablePanel components", () => {
-    const { container } = renderPage();
-    const panels = container.querySelectorAll("[data-panel]");
-    expect(panels).toHaveLength(2);
-  });
-
   it("renders ResizableHandle between panels", () => {
     const { container } = renderPage();
     const handle = container.querySelector("[data-slot='resizable-handle']");
     expect(handle).not.toBeNull();
+  });
+
+  it("renders 3 ResizablePanels on desktop (sidebar + article list + reader)", () => {
+    // All three columns must be independently resizable. Two handles required:
+    // sidebar|article-list and article-list|reader.
+    const { container } = renderPage();
+    const panels = container.querySelectorAll("[data-panel]");
+    expect(panels).toHaveLength(3);
+    const handles = container.querySelectorAll("[data-slot='resizable-handle']");
+    expect(handles).toHaveLength(2);
+  });
+
+  it("sidebar CSS variable is at most 14rem so three panels fit at 1024px", () => {
+    // At 1024px: sidebar (≤14rem = 224px) + article list (≥180px) + reader (≥200px)
+    // = 224 + 180 + 200 = 604px — well within 1024px. If the sidebar grows beyond
+    // 14rem, the remaining space gets too tight at common laptop widths.
+    const { container } = renderPage();
+    const wrapper = container.querySelector("[data-slot='sidebar-wrapper']");
+    expect(wrapper).not.toBeNull();
+    const style = (wrapper as HTMLElement).getAttribute("style") ?? "";
+    // Extract the --sidebar-width value from the inline style
+    const match = style.match(/--sidebar-width:\s*([^;]+)/);
+    expect(match).not.toBeNull();
+    const remValue = parseFloat(match![1]);
+    expect(remValue).toBeLessThanOrEqual(14);
   });
 });
 

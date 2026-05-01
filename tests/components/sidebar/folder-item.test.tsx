@@ -203,6 +203,50 @@ describe("FolderItem", () => {
     }
   });
 
+  describe("folder color customization", () => {
+    it("folder title is bold (font-semibold)", () => {
+      renderFolder();
+      const btn = screen.getByText("Tech News").closest("[data-sidebar='menu-button']");
+      expect(btn?.className).toContain("font-semibold");
+    });
+
+    it("applies colored background when folder has a color", () => {
+      const coloredFolder = { ...mockFolder, color: "#7c3aed" };
+      render(
+        <SidebarProvider>
+          <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+            <div />
+          </FolderItem>
+        </SidebarProvider>
+      );
+      const btn = screen.getByText("Tech News").closest("[data-sidebar='menu-button']");
+      const style = (btn as HTMLElement)?.getAttribute("style") ?? "";
+      expect(style).toContain("background");
+    });
+
+    it("applies white text when folder has a color", () => {
+      const coloredFolder = { ...mockFolder, color: "#7c3aed" };
+      render(
+        <SidebarProvider>
+          <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+            <div />
+          </FolderItem>
+        </SidebarProvider>
+      );
+      const btn = screen.getByText("Tech News").closest("[data-sidebar='menu-button']");
+      const style = (btn as HTMLElement)?.getAttribute("style") ?? "";
+      expect(style).toContain("color");
+    });
+
+    it("shows a color picker option in the dropdown", async () => {
+      const user = userEvent.setup();
+      renderFolder();
+      const moreBtn = screen.getByRole("button", { name: /folder options/i });
+      await user.click(moreBtn);
+      expect(screen.getByTestId("folder-color-picker")).toBeInTheDocument();
+    });
+  });
+
   it("feed inside folder is not a DOM descendant of folder's menu-item (hover scope isolation)", () => {
     renderFolderWithFeed();
     // If the feed <li data-sidebar='menu-item'> is nested inside the folder's

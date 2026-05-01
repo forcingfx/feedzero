@@ -172,6 +172,22 @@ describe("FeedItem", () => {
     expect(onSelect).toHaveBeenCalled();
   });
 
+  it("unread badge is hidden on mobile (max-md:hidden) to avoid simultaneous badge + action dots", () => {
+    // On mobile, SidebarMenuAction showOnHover defaults to visible (md:opacity-0 only
+    // applies ≥768px). Without hiding the badge on mobile, both the count and the
+    // three-dots trigger are permanently visible at the same time. Since the badge
+    // is informational and the action is interactive, we hide the badge on mobile.
+    useArticleStore.setState({
+      articlesByFeedId: {
+        f1: Array.from({ length: 3 }, (_, i) => articleFixture(`a${i}`, false)),
+      },
+    });
+    renderFeedItem();
+    const badge = screen.getByText("3").closest("[data-sidebar='menu-badge']");
+    expect(badge).not.toBeNull();
+    expect(badge!.className).toContain("max-md:hidden");
+  });
+
   it("action dots do not appear on click-focus, only on hover or keyboard focus-visible", () => {
     // Bug: clicking a feed puts the button into :focus state (click focus).
     // The shadcn SidebarMenuAction's showOnHover variant used

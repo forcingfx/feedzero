@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { extract } from "../core/extractor/extractor.ts";
 import { registry } from "../core/extractor/adapters/index.ts";
 import { proxyFetch } from "../core/proxy/proxy-fetch.ts";
-import type { ExtractionStatus } from "../components/reader/view-toggle.tsx";
+export type ExtractionStatus = "idle" | "extracting" | "available" | "failed";
 
 interface ExtractionStore {
   cache: Record<string, string>;

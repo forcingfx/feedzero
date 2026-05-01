@@ -50,7 +50,7 @@ test.describe("Error states", () => {
 
     // The auto-extract triggers in background for short content articles.
     // Since the mock returns 500, extraction fails and disables the Full text toggle.
-    const fullTextToggle = page.getByRole("radio", { name: /Full text/ });
+    const fullTextToggle = page.getByRole("button", { name: /Full text/ });
     await expect(fullTextToggle).toBeDisabled({ timeout: 10000 });
 
     // Feed content should still be visible despite extraction failure

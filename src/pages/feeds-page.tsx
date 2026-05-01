@@ -212,13 +212,23 @@ export function FeedsPage() {
     el.scrollTo({ left: 0, behavior: "smooth" });
   }, []);
 
-  // When the URL gains an articleId, scroll to the reader panel.
+  // Scroll to the reader panel when the user explicitly navigates to an article.
+  // mountedRef skips the initial render so loading the app with an articleId
+  // already in the URL (e.g. after a desktop session or direct link) lands on
+  // the article list, not the reader. Depending only on articleId means a
+  // desktop→mobile viewport transition never fires this scroll.
+  const snapScrollMountedRef = useRef(false);
   useEffect(() => {
+    if (!snapScrollMountedRef.current) {
+      snapScrollMountedRef.current = true;
+      return;
+    }
     if (!isDesktop && articleId && feedId) {
-      // Small delay so the reader content renders before we scroll.
       requestAnimationFrame(() => scrollToReader());
     }
-  }, [isDesktop, articleId, feedId, scrollToReader]);
+    // isDesktop intentionally excluded: viewport changes should not trigger scroll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [articleId]);
 
   // Detect user-initiated swipe-back via scrollend. When the user swipes
   // from the reader panel back to the list, drop the articleId from the URL
@@ -334,38 +344,48 @@ export function FeedsPage() {
     );
   }
 
-  // Desktop: sidebar + article list + reader pane
+  // Desktop: all three columns in one ResizablePanelGroup so sidebar, article
+  // list, and reader are all independently user-resizable.
+  // AppSidebar uses collapsible="none" so it renders inline (not fixed-position)
+  // and participates naturally in the panel layout.
+  const exploreOrEmpty = isExplorePage || feeds.length === 0;
+
   return (
     <SidebarProvider className="h-svh overflow-hidden">
       <SidebarKeyboardToggle />
-      <AppSidebar onFeedSelect={handleFeedSelect} />
-      <SidebarInset className="overflow-hidden">
-        {isExplorePage ? (
-          <ScrollArea className="flex-1 min-h-0">
-            <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
-          </ScrollArea>
-        ) : feeds.length === 0 ? (
-          <ScrollArea className="flex-1 min-h-0">
-            <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
-          </ScrollArea>
+      <ResizablePanelGroup direction="horizontal" className="h-svh">
+        <ResizablePanel
+          defaultSize="17%"
+          minSize="150px"
+          maxSize="280px"
+          className="overflow-hidden"
+        >
+          <AppSidebar
+            collapsible="none"
+            className="w-full h-full"
+            onFeedSelect={handleFeedSelect}
+          />
+        </ResizablePanel>
+        <ResizableHandle />
+        {exploreOrEmpty ? (
+          <ResizablePanel className="overflow-hidden">
+            <ScrollArea className="h-full">
+              <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
+            </ScrollArea>
+          </ResizablePanel>
         ) : (
-          <ResizablePanelGroup
-            direction="horizontal"
-            className="flex-1 min-h-0"
-          >
+          <>
             <ResizablePanel
-              defaultSize="35%"
+              defaultSize="33%"
               minSize="180px"
               className="overflow-hidden"
             >
-              {/* ArticleList owns its own scroll container so the virtualizer
-                  can measure and observe a single scroll element. */}
               <ArticleList onArticleSelect={handleArticleSelect} />
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel
-              defaultSize="65%"
-              minSize="280px"
+              defaultSize="50%"
+              minSize="200px"
               className="overflow-hidden"
             >
               <ScrollArea className="h-full">
@@ -376,9 +396,9 @@ export function FeedsPage() {
                 />
               </ScrollArea>
             </ResizablePanel>
-          </ResizablePanelGroup>
+          </>
         )}
-      </SidebarInset>
+      </ResizablePanelGroup>
     </SidebarProvider>
   );
 }

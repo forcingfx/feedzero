@@ -451,6 +451,38 @@ describe("FeedsPage behavior — mobile", () => {
     });
   });
 
+  it("does NOT scroll to reader on initial mobile load with articleId in URL", async () => {
+    // When the URL contains an articleId on initial load (e.g. user resized from
+    // desktop or opened a bookmarked article URL), the snap container must stay
+    // at position 0 (article list). The scroll-to-reader effect must only fire
+    // when the user explicitly selects an article — not on mount.
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({ articles: [makeArticle("art-1")] });
+
+    // Spy on HTMLElement.prototype.scrollTo to capture scroll-left calls
+    const snapScrollCalls: number[] = [];
+    const origScrollTo = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = function (optionsOrX?: ScrollToOptions | number) {
+      const left = typeof optionsOrX === "number"
+        ? optionsOrX
+        : (optionsOrX as ScrollToOptions)?.left ?? 0;
+      if ((this as HTMLElement).classList?.contains("snap-x")) {
+        snapScrollCalls.push(left);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (origScrollTo as any).call(this, optionsOrX);
+    };
+
+    renderPage("/feeds/feed-1/articles/art-1");
+    // Wait for any requestAnimationFrame callbacks to settle
+    await new Promise((r) => setTimeout(r, 50));
+
+    HTMLElement.prototype.scrollTo = origScrollTo;
+
+    // scrollTo with left > 0 should NOT have been called on the snap container
+    expect(snapScrollCalls.filter((l) => l > 0)).toHaveLength(0);
+  });
+
   it("mobile header is present with sidebar trigger", () => {
     const { container } = renderPage("/feeds");
 
@@ -484,14 +516,14 @@ describe("FeedsPage — explore route", () => {
   });
 
   it("does not show article list or reader at /explore", async () => {
+    // Desktop /explore shows sidebar + explore (2 panels), not 3-panel reader layout.
     mockIsDesktop = true;
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
 
     const { container } = renderPage("/explore");
 
-    expect(
-      container.querySelector("[data-slot='resizable-panel-group']"),
-    ).toBeNull();
+    const panels = container.querySelectorAll("[data-panel]");
+    expect(panels).toHaveLength(2);
     expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
   });
 });
