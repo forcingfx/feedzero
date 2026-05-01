@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils.ts";
 import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { useDroppable } from "@dnd-kit/core";
@@ -38,6 +39,7 @@ interface FolderItemProps {
 }
 
 export function FolderItem({ folder, children, onDelete, isSelected, onSelect }: FolderItemProps) {
+  const [open, setOpen] = useState(true);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const renameFolder = useFeedStore((s) => s.renameFolder);
@@ -69,7 +71,7 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect }:
       ref={setNodeRef}
       className={isOver ? "bg-accent/50 rounded-md transition-colors" : "transition-colors"}
     >
-      <Collapsible.Root className="group/folder" defaultOpen>
+      <Collapsible.Root className="group/folder" open={open} onOpenChange={setOpen}>
         <div
           data-sidebar="menu-item"
           className="group/menu-item relative"
@@ -89,14 +91,15 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect }:
           ) : (
             <>
               {/*
-                Split interaction: the main SidebarMenuButton navigates to
-                the folder's aggregated feed; a small absolutely-positioned
-                Collapsible.Trigger on its left toggles collapse. Button
-                padding leaves room for the chevron so the two don't overlap.
+                The SidebarMenuButton does both: navigate to the folder's
+                aggregated feed AND toggle collapse. The absolutely-positioned
+                Collapsible.Trigger (chevron) also toggles collapse but does
+                NOT navigate — useful for keyboard/pointer users who want
+                collapse-only. Button padding (pl-7) leaves room for the chevron.
               */}
               <SidebarMenuButton
                 isActive={isSelected}
-                onClick={onSelect}
+                onClick={() => { onSelect(); setOpen(o => !o); }}
                 className="font-semibold pl-7"
                 style={colorStyle}
               >
@@ -106,7 +109,10 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect }:
                 <button
                   type="button"
                   aria-label="Toggle folder"
-                  className="absolute left-1 top-1 size-6 flex items-center justify-center rounded-sm hover:bg-sidebar-accent z-10"
+                  className={cn(
+                    "absolute left-1 top-1 size-6 flex items-center justify-center rounded-sm z-10",
+                    folder.color ? "hover:bg-white/20" : "hover:bg-sidebar-accent",
+                  )}
                   style={folder.color ? { color: "#ffffff" } : undefined}
                 >
                   <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />

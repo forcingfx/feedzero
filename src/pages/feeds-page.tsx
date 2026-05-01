@@ -113,6 +113,9 @@ export function FeedsPage() {
     loadedFeedRef.current = feedId;
     selectFeed(feedId);
     selectArticle(null);
+    // On mobile, if the reader panel is visible (container scrolled right),
+    // snap back to the article list so the user lands on panel 1 for the new feed.
+    if (snapContainerRef.current?.scrollLeft) scrollToList();
     loadArticles(feedId).then(() => {
       // Only auto-select the first article on desktop, where the 3-panel
       // layout would otherwise show an empty reader pane. On mobile the

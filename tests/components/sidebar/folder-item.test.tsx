@@ -108,17 +108,16 @@ describe("FolderItem", () => {
     expect(screen.getByTestId("child-content")).toBeInTheDocument();
   });
 
-  it("calls onSelect when folder name is clicked, without collapsing", async () => {
+  it("calls onSelect when folder title is clicked AND also collapses the folder", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     renderFolder({ onSelect });
 
     await user.click(screen.getByText("Tech News"));
 
-    // Clicking the folder name navigates to the folder feed. It does NOT
-    // toggle collapse — that is the chevron's job.
     expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("child-content")).toBeInTheDocument();
+    // Clicking the title also collapses — title is both a navigate AND toggle target.
+    expect(screen.queryByTestId("child-content")).not.toBeInTheDocument();
   });
 
   it("collapses children when the chevron toggle is clicked, without calling onSelect", async () => {
@@ -132,6 +131,20 @@ describe("FolderItem", () => {
     // Chevron toggles collapse and does NOT navigate.
     expect(screen.queryByTestId("child-content")).not.toBeInTheDocument();
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("chevron trigger uses hover:bg-white/20 on colored folders to avoid light square on dark background", () => {
+    const coloredFolder = { ...mockFolder, color: "#7c3aed" };
+    render(
+      <SidebarProvider>
+        <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+          <div />
+        </FolderItem>
+      </SidebarProvider>
+    );
+    const toggle = screen.getByRole("button", { name: /toggle folder/i });
+    expect(toggle.className).toContain("hover:bg-white/20");
+    expect(toggle.className).not.toContain("hover:bg-sidebar-accent");
   });
 
   it("marks the folder header active when isSelected is true", () => {

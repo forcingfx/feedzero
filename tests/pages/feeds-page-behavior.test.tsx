@@ -487,6 +487,50 @@ describe("FeedsPage behavior — mobile", () => {
     expect(snapScrollCalls.filter((l) => l > 0)).toHaveLength(0);
   });
 
+  it("navigating to a different feed scrolls the snap container back to the article list", async () => {
+    // If the user is on the reader panel (panel 2) and navigates to a different
+    // feed, the snap container must scroll back to panel 1 (article list).
+    // Without this, the reader shows empty state for the new feed.
+    useFeedStore.setState({ feeds: [makeFeed("feed-1"), makeFeed("feed-2")] });
+    useArticleStore.setState({ articles: [makeArticle("art-1")], selectedArticle: makeArticle("art-1") });
+
+    const snapScrollToLeft: number[] = [];
+    const origScrollTo = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = function (optionsOrX?: ScrollToOptions | number) {
+      const left = typeof optionsOrX === "number"
+        ? optionsOrX
+        : (optionsOrX as ScrollToOptions)?.left ?? 0;
+      if ((this as HTMLElement).classList?.contains("snap-x")) {
+        snapScrollToLeft.push(left);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (origScrollTo as any).call(this, optionsOrX);
+    };
+
+    const user = userEvent.setup();
+    const { container } = render(
+      <MemoryRouter initialEntries={["/feeds/feed-1/articles/art-1"]}>
+        <NavigateButton to="/feeds/feed-2" label="go-feed-2" />
+        <Routes>
+          <Route path="/feeds/:feedId" element={<FeedsPage />} />
+          <Route path="/feeds/:feedId/articles/:articleId" element={<FeedsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // Simulate snap container being at panel 2
+    const snapEl = container.querySelector(".snap-x") as HTMLElement;
+    if (snapEl) Object.defineProperty(snapEl, "scrollLeft", { value: 400, writable: true });
+
+    await user.click(screen.getByTestId("nav-to-go-feed-2"));
+
+    HTMLElement.prototype.scrollTo = origScrollTo;
+
+    await waitFor(() => {
+      expect(snapScrollToLeft.filter((l) => l === 0)).toHaveLength(1);
+    });
+  });
+
   it("mobile header is present with sidebar trigger", () => {
     const { container } = renderPage("/feeds");
 
