@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { ViewToggle } from "@/components/reader/view-toggle.tsx";
 
 describe("ViewToggle", () => {
-  it("always renders all three buttons", () => {
+  it("renders Feed and Full text buttons (no Original)", () => {
     render(
       <ViewToggle
         activeMode="feed"
@@ -14,7 +14,7 @@ describe("ViewToggle", () => {
     );
     expect(screen.getByText("Feed")).toBeInTheDocument();
     expect(screen.getByText("Full text")).toBeInTheDocument();
-    expect(screen.getByText("Original")).toBeInTheDocument();
+    expect(screen.queryByText("Original")).not.toBeInTheDocument();
   });
 
   it("never returns null — always renders even without articleLink", () => {
@@ -79,21 +79,6 @@ describe("ViewToggle", () => {
     expect(kbdTexts).toContain("h");
   });
 
-  it("shows Kbd O hint on the Original button", () => {
-    const { container } = render(
-      <ViewToggle
-        activeMode="feed"
-        articleLink="https://example.com"
-        extractionStatus="idle"
-        onModeChange={vi.fn()}
-      />,
-    );
-    const kbdTexts = Array.from(container.querySelectorAll("kbd")).map(
-      (k) => k.textContent,
-    );
-    expect(kbdTexts).toContain("o");
-  });
-
   describe("Full text button states", () => {
     it("is clickable when status is idle", () => {
       render(
@@ -117,7 +102,6 @@ describe("ViewToggle", () => {
       );
       const btn = screen.getByRole("radio", { name: /Full text/ });
       expect(btn).toBeDisabled();
-      // Spinner SVG (Loader2) should be present
       expect(container.querySelector(".animate-spin")).toBeInTheDocument();
     });
 
@@ -147,47 +131,6 @@ describe("ViewToggle", () => {
         "title",
         "Extraction didn't find additional content",
       );
-    });
-  });
-
-  describe("Original button", () => {
-    it("renders as a link when articleLink is provided", () => {
-      render(
-        <ViewToggle
-          activeMode="feed"
-          articleLink="https://example.com/article"
-          extractionStatus="idle"
-          onModeChange={vi.fn()}
-        />,
-      );
-      const link = screen.getByRole("radio", { name: /Original/ });
-      expect(link).toHaveAttribute("href", "https://example.com/article");
-      expect(link).toHaveAttribute("target", "_blank");
-    });
-
-    it("is disabled when no articleLink provided", () => {
-      render(
-        <ViewToggle
-          activeMode="feed"
-          extractionStatus="idle"
-          onModeChange={vi.fn()}
-        />,
-      );
-      const btn = screen.getByRole("radio", { name: /Original/ });
-      expect(btn).toBeDisabled();
-      expect(btn).toHaveAttribute("title", "No link available");
-    });
-
-    it("has external link icon", () => {
-      const { container } = render(
-        <ViewToggle
-          activeMode="feed"
-          articleLink="https://example.com"
-          extractionStatus="idle"
-          onModeChange={vi.fn()}
-        />,
-      );
-      expect(container.querySelector("svg")).toBeInTheDocument();
     });
   });
 });

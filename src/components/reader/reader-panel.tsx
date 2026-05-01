@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -92,7 +92,6 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPane
     : ("idle" as const);
 
   function handleModeChange(mode: ViewMode) {
-    if (mode === "original") return;
     if (mode === "extracted") {
       switchToExtracted(article?.link);
     } else {
@@ -122,8 +121,19 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPane
   return (
     <article className="p-4 px-6">
       <header className="mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight mb-2">
-          {decodeEntities(article.title)}
+        <h2 className="text-2xl font-semibold tracking-tight mb-2 break-words">
+          {article.link ? (
+            <a
+              href={article.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              {decodeEntities(article.title)}
+            </a>
+          ) : (
+            decodeEntities(article.title)
+          )}
         </h2>
 
         <div className="flex items-center gap-2 text-xs tracking-wide text-muted-foreground">
@@ -135,12 +145,20 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPane
             </>
           )}
           {formatDate(article.publishedAt)}
+          {article.link && (
+            <span
+              data-testid="open-original-hint"
+              className="inline-flex items-center gap-0.5 ml-1 text-muted-foreground/60"
+            >
+              <ExternalLink className="size-3" />
+              <Kbd className="text-[9px] px-0.5 py-0">o</Kbd>
+            </span>
+          )}
         </div>
       </header>
 
       <ViewToggle
         activeMode={viewMode}
-        articleLink={article.link}
         extractionStatus={extractionStatus}
         onModeChange={handleModeChange}
       />
@@ -160,11 +178,11 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPane
               data-testid="prev-pill"
               variant="outline"
               size="sm"
-              className="flex items-center gap-1.5 max-w-[45%]"
+              className="flex items-center gap-1 min-w-0 w-[46%]"
               onClick={() => onNavigate(prevArticle)}
             >
               <ChevronLeft className="size-3.5 shrink-0" />
-              <Kbd>k</Kbd>
+              <Kbd className="shrink-0">k</Kbd>
               <span className="truncate">{decodeEntities(prevArticle.title)}</span>
             </Button>
           ) : <div />}
@@ -173,11 +191,11 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPane
               data-testid="next-pill"
               variant="outline"
               size="sm"
-              className="flex items-center gap-1.5 max-w-[45%] ml-auto"
+              className="flex items-center gap-1 min-w-0 w-[46%] ml-auto"
               onClick={() => onNavigate(nextArticle)}
             >
               <span className="truncate">{decodeEntities(nextArticle.title)}</span>
-              <Kbd>j</Kbd>
+              <Kbd className="shrink-0">j</Kbd>
               <ChevronRight className="size-3.5 shrink-0" />
             </Button>
           ) : <div />}

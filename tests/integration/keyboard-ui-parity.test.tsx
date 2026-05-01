@@ -193,8 +193,8 @@ describe("keyboard-UI behavior parity", () => {
     });
   });
 
-  describe("O key vs Original link", () => {
-    it("both open the same URL with same flags", () => {
+  describe("O key vs title link", () => {
+    it("o key opens article.link — same URL as the clickable title", () => {
       const article = mockArticle("a1", "f1");
       useArticleStore.setState({ selectedArticle: article });
 
@@ -202,7 +202,6 @@ describe("keyboard-UI behavior parity", () => {
         .spyOn(window, "open")
         .mockImplementation(() => null);
 
-      // Keyboard path
       renderHook(() => useKeyboardNav());
       pressKey("o");
 
@@ -215,7 +214,7 @@ describe("keyboard-UI behavior parity", () => {
       windowOpenSpy.mockRestore();
     });
 
-    it("keyboard does nothing when no article selected (same as UI)", () => {
+    it("keyboard does nothing when no article selected", () => {
       useArticleStore.setState({ selectedArticle: null });
 
       const windowOpenSpy = vi

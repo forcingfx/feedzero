@@ -104,7 +104,7 @@ describe("ReaderPanel", () => {
     expect(header?.className).not.toContain("border-b");
   });
 
-  it("always shows all three buttons", () => {
+  it("shows Feed and Full text buttons (no Original button)", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -114,10 +114,10 @@ describe("ReaderPanel", () => {
     render(<ReaderPanel />);
     expect(screen.getByText("Feed")).toBeInTheDocument();
     expect(screen.getByText("Full text")).toBeInTheDocument();
-    expect(screen.getByText("Original")).toBeInTheDocument();
+    expect(screen.queryByText("Original")).not.toBeInTheDocument();
   });
 
-  it("shows Original button as link when article has a link", () => {
+  it("article title is a link to the original URL", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -125,9 +125,9 @@ describe("ReaderPanel", () => {
     });
 
     render(<ReaderPanel />);
-    const link = screen.getByText("Original");
-    expect(link).toHaveAttribute("href", "https://example.com/post");
-    expect(link).toHaveAttribute("target", "_blank");
+    const titleLink = screen.getByRole("link", { name: /Test Article/ });
+    expect(titleLink).toHaveAttribute("href", "https://example.com/post");
+    expect(titleLink).toHaveAttribute("target", "_blank");
   });
 
   it("shows extracting state when viewing extracted and extracting", async () => {
@@ -173,7 +173,7 @@ describe("ReaderPanel", () => {
     expect(container.textContent).toContain("expanded");
   });
 
-  it("shows Kbd O hint next to the Original link", () => {
+  it("shows a discreet external link icon near the title with o kbd hint", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -181,10 +181,9 @@ describe("ReaderPanel", () => {
     });
 
     render(<ReaderPanel />);
-    const originalLink = screen.getByText("Original").closest("a");
-    const kbd = originalLink?.querySelector("kbd");
-    expect(kbd).toBeTruthy();
-    expect(kbd?.textContent).toBe("o");
+    const hint = screen.getByTestId("open-original-hint");
+    expect(hint).toBeInTheDocument();
+    expect(hint.querySelector("kbd")?.textContent).toBe("o");
   });
 
   describe("timestamp display (006-S11)", () => {

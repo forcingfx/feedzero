@@ -88,17 +88,14 @@ test.describe("Content viewing", () => {
     });
   });
 
-  test("original link has correct href", async ({ feedPage: page }) => {
+  test("article title is a link to the original URL", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // The "Original" is rendered as an <a> inside a ToggleGroupItem with asChild,
-    // so it has role="radio" (from Radix) rather than role="link".
-    const originalToggle = page.getByRole("radio", { name: /Original/ });
-    await expect(originalToggle).toBeVisible({ timeout: 10000 });
-    await expect(originalToggle).toHaveAttribute(
-      "href",
-      "https://example.com/first",
-    );
+    // The article title is rendered as an <a> linking to the original article.
+    const titleLink = page.getByRole("link", { name: /First Article/ });
+    await expect(titleLink).toBeVisible({ timeout: 10000 });
+    await expect(titleLink).toHaveAttribute("href", "https://example.com/first");
+    await expect(titleLink).toHaveAttribute("target", "_blank");
   });
 
   test("article title with HTML entities is decoded", async ({
