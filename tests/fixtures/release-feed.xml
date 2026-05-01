@@ -3,12 +3,44 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-04-19T12:00:00Z</updated>
+  <updated>2026-05-01T12:00:00Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.6.0</id>
+    <title>v0.6.0 — Resizable panels, navigation pills, and auto-organize</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-05-01T12:00:00Z</published>
+    <updated>2026-05-01T12:00:00Z</updated>
+    <summary>Three-panel resizable desktop layout, always-visible prev/next navigation, pull-to-advance on mobile, folder colors, and keyword-based auto-organize.</summary>
+    <content type="html"><![CDATA[<p>Three-panel resizable desktop layout, always-visible prev/next navigation, pull-to-advance on mobile, folder colors, and keyword-based auto-organize.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added a three-panel resizable desktop layout. The sidebar, article list, and reader are now independently draggable columns.</li>
+  <li>Added prev/next navigation pills pinned to the bottom of the reader panel. The pills are always visible regardless of scroll position and show &lt;kbd&gt;k&lt;/kbd&gt;/&lt;kbd&gt;j&lt;/kbd&gt; keyboard hints.</li>
+  <li>Added pull-to-advance gesture on mobile. Scrolling past the end of an article advances to the next; pulling down from the top goes back.</li>
+  <li>Added folder color customization. An eight-color swatch picker in the folder context menu tints the sidebar label and applies a colored background to folder items.</li>
+  <li>Added auto-organize. The wand button near New Folder groups existing feeds into topic folders using a built-in keyword ruleset.</li>
+  <li>Added feed sort mode. Feeds in the sidebar can now be sorted by name, unread count, or kept in the original custom order.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Article titles in the reader panel are now links to the original URL. The external-link icon in the meta line shows an &lt;kbd&gt;o&lt;/kbd&gt; shortcut hint on hover.</li>
+  <li>The Feed/Full text mode selector is now a compact inline pill control, reducing vertical space. The &lt;kbd&gt;h&lt;/kbd&gt; shortcut hint is in a hover tooltip.</li>
+  <li>The article list is now virtualized. Scrolling through All Items with hundreds of articles no longer causes layout jank.</li>
+  <li>The desktop breakpoint was lowered from 1024px to 768px so tablet-sized windows use the multi-panel layout.</li>
+  <li>Publisher boilerplate phrases (&quot;Read more at&quot;, &quot;Continue reading&quot;, etc.) are stripped from feed content before display.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed article text clipping at the right edge of the reader panel. Replaced Radix ScrollArea (which uses a <code>display:table</code> wrapper that breaks text wrapping) with a native <code>overflow-y-auto</code> container.</li>
+  <li>Fixed mobile landing on the reader view when selecting a feed. The app now defaults to the article list, not the reader.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.5.0</id>
     <title>v0.5.0 — Feed folders and mobile navigation</title>
