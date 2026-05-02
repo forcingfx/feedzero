@@ -420,6 +420,17 @@ describe("feed-store", () => {
       expect(useFeedStore.getState().folders).toHaveLength(1);
       expect(useFeedStore.getState().folders[0].name).toBe("Tech");
     });
+
+    it("auto-assigns a color to the new folder", async () => {
+      vi.mocked(addFolder).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().createFolder("Tech");
+
+      const call = vi.mocked(addFolder).mock.calls[0][0];
+      expect(call.color).toBeDefined();
+      expect(call.color).toMatch(/^#[0-9a-f]{6}$/i);
+    });
   });
 
   describe("renameFolder", () => {
@@ -544,6 +555,33 @@ describe("feed-store", () => {
       expect(updateFeed).toHaveBeenCalledWith(
         expect.objectContaining({ id: "f1", folderId: "fold-tech" }),
       );
+    });
+
+    it("auto-assigns a color to each new folder", async () => {
+      const f1 = mockFeed("f1", "Hacker News");
+      const f2 = mockFeed("f2", "Bloomberg");
+      useFeedStore.setState({ feeds: [f1, f2], folders: [] });
+
+      vi.mocked(addFolder).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [] });
+      vi.mocked(getFeed).mockImplementation(async (id) => ({
+        ok: true,
+        value: id === "f1" ? f1 : f2,
+      }));
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1, f2] });
+
+      await useFeedStore.getState().applyAutoOrganize([
+        { folderName: "Tech", feedIds: ["f1"] },
+        { folderName: "Business", feedIds: ["f2"] },
+      ]);
+
+      const calls = vi.mocked(addFolder).mock.calls;
+      expect(calls).toHaveLength(2);
+      for (const call of calls) {
+        expect(call[0].color).toBeDefined();
+        expect(call[0].color).toMatch(/^#[0-9a-f]{6}$/i);
+      }
     });
 
     it("skips empty topics (no folder created, no feeds moved)", async () => {

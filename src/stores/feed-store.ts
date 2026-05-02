@@ -18,6 +18,7 @@ import {
 import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
+import { pickNextFolderColor } from "../lib/folder-colors.ts";
 import type { Feed, Folder, FeedSortMode } from "../types/index.ts";
 import type { Result } from "../utils/result.ts";
 
@@ -217,7 +218,8 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   createFolder: async (name) => {
-    const folder: Folder = { id: crypto.randomUUID(), name, createdAt: Date.now() };
+    const color = pickNextFolderColor(get().folders.map((f) => f.color));
+    const folder: Folder = { id: crypto.randomUUID(), name, color, createdAt: Date.now() };
     await dbAddFolder(folder);
     const result = await dbGetFolders();
     if (result.ok) set({ folders: result.value.sort((a, b) => a.name.localeCompare(b.name)) });
@@ -299,6 +301,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     );
     const folderIdByPlan = new Map<string, string>();
 
+    // Track colors as we go so successive new folders get distinct ones
+    // (the in-memory store hasn't been refreshed yet within this loop).
+    const usedColors: (string | undefined)[] = get().folders.map((f) => f.color);
     for (const entry of nonEmpty) {
       const key = entry.folderName.toLowerCase();
       const existing = existingByName.get(key);
@@ -306,9 +311,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         folderIdByPlan.set(entry.folderName, existing);
         continue;
       }
+      const color = pickNextFolderColor(usedColors);
+      usedColors.push(color);
       const folder: Folder = {
         id: crypto.randomUUID(),
         name: entry.folderName,
+        color,
         createdAt: Date.now(),
       };
       await dbAddFolder(folder);

@@ -16,17 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import type { Folder } from "@/types/index.ts";
-
-const FOLDER_COLORS = [
-  "#7c3aed", // violet
-  "#2563eb", // blue
-  "#0891b2", // cyan
-  "#059669", // emerald
-  "#d97706", // amber
-  "#dc2626", // red
-  "#db2777", // pink
-  "#64748b", // slate
-];
+import { FOLDER_COLORS } from "@/lib/folder-colors.ts";
 
 interface FolderItemProps {
   folder: Folder;
