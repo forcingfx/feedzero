@@ -406,13 +406,19 @@ describe("ReaderPanel", () => {
       expect(screen.queryByTestId("prev-pill")).toBeNull();
     });
 
-    it("pills are content-sized — no flex-1 so short titles produce short pills", () => {
+    it("pills share available space (flex-1) and truncate before overflowing", () => {
       render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} onNavigate={vi.fn()} />);
-      expect(screen.getByTestId("prev-pill").className).not.toContain("flex-1");
-      expect(screen.getByTestId("next-pill").className).not.toContain("flex-1");
+      // Both pills should grow to fill space (flex-1) and be allowed to shrink (min-w-0)
+      // so they truncate their titles instead of overflowing the container.
+      const prev = screen.getByTestId("prev-pill");
+      const next = screen.getByTestId("next-pill");
+      expect(prev.className).toContain("flex-1");
+      expect(prev.className).toContain("min-w-0");
+      expect(next.className).toContain("flex-1");
+      expect(next.className).toContain("min-w-0");
     });
 
-    it("pills are not capped at 35% width — they grow to fit long titles", () => {
+    it("pills are not capped at 35% width", () => {
       render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} onNavigate={vi.fn()} />);
       expect(screen.getByTestId("prev-pill").className).not.toContain("max-w-[35%]");
       expect(screen.getByTestId("next-pill").className).not.toContain("max-w-[35%]");

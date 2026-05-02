@@ -100,10 +100,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           data-testid="prev-pill"
           variant="outline"
           size="sm"
-          className={cn(
-            "min-w-0 flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm",
-            !isDesktop && "flex-1",
-          )}
+          className="flex-1 min-w-0 flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm"
           onClick={() => onNavigate(prevArticle)}
         >
           <ChevronLeft className="size-3.5 shrink-0" />
@@ -111,16 +108,12 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           <span className="truncate">{decodeEntities(prevArticle.title)}</span>
         </Button>
       )}
-      {isDesktop && <div className="flex-1" />}
       {nextArticle && (
         <Button
           data-testid="next-pill"
           variant="outline"
           size="sm"
-          className={cn(
-            "min-w-0 flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm",
-            !isDesktop && "flex-1",
-          )}
+          className="flex-1 min-w-0 flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm"
           onClick={() => onNavigate(nextArticle)}
         >
           <span className="truncate">{decodeEntities(nextArticle.title)}</span>
