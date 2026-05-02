@@ -134,19 +134,34 @@ describe("MobileNavDrawer", () => {
     expect(safeAreaPadded!.className).toContain("safe-area-inset-bottom");
   });
 
-  it("tapping Settings opens a menu with all settings options (not just sync)", async () => {
+  it("settings items are inlined directly in the drawer (no Settings dropdown)", async () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
     renderDrawer();
     await user.click(screen.getByRole("button", { name: "Open feed list" }));
-    await user.click(await screen.findByText("Settings"));
 
-    // The full settings menu — same items as the desktop sidebar footer
+    // All settings items are reachable WITHOUT opening a sub-menu —
+    // a dropdown anchored to the drawer bottom gets covered by iOS browser
+    // chrome, so we surface every item as a direct row in the footer.
     expect(await screen.findByText("Cloud sync")).toBeInTheDocument();
     expect(screen.getByText("Auto-organize feeds")).toBeInTheDocument();
     expect(screen.getByText("Keyboard shortcuts")).toBeInTheDocument();
     expect(screen.getByText("Send feedback")).toBeInTheDocument();
     expect(screen.getByText(/What.*new/)).toBeInTheDocument();
+    // No "Settings" button — the items themselves are the surface.
+    expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
+  });
+
+  it("drawer scroll container prevents horizontal scrolling", async () => {
+    const user = userEvent.setup();
+    const { container } = renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    const scroll = await waitFor(() => {
+      const s = container.ownerDocument.querySelector("[data-testid='drawer-scroll']");
+      if (!s) throw new Error("scroll not mounted");
+      return s;
+    });
+    expect(scroll.className).toContain("overflow-x-hidden");
   });
 
   it("toggles open when feedzero:toggle-sidebar event is dispatched", async () => {
