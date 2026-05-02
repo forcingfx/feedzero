@@ -72,8 +72,18 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
         >
           <div className="mx-auto w-10 h-1 rounded-full bg-muted-foreground/30 mt-3 mb-1 shrink-0" />
 
-          <div className="flex-1 overflow-y-auto">
-            <SidebarProvider defaultOpen={false}>
+          {/*
+            SidebarProvider's default wrapper is `flex min-h-svh w-full` (row, viewport-tall).
+            Inside a height-bounded drawer that lays out content vertically, we override to
+            `block min-h-0` so the feed list and Settings row stack vertically and the inner
+            overflow-y-auto can do its job without competing with min-h-svh.
+          */}
+          <SidebarProvider defaultOpen={false} className="block min-h-0">
+            <div
+              data-testid="drawer-scroll"
+              className="overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_2rem)]"
+              style={{ height: "calc(85dvh - 1.25rem)" }}
+            >
               <div className="w-full py-1">
                 <SidebarMenu>
                   <SidebarMenuItem>
@@ -90,7 +100,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                 </SidebarMenu>
               </div>
 
-              <div className="border-t px-2 py-2">
+              <div className="border-t mt-2 px-2 py-2">
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => { setSyncDialogOpen(true); setOpen(false); }}>
@@ -100,8 +110,8 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                   </SidebarMenuItem>
                 </SidebarMenu>
               </div>
-            </SidebarProvider>
-          </div>
+            </div>
+          </SidebarProvider>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

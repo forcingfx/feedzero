@@ -98,6 +98,42 @@ describe("MobileNavDrawer", () => {
     expect(onFeedSelect).toHaveBeenCalledWith("f1");
   });
 
+  it("drawer content stacks vertically (no horizontal flex layout from SidebarProvider)", async () => {
+    const user = userEvent.setup();
+    const { container } = renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+
+    const wrapper = await waitFor(() => {
+      const w = container.ownerDocument.querySelector("[data-slot='sheet-content'], [data-slot='drawer-content'], [data-testid='drawer-content']");
+      if (!w) throw new Error("drawer content not yet mounted");
+      return w;
+    });
+    const sidebarWrapper = wrapper.querySelector("[data-slot='sidebar-wrapper']");
+    expect(sidebarWrapper).not.toBeNull();
+    // SidebarProvider's default is `flex min-h-svh w-full` (row layout) — must be overridden
+    // inside the drawer so settings + feed-list stack vertically instead of side by side.
+    expect(sidebarWrapper!.className).not.toContain("flex ");
+    expect(sidebarWrapper!.className).not.toMatch(/\bflex$/);
+    expect(sidebarWrapper!.className).not.toContain("min-h-svh");
+  });
+
+  it("scrollable feed list area has bottom padding to clear iOS Safari browser chrome", async () => {
+    const user = userEvent.setup();
+    const { container } = renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+
+    const drawer = await waitFor(() => {
+      const d = container.ownerDocument.querySelector("[data-testid='drawer-content']");
+      if (!d) throw new Error("drawer not mounted");
+      return d;
+    });
+    // The scroll container's bottom padding must respect the safe-area inset so the
+    // new-folder input isn't hidden behind the iOS URL bar after rubber-banding.
+    const safeAreaPadded = drawer.querySelector("[data-testid='drawer-scroll']");
+    expect(safeAreaPadded).not.toBeNull();
+    expect(safeAreaPadded!.className).toContain("safe-area-inset-bottom");
+  });
+
   it("toggles open when feedzero:toggle-sidebar event is dispatched", async () => {
     const { container } = renderDrawer();
     const doc = container.ownerDocument;
