@@ -531,42 +531,27 @@ describe("FeedsPage behavior — mobile", () => {
     });
   });
 
-  it("mobile header is present with sidebar trigger", () => {
+  it("mobile header does not have a sidebar trigger (replaced by bottom drawer)", () => {
     const { container } = renderPage("/feeds");
 
     const header = container.querySelector("header");
     expect(header).not.toBeNull();
-    // Header contains the sidebar trigger
     const trigger = header!.querySelector("[data-sidebar='trigger']");
-    expect(trigger).not.toBeNull();
+    expect(trigger).toBeNull();
   });
 
-  it("tapping the feed breadcrumb opens the feed switcher sheet", async () => {
-    const user = userEvent.setup();
-    const feed = makeFeed("feed-1");
-    useFeedStore.setState({ feeds: [feed], selectedFeedId: feed.id });
-    const { container } = renderPage(`/feeds/${feed.id}`);
-
-    const breadcrumbLink = await waitFor(() =>
-      container.querySelector("[data-slot='breadcrumb-link']"),
-    );
-    await user.click(breadcrumbLink!);
-
-    await waitFor(() => {
-      expect(
-        container.ownerDocument.querySelector("[data-slot='sheet-content']"),
-      ).not.toBeNull();
-    });
-  });
-
-  it("does not render the feed switcher sheet on desktop", () => {
-    mockIsDesktop = true;
-    const feed = makeFeed("feed-1");
-    useFeedStore.setState({ feeds: [feed], selectedFeedId: feed.id });
-    const { container } = renderPage(`/feeds/${feed.id}`);
-
+  it("mobile nav drawer handle strip is present on mobile", () => {
+    const { container } = renderPage("/feeds");
     expect(
-      container.ownerDocument.querySelector("[data-slot='sheet-content']"),
+      container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']"),
+    ).not.toBeNull();
+  });
+
+  it("mobile nav drawer is not rendered on desktop", () => {
+    mockIsDesktop = true;
+    const { container } = renderPage("/feeds");
+    expect(
+      container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']"),
     ).toBeNull();
   });
 });

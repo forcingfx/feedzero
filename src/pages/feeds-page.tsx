@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState, lazy, Suspense } from "react";
+import { useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -14,19 +14,11 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable.tsx";
 import {
-  SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar.tsx";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
-import { FeedSwitcherSheet } from "@/components/layout/feed-switcher-sheet.tsx";
-import { Kbd } from "@/components/ui/kbd.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip.tsx";
+import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer.tsx";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 const ExploreCatalog = lazy(() =>
@@ -61,7 +53,6 @@ export function FeedsPage() {
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
   const isDesktop = useIsDesktop();
-  const [feedSheetOpen, setFeedSheetOpen] = useState(false);
   useKeyboardNav();
   const feeds = useFeedStore((s) => s.feeds);
   const selectFeed = useFeedStore((s) => s.selectFeed);
@@ -237,70 +228,52 @@ export function FeedsPage() {
     return () => el.removeEventListener("scrollend", handleScrollEnd);
   }, [isDesktop, articleId, feedId, navigate]);
 
-  // Mobile: sidebar is offcanvas, two-panel scroll-snap for list ↔ reader
+  // Mobile: persistent bottom drawer for feed nav, two-panel scroll-snap for list ↔ reader
   if (!isDesktop) {
     // Explore page: no scroll-snap, single panel
     const showExplore = isExplorePage || (!feedId && feeds.length === 0);
 
     return (
-      <SidebarProvider defaultOpen={false}>
-        <SidebarKeyboardToggle />
-        <AppSidebar onFeedSelect={handleFeedSelect} />
-        <SidebarInset className="flex flex-col h-dvh overflow-hidden">
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 z-10 bg-background">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SidebarTrigger />
-              </TooltipTrigger>
-              <TooltipContent>
-                Toggle Sidebar <Kbd className="ml-1">[</Kbd>
-              </TooltipContent>
-            </Tooltip>
-            <HeaderBreadcrumbs
-              fallback={feedId ? "Articles" : "Feeds"}
-              onTriggerClick={() => setFeedSheetOpen(true)}
-            />
-          </header>
-          <FeedSwitcherSheet
-            open={feedSheetOpen}
-            onOpenChange={setFeedSheetOpen}
-            onFeedSelect={handleFeedSelect}
-          />
+      <div className="flex flex-col h-dvh overflow-hidden bg-background">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 z-10 bg-background">
+          <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
+        </header>
 
-          {showExplore ? (
-            <main role="main" className="flex-1 overflow-y-auto">
-              <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
+        {showExplore ? (
+          <main role="main" className="flex-1 overflow-y-auto">
+            <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
+          </main>
+        ) : (
+          <div
+            ref={snapContainerRef}
+            className="flex flex-1 min-h-0 overflow-x-auto snap-x snap-mandatory"
+            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+          >
+            {/* Panel 1: Article list — owns its own scroll for virtualization */}
+            <main role="main" className="shrink-0 w-full snap-start">
+              <ArticleList onArticleSelect={handleArticleSelect} />
             </main>
-          ) : (
-            <div
-              ref={snapContainerRef}
-              className="flex flex-1 min-h-0 overflow-x-auto snap-x snap-mandatory"
-              style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
-            >
-              {/* Panel 1: Article list — owns its own scroll for virtualization */}
-              <main role="main" className="shrink-0 w-full snap-start">
-                <ArticleList onArticleSelect={handleArticleSelect} />
-              </main>
 
-              {/* Panel 2: Reader — ReaderPanel owns its own scroll and nav bar */}
-              <div
-                data-testid="reader-scroll-mobile"
-                className="shrink-0 w-full snap-start h-full"
-              >
-                <ReaderPanel
-                  nextArticle={nextArticle}
-                  prevArticle={prevArticle}
-                  onNavigate={handleArticleSelect}
-                  onBack={articleId ? () => {
-                    scrollToList();
-                    navigate(`/feeds/${feedId}`);
-                  } : undefined}
-                />
-              </div>
+            {/* Panel 2: Reader — ReaderPanel owns its own scroll and nav bar */}
+            <div
+              data-testid="reader-scroll-mobile"
+              className="shrink-0 w-full snap-start h-full"
+            >
+              <ReaderPanel
+                nextArticle={nextArticle}
+                prevArticle={prevArticle}
+                onNavigate={handleArticleSelect}
+                onBack={articleId ? () => {
+                  scrollToList();
+                  navigate(`/feeds/${feedId}`);
+                } : undefined}
+              />
             </div>
-          )}
-        </SidebarInset>
-      </SidebarProvider>
+          </div>
+        )}
+
+        <MobileNavDrawer onFeedSelect={handleFeedSelect} />
+      </div>
     );
   }
 
