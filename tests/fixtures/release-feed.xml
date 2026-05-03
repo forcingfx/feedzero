@@ -3,12 +3,44 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-05-01T12:00:00Z</updated>
+  <updated>2026-05-03T12:00:00Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.7.0</id>
+    <title>v0.7.0 — Mobile bottom drawer, pill navigation, and the stats page</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-05-03T12:00:00Z</published>
+    <updated>2026-05-03T12:00:00Z</updated>
+    <summary>A persistent swipeable bottom drawer replaces the offcanvas mobile sidebar, navigation pills handle prev/next on every device, and a public /stats dashboard exposes anonymous usage numbers.</summary>
+    <content type="html"><![CDATA[<p>A persistent swipeable bottom drawer replaces the offcanvas mobile sidebar, navigation pills handle prev/next on every device, and a public /stats dashboard exposes anonymous usage numbers.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added a persistent swipeable bottom drawer on mobile that replaces the offcanvas sidebar. The drawer handle is always visible at the bottom of the screen and shows the current feed name; tapping or swiping up reveals the full feed list, folders, All items, Explore, and Settings.</li>
+  <li>Added a bottom sheet feed switcher on mobile. The active feed name in the bottom drawer doubles as a switcher: a tap opens a sheet with all feeds and folders.</li>
+  <li>Added a public stats page at &lt;code&gt;/stats&lt;/code&gt;. Shows total vaults, total feeds tracked, and the top 100 feeds by request volume. No accounts, no personal data, no login.</li>
+  <li>Added automatic color assignment for new folders. Created folders now get a distinct color from the eight-color palette without an extra picker step.</li>
+  <li>Added the full settings menu inline in the mobile bottom drawer. Cloud sync, Auto-organize, Keyboard shortcuts, Send feedback, and What's new are all reachable without opening a separate dropdown.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Replaced the pull-to-advance gesture on mobile with explicit prev/next nav pills. The pills are pinned to the bottom of the reader and remain accessible regardless of scroll position. Pull-to-advance was removed because behavior was inconsistent across mobile browsers.</li>
+  <li>The mobile nav pills are now icon-only for back navigation, show no keyboard hints, and stretch to fill the available width. Long article titles in the prev/next labels are truncated with ellipses instead of overflowing.</li>
+  <li>The desktop sidebar and the mobile bottom drawer now share a single navigation body component. Adding a new top-level entry (such as Explore) only needs to be done in one place.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed the article list jumping unexpectedly when clicking an already-visible article. The virtualizer no longer re-anchors on click-driven selection changes; keyboard &lt;kbd&gt;j&lt;/kbd&gt;/&lt;kbd&gt;k&lt;/kbd&gt; still scroll the selected article into view.</li>
+  <li>Fixed the mobile bottom drawer overflowing horizontally on viewports with safe-area insets. The drawer now respects the iOS Dynamic Island and notch in all orientations.</li>
+  <li>Fixed desktop reader navigation pills clipping long article titles. The pills now share the available width and grow to fit instead of letting text overflow.</li>
+  <li>Fixed the folder title toggle in the sidebar collapsing the folder when clicked. Selecting a feed inside a folder on mobile now snaps back to the article list as expected.</li>
+  <li>Fixed the mobile drawer settings rendering as a nested dropdown that introduced horizontal scroll. The settings entries are now inline within the drawer.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.6.0</id>
     <title>v0.6.0 — Resizable panels, navigation pills, and auto-organize</title>
