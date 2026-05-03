@@ -122,6 +122,7 @@ export function App() {
               element={<FeedsPage />}
             />
             <Route path="/explore" element={<FeedsPage />} />
+            <Route path="/stats" element={<FeedsPage />} />
             <Route path="*" element={<Navigate to="/feeds" replace />} />
           </Routes>
         </AppInit>

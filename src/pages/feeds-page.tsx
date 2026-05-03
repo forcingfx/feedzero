@@ -26,6 +26,11 @@ const ExploreCatalog = lazy(() =>
     default: m.ExploreCatalog,
   })),
 );
+const StatsPage = lazy(() =>
+  import("@/components/stats/stats-page.tsx").then((m) => ({
+    default: m.StatsPage,
+  })),
+);
 
 /**
  * Listens for the feedzero:toggle-sidebar event and toggles the sidebar.
@@ -52,6 +57,7 @@ export function FeedsPage() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
+  const isStatsPage = pathname === "/stats";
   const isDesktop = useIsDesktop();
   useKeyboardNav();
   const feeds = useFeedStore((s) => s.feeds);
@@ -89,11 +95,11 @@ export function FeedsPage() {
   // it shortly, and Explore is reachable via the sidebar. Defaulting to
   // Explore would otherwise make the app feel like a directory, not a reader.
   useEffect(() => {
-    if (isExplorePage) return;
+    if (isExplorePage || isStatsPage) return;
     if (!feedId) {
       navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
     }
-  }, [isExplorePage, feedId, navigate]);
+  }, [isExplorePage, isStatsPage, feedId, navigate]);
 
   const isLoadingArticles = useArticleStore((s) => s.isLoading);
 
@@ -231,7 +237,7 @@ export function FeedsPage() {
   // Mobile: persistent bottom drawer for feed nav, two-panel scroll-snap for list ↔ reader
   if (!isDesktop) {
     // Explore page: no scroll-snap, single panel
-    const showExplore = isExplorePage || (!feedId && feeds.length === 0);
+    const showExplore = isExplorePage || (!feedId && feeds.length === 0 && !isStatsPage);
 
     return (
       <div className="flex flex-col h-dvh overflow-hidden bg-background">
@@ -239,7 +245,11 @@ export function FeedsPage() {
           <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
         </header>
 
-        {showExplore ? (
+        {isStatsPage ? (
+          <main role="main" className="flex-1 overflow-y-auto">
+            <Suspense><StatsPage /></Suspense>
+          </main>
+        ) : showExplore ? (
           <main role="main" className="flex-1 overflow-y-auto">
             <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
           </main>
@@ -282,6 +292,7 @@ export function FeedsPage() {
   // AppSidebar uses collapsible="none" so it renders inline (not fixed-position)
   // and participates naturally in the panel layout.
   const exploreOrEmpty = isExplorePage || feeds.length === 0;
+  const showStats = isStatsPage;
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
@@ -300,7 +311,13 @@ export function FeedsPage() {
           />
         </ResizablePanel>
         <ResizableHandle />
-        {exploreOrEmpty ? (
+        {showStats ? (
+          <ResizablePanel className="overflow-hidden">
+            <ScrollArea className="h-full">
+              <Suspense><StatsPage /></Suspense>
+            </ScrollArea>
+          </ResizablePanel>
+        ) : exploreOrEmpty ? (
           <ResizablePanel className="overflow-hidden">
             <ScrollArea className="h-full">
               <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
