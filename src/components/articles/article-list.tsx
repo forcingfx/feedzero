@@ -87,6 +87,16 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   // off-screen items once the user scrolls) and the initial reveal of a
   // selection that was restored from URL state. NOT for click-driven
   // selection — see skipNextAutoScroll above.
+  //
+  // Deps are intentionally limited to `selectedId`: the auto-scroll must
+  // run only when the selection itself changes, not when the `articles`
+  // array reference changes. If we depended on `articles`, any unrelated
+  // mutation (auto-mark-as-read after selection, refresh, sync push) would
+  // re-fire the effect with the click-skip flag already consumed, and
+  // re-anchor the list to the previously-selected (now off-screen) article
+  // — see GitLab #12. We read the latest articles via a ref instead.
+  const articlesRef = useRef(articles);
+  articlesRef.current = articles;
   const selectedId = selectedArticle?.id;
   useEffect(() => {
     if (!selectedId) return;
@@ -94,9 +104,9 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       skipNextAutoScroll.current = false;
       return;
     }
-    const index = articles.findIndex((a) => a.id === selectedId);
+    const index = articlesRef.current.findIndex((a) => a.id === selectedId);
     if (index !== -1) virtualizer.scrollToIndex(index, { align: "auto" });
-  }, [selectedId, articles, virtualizer]);
+  }, [selectedId, virtualizer]);
 
   // Empty/loading states render inside the scroll wrapper so the panel
   // layout stays consistent whether or not there are articles — callers

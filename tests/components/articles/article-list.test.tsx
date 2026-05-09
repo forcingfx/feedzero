@@ -212,6 +212,59 @@ describe("ArticleList", () => {
     expect(list!.className).toContain("pb-12");
   });
 
+  it("clicking a visible article does not re-anchor the virtualizer to the previously-selected (off-screen) article (GitLab #12)", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    // Long list so the virtualizer renders only a window of items.
+    const articles = Array.from({ length: 200 }, (_, i) =>
+      mockArticle(`a${i}`, `Article ${i}`),
+    );
+    // Pre-select the first article. The user has scrolled it off-screen.
+    useArticleStore.setState({
+      articles,
+      selectedArticle: articles[0],
+      isLoading: false,
+    });
+
+    const { container } = render(<ArticleList />);
+    const scrollEl = container.querySelector(".overflow-y-auto") as HTMLElement;
+    const virtualizerScrollSpy = vi.fn();
+    scrollEl.scrollTo = virtualizerScrollSpy as unknown as typeof scrollEl.scrollTo;
+    // Stub scrollBy as well — some virtualizer code paths use it.
+    scrollEl.scrollBy = vi.fn() as unknown as typeof scrollEl.scrollBy;
+
+    // Now mutate the articles array — this simulates anything that changes
+    // the array reference *without* changing the selection: the auto-mark-
+    // as-read timer firing, a refresh updating an article, sync push, etc.
+    // The selection is unchanged; the user has not re-selected anything.
+    // The list MUST NOT scroll just because the array reference changed.
+    const updatedArticles = articles.map((a) =>
+      a.id === "a0" ? { ...a, read: true } : a,
+    );
+    useArticleStore.setState({ articles: updatedArticles });
+
+    // Allow React to flush the effect triggered by the articles change.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Now click a still-visible article. The selection changes from a0 to
+    // whatever is rendered first. handleSelect sets the skip flag, so no
+    // scroll should happen for THIS selection change either.
+    const visibleOptions = screen.getAllByRole("option");
+    await user.click(visibleOptions[0]);
+
+    // Across the whole interaction (articles mutation + click), the list
+    // must never have re-anchored the scroll position. The bug was: a stray
+    // articles-reference-change effect call, plus the click effect, both
+    // calling scrollToIndex(previouslySelected) and bringing it back into
+    // view.
+    expect(virtualizerScrollSpy).not.toHaveBeenCalled();
+  });
+
   it("shows read/unread styling", () => {
     useFeedStore.setState({
       feeds: [],
