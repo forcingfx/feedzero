@@ -34,6 +34,12 @@ describe("server", () => {
       expect(csp).toContain("img-src 'self' data: https:");
     });
 
+    it("allows direct browser calls to api.anthropic.com for Signal", async () => {
+      const res = await createApp().request("/");
+      const csp = res.headers.get("Content-Security-Policy");
+      expect(csp).toMatch(/connect-src[^;]*https:\/\/api\.anthropic\.com/);
+    });
+
     it("does not set CSP on API responses", async () => {
       const res = await createApp().request("/api/feed");
       const csp = res.headers.get("Content-Security-Policy");

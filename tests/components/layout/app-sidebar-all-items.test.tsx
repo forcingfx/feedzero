@@ -65,10 +65,11 @@ describe("AppSidebar All items entry", () => {
     );
     const texts = Array.from(menuButtons).map((btn) => btn.textContent);
 
-    // Explore at top of Feeds group, then All items
+    // Explore, Signal, All items, then individual feeds
     expect(texts[0]).toContain("Explore");
-    expect(texts[1]).toContain("All items");
-    expect(texts[2]).toContain("Tech News");
+    expect(texts[1]).toContain("Signal");
+    expect(texts[2]).toContain("All items");
+    expect(texts[3]).toContain("Tech News");
   });
 
   it("calls onFeedSelect with ALL_FEEDS_ID when clicked", async () => {

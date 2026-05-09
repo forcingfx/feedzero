@@ -31,6 +31,11 @@ const StatsPage = lazy(() =>
     default: m.StatsPage,
   })),
 );
+const SignalPage = lazy(() =>
+  import("@/components/signal/signal-page.tsx").then((m) => ({
+    default: m.SignalPage,
+  })),
+);
 
 /**
  * Listens for the feedzero:toggle-sidebar event and toggles the sidebar.
@@ -58,6 +63,7 @@ export function FeedsPage() {
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
   const isStatsPage = pathname === "/stats";
+  const isSignalPage = pathname === "/signal";
   const isDesktop = useIsDesktop();
   useKeyboardNav();
   const feeds = useFeedStore((s) => s.feeds);
@@ -95,11 +101,11 @@ export function FeedsPage() {
   // it shortly, and Explore is reachable via the sidebar. Defaulting to
   // Explore would otherwise make the app feel like a directory, not a reader.
   useEffect(() => {
-    if (isExplorePage || isStatsPage) return;
+    if (isExplorePage || isStatsPage || isSignalPage) return;
     if (!feedId) {
       navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
     }
-  }, [isExplorePage, isStatsPage, feedId, navigate]);
+  }, [isExplorePage, isStatsPage, isSignalPage, feedId, navigate]);
 
   const isLoadingArticles = useArticleStore((s) => s.isLoading);
 
@@ -237,7 +243,7 @@ export function FeedsPage() {
   // Mobile: persistent bottom drawer for feed nav, two-panel scroll-snap for list ↔ reader
   if (!isDesktop) {
     // Explore page: no scroll-snap, single panel
-    const showExplore = isExplorePage || (!feedId && feeds.length === 0 && !isStatsPage);
+    const showExplore = isExplorePage || (!feedId && feeds.length === 0 && !isStatsPage && !isSignalPage);
 
     return (
       <div className="flex flex-col h-dvh overflow-hidden bg-background">
@@ -248,6 +254,10 @@ export function FeedsPage() {
         {isStatsPage ? (
           <main role="main" className="flex-1 overflow-y-auto">
             <Suspense><StatsPage /></Suspense>
+          </main>
+        ) : isSignalPage ? (
+          <main role="main" className="flex-1 overflow-y-auto">
+            <Suspense><SignalPage /></Suspense>
           </main>
         ) : showExplore ? (
           <main role="main" className="flex-1 overflow-y-auto">
@@ -293,6 +303,7 @@ export function FeedsPage() {
   // and participates naturally in the panel layout.
   const exploreOrEmpty = isExplorePage || feeds.length === 0;
   const showStats = isStatsPage;
+  const showSignal = isSignalPage;
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
@@ -315,6 +326,12 @@ export function FeedsPage() {
           <ResizablePanel className="overflow-hidden">
             <ScrollArea className="h-full">
               <Suspense><StatsPage /></Suspense>
+            </ScrollArea>
+          </ResizablePanel>
+        ) : showSignal ? (
+          <ResizablePanel className="overflow-hidden">
+            <ScrollArea className="h-full">
+              <Suspense><SignalPage /></Suspense>
             </ScrollArea>
           </ResizablePanel>
         ) : exploreOrEmpty ? (

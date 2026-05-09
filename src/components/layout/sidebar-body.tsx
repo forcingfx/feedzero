@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router";
-import { Compass, Layers } from "lucide-react";
+import { Compass, Layers, Sparkles } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import {
@@ -29,10 +29,16 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
   const feeds = useFeedStore((s) => s.feeds);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const isExplorePage = pathname === "/explore";
+  const isSignalPage = pathname === "/signal";
 
   function handleExplore() {
     onBeforeNavigate?.();
     navigate("/explore");
+  }
+
+  function handleSignal() {
+    onBeforeNavigate?.();
+    navigate("/signal");
   }
 
   return (
@@ -45,6 +51,16 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
         >
           <Compass className="size-4" />
           <span>Explore</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          isActive={isSignalPage}
+          onClick={handleSignal}
+          tooltip="Signal"
+        >
+          <Sparkles className="size-4" />
+          <span>Signal</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
       {feeds.length > 0 && (
