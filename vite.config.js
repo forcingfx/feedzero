@@ -146,6 +146,15 @@ function apiProxyPlugin() {
         const webRes = await handleFeedbackRequest(webReq);
         await sendWebResponse(webRes, res);
       });
+
+      server.middlewares.use("/api/health", async (req, res) => {
+        const { handleHealthRequest } = await import(
+          "./src/core/health/health-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handleHealthRequest(webReq);
+        await sendWebResponse(webRes, res);
+      });
     },
   };
 }
