@@ -134,4 +134,76 @@ describe("FeedbackDialog", () => {
     // no fetch should fire.
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  describe("keyboard submit (GitLab #13)", () => {
+    it("submits on Cmd+Enter inside the textarea", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+
+      const textarea = screen.getByPlaceholderText("What's on your mind?");
+      await userEvent.type(textarea, "shipped via Cmd+Enter");
+      await userEvent.keyboard("{Meta>}{Enter}{/Meta}");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/feedback",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ message: "shipped via Cmd+Enter" }),
+        }),
+      );
+    });
+
+    it("submits on Ctrl+Enter inside the textarea", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+
+      const textarea = screen.getByPlaceholderText("What's on your mind?");
+      await userEvent.type(textarea, "shipped via Ctrl+Enter");
+      await userEvent.keyboard("{Control>}{Enter}{/Control}");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/feedback",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ message: "shipped via Ctrl+Enter" }),
+        }),
+      );
+    });
+
+    it("does not submit on plain Enter (newline only)", async () => {
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+
+      const textarea = screen.getByPlaceholderText("What's on your mind?");
+      await userEvent.type(textarea, "first line");
+      await userEvent.keyboard("{Enter}");
+      await userEvent.type(textarea, "second line");
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect((textarea as HTMLTextAreaElement).value).toBe(
+        "first line\nsecond line",
+      );
+    });
+
+    it("does not submit on Cmd+Enter with empty/whitespace message", async () => {
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+
+      const textarea = screen.getByPlaceholderText("What's on your mind?");
+      await userEvent.type(textarea, "   ");
+      await userEvent.keyboard("{Meta>}{Enter}{/Meta}");
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
 });
