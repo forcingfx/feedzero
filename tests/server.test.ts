@@ -439,7 +439,10 @@ describe("server", () => {
       process.env = { ...ORIGINAL_ENV };
     });
 
-    it("returns 503 when GitLab credentials are not configured", async () => {
+    it("returns 503 when GitHub credentials are not configured", async () => {
+      delete process.env.GITHUB_FEEDBACK_TOKEN;
+      delete process.env.GITHUB_REPO;
+      // Also unset the legacy GitLab vars so we don't accidentally fall back to them.
       delete process.env.GITLAB_FEEDBACK_TOKEN;
       delete process.env.GITLAB_PROJECT_ID;
 
@@ -456,8 +459,8 @@ describe("server", () => {
     });
 
     it("returns 400 when message is missing", async () => {
-      process.env.GITLAB_FEEDBACK_TOKEN = "fake-token";
-      process.env.GITLAB_PROJECT_ID = "12345";
+      process.env.GITHUB_FEEDBACK_TOKEN = "fake-token";
+      process.env.GITHUB_REPO = "forcingfx/feedzero";
 
       const res = await createApp().request("/api/feedback", {
         method: "POST",
@@ -471,13 +474,12 @@ describe("server", () => {
       expect(data.error).toMatch(/required/i);
     });
 
-    it("posts a GitLab issue and returns ok when credentials are valid", async () => {
-      process.env.GITLAB_FEEDBACK_TOKEN = "fake-token";
-      process.env.GITLAB_PROJECT_ID = "12345";
+    it("posts a GitHub issue and returns ok when credentials are valid", async () => {
+      process.env.GITHUB_FEEDBACK_TOKEN = "fake-token";
+      process.env.GITHUB_REPO = "forcingfx/feedzero";
 
-      // The handler reads URL string + RequestInit, so match accordingly.
       mockFetch.mockResolvedValue(
-        new Response(JSON.stringify({ iid: 1 }), {
+        new Response(JSON.stringify({ number: 1, html_url: "https://github.com/forcingfx/feedzero/issues/1" }), {
           status: 201,
           headers: { "Content-Type": "application/json" },
         }),
@@ -493,16 +495,28 @@ describe("server", () => {
       const data = await res.json();
       expect(data.ok).toBe(true);
 
-      // Verify it called the GitLab issues API with the right payload
+      // Verify it called the GitHub issues API with the right payload shape:
+      // - URL: /repos/{owner}/{repo}/issues
+      // - Authorization: Bearer <token>
+      // - Accept: application/vnd.github+json (recommended pinning)
+      // - body labels is an ARRAY (GitHub) not a comma-string (GitLab)
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/v4/projects/12345/issues"),
+        "https://api.github.com/repos/forcingfx/feedzero/issues",
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
-            "PRIVATE-TOKEN": "fake-token",
+            Authorization: "Bearer fake-token",
+            Accept: "application/vnd.github+json",
+            "Content-Type": "application/json",
           }),
         }),
       );
+
+      const callArgs = mockFetch.mock.calls.at(-1);
+      const sentBody = JSON.parse(callArgs![1].body);
+      expect(sentBody.title).toMatch(/^Feedback: /);
+      expect(sentBody.body).toBe("Great app!");
+      expect(sentBody.labels).toEqual(["feedback"]);
     });
 
     it("rejects non-POST methods (Hono returns 404 for unregistered method)", async () => {

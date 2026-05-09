@@ -13,19 +13,28 @@ function postJson(body: unknown): Request {
 
 describe("handleFeedbackRequest", () => {
   let originalToken: string | undefined;
-  let originalProjectId: string | undefined;
+  let originalRepo: string | undefined;
+  let originalLegacyToken: string | undefined;
+  let originalLegacyProject: string | undefined;
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    originalToken = process.env.GITLAB_FEEDBACK_TOKEN;
-    originalProjectId = process.env.GITLAB_PROJECT_ID;
-    process.env.GITLAB_FEEDBACK_TOKEN = "test-token";
-    process.env.GITLAB_PROJECT_ID = "12345";
+    originalToken = process.env.GITHUB_FEEDBACK_TOKEN;
+    originalRepo = process.env.GITHUB_REPO;
+    originalLegacyToken = process.env.GITLAB_FEEDBACK_TOKEN;
+    originalLegacyProject = process.env.GITLAB_PROJECT_ID;
+    process.env.GITHUB_FEEDBACK_TOKEN = "test-token";
+    process.env.GITHUB_REPO = "forcingfx/feedzero";
+    // Ensure the legacy GitLab vars do not accidentally satisfy the configured-check.
+    delete process.env.GITLAB_FEEDBACK_TOKEN;
+    delete process.env.GITLAB_PROJECT_ID;
   });
 
   afterEach(() => {
-    process.env.GITLAB_FEEDBACK_TOKEN = originalToken;
-    process.env.GITLAB_PROJECT_ID = originalProjectId;
+    process.env.GITHUB_FEEDBACK_TOKEN = originalToken;
+    process.env.GITHUB_REPO = originalRepo;
+    process.env.GITLAB_FEEDBACK_TOKEN = originalLegacyToken;
+    process.env.GITLAB_PROJECT_ID = originalLegacyProject;
   });
 
   it("rejects non-POST methods with 405", async () => {
@@ -35,8 +44,8 @@ describe("handleFeedbackRequest", () => {
     expect(res.status).toBe(405);
   });
 
-  it("returns 503 when GITLAB_FEEDBACK_TOKEN is missing", async () => {
-    delete process.env.GITLAB_FEEDBACK_TOKEN;
+  it("returns 503 when GITHUB_FEEDBACK_TOKEN is missing", async () => {
+    delete process.env.GITHUB_FEEDBACK_TOKEN;
     const res = await handleFeedbackRequest(postJson({ message: "Hi" }));
     expect(res.status).toBe(503);
     const body = await res.json();
@@ -44,8 +53,8 @@ describe("handleFeedbackRequest", () => {
     expect(body.error).toMatch(/not configured/i);
   });
 
-  it("returns 503 when GITLAB_PROJECT_ID is missing", async () => {
-    delete process.env.GITLAB_PROJECT_ID;
+  it("returns 503 when GITHUB_REPO is missing", async () => {
+    delete process.env.GITHUB_REPO;
     const res = await handleFeedbackRequest(postJson({ message: "Hi" }));
     expect(res.status).toBe(503);
   });
@@ -86,9 +95,9 @@ describe("handleFeedbackRequest", () => {
     expect(body.error).toMatch(/2000/);
   });
 
-  it("posts the message to the GitLab issues API and returns ok:true", async () => {
+  it("posts the message to the GitHub issues API and returns ok:true", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ id: 1 }), { status: 201 }),
+      new Response(JSON.stringify({ number: 1 }), { status: 201 }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -101,15 +110,18 @@ describe("handleFeedbackRequest", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://gitlab.com/api/v4/projects/12345/issues");
+    expect(url).toBe("https://api.github.com/repos/forcingfx/feedzero/issues");
     expect(init.method).toBe("POST");
-    expect(init.headers["PRIVATE-TOKEN"]).toBe("test-token");
+    expect(init.headers.Authorization).toBe("Bearer test-token");
+    expect(init.headers.Accept).toBe("application/vnd.github+json");
+    expect(init.headers["X-GitHub-Api-Version"]).toBe("2022-11-28");
 
     const sent = JSON.parse(init.body);
     expect(sent.title).toMatch(/Feedback:/);
     expect(sent.title).toContain("example.com");
-    expect(sent.description).toBe("User can't subscribe to a feed at example.com");
-    expect(sent.labels).toBe("feedback");
+    // GitHub uses `body` (not `description` like GitLab) and an array of label names.
+    expect(sent.body).toBe("User can't subscribe to a feed at example.com");
+    expect(sent.labels).toEqual(["feedback"]);
   });
 
   it("truncates the issue title at 80 characters with an ellipsis", async () => {
@@ -124,7 +136,7 @@ describe("handleFeedbackRequest", () => {
     expect(sent.title).toMatch(/^Feedback: a{80}…$/);
   });
 
-  it("returns 502 when GitLab responds non-OK", async () => {
+  it("returns 502 when GitHub responds non-OK", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(new Response("forbidden", { status: 403 })),

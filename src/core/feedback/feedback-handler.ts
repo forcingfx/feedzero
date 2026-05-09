@@ -1,10 +1,11 @@
 /**
- * Shared feedback handler. Receives user feedback and creates a GitLab issue.
+ * Shared feedback handler. Receives user feedback and creates a GitHub issue.
  *
- * Requires GITLAB_FEEDBACK_TOKEN env var (project access token with api scope)
- * and GITLAB_PROJECT_ID env var (numeric project ID).
+ * Requires GITHUB_FEEDBACK_TOKEN env var (a GitHub fine-grained PAT or classic
+ * token with `repo` scope, scoped to the issues repo) and GITHUB_REPO env var
+ * in the form "owner/repo" (e.g. "forcingfx/feedzero").
  *
- * No user identity is collected. The message is the only content.
+ * No user identity is collected. The message is the only content posted.
  */
 
 interface FeedbackBody {
@@ -27,10 +28,10 @@ export async function handleFeedbackRequest(
     return new Response("Method not allowed", { status: 405 });
   }
 
-  const token = process.env.GITLAB_FEEDBACK_TOKEN;
-  const projectId = process.env.GITLAB_PROJECT_ID;
+  const token = process.env.GITHUB_FEEDBACK_TOKEN;
+  const repo = process.env.GITHUB_REPO;
 
-  if (!token || !projectId) {
+  if (!token || !repo) {
     return jsonResponse(
       { ok: false, error: "Feedback is not configured on this server" },
       503,
@@ -57,17 +58,20 @@ export async function handleFeedbackRequest(
 
   try {
     const response = await fetch(
-      `https://gitlab.com/api/v4/projects/${projectId}/issues`,
+      `https://api.github.com/repos/${repo}/issues`,
       {
         method: "POST",
         headers: {
-          "PRIVATE-TOKEN": token,
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
           "Content-Type": "application/json",
+          // GitHub recommends pinning the API version for stability.
+          "X-GitHub-Api-Version": "2022-11-28",
         },
         body: JSON.stringify({
           title: `Feedback: ${message.slice(0, 80)}${message.length > 80 ? "…" : ""}`,
-          description: message,
-          labels: "feedback",
+          body: message,
+          labels: ["feedback"],
         }),
       },
     );
