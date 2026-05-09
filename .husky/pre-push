@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+# Local pre-push gate. Mirrors the cheap part of CI so we catch regressions
+# before they burn a CI cycle. E2E lives in CI (too slow for pre-push).
+# See docs/internal/strategy.md §9.2.
+# Bypass with `git push --no-verify` only for documented exceptions.
+
+set -e
+
+red()  { printf '\033[31m%s\033[0m\n' "$1" >&2; }
+info() { printf '\033[36m%s\033[0m\n' "$1" >&2; }
+
+info "pre-push: typecheck (tsc --noEmit)..."
+if ! npx --no-install tsc --noEmit; then
+  red "TypeScript check failed. Push aborted."
+  exit 1
+fi
+
+info "pre-push: unit + integration tests (vitest)..."
+if ! npm test --silent; then
+  red "Tests failed. Push aborted."
+  exit 1
+fi

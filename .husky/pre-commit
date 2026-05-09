@@ -1,1 +1,67 @@
-npm test 2>&1 | tee /dev/stderr | grep -q "^.*Tests.*failed" && exit 1 || exit 0
+#!/usr/bin/env sh
+# Local pre-commit guardrails.
+# See docs/internal/strategy.md §9.2 for context.
+# Bypass with `git commit --no-verify` only for documented exceptions.
+
+set -e
+
+red()  { printf '\033[31m%s\033[0m\n' "$1" >&2; }
+warn() { printf '\033[33m%s\033[0m\n' "$1" >&2; }
+
+# 1. Block direct commits to main (defence in depth — branch protection is primary).
+current_branch="$(git symbolic-ref --short -q HEAD || echo "")"
+if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
+  red "Refusing to commit directly to '$current_branch'."
+  red "  Open a feature branch: git switch -c feat/<slug>"
+  exit 1
+fi
+
+# 2. Block staging of secret-shaped or key-shaped files.
+secret_patterns='\.env(\..+)?$|\.pem$|\.key$|(^|/)id_rsa$|(^|/)id_ed25519$'
+staged="$(git diff --cached --name-only --diff-filter=ACM)"
+
+if [ -n "$staged" ]; then
+  blocked="$(printf '%s\n' "$staged" | grep -E "$secret_patterns" || true)"
+  if [ -n "$blocked" ]; then
+    red "Refusing to commit secret-shaped files:"
+    printf '%s\n' "$blocked" | sed 's/^/    /' >&2
+    red "  Add them to .gitignore. If this is intentional, use --no-verify and document why."
+    exit 1
+  fi
+fi
+
+# 3. Block staged files larger than 1 MiB. Large binaries belong in object storage.
+max_bytes=1048576
+if [ -n "$staged" ]; then
+  oversized=""
+  # POSIX-safe: newline-delimited iteration. Paths with newlines are exotic enough
+  # to fall back to gitleaks/manual review.
+  printf '%s\n' "$staged" | while IFS= read -r file; do
+    [ -f "$file" ] || continue
+    size="$(wc -c < "$file" | tr -d ' ')"
+    if [ "$size" -gt "$max_bytes" ]; then
+      printf '    %s (%s bytes)\n' "$file" "$size"
+    fi
+  done > /tmp/feedzero-precommit-oversized.$$
+  oversized="$(cat /tmp/feedzero-precommit-oversized.$$)"
+  rm -f /tmp/feedzero-precommit-oversized.$$
+
+  if [ -n "$oversized" ]; then
+    red "Refusing to commit files larger than 1 MiB:"
+    printf '%s\n' "$oversized" >&2
+    red "  Use Git LFS or object storage. If intentional, use --no-verify and document why."
+    exit 1
+  fi
+fi
+
+# 4. Run gitleaks if available; warn (don't fail) when missing.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --no-banner || {
+    red "gitleaks detected secrets in staged changes."
+    red "  Remove the secret, rotate it, then recommit."
+    exit 1
+  }
+else
+  warn "gitleaks not installed — skipping secret scan."
+  warn "  Install: https://github.com/gitleaks/gitleaks (brew install gitleaks)"
+fi

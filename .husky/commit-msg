@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+# Validate conventional-commit prefix.
+# See docs/internal/strategy.md §9.2 and CLAUDE.md "Commit Messages".
+# Allow scopes (feat(reader):), breaking marker (feat!:, fix(api)!:),
+# and merge / revert auto-messages.
+
+msg_file="$1"
+# First non-comment, non-empty line — the subject.
+subject="$(grep -v '^#' "$msg_file" | sed '/^[[:space:]]*$/d' | head -n 1)"
+
+# Auto-generated merge/revert subjects pass through untouched.
+case "$subject" in
+  "Merge "*|"Revert "*) exit 0 ;;
+esac
+
+pattern='^(feat|fix|chore|refactor|docs|test|ci|build|perf|style|revert)(\([a-z0-9_./-]+\))?!?: .+'
+
+if ! printf '%s' "$subject" | grep -Eq "$pattern"; then
+  printf '\033[31m%s\033[0m\n' "Commit message subject does not follow Conventional Commits." >&2
+  printf '\033[31m%s\033[0m\n' "  Got:      $subject" >&2
+  printf '\033[33m%s\033[0m\n' "  Expected: <type>(<scope>)?!?: <subject>" >&2
+  printf '\033[33m%s\033[0m\n' "  Types:    feat, fix, chore, refactor, docs, test, ci, build, perf, style, revert" >&2
+  printf '\033[33m%s\033[0m\n' "  Examples:" >&2
+  printf '\033[33m%s\033[0m\n' "    feat(reader): add summary toggle" >&2
+  printf '\033[33m%s\033[0m\n' "    fix(api)!: drop legacy GET /api/sync handler" >&2
+  printf '\033[33m%s\033[0m\n' "    chore: bump deps" >&2
+  exit 1
+fi
