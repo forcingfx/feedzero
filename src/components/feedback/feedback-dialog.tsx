@@ -50,6 +50,16 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
     }
   }
 
+  // Cmd+Enter (mac) / Ctrl+Enter (others) submits without leaving the textarea.
+  // Plain Enter still inserts a newline so multi-line feedback stays natural.
+  function handleTextareaKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      if (isSending || !message.trim()) return;
+      void handleSubmit(e);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -65,6 +75,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleTextareaKeyDown}
             placeholder="What's on your mind?"
             maxLength={MAX_LENGTH}
             rows={5}
