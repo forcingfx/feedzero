@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { ChevronLeft, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
@@ -57,8 +57,14 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Reset scroll and view mode when article changes
-  useEffect(() => {
+  // Reset scroll and view mode when article changes.
+  //
+  // useLayoutEffect (not useEffect) is required: the scroll reset must run
+  // synchronously after the DOM mutation but BEFORE the browser paints the
+  // new article. With useEffect the user briefly sees article B at the
+  // previous (article A) scroll offset before the position snaps back to 0.
+  // See GitLab #8.
+  useLayoutEffect(() => {
     resetForArticle();
     if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
   }, [article?.id, resetForArticle]);
@@ -126,11 +132,18 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
 
   // Wraps empty/loading states in the flex column so layout is stable and the
   // nav bar (including back button) is always visible when onNavigate is provided.
+  // The scroll container shares its ref + testid with the loaded-article path
+  // so the scroll-reset effect always targets a stable element across state
+  // transitions (loading → article).
   function wrap(content: ReactNode) {
     if (onNavigate) {
       return (
         <div className="h-full flex flex-col">
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none">
+          <div
+            ref={scrollContainerRef}
+            data-testid="reader-scroll-container"
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none"
+          >
             {content}
           </div>
           {navPills}

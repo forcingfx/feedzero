@@ -474,6 +474,107 @@ describe("ReaderPanel", () => {
     });
   });
 
+  describe("scroll reset on article change (GitLab #8)", () => {
+    const articleA = mockArticle({ id: "a1", title: "Article A" });
+    const articleB = mockArticle({
+      id: "a2",
+      title: "Article B",
+      link: "https://example.com/b",
+    });
+
+    beforeEach(() => {
+      mockIsDesktop = true;
+    });
+
+    it("resets reader scroll to top when switching articles", () => {
+      useArticleStore.setState({
+        selectedArticle: articleA,
+        articles: [articleA, articleB],
+        isLoading: false,
+      });
+
+      const { rerender } = render(
+        <ReaderPanel nextArticle={articleB} onNavigate={vi.fn()} />,
+      );
+
+      const scrollContainer = document.querySelector(
+        "[data-testid='reader-scroll-container']",
+      ) as HTMLDivElement | null;
+      expect(scrollContainer).not.toBeNull();
+
+      // User scrolls into article A.
+      scrollContainer!.scrollTop = 500;
+      expect(scrollContainer!.scrollTop).toBe(500);
+
+      // User selects article B (mimicking j/k or click on article list).
+      act(() => {
+        useArticleStore.setState({ selectedArticle: articleB });
+      });
+
+      rerender(<ReaderPanel nextArticle={articleB} onNavigate={vi.fn()} />);
+
+      const scrollAfter = document.querySelector(
+        "[data-testid='reader-scroll-container']",
+      ) as HTMLDivElement;
+      expect(scrollAfter.scrollTop).toBe(0);
+    });
+
+    it("loading-state scroll container exposes the same testid as the article container", () => {
+      // The reset effect targets a single scroll container by ref. When the
+      // panel is in its loading/empty wrap() path, that container must still
+      // be discoverable so React reuses it across renders. Without a stable
+      // testid both branches share, the user-visible scroll position can leak
+      // across the loading→article transition.
+      useArticleStore.setState({
+        selectedArticle: null,
+        articles: [],
+        isLoading: true,
+      });
+      render(<ReaderPanel nextArticle={articleB} onNavigate={vi.fn()} />);
+      expect(
+        document.querySelector("[data-testid='reader-scroll-container']"),
+      ).not.toBeNull();
+    });
+
+    it("resets reader scroll to top when transitioning from loading to article", () => {
+      // Reproduces GitLab #8 path: loading state renders a scroll container
+      // WITHOUT the ref, then the article arrives and a different scroll
+      // container is mounted. The new container must start at scrollTop 0
+      // even though the previous (refless) one had been scrolled by the user.
+      useArticleStore.setState({
+        selectedArticle: null,
+        articles: [],
+        isLoading: true,
+      });
+
+      const { rerender } = render(
+        <ReaderPanel nextArticle={articleB} onNavigate={vi.fn()} />,
+      );
+
+      // Loading-state scroll container (no ref, in wrap()).
+      const loadingScrollEl = document
+        .querySelectorAll(".overflow-y-auto")[0] as HTMLDivElement | undefined;
+      expect(loadingScrollEl).toBeDefined();
+      // User had scrolled the previous article before this navigation began.
+      loadingScrollEl!.scrollTop = 500;
+
+      // Article arrives.
+      act(() => {
+        useArticleStore.setState({
+          selectedArticle: articleA,
+          articles: [articleA, articleB],
+          isLoading: false,
+        });
+      });
+      rerender(<ReaderPanel nextArticle={articleB} onNavigate={vi.fn()} />);
+
+      const scrollAfter = document.querySelector(
+        "[data-testid='reader-scroll-container']",
+      ) as HTMLDivElement;
+      expect(scrollAfter.scrollTop).toBe(0);
+    });
+  });
+
   describe("mobile navigation pills", () => {
     const nextArt = { ...mockArticle(), id: "a2", title: "Next Article" };
     const prevArt = { ...mockArticle(), id: "a0", title: "Prev Article" };
