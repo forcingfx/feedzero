@@ -1,14 +1,16 @@
 # Contributing to FeedZero
 
+[`CLAUDE.md`](./CLAUDE.md) is the source of truth for how this codebase is developed. This document is a quick-start that links into it — when in doubt, the longer doc wins.
+
 ## Development Workflow
 
 This project follows **Red-Green-Refactor (RGR)** for all code changes:
 
-1. **RED** - Write a failing test first
-2. **GREEN** - Write minimal code to make it pass
-3. **REFACTOR** - Clean up the code (this step is mandatory)
+1. **RED** — Write a failing test first
+2. **GREEN** — Write minimal code to make it pass
+3. **REFACTOR** — Clean up the code (this step is mandatory)
 
-No production code without a failing test. No commit without refactoring.
+No production code without a failing test. No commit without refactoring. The full sequence (PLAN → RED → GREEN → VERIFY → REFACTOR → DOCUMENT) is in [CLAUDE.md → Development Workflow](./CLAUDE.md#development-workflow).
 
 ## Getting Started
 
@@ -82,13 +84,13 @@ UI components subscribe to store slices. Stores call core modules directly. URL 
    npm run test:e2e  # If touching UI
    ```
 
-4. **Write descriptive commits**:
-   - Use conventional prefixes: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`
-   - For bug fixes, include: What (symptom), Why (root cause), Fix (what changed), Prevention (tests added)
+4. **Write descriptive commits**: Conventional prefixes (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`); bug fixes need What / Why / Fix / Prevention. Full rules in [CLAUDE.md → Commit Messages](./CLAUDE.md#commit-messages).
 
-5. **Keep PRs focused**: One feature or fix per PR. Split large changes.
+5. **Open the PR**: The [pull request template](.github/pull_request_template.md) walks through the RGR + smoke-test checklist and the three-entry-point checklist for API changes. Tick the boxes that apply, delete the sections that don't.
 
-6. **Update documentation**: If you changed behavior, update `docs/` to match.
+6. **Keep PRs focused**: One feature or fix per PR. Split large changes.
+
+7. **Update documentation**: If you changed behavior, update `docs/` to match.
 
 ## What We're Looking For
 
@@ -107,7 +109,7 @@ UI components subscribe to store slices. Stores call core modules directly. URL 
 
 ## Reporting security issues
 
-Do not open a public issue for security vulnerabilities. Email `security@feedzero.app` with a description and reproduction steps. We respond within 48 hours and credit you publicly when fixed (with your consent).
+Do not open a public issue for security vulnerabilities. See [SECURITY.md](./SECURITY.md) for the disclosure policy — preferred channel is a private [GitHub Security Advisory](https://github.com/forcingfx/feedzero/security/advisories/new); email `security@feedzero.app` is also accepted.
 
 ## Questions?
 

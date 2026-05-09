@@ -1,0 +1,51 @@
+name: Security discussion
+description: Public discussion of an already-disclosed security issue
+title: "security: "
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **For sensitive disclosures, do not use this template.**
+        > Use https://github.com/forcingfx/feedzero/security/advisories/new instead, or
+        > email security@feedzero.app. See [SECURITY.md](../../SECURITY.md) for the full policy.
+        >
+        > This template is for **public discussion of issues that have already been disclosed**
+        > (e.g. via a published advisory or coordinated release).
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Your best estimate. We may revise after triage.
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What is the issue? What is the impact on FeedZero users?
+    validations:
+      required: true
+
+  - type: input
+    id: affected-versions
+    attributes:
+      label: Affected versions
+      description: Which versions are vulnerable? Visible in Settings.
+      placeholder: 0.9.0 through 0.10.1
+
+  - type: textarea
+    id: poc
+    attributes:
+      label: Proof of concept
+      description: |
+        Optional. A minimal reproduction.
+        **Do not include a working exploit if the issue is not yet patched** — open a private
+        advisory at https://github.com/forcingfx/feedzero/security/advisories/new instead.

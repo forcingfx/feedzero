@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a defect in FeedZero
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more we can reproduce, the faster we can fix.
+
+        For security issues, please **do not** file a public issue — use
+        https://github.com/forcingfx/feedzero/security/advisories/new instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the bug.
+      placeholder: When I clicked "Add feed", the modal closed but the feed never appeared in the sidebar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that let us reproduce the issue.
+      placeholder: |
+        1. Open the app at https://feedzero.app
+        2. Click "Add feed"
+        3. Paste a valid RSS URL
+        4. Click "Add"
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser + version
+      description: e.g. "Firefox 128.0.3 on macOS 14.5"
+      placeholder: Firefox 128.0.3 on macOS 14.5
+
+  - type: input
+    id: reader-version
+    attributes:
+      label: Reader version
+      description: Visible in Settings.
+      placeholder: 0.10.2
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Console errors, screenshots, network logs, anything else useful.

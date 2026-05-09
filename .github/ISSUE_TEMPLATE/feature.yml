@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest a new capability or improvement
+title: "feature: "
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. We prioritise features that solve a clear user need.
+        Vague "would be nice" requests are likely to sit. Specific user needs get attention.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user need does this address? Whose problem is it, and how does it bite them today?
+      placeholder: As a user reading 200+ feeds, I need a way to mute a feed for a week without unsubscribing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Optional. If you have a concrete idea, sketch it out.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. What else did you try, and why does it not work?

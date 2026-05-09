@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/forcingfx/feedzero/security/advisories/new
+    about: For sensitive disclosures, open a private GitHub Security Advisory instead of a public issue.
+  - name: General support
+    url: mailto:support@feedzero.app
+    about: For account, billing, or general help. (Address provisioning may lag this template — see SECURITY.md if it bounces.)

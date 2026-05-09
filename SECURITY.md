@@ -8,17 +8,28 @@ All claims are verifiable from source code. A [source reference table](#source-v
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in FeedZero, please report it responsibly:
+FeedZero is used by journalists, activists, and people living under surveillance. **FeedZero protects people. Act accordingly.** If you find something, please tell us privately — public disclosure of an unpatched flaw can cost real users their safety.
 
-1. **Do not** open a public GitHub issue
-2. Email the maintainers directly (see repository owner's profile for contact info)
-3. Include:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+Two private reporting channels:
 
-We aim to respond within 48 hours and will work with you to understand and address the issue.
+1. **GitHub Security Advisories (preferred):** https://github.com/forcingfx/feedzero/security/advisories/new
+2. **Email:** `security@feedzero.app` (PGP key: TBD — until then, treat the channel as transit-encrypted only and avoid pasting sensitive PoC payloads)
+
+Please **do not** open a public GitHub issue or discuss the issue on social media until a fix has shipped.
+
+Include:
+- A description of the vulnerability and its impact
+- Steps to reproduce (or a minimal PoC)
+- Affected versions if known
+- Any suggested mitigation
+
+We aim to acknowledge within 48 hours and to ship a fix within the disclosure timeline below.
+
+### Disclosure timeline
+
+- **Standard:** 90 days from initial report to public disclosure.
+- **May extend** when user impact requires (e.g. coordinated disclosure with downstream packages, complex remediation, or active exploitation in the wild).
+- We will credit reporters publicly when the fix ships, with your consent.
 
 ## Scope
 
@@ -28,7 +39,8 @@ The following are in scope for security reports:
 |------|----------|
 | **Cryptographic issues** | Weak key derivation, IV reuse, encryption bypass |
 | **XSS vulnerabilities** | Bypassing DOMPurify sanitization, script injection via feeds |
-| **SSRF in proxy** | Bypassing private IP blocking, accessing internal resources |
+| **SSRF in proxy** | Bypassing private IP blocking, accessing internal resources via `/api/feed`, `/api/page`, or `/api/icon` |
+| **Privacy leaks via the proxy** | Logging of feed URLs or user IPs, header leakage to upstream feed publishers |
 | **Data leakage** | Unintended data exposure to server, logging of sensitive data |
 | **Authentication bypass** | Accessing another user's encrypted vault |
 
@@ -36,7 +48,8 @@ The following are **out of scope**:
 
 - Social engineering attacks
 - Physical access attacks (if someone has your device, derived keys in localStorage can decrypt local data — but cannot recover the passphrase or access the cloud vault)
-- Denial of service (the app is client-side; there's no meaningful DoS vector)
+- Volumetric DDoS (mitigated at the edge by Cloudflare; please report to Cloudflare directly)
+- Missing security headers below high severity, where no exploit path is demonstrated
 - Issues in dependencies without a demonstrated exploit path in FeedZero
 
 ---
