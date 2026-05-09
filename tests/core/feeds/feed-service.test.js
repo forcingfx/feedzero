@@ -111,6 +111,16 @@ vi.mock("../../../src/core/storage/db.ts", () => {
       for (const a of arts) articles.set(a.id, a);
       return { ok: true, value: true };
     }),
+    removeArticlesByFeedId: vi.fn(async (feedId) => {
+      let removed = 0;
+      for (const [id, a] of articles.entries()) {
+        if (a.feedId === feedId) {
+          articles.delete(id);
+          removed++;
+        }
+      }
+      return { ok: true, value: removed };
+    }),
     _reset: () => {
       feeds.clear();
       orphanUrls.clear();
@@ -122,7 +132,7 @@ vi.mock("../../../src/core/storage/db.ts", () => {
   };
 });
 
-let addFeedFlow, refreshFeed, refreshAllFeeds;
+let addFeedFlow, refreshFeed, refreshAllFeeds, reloadFeed, previewFeed;
 let db;
 
 beforeEach(async () => {
@@ -135,6 +145,8 @@ beforeEach(async () => {
   addFeedFlow = mod.addFeedFlow;
   refreshFeed = mod.refreshFeed;
   refreshAllFeeds = mod.refreshAllFeeds;
+  reloadFeed = mod.reloadFeed;
+  previewFeed = mod.previewFeed;
 });
 
 describe("feed-service", () => {
@@ -478,6 +490,20 @@ describe("refreshFeed", () => {
     expect(isErr(result)).toBe(true);
     expect(result.error).toMatch(/Failed to fetch/);
   });
+
+  it("should return 'Refresh failed: ...' when fetch throws (outer catch)", async () => {
+    const feed = await addTestFeed();
+
+    // Network throw, not just non-OK — hits the outer catch
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(new Error("connection reset"));
+
+    const result = await refreshFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/Refresh failed/);
+    expect(result.error).toMatch(/connection reset/);
+  });
 });
 
 describe("refreshAllFeeds", () => {
@@ -542,5 +568,237 @@ describe("refreshAllFeeds", () => {
       .slice(0, firstResolveIndex)
       .filter((e) => e === "start").length;
     expect(startCount).toBe(3);
+  });
+
+  it("records per-feed errors when refresh fails for that feed", async () => {
+    // Add a feed
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_XML),
+    });
+    await addFeedFlow("https://example.com/feed.xml");
+
+    // Now make subsequent fetches fail
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+
+    const result = await refreshAllFeeds();
+    expect(isOk(result)).toBe(true);
+    expect(result.value.results).toHaveLength(1);
+    expect(result.value.results[0].error).toMatch(/Failed to fetch/);
+    expect(result.value.results[0].newCount).toBe(0);
+    expect(result.value.results[0].updatedCount).toBe(0);
+  });
+});
+
+// --- previewFeed tests ---
+
+describe("previewFeed", () => {
+  it("returns feed title, siteUrl, and articles without persisting", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_XML),
+    });
+
+    const result = await previewFeed("https://example.com/feed.xml");
+    expect(isOk(result)).toBe(true);
+    const preview = unwrap(result);
+    expect(preview.title).toBe("Example Feed");
+    expect(preview.siteUrl).toBe("https://example.com");
+    expect(preview.articles.length).toBeGreaterThan(0);
+    // Did not persist
+    expect(db.addFeed).not.toHaveBeenCalled();
+    expect(db.addArticles).not.toHaveBeenCalled();
+  });
+
+  it("synthesises summary from content when summary is missing", async () => {
+    // Use a feed where article has content but no summary
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>X</title>
+  <link href="https://x.com" rel="alternate"/>
+  <entry>
+    <title>P</title>
+    <link href="https://x.com/1" rel="alternate"/>
+    <id>tag:x.com,2024:1</id>
+    <content type="html">&lt;p&gt;Some content body that is plain enough for summary fallback.&lt;/p&gt;</content>
+  </entry>
+</feed>`;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(feed),
+    });
+
+    const result = await previewFeed("https://x.com/feed.xml");
+    expect(isOk(result)).toBe(true);
+    const preview = unwrap(result);
+    expect(preview.articles[0].summary).toContain("Some content body");
+  });
+
+  it("returns user-friendly error when fetch responds non-OK", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+    const result = await previewFeed("https://missing.example/feed");
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/could not be reached/i);
+  });
+
+  it("returns user-friendly error when fetch throws", async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(new TypeError("network down"));
+    const result = await previewFeed("https://x.example/feed");
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/could not be reached/i);
+  });
+
+  it("returns user-friendly error when content is not a feed", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve("<html><body>Not a feed</body></html>"),
+    });
+    const result = await previewFeed("https://x.example/page");
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/not a valid feed/i);
+  });
+});
+
+// --- reloadFeed tests ---
+
+describe("reloadFeed", () => {
+  async function addTestFeedForReload() {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_XML),
+    });
+    return unwrap(
+      await addFeedFlow("https://example.com/feed.xml"),
+    ).feed;
+  }
+
+  it("removes existing articles, fetches, parses, and stores fresh", async () => {
+    const feed = await addTestFeedForReload();
+
+    // Confirm we start with 1 stored article
+    expect(db._articles.size).toBe(1);
+
+    // Reload with a different feed payload (2 articles)
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_WITH_TWO),
+    });
+
+    const result = await reloadFeed(feed);
+    expect(isOk(result)).toBe(true);
+    expect(unwrap(result).articleCount).toBe(2);
+
+    expect(db.removeArticlesByFeedId).toHaveBeenCalledWith(feed.id);
+    expect(db.addArticles).toHaveBeenCalled();
+    // Old article gone, two new ones present
+    expect(db._articles.size).toBe(2);
+  });
+
+  it("uses prefetchedContent when provided (no network call)", async () => {
+    const feed = await addTestFeedForReload();
+
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy;
+
+    const result = await reloadFeed(feed, { prefetchedContent: ATOM_WITH_TWO });
+    expect(isOk(result)).toBe(true);
+    expect(unwrap(result).articleCount).toBe(2);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns error when fetch responds non-OK", async () => {
+    const feed = await addTestFeedForReload();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+
+    const result = await reloadFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/Failed to fetch/);
+  });
+
+  it("returns error when parse fails", async () => {
+    const feed = await addTestFeedForReload();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve("<html>Not a feed</html>"),
+    });
+
+    const result = await reloadFeed(feed);
+    expect(isErr(result)).toBe(true);
+  });
+
+  it("returns error when fetch throws (network)", async () => {
+    const feed = await addTestFeedForReload();
+
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("dns fail"));
+
+    const result = await reloadFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/Reload failed/);
+  });
+
+  it("propagates removeArticlesByFeedId failure", async () => {
+    const feed = await addTestFeedForReload();
+
+    db.removeArticlesByFeedId.mockResolvedValueOnce({
+      ok: false,
+      error: "DB write blocked",
+    });
+
+    const result = await reloadFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/DB write blocked/);
+  });
+
+  it("succeeds with zero articles when feed payload has no items", async () => {
+    const feed = await addTestFeedForReload();
+
+    const emptyFeed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Empty</title>
+  <link href="https://example.com" rel="alternate"/>
+</feed>`;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(emptyFeed),
+    });
+
+    const result = await reloadFeed(feed);
+    expect(isOk(result)).toBe(true);
+    expect(unwrap(result).articleCount).toBe(0);
+  });
+
+  it("skips articles with no guid and no link during reload", async () => {
+    const feed = await addTestFeedForReload();
+
+    // Atom without <id> and without <link> for the entry — both guid sources
+    // are empty, so the entry is skipped.
+    const noIds = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>No IDs</title>
+  <link href="https://example.com" rel="alternate"/>
+  <entry>
+    <title>Orphan</title>
+    <summary>No id, no link</summary>
+  </entry>
+  <entry>
+    <title>Has Id</title>
+    <link href="https://example.com/2" rel="alternate"/>
+    <id>tag:example.com,2024:2</id>
+    <content type="html">&lt;p&gt;Body&lt;/p&gt;</content>
+  </entry>
+</feed>`;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(noIds),
+    });
+
+    const result = await reloadFeed(feed);
+    expect(isOk(result)).toBe(true);
+    // Only the entry with an id was kept
+    expect(unwrap(result).articleCount).toBe(1);
   });
 });
