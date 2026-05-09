@@ -131,7 +131,10 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       <ul
         role="listbox"
         aria-label="Articles"
-        className="list-none m-0 p-0 relative"
+        // pb-12 reserves space at the end of the list so the sticky "Mark N
+        // read" pill (h-7 + bottom-3 = ~40px) cannot overlap the last article
+        // when the user scrolls to the bottom. See GitLab #11.
+        className="list-none m-0 p-0 pb-12 relative"
         style={{ height: totalSize }}
       >
         {virtualItems.map((virtualItem) => {
