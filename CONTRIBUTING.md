@@ -13,9 +13,9 @@ No production code without a failing test. No commit without refactoring.
 ## Getting Started
 
 ```bash
-git clone https://github.com/user/feedzero.git
+git clone https://github.com/forcingfx/feedzero.git
 cd feedzero
-npm install
+npm ci
 npm run dev     # Dev server at http://localhost:3000
 npm test        # Run tests
 ```
@@ -23,19 +23,21 @@ npm test        # Run tests
 ## Running Tests
 
 ```bash
-npm test              # All unit/integration tests
+npm test              # All unit/integration tests (~9s)
 npm run test:watch    # Watch mode
-npm run test:coverage # Coverage report (90% threshold enforced)
+npm run test:coverage # Coverage report — thresholds enforced in CI
 npm run test:e2e      # Playwright E2E tests
-npx tsc --noEmit      # Type check
+npx tsc --noEmit      # Type check (strict)
 ```
 
 ## Code Style
 
 - TypeScript strict mode (no `any` except in type declarations for untyped libraries)
-- No ESLint/Prettier - TypeScript compiler is the primary static analysis tool
+- No ESLint/Prettier — TypeScript compiler is the primary static analysis tool
 - Self-documenting code: if you need a comment to explain *what*, rename or extract instead
 - Comments only for *why* (intent, trade-offs, non-obvious decisions)
+
+For the full code-review checklist (clean code rules, naming, function size, structure, code smells), see the **Clean Code rules** section of [`CLAUDE.md`](./CLAUDE.md). It is the source of truth for engineering style on this project.
 
 ## Architecture Guidelines
 
@@ -102,6 +104,10 @@ UI components subscribe to store slices. Stores call core modules directly. URL 
 - Analytics, telemetry, or tracking of any kind
 - Dependencies that make network calls without user action
 - UI redesigns without prior discussion
+
+## Reporting security issues
+
+Do not open a public issue for security vulnerabilities. Email `security@feedzero.app` with a description and reproduction steps. We respond within 48 hours and credit you publicly when fixed (with your consent).
 
 ## Questions?
 
