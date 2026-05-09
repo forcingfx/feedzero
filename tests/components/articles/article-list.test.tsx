@@ -185,6 +185,33 @@ describe("ArticleList", () => {
     expect(scrollToSpy).not.toHaveBeenCalled();
   });
 
+  it("reserves bottom space inside the scroll container so the sticky 'Mark N read' pill does not overlap the last article", () => {
+    // The pill is `sticky bottom-3` with height `h-7`. Without bottom padding
+    // on the list, the last article sits flush against the pill at the end
+    // of the scroll container — that's GitLab #11. Reserving padding equal
+    // to or greater than the pill's height + offset keeps them apart.
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [
+        mockArticle("a1", "First", false),
+        mockArticle("a2", "Second", false),
+      ],
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    const { container } = render(<ArticleList />);
+    const list = container.querySelector('ul[role="listbox"]');
+    expect(list).not.toBeNull();
+    // pb-12 = 48px ≥ pill height (h-7 = 28px) + bottom offset (bottom-3 = 12px).
+    expect(list!.className).toContain("pb-12");
+  });
+
   it("shows read/unread styling", () => {
     useFeedStore.setState({
       feeds: [],
