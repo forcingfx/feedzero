@@ -1,0 +1,101 @@
+import { describe, it, expect } from "vitest";
+import {
+  MemoryLicenseStorage,
+  type LicenseRecord,
+  type LicenseStorage,
+} from "../../../src/core/license/storage";
+import { isOk } from "../../../src/utils/result";
+
+/**
+ * Build a sample LicenseRecord for tests. Defaults are intentionally boring
+ * so each test can override only the field it cares about.
+ */
+function makeRecord(overrides: Partial<LicenseRecord> = {}): LicenseRecord {
+  const now = 1_700_000_000;
+  return {
+    keyId: "lic_test_001",
+    customerId: "cus_test_001",
+    tier: "personal",
+    status: "active",
+    issuedAtSec: now,
+    expirySec: now + 60 * 60 * 24 * 365,
+    updatedAtSec: now,
+    ...overrides,
+  };
+}
+
+/**
+ * Shared contract suite. Re-used for any LicenseStorage implementation —
+ * runs against MemoryLicenseStorage today, will run against
+ * VercelKVLicenseStorage once KV credentials are wired in CI.
+ */
+export function runStorageContractTests(
+  name: string,
+  makeStorage: () => LicenseStorage,
+): void {
+  describe(name, () => {
+    it("put then get returns the same record", async () => {
+      const storage = makeStorage();
+      const record = makeRecord();
+
+      await storage.put(record);
+      const result = await storage.get(record.keyId);
+
+      expect(isOk(result) && result.value).toEqual(record);
+    });
+
+    it("get for unknown keyId returns ok(null), not an error", async () => {
+      const storage = makeStorage();
+
+      const result = await storage.get("lic_does_not_exist");
+
+      expect(isOk(result) && result.value).toBeNull();
+    });
+
+    it("revoke is idempotent and isRevoked stays true", async () => {
+      const storage = makeStorage();
+      const keyId = "lic_revoke_twice";
+
+      await storage.revoke(keyId, "leak");
+      const second = await storage.revoke(keyId, "leak again");
+      const revoked = await storage.isRevoked(keyId);
+
+      expect(isOk(second) && isOk(revoked) && revoked.value).toBe(true);
+    });
+
+    it("isRevoked returns false for never-revoked keyIds", async () => {
+      const storage = makeStorage();
+
+      const result = await storage.isRevoked("lic_never_seen");
+
+      expect(isOk(result) && result.value).toBe(false);
+    });
+
+    it("revoke does not delete the underlying record", async () => {
+      const storage = makeStorage();
+      const record = makeRecord({ keyId: "lic_audit_trail" });
+      await storage.put(record);
+
+      await storage.revoke(record.keyId, "audit-trail-test");
+      const fetched = await storage.get(record.keyId);
+
+      expect(isOk(fetched) && fetched.value).toEqual(record);
+    });
+
+    it("put does not clear the deny-list for a previously revoked keyId", async () => {
+      const storage = makeStorage();
+      const record = makeRecord({ keyId: "lic_one_way_revoke" });
+      await storage.revoke(record.keyId, "leak");
+
+      await storage.put(record);
+      const revoked = await storage.isRevoked(record.keyId);
+
+      expect(isOk(revoked) && revoked.value).toBe(true);
+    });
+  });
+}
+
+runStorageContractTests(
+  "MemoryLicenseStorage",
+  () => new MemoryLicenseStorage(),
+);
