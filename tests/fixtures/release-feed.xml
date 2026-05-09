@@ -35,7 +35,7 @@
 <ul>
   <li>Added a persistent swipeable bottom drawer on mobile that replaces the offcanvas sidebar. The drawer handle is always visible at the bottom of the screen and shows the current feed name; tapping or swiping up reveals the full feed list, folders, All items, Explore, and Settings.</li>
   <li>Added a bottom sheet feed switcher on mobile. The active feed name in the bottom drawer doubles as a switcher: a tap opens a sheet with all feeds and folders.</li>
-  <li>Added a public stats page at &lt;code&gt;/stats&lt;/code&gt;. Shows total vaults, total feeds tracked, and the top 100 feeds by request volume. No accounts, no personal data, no login.</li>
+  <li>Added a public stats page at <code>/stats</code>. Shows total vaults, total feeds tracked, and the top 100 feeds by request volume. No accounts, no personal data, no login.</li>
   <li>Added automatic color assignment for new folders. Created folders now get a distinct color from the eight-color palette without an extra picker step.</li>
   <li>Added the full settings menu inline in the mobile bottom drawer. Cloud sync, Auto-organize, Keyboard shortcuts, Send feedback, and What's new are all reachable without opening a separate dropdown.</li>
 </ul>
@@ -47,7 +47,7 @@
 </ul>
 <h3>Fixed</h3>
 <ul>
-  <li>Fixed the article list jumping unexpectedly when clicking an already-visible article. The virtualizer no longer re-anchors on click-driven selection changes; keyboard &lt;kbd&gt;j&lt;/kbd&gt;/&lt;kbd&gt;k&lt;/kbd&gt; still scroll the selected article into view.</li>
+  <li>Fixed the article list jumping unexpectedly when clicking an already-visible article. The virtualizer no longer re-anchors on click-driven selection changes; keyboard <kbd>j</kbd>/<kbd>k</kbd> still scroll the selected article into view.</li>
   <li>Fixed the mobile bottom drawer overflowing horizontally on viewports with safe-area insets. The drawer now respects the iOS Dynamic Island and notch in all orientations.</li>
   <li>Fixed desktop reader navigation pills clipping long article titles. The pills now share the available width and grow to fit instead of letting text overflow.</li>
   <li>Fixed the folder title toggle in the sidebar collapsing the folder when clicked. Selecting a feed inside a folder on mobile now snaps back to the article list as expected.</li>
@@ -66,7 +66,7 @@
 <h3>Added</h3>
 <ul>
   <li>Added a three-panel resizable desktop layout. The sidebar, article list, and reader are now independently draggable columns.</li>
-  <li>Added prev/next navigation pills pinned to the bottom of the reader panel. The pills are always visible regardless of scroll position and show &lt;kbd&gt;k&lt;/kbd&gt;/&lt;kbd&gt;j&lt;/kbd&gt; keyboard hints.</li>
+  <li>Added prev/next navigation pills pinned to the bottom of the reader panel. The pills are always visible regardless of scroll position and show <kbd>k</kbd>/<kbd>j</kbd> keyboard hints.</li>
   <li>Added pull-to-advance gesture on mobile. Scrolling past the end of an article advances to the next; pulling down from the top goes back.</li>
   <li>Added folder color customization. An eight-color swatch picker in the folder context menu tints the sidebar label and applies a colored background to folder items.</li>
   <li>Added auto-organize. The wand button near New Folder groups existing feeds into topic folders using a built-in keyword ruleset.</li>
@@ -74,8 +74,8 @@
 </ul>
 <h3>Changed</h3>
 <ul>
-  <li>Article titles in the reader panel are now links to the original URL. The external-link icon in the meta line shows an &lt;kbd&gt;o&lt;/kbd&gt; shortcut hint on hover.</li>
-  <li>The Feed/Full text mode selector is now a compact inline pill control, reducing vertical space. The &lt;kbd&gt;h&lt;/kbd&gt; shortcut hint is in a hover tooltip.</li>
+  <li>Article titles in the reader panel are now links to the original URL. The external-link icon in the meta line shows an <kbd>o</kbd> shortcut hint on hover.</li>
+  <li>The Feed/Full text mode selector is now a compact inline pill control, reducing vertical space. The <kbd>h</kbd> shortcut hint is in a hover tooltip.</li>
   <li>The article list is now virtualized. Scrolling through All Items with hundreds of articles no longer causes layout jank.</li>
   <li>The desktop breakpoint was lowered from 1024px to 768px so tablet-sized windows use the multi-panel layout.</li>
   <li>Publisher boilerplate phrases (&quot;Read more at&quot;, &quot;Continue reading&quot;, etc.) are stripped from feed content before display.</li>

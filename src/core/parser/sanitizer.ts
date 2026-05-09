@@ -33,6 +33,7 @@ const PURIFY_CONFIG = {
     "blockquote",
     "pre",
     "code",
+    "kbd",
     "table",
     "thead",
     "tbody",

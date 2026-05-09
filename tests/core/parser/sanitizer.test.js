@@ -94,4 +94,11 @@ describe("Sanitizer", () => {
     expect(result).not.toContain("onload");
     expect(result).not.toContain("svg");
   });
+
+  it("should preserve <kbd> elements (technical content uses these)", () => {
+    const html = "<p>Press <kbd>j</kbd>/<kbd>k</kbd> to navigate.</p>";
+    const result = sanitize(html);
+    expect(result).toContain("<kbd>j</kbd>");
+    expect(result).toContain("<kbd>k</kbd>");
+  });
 });
