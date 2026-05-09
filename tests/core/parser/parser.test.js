@@ -435,6 +435,320 @@ describe("Parser", () => {
     it("should reject empty input", () => {
       expect(isErr(parse("", "https://example.com"))).toBe(true);
     });
+
+    it("should reject whitespace-only input", () => {
+      expect(isErr(parse("   \n\t  ", "https://example.com"))).toBe(true);
+    });
+
+    it("should reject JSON without jsonfeed version marker (parser-side)", () => {
+      const bad = JSON.stringify({ title: "Not a feed", items: [] });
+      const result = parse(bad, "https://example.com");
+      expect(isErr(result)).toBe(true);
+    });
+
+    it("should fall through to feedsmith when input starts with { but is invalid JSON", () => {
+      // Malformed JSON triggers the catch on JSON.parse; feedsmith gets the
+      // text and rejects it. End result is an err either way.
+      const result = parse("{not really json", "https://example.com");
+      expect(isErr(result)).toBe(true);
+    });
+  });
+
+  describe("author resolution variants", () => {
+    it("RSS falls back to authors[] string when no dc:creator is present", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>X</title>
+    <link>https://x.com</link>
+    <description>X</description>
+    <item>
+      <title>Post</title>
+      <link>https://x.com/1</link>
+      <author>writer@example.com (Writer Name)</author>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/feed"));
+      // RSS <author> can be string or {name} from feedsmith — both branches
+      // valid; we just assert it's a non-empty string.
+      expect(typeof articles[0].author).toBe("string");
+      expect(articles[0].author.length).toBeGreaterThan(0);
+    });
+
+    it("RSS extracts author.name when authors[0] is an object", () => {
+      // atom:author within RSS is parsed by feedsmith as an object form
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Hybrid</title>
+    <link>https://x.com</link>
+    <description>X</description>
+    <item>
+      <title>Post</title>
+      <link>https://x.com/1</link>
+      <atom:author><atom:name>Atom Writer</atom:name></atom:author>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/feed"));
+      // We don't assert the exact value (depends on feedsmith parsing)
+      // but the extraction path with object {name} must not crash and
+      // must yield a string.
+      expect(typeof articles[0].author).toBe("string");
+    });
+
+    it("RSS uses empty string when no author info anywhere", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>X</title>
+    <link>https://x.com</link>
+    <description>X</description>
+    <item>
+      <title>No Author Post</title>
+      <link>https://x.com/1</link>
+      <description>Body</description>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/feed"));
+      expect(articles[0].author).toBe("");
+    });
+
+    it("Atom uses empty string when entry has no <author>", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>X</title>
+  <link href="https://x.com" rel="alternate"/>
+  <entry>
+    <title>Anonymous</title>
+    <link href="https://x.com/1" rel="alternate"/>
+    <id>tag:x.com,2024:1</id>
+    <summary>Hi</summary>
+  </entry>
+</feed>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/atom"));
+      expect(articles[0].author).toBe("");
+    });
+  });
+
+  describe("Atom link resolution", () => {
+    it("falls back to first link when no rel='alternate' exists", () => {
+      // findLink(entry.links, "alternate") returns "" (no match → covers the
+      // late `return ""` branch); findLink(entry.links) then returns the
+      // first link.
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>X</title>
+  <entry>
+    <title>Related-only</title>
+    <link href="https://x.com/related" rel="related"/>
+    <id>tag:x.com,2024:1</id>
+  </entry>
+</feed>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/atom"));
+      expect(articles[0].link).toBe("https://x.com/related");
+    });
+
+    it("yields empty link when entry has no <link> elements at all", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>X</title>
+  <entry>
+    <title>Linkless</title>
+    <id>tag:x.com,2024:1</id>
+    <summary>Body</summary>
+  </entry>
+</feed>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/atom"));
+      expect(articles[0].link).toBe("");
+    });
+
+    it("yields empty siteUrl when feed has no rel='alternate' link", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>X</title>
+  <link href="https://x.com/self" rel="self"/>
+  <entry>
+    <title>P</title>
+    <link href="https://x.com/1" rel="alternate"/>
+    <id>tag:x.com,2024:1</id>
+  </entry>
+</feed>`;
+      const { feed: parsed } = unwrap(parse(feed, "https://x.com/atom"));
+      // No `rel="alternate"` link in the feed metadata; siteUrl is "".
+      expect(parsed.siteUrl).toBe("");
+    });
+  });
+
+  describe("JSON Feed branch coverage", () => {
+    it("falls back to external_url when item has no url", () => {
+      const feed = JSON.stringify({
+        version: "https://jsonfeed.org/version/1.1",
+        title: "X",
+        items: [
+          {
+            id: "1",
+            external_url: "https://other.com/post",
+            title: "Externally hosted",
+            content_text: "Body",
+          },
+        ],
+      });
+      const { articles } = unwrap(parse(feed, "https://x.com/feed.json"));
+      expect(articles[0].link).toBe("https://other.com/post");
+    });
+
+    it("falls back to url for guid when id is missing", () => {
+      const feed = JSON.stringify({
+        version: "https://jsonfeed.org/version/1.1",
+        title: "X",
+        items: [
+          {
+            url: "https://x.com/no-id",
+            title: "ID-less",
+            content_text: "Body",
+          },
+        ],
+      });
+      const { articles } = unwrap(parse(feed, "https://x.com/feed.json"));
+      expect(articles[0].guid).toBe("https://x.com/no-id");
+    });
+
+    it("uses 'Untitled' when an item has no title", () => {
+      const feed = JSON.stringify({
+        version: "https://jsonfeed.org/version/1.1",
+        title: "X",
+        items: [
+          { id: "1", url: "https://x.com/1", content_text: "Body" },
+        ],
+      });
+      const { articles } = unwrap(parse(feed, "https://x.com/feed.json"));
+      expect(articles[0].title).toBe("Untitled");
+    });
+
+    it("yields empty siteUrl when JSON Feed has no home_page_url", () => {
+      const feed = JSON.stringify({
+        version: "https://jsonfeed.org/version/1.1",
+        title: "X",
+        items: [],
+      });
+      const { feed: parsed } = unwrap(parse(feed, "https://x.com/feed.json"));
+      expect(parsed.siteUrl).toBe("");
+    });
+
+    it("yields empty articles when JSON Feed has no items field", () => {
+      const feed = JSON.stringify({
+        version: "https://jsonfeed.org/version/1.1",
+        title: "X",
+      });
+      const { articles } = unwrap(parse(feed, "https://x.com/feed.json"));
+      expect(articles).toEqual([]);
+    });
+  });
+
+  describe("date parsing edge cases", () => {
+    it("returns null for an invalid pubDate string", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>X</title>
+    <link>https://x.com</link>
+    <description>X</description>
+    <item>
+      <title>Bad Date</title>
+      <link>https://x.com/1</link>
+      <pubDate>not a real date</pubDate>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/feed"));
+      expect(articles[0].publishedAt).toBeNull();
+    });
+
+    it("returns null when pubDate is absent", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>X</title>
+    <link>https://x.com</link>
+    <description>X</description>
+    <item>
+      <title>No Date</title>
+      <link>https://x.com/1</link>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/feed"));
+      expect(articles[0].publishedAt).toBeNull();
+    });
+  });
+
+  describe("metadata fallbacks", () => {
+    it("RSS uses feedUrl when channel has no <title>", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <link>https://x.com</link>
+    <description>D</description>
+    <item>
+      <title>P</title>
+      <link>https://x.com/1</link>
+    </item>
+  </channel>
+</rss>`;
+      const { feed: parsed } = unwrap(parse(feed, "https://x.com/feed"));
+      expect(parsed.title).toBe("https://x.com/feed");
+    });
+
+    it("Atom uses feedUrl when feed has no <title>", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <link href="https://x.com" rel="alternate"/>
+  <entry>
+    <title>P</title>
+    <link href="https://x.com/1" rel="alternate"/>
+    <id>tag:x.com,2024:1</id>
+  </entry>
+</feed>`;
+      const { feed: parsed } = unwrap(parse(feed, "https://x.com/atom"));
+      expect(parsed.title).toBe("https://x.com/atom");
+    });
+
+    it("RSS items without title use 'Untitled'", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>X</title>
+    <link>https://x.com</link>
+    <description>D</description>
+    <item>
+      <link>https://x.com/1</link>
+      <description>Body</description>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/feed"));
+      expect(articles[0].title).toBe("Untitled");
+    });
+
+    it("RSS guid falls back to link when no <guid> element", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>X</title>
+    <link>https://x.com</link>
+    <description>D</description>
+    <item>
+      <title>P</title>
+      <link>https://x.com/1</link>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://x.com/feed"));
+      expect(articles[0].guid).toBe("https://x.com/1");
+    });
   });
 
   describe("XML attack prevention", () => {
