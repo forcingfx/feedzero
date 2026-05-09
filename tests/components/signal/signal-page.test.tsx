@@ -22,7 +22,6 @@ import { SignalPage } from "../../../src/components/signal/signal-page.tsx";
 import {
   useSignalStore,
   type ResolvedTopStory,
-  type ResolvedSwimlane,
 } from "../../../src/stores/signal-store.ts";
 import { useFeedStore } from "../../../src/stores/feed-store.ts";
 import type { Feed, Article } from "../../../src/types";
@@ -40,17 +39,25 @@ const ART_A: Article = {
 };
 const ART_B: Article = { ...ART_A, id: "x2", feedId: "f2", title: "T2", link: "https://b.example.com/x2" };
 
-const STORY: ResolvedTopStory = {
+const HERO: ResolvedTopStory = {
   id: "x1|x2",
-  headline: "Top headline",
-  blurb: "Blurb.",
+  headline: "Hero headline",
+  blurb: "Hero blurb.",
   articles: [ART_A, ART_B],
 };
 
-const SWIMLANE: ResolvedSwimlane = {
-  id: "lane-id",
-  title: "Iran War",
-  articles: [ART_A, ART_B],
+const SECOND: ResolvedTopStory = {
+  id: "x2",
+  headline: "Second story",
+  blurb: "Second blurb.",
+  articles: [ART_B],
+};
+
+const THIRD: ResolvedTopStory = {
+  id: "x1",
+  headline: "Third story",
+  blurb: "Third blurb.",
+  articles: [ART_A],
 };
 
 function renderPage(initialPath = "/signal") {
@@ -74,7 +81,6 @@ describe("SignalPage", () => {
       apiKey: null,
       status: "idle",
       topStories: [],
-      swimlanes: [],
       generatedAt: null,
       error: null,
       init: () => {},
@@ -120,41 +126,32 @@ describe("SignalPage", () => {
     expect(await screen.findByText(/nothing to surface/i)).toBeInTheDocument();
   });
 
-  it("renders top stories in the masonry section", async () => {
+  it("renders #1 as the hero and #2+ as numbered list items", async () => {
     localStorage.setItem("feedzero:llm-key", "sk-test");
     useSignalStore.setState({
       apiKey: "sk-test",
       status: "ready",
-      topStories: [STORY],
-      swimlanes: [],
+      topStories: [HERO, SECOND, THIRD],
     });
     renderPage();
-    expect(await screen.findByText("Top headline")).toBeInTheDocument();
+    // Hero renders its headline
+    expect(await screen.findByText("Hero headline")).toBeInTheDocument();
+    // Listicle items render their numbers
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Second story")).toBeInTheDocument();
+    expect(screen.getByText("Third story")).toBeInTheDocument();
+    // Hero does NOT get a "1" label — its rank is implicit in the layout
+    expect(screen.queryByText(/^1$/)).toBeNull();
   });
 
-  it("renders swimlanes with title and article cards", async () => {
-    localStorage.setItem("feedzero:llm-key", "sk-test");
-    useSignalStore.setState({
-      apiKey: "sk-test",
-      status: "ready",
-      topStories: [],
-      swimlanes: [SWIMLANE],
-    });
-    renderPage();
-    expect(await screen.findByText("Iran War")).toBeInTheDocument();
-    // Each underlying article appears as its own card.
-    expect(screen.getByText("T1")).toBeInTheDocument();
-    expect(screen.getByText("T2")).toBeInTheDocument();
-  });
-
-  it("clicking a multi-article top story opens an article chooser dialog", async () => {
+  it("clicking a multi-article hero opens an article chooser dialog", async () => {
     const user = userEvent.setup();
     localStorage.setItem("feedzero:llm-key", "sk-test");
     useSignalStore.setState({
       apiKey: "sk-test",
       status: "ready",
-      topStories: [STORY],
-      swimlanes: [],
+      topStories: [HERO],
     });
     renderPage();
     await user.click(await screen.findByRole("article"));
@@ -163,18 +160,18 @@ describe("SignalPage", () => {
     expect(within(chooser).getByText("T2")).toBeInTheDocument();
   });
 
-  it("clicking a swimlane card navigates directly to that article", async () => {
+  it("clicking a single-article list item navigates to the article", async () => {
     const user = userEvent.setup();
     localStorage.setItem("feedzero:llm-key", "sk-test");
     useSignalStore.setState({
       apiKey: "sk-test",
       status: "ready",
-      topStories: [],
-      swimlanes: [SWIMLANE],
+      topStories: [HERO, SECOND],
     });
     renderPage();
-    const card = (await screen.findAllByRole("article"))[0];
-    await user.click(card);
+    const articles = await screen.findAllByRole("article");
+    // Click the second one (the list-item, single article → direct navigation)
+    await user.click(articles[1]);
     expect(screen.getByTestId("article-route")).toBeInTheDocument();
   });
 
@@ -185,8 +182,7 @@ describe("SignalPage", () => {
     useSignalStore.setState({
       apiKey: "sk-test",
       status: "ready",
-      topStories: [STORY],
-      swimlanes: [],
+      topStories: [HERO],
       init: () => {},
       loadFrontpage,
     });

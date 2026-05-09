@@ -13,10 +13,8 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { decodeEntities } from "@/lib/decode-entities.ts";
-import { extractImage } from "@/lib/extract-image.ts";
 import { formatRelative } from "@/lib/format-relative.ts";
-import { SignalCard, type SignalCardVariant } from "./signal-card.tsx";
-import { SwimlaneCard } from "./swimlane-card.tsx";
+import { SignalCard } from "./signal-card.tsx";
 import type { Article, Feed } from "@/types/index.ts";
 
 export function SignalPage() {
@@ -24,7 +22,6 @@ export function SignalPage() {
   const apiKey = useSignalStore((s) => s.apiKey);
   const status = useSignalStore((s) => s.status);
   const topStories = useSignalStore((s) => s.topStories);
-  const swimlanes = useSignalStore((s) => s.swimlanes);
   const error = useSignalStore((s) => s.error);
   const init = useSignalStore((s) => s.init);
   const loadFrontpage = useSignalStore((s) => s.loadFrontpage);
@@ -53,7 +50,7 @@ export function SignalPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 md:py-10">
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10">
       <header className="mb-6 flex items-center gap-2">
         <Sparkles className="size-5 text-primary" />
         <h1 className="text-xl font-semibold">Signal</h1>
@@ -70,10 +67,8 @@ export function SignalPage() {
         status={status}
         error={error}
         topStories={topStories}
-        swimlanes={swimlanes}
         feedMap={feedMap}
         onOpenStory={openStory}
-        onOpenArticle={openArticle}
       />
 
       <ClusterChooser
@@ -91,116 +86,41 @@ function Body({
   status,
   error,
   topStories,
-  swimlanes,
   feedMap,
   onOpenStory,
-  onOpenArticle,
 }: {
   apiKey: string | null;
   status: ReturnType<typeof useSignalStore.getState>["status"];
   error: string | null;
   topStories: ReturnType<typeof useSignalStore.getState>["topStories"];
-  swimlanes: ReturnType<typeof useSignalStore.getState>["swimlanes"];
   feedMap: Record<string, Feed>;
   onOpenStory: (s: ResolvedTopStory) => void;
-  onOpenArticle: (a: Article) => void;
 }) {
   if (!apiKey) return <NoKeyEmptyState />;
   if (status === "loading" || status === "idle") return <LoadingState feedMap={feedMap} />;
   if (status === "error") return <GenerationErrorState error={error} />;
   if (status === "no-content") return <NoContentEmptyState />;
 
+  const [hero, ...rest] = topStories;
   return (
-    <>
-      {topStories.length > 0 && (
-        <div data-testid="cluster-masonry" className="columns-1 md:columns-3 gap-3 [column-fill:balance]">
-          {orderForMasonry(topStories).map((story, index) => {
-            const variant: SignalCardVariant = pickVariant(story, index);
-            const card = (
-              <SignalCard
-                story={story}
-                feeds={feedMap}
-                variant={variant}
-                onOpen={onOpenStory}
-              />
-            );
-            if (variant === "hero") {
-              return (
-                <div
-                  key={story.id}
-                  data-testid="hero-wrapper"
-                  className="mb-3 break-inside-avoid"
-                  style={{ columnSpan: "all" }}
-                >
-                  {card}
-                </div>
-              );
-            }
-            return (
-              <div key={story.id} className="mb-3 break-inside-avoid">
-                {card}
-              </div>
-            );
-          })}
+    <div data-testid="signal-list">
+      {hero && (
+        <div className="mb-2">
+          <SignalCard story={hero} feeds={feedMap} variant="hero" rank={1} onOpen={onOpenStory} />
         </div>
       )}
-
-      {swimlanes.length > 0 && (
-        <div className="mt-8 space-y-6">
-          {swimlanes.map((lane) => (
-            <section key={lane.id} data-testid="swimlane">
-              <h2 className="text-lg font-semibold tracking-tight mb-3 px-1">
-                {lane.title}
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  · {lane.articles.length}
-                </span>
-              </h2>
-              {lane.description && (
-                <p className="text-sm text-muted-foreground mb-3 px-1">
-                  {lane.description}
-                </p>
-              )}
-              <div
-                className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4"
-                style={{ scrollbarWidth: "thin" }}
-              >
-                {lane.articles.map((article) => (
-                  <SwimlaneCard
-                    key={article.id}
-                    article={article}
-                    feed={feedMap[article.feedId]}
-                    onOpen={onOpenArticle}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
-    </>
+      {rest.map((story, i) => (
+        <SignalCard
+          key={story.id}
+          story={story}
+          feeds={feedMap}
+          variant="list-item"
+          rank={i + 2}
+          onOpen={onOpenStory}
+        />
+      ))}
+    </div>
   );
-}
-
-function pickVariant(story: ResolvedTopStory, index: number): SignalCardVariant {
-  if (index === 0) return "hero";
-  return storyHasImage(story) ? "tile" : "brief";
-}
-
-function orderForMasonry(stories: ResolvedTopStory[]): ResolvedTopStory[] {
-  if (stories.length < 2) return stories;
-  if (storyHasImage(stories[0])) return stories;
-  const idx = stories.findIndex(storyHasImage);
-  if (idx <= 0) return stories;
-  const reordered = [...stories];
-  [reordered[0], reordered[idx]] = [reordered[idx], reordered[0]];
-  return reordered;
-}
-
-function storyHasImage(story: ResolvedTopStory): boolean {
-  for (const article of story.articles) {
-    if (extractImage(article)) return true;
-  }
-  return false;
 }
 
 function indexFeeds(feeds: Feed[]): Record<string, Feed> {

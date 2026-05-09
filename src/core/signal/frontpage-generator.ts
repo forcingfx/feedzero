@@ -1,17 +1,17 @@
 import { ok, err, type Result } from "../../utils/result.ts";
 import type { Article, Feed, Folder } from "../../types";
 import {
-  SIGNAL_SWIMLANES_TARGET,
   SIGNAL_TOP_STORIES_TARGET,
   type Frontpage,
   type FrontpageStory,
-  type Swimlane,
 } from "./types.ts";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 3000;
+// Headroom for ~10 ranked stories with multi-id arrays. 4000 leaves slack
+// for long article ids without inviting the model to ramble.
+const MAX_TOKENS = 4000;
 const TITLE_CHAR_BUDGET = 200;
 const SUMMARY_CHAR_BUDGET = 220;
 const UNFILED_LABEL = "Unfiled";
@@ -22,8 +22,9 @@ export interface FrontpageContext {
 }
 
 /**
- * One LLM call produces both the top stories (for the masonry) and the
- * swimlanes (topical lanes below). Browser-direct, BYO Anthropic key.
+ * One LLM call ranks the day's reading into a top-N list. The first item is
+ * the hero on the page; the rest render as a numbered listicle. Browser-direct,
+ * BYO Anthropic key.
  */
 export async function generateFrontpage(
   articles: Article[],
@@ -74,12 +75,16 @@ export async function generateFrontpage(
   if (!text) return err("Anthropic returned no text content");
 
   const parsed = extractJsonObject(text);
-  if (!parsed) return err("Anthropic response was not valid JSON");
+  if (!parsed) {
+    if (wasTruncated(body)) {
+      return err("Anthropic response was cut off — try again");
+    }
+    return err("Anthropic response was not valid JSON");
+  }
 
   const knownIds = new Set(articles.map((a) => a.id));
   return ok({
     topStories: extractTopStories(parsed, knownIds),
-    swimlanes: extractSwimlanes(parsed, knownIds),
   });
 }
 
@@ -112,19 +117,17 @@ function buildPrompt(
   return [
     `You are an editor for a personal news magazine. Today is ${today}. The reader has organized their feed subscriptions into topical folders. Build a frontpage from the recent articles below.`,
     "",
-    "The frontpage has TWO parts:",
-    `1. **Top stories** (${SIGNAL_TOP_STORIES_TARGET} stories): the most important things happening right now. Each is a magazine-style headline + one-sentence blurb that synthesizes coverage from one or more outlets. Strong preference for multi-source events, but include a single-source story if it's clearly significant.`,
-    `2. **Swimlanes** (${SIGNAL_SWIMLANES_TARGET} lanes): topical clusters with their own short title (e.g. "Iran War", "Apple M5 launch", "UK politics"). Each lane lists 4-8 article ids that fit the theme. The reader will swipe through them.`,
+    `Produce a ranked top ${SIGNAL_TOP_STORIES_TARGET} list — the most important and noteworthy stories from this reader's sources. Each item is a magazine-style headline + one-sentence blurb that synthesizes coverage from one or more outlets. Item #1 is the lead story, so prefer one with strong visual impact (multi-source events tend to qualify). Items below are ranked by importance.`,
     "",
     "Recency rules (these are first-class — a stale story does not deserve the front page):",
     `- Strongly prefer articles from the last 24 hours.`,
     `- A story from 2+ days ago should appear only if it's still actively developing or genuinely consequential.`,
-    `- Top stories MUST be from today or yesterday.`,
+    `- Items #1 through #3 MUST be from today or yesterday.`,
     "",
     "Diversity rules (the magazine should reflect the reader's full set of interests):",
     `- The reader's articles span these folders: ${listFolders(folderCount)}.`,
-    "- Aim for at least one top story or swimlane from each folder that has meaningful content.",
-    "- Don't let any single folder dominate top stories: at most 3 of the top stories from any one folder.",
+    "- Aim for at least one item from each folder that has meaningful content.",
+    "- Don't let any single folder dominate: at most 4 of the 10 items from any one folder.",
     "- Tech, hobby, and niche stories are valuable — don't default to international news.",
     "",
     "Quality rules:",
@@ -132,14 +135,12 @@ function buildPrompt(
     "- Don't invent article ids. Only use ids that appear in the list.",
     "- Headlines: 8 words or fewer, no clickbait, no trailing punctuation.",
     "- Blurbs: a single factual, neutral sentence of 25 words or fewer.",
-    "- Swimlane titles: 1-4 words, descriptive, no punctuation.",
-    "- An article can appear in both a top story and a swimlane; that's fine.",
-    "- An article can be in at most one swimlane.",
+    "- An article can appear in at most one item.",
     "",
     "Articles (each line: id, source, folder, publish date, title, optional summary):",
     ...lines,
     "",
-    'Respond with ONLY valid JSON in this shape: {"topStories":[{"headline":"...","blurb":"...","articleIds":["..."]}],"swimlanes":[{"title":"...","description":"optional","articleIds":["..."]}]}.',
+    'Respond with ONLY valid JSON in this shape: {"topStories":[{"headline":"...","blurb":"...","articleIds":["..."]}]}.',
   ].join("\n");
 }
 
@@ -174,6 +175,11 @@ function friendlyStatusError(status: number): string {
 interface AnthropicTextBlock {
   type: string;
   text?: string;
+}
+
+function wasTruncated(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  return (body as { stop_reason?: string }).stop_reason === "max_tokens";
 }
 
 function extractTextBlock(body: unknown): string | null {
@@ -217,29 +223,6 @@ function extractTopStories(
       : [];
     if (!headline || !blurb || ids.length === 0) continue;
     out.push({ headline, blurb, articleIds: ids });
-  }
-  return out;
-}
-
-function extractSwimlanes(
-  payload: Record<string, unknown>,
-  knownIds: Set<string>,
-): Swimlane[] {
-  const raw = payload.swimlanes;
-  if (!Array.isArray(raw)) return [];
-  const out: Swimlane[] = [];
-  for (const entry of raw) {
-    if (!entry || typeof entry !== "object") continue;
-    const e = entry as Record<string, unknown>;
-    const title = typeof e.title === "string" ? e.title.trim() : "";
-    const description = typeof e.description === "string" ? e.description.trim() : undefined;
-    const ids = Array.isArray(e.articleIds)
-      ? (e.articleIds as unknown[])
-          .filter((x): x is string => typeof x === "string")
-          .filter((x) => knownIds.has(x))
-      : [];
-    if (!title || ids.length === 0) continue;
-    out.push(description ? { title, description, articleIds: ids } : { title, articleIds: ids });
   }
   return out;
 }

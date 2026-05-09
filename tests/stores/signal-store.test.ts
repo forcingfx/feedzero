@@ -55,7 +55,6 @@ function resetSignalStore(): void {
     apiKey: null,
     status: "idle",
     topStories: [],
-    swimlanes: [],
     generatedAt: null,
     error: null,
   });
@@ -93,7 +92,7 @@ describe("signal-store", () => {
     localStorage.setItem(LOCAL_STORAGE.LLM_KEY, KEY);
     localStorage.setItem(
       FRONTPAGE_CACHE_KEY,
-      JSON.stringify({ generatedAt: Date.now(), frontpage: { topStories: [], swimlanes: [] } }),
+      JSON.stringify({ generatedAt: Date.now(), frontpage: { topStories: [] } }),
     );
     useSignalStore.getState().setApiKey(null);
     expect(localStorage.getItem(LOCAL_STORAGE.LLM_KEY)).toBeNull();
@@ -112,16 +111,13 @@ describe("signal-store", () => {
     expect(generateMock).not.toHaveBeenCalled();
   });
 
-  it("populates topStories AND swimlanes with resolved articles", async () => {
+  it("populates topStories with resolved articles", async () => {
     generateMock.mockResolvedValue({
       ok: true,
       value: {
         topStories: [
-          { headline: "Top", blurb: "B.", articleIds: ["a1", "a2"] },
-        ],
-        swimlanes: [
-          { title: "Lane 1", articleIds: ["a1", "a2"] },
-          { title: "Lane 2", articleIds: ["b1"] },
+          { headline: "Lead", blurb: "B.", articleIds: ["a1", "a2"] },
+          { headline: "Second", blurb: "B.", articleIds: ["b1"] },
         ],
       },
     });
@@ -136,11 +132,32 @@ describe("signal-store", () => {
 
     const state = useSignalStore.getState();
     expect(state.status).toBe("ready");
-    expect(state.topStories).toHaveLength(1);
+    expect(state.topStories).toHaveLength(2);
+    expect(state.topStories[0].headline).toBe("Lead");
     expect(state.topStories[0].articles.map((a) => a.id).sort()).toEqual(["a1", "a2"]);
-    expect(state.swimlanes).toHaveLength(2);
-    expect(state.swimlanes[0].title).toBe("Lane 1");
-    expect(state.swimlanes[0].articles.map((a) => a.id).sort()).toEqual(["a1", "a2"]);
+    expect(state.topStories[1].headline).toBe("Second");
+  });
+
+  it("preserves the order of stories from the LLM (#1 first, then ranked)", async () => {
+    generateMock.mockResolvedValue({
+      ok: true,
+      value: {
+        topStories: [
+          { headline: "First", blurb: "B.", articleIds: ["a1"] },
+          { headline: "Second", blurb: "B.", articleIds: ["a2"] },
+          { headline: "Third", blurb: "B.", articleIds: ["a3"] },
+        ],
+      },
+    });
+    useSignalStore.getState().setApiKey(KEY);
+    seedArticles([
+      makeArticle("a1", "f1", "T1"),
+      makeArticle("a2", "f2", "T2"),
+      makeArticle("a3", "f3", "T3"),
+    ]);
+    await useSignalStore.getState().loadFrontpage();
+    const headlines = useSignalStore.getState().topStories.map((s) => s.headline);
+    expect(headlines).toEqual(["First", "Second", "Third"]);
   });
 
   it("drops top stories whose articleIds no longer exist locally", async () => {
@@ -151,32 +168,12 @@ describe("signal-store", () => {
           { headline: "Real", blurb: "B.", articleIds: ["a1"] },
           { headline: "Stale", blurb: "B.", articleIds: ["aged-out"] },
         ],
-        swimlanes: [],
       },
     });
     useSignalStore.getState().setApiKey(KEY);
     seedArticles([makeArticle("a1", "f1", "T")]);
     await useSignalStore.getState().loadFrontpage();
     expect(useSignalStore.getState().topStories).toHaveLength(1);
-  });
-
-  it("drops swimlanes whose articleIds no longer exist locally", async () => {
-    generateMock.mockResolvedValue({
-      ok: true,
-      value: {
-        topStories: [],
-        swimlanes: [
-          { title: "Real lane", articleIds: ["a1"] },
-          { title: "Stale lane", articleIds: ["aged-out"] },
-        ],
-      },
-    });
-    useSignalStore.getState().setApiKey(KEY);
-    seedArticles([makeArticle("a1", "f1", "T")]);
-    await useSignalStore.getState().loadFrontpage();
-    const lanes = useSignalStore.getState().swimlanes;
-    expect(lanes).toHaveLength(1);
-    expect(lanes[0].title).toBe("Real lane");
   });
 
   it("sets status to error when generation fails", async () => {
@@ -188,10 +185,10 @@ describe("signal-store", () => {
     expect(useSignalStore.getState().error).toMatch(/rate-limit/i);
   });
 
-  it("status is 'no-content' when both topStories AND swimlanes are empty", async () => {
+  it("status is 'no-content' when topStories is empty", async () => {
     generateMock.mockResolvedValue({
       ok: true,
-      value: { topStories: [], swimlanes: [] },
+      value: { topStories: [] },
     });
     useSignalStore.getState().setApiKey(KEY);
     seedArticles([makeArticle("a1", "f1", "T")]);
@@ -206,7 +203,6 @@ describe("signal-store", () => {
       ok: true,
       value: {
         topStories: [{ headline: "h", blurb: "b", articleIds: ["a1"] }],
-        swimlanes: [],
       },
     });
     useSignalStore.getState().setApiKey(KEY);
@@ -224,7 +220,6 @@ describe("signal-store", () => {
         generatedAt: Date.now() - 60 * 1000,
         frontpage: {
           topStories: [{ headline: "cached", blurb: "B.", articleIds: ["a1"] }],
-          swimlanes: [{ title: "cached lane", articleIds: ["a1"] }],
         },
       }),
     );
@@ -234,9 +229,7 @@ describe("signal-store", () => {
     await useSignalStore.getState().loadFrontpage();
 
     expect(generateMock).not.toHaveBeenCalled();
-    const state = useSignalStore.getState();
-    expect(state.topStories[0].headline).toBe("cached");
-    expect(state.swimlanes[0].title).toBe("cached lane");
+    expect(useSignalStore.getState().topStories[0].headline).toBe("cached");
   });
 
   it("loadFrontpage regenerates when cache is older than the TTL", async () => {
@@ -244,14 +237,13 @@ describe("signal-store", () => {
       FRONTPAGE_CACHE_KEY,
       JSON.stringify({
         generatedAt: Date.now() - FRONTPAGE_TTL_MS - 60 * 1000,
-        frontpage: { topStories: [{ headline: "old", blurb: "B.", articleIds: ["a1"] }], swimlanes: [] },
+        frontpage: { topStories: [{ headline: "old", blurb: "B.", articleIds: ["a1"] }] },
       }),
     );
     generateMock.mockResolvedValue({
       ok: true,
       value: {
         topStories: [{ headline: "fresh", blurb: "B.", articleIds: ["a1"] }],
-        swimlanes: [],
       },
     });
     useSignalStore.getState().setApiKey(KEY);
@@ -266,14 +258,13 @@ describe("signal-store", () => {
       FRONTPAGE_CACHE_KEY,
       JSON.stringify({
         generatedAt: Date.now() - 60 * 1000,
-        frontpage: { topStories: [{ headline: "cached", blurb: "B.", articleIds: ["a1"] }], swimlanes: [] },
+        frontpage: { topStories: [{ headline: "cached", blurb: "B.", articleIds: ["a1"] }] },
       }),
     );
     generateMock.mockResolvedValue({
       ok: true,
       value: {
         topStories: [{ headline: "fresh", blurb: "B.", articleIds: ["a1"] }],
-        swimlanes: [],
       },
     });
     useSignalStore.getState().setApiKey(KEY);
@@ -283,10 +274,33 @@ describe("signal-store", () => {
     expect(useSignalStore.getState().topStories[0].headline).toBe("fresh");
   });
 
+  it("ignores cached frontpages with the legacy swimlane shape", async () => {
+    // Pre-redesign caches will linger in users' localStorage. They lack
+    // the new shape (just topStories) but used to have a swimlanes key.
+    // We accept either shape on read, treating swimlanes as absent.
+    localStorage.setItem(
+      FRONTPAGE_CACHE_KEY,
+      JSON.stringify({
+        generatedAt: Date.now() - 60 * 1000,
+        frontpage: {
+          topStories: [{ headline: "cached", blurb: "B.", articleIds: ["a1"] }],
+          swimlanes: [{ title: "old", articleIds: ["a1"] }],
+        },
+      }),
+    );
+    useSignalStore.getState().setApiKey(KEY);
+    seedArticles([makeArticle("a1", "f1", "T")]);
+    await useSignalStore.getState().loadFrontpage();
+    // Either the legacy cache is discarded (regenerated) or it's loaded with
+    // just topStories. Either way the store should not expose swimlanes.
+    const state = useSignalStore.getState() as unknown as Record<string, unknown>;
+    expect(state).not.toHaveProperty("swimlanes");
+  });
+
   // ---------- corpus filter -----------------------------------------------
 
   it("filters the corpus to the recency window before calling generateFrontpage", async () => {
-    generateMock.mockResolvedValue({ ok: true, value: { topStories: [], swimlanes: [] } });
+    generateMock.mockResolvedValue({ ok: true, value: { topStories: [] } });
     useSignalStore.getState().setApiKey(KEY);
     const recent = makeArticle("recent", "f1", "Recent");
     const tooOld: Article = {
@@ -301,7 +315,7 @@ describe("signal-store", () => {
   });
 
   it("sorts the corpus newest-first before sending", async () => {
-    generateMock.mockResolvedValue({ ok: true, value: { topStories: [], swimlanes: [] } });
+    generateMock.mockResolvedValue({ ok: true, value: { topStories: [] } });
     useSignalStore.getState().setApiKey(KEY);
     const t = Date.now();
     const older: Article = { ...makeArticle("older", "f1", "Older"), publishedAt: t - 5 * 60 * 60 * 1000 };

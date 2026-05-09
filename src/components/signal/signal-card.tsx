@@ -6,139 +6,62 @@ import { cn } from "@/lib/utils.ts";
 import type { ResolvedTopStory } from "@/stores/signal-store.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
-export type SignalCardVariant = "hero" | "tile" | "brief";
+export type SignalCardVariant = "hero" | "list-item";
 
 interface SignalCardProps {
   story: ResolvedTopStory;
   feeds: Record<string, Feed>;
   variant: SignalCardVariant;
+  /** 1-based position in the top-N list. */
+  rank: number;
   onOpen: (story: ResolvedTopStory) => void;
 }
 
 /**
- * Three sizes for the top masonry:
- *   hero  — only one per page; full-bleed splash with image when available.
- *   tile  — image cards in the masonry.
- *   brief — text-only cards; pack tightly in the column flow.
+ * Two layouts share one component:
+ *   hero      — only #1; full-bleed splash with image when available.
+ *   list-item — #2 through #10; rank number, headline, blurb, sources on one row.
  */
-export function SignalCard({ story, feeds, variant, onOpen }: SignalCardProps) {
-  const isHero = variant === "hero";
-  const isBrief = variant === "brief";
-  const image = isBrief ? null : pickImage(story.articles);
-  const isSplash = isHero && !!image;
-
-  if (isSplash) {
-    return <SplashHero story={story} feeds={feeds} image={image!} onOpen={onOpen} />;
+export function SignalCard({ story, feeds, variant, rank, onOpen }: SignalCardProps) {
+  if (variant === "hero") {
+    return <HeroCard story={story} feeds={feeds} onOpen={onOpen} />;
   }
+  return <ListItemCard story={story} feeds={feeds} rank={rank} onOpen={onOpen} />;
+}
+
+function HeroCard({
+  story,
+  feeds,
+  onOpen,
+}: {
+  story: ResolvedTopStory;
+  feeds: Record<string, Feed>;
+  onOpen: (story: ResolvedTopStory) => void;
+}) {
+  const image = pickImage(story.articles);
+  if (image) return <SplashHero story={story} feeds={feeds} image={image} onOpen={onOpen} />;
 
   return (
     <article
       onClick={() => onOpen(story)}
-      className={cn(
-        "group cursor-pointer overflow-hidden rounded-lg border border-border bg-card transition-colors hover:bg-accent/40 break-inside-avoid",
-      )}
+      className="group cursor-pointer overflow-hidden rounded-lg border border-border bg-card transition-colors hover:bg-accent/40"
     >
-      {image && (
-        <div className="relative w-full overflow-hidden bg-muted aspect-[16/10]">
-          <img
-            src={image}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          />
-        </div>
-      )}
-      <div className={cn(isHero ? "p-5 md:p-6" : isBrief ? "p-3" : "p-3.5")}>
-        <Heading variant={variant}>{decodeEntities(story.headline)}</Heading>
-        <Blurb variant={variant}>{decodeEntities(story.blurb)}</Blurb>
-        <SourceRow story={story} feeds={feeds} compact={isBrief} />
+      <div className="p-5 md:p-6">
+        <h2 className="text-2xl md:text-3xl font-semibold leading-tight tracking-tight">
+          {decodeEntities(story.headline)}
+        </h2>
+        <p className="text-muted-foreground leading-snug mt-1.5 text-sm md:text-base">
+          {decodeEntities(story.blurb)}
+        </p>
+        <SourceRow story={story} feeds={feeds} className="mt-3" />
       </div>
     </article>
   );
 }
 
-function Heading({
-  variant,
-  children,
-}: {
-  variant: SignalCardVariant;
-  children: React.ReactNode;
-}) {
-  const Tag = variant === "hero" ? "h2" : "h3";
-  return (
-    <Tag
-      className={cn(
-        "font-semibold leading-tight tracking-tight",
-        variant === "hero" ? "text-2xl md:text-3xl" : variant === "brief" ? "text-sm" : "text-base",
-      )}
-    >
-      {children}
-    </Tag>
-  );
-}
-
-function Blurb({
-  variant,
-  children,
-}: {
-  variant: SignalCardVariant;
-  children: React.ReactNode;
-}) {
-  return (
-    <p
-      className={cn(
-        "text-muted-foreground leading-snug mt-1.5",
-        variant === "hero" ? "text-sm md:text-base" : "text-xs",
-        variant === "brief" && "line-clamp-2",
-      )}
-    >
-      {children}
-    </p>
-  );
-}
-
-function SourceRow({
-  story,
-  feeds,
-  compact,
-}: {
-  story: ResolvedTopStory;
-  feeds: Record<string, Feed>;
-  compact: boolean;
-}) {
-  const uniqueFeedIds = Array.from(new Set(story.articles.map((a) => a.feedId)));
-  const latest = Math.max(...story.articles.map((a) => a.publishedAt));
-  return (
-    <div
-      data-testid="signal-card-sources"
-      className={cn(
-        "flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground",
-        compact ? "mt-2" : "mt-3",
-      )}
-    >
-      {uniqueFeedIds.map((feedId) => {
-        const feed = feeds[feedId];
-        if (!feed) return null;
-        return (
-          <span key={feedId} className="inline-flex items-center gap-1.5 min-w-0">
-            <FeedFavicon siteUrl={feed.siteUrl || feed.url} className="size-3.5" />
-            <span className="truncate max-w-[8rem]">{feed.title}</span>
-          </span>
-        );
-      })}
-      <span className="ml-auto" data-testid="signal-card-date">
-        {formatRelative(latest)}
-      </span>
-    </div>
-  );
-}
-
 /**
- * The hero card when there's an image: image fills the card edge-to-edge,
- * a dark gradient anchors the bottom, and the headline + blurb + sources sit
- * over the gradient in white.
+ * Hero with image: image fills the card edge-to-edge, dark gradient anchors
+ * the bottom, headline + blurb + sources sit over the gradient in white.
  */
 function SplashHero({
   story,
@@ -151,12 +74,10 @@ function SplashHero({
   image: string;
   onOpen: (story: ResolvedTopStory) => void;
 }) {
-  const uniqueFeedIds = Array.from(new Set(story.articles.map((a) => a.feedId)));
-  const latest = Math.max(...story.articles.map((a) => a.publishedAt));
   return (
     <article
       onClick={() => onOpen(story)}
-      className="group relative cursor-pointer overflow-hidden rounded-lg border border-border bg-muted min-h-[24rem] break-inside-avoid"
+      className="group relative cursor-pointer overflow-hidden rounded-lg border border-border bg-muted min-h-[24rem]"
     >
       <img
         src={image}
@@ -174,26 +95,87 @@ function SplashHero({
         <p className="mt-1.5 text-sm md:text-base leading-snug text-white/85">
           {decodeEntities(story.blurb)}
         </p>
-        <div
-          data-testid="signal-card-sources"
-          className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-white/85"
-        >
-          {uniqueFeedIds.map((feedId) => {
-            const feed = feeds[feedId];
-            if (!feed) return null;
-            return (
-              <span key={feedId} className="inline-flex items-center gap-1.5 min-w-0">
-                <FeedFavicon siteUrl={feed.siteUrl || feed.url} className="size-4" avatar />
-                <span className="truncate max-w-[8rem]">{feed.title}</span>
-              </span>
-            );
-          })}
-          <span className="ml-auto" data-testid="signal-card-date">
-            {formatRelative(latest)}
-          </span>
-        </div>
+        <SourceRow story={story} feeds={feeds} className="mt-4" tone="onImage" />
       </div>
     </article>
+  );
+}
+
+function ListItemCard({
+  story,
+  feeds,
+  rank,
+  onOpen,
+}: {
+  story: ResolvedTopStory;
+  feeds: Record<string, Feed>;
+  rank: number;
+  onOpen: (story: ResolvedTopStory) => void;
+}) {
+  return (
+    <article
+      onClick={() => onOpen(story)}
+      className="group flex cursor-pointer gap-4 border-t border-border/70 py-4 transition-colors hover:bg-accent/30"
+    >
+      <div
+        aria-hidden="true"
+        className="shrink-0 w-8 text-2xl font-semibold tabular-nums tracking-tight text-muted-foreground/70 leading-none pt-0.5"
+      >
+        {rank}
+      </div>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-base md:text-lg font-semibold leading-snug tracking-tight">
+          {decodeEntities(story.headline)}
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground leading-snug">
+          {decodeEntities(story.blurb)}
+        </p>
+        <SourceRow story={story} feeds={feeds} className="mt-2" />
+      </div>
+    </article>
+  );
+}
+
+function SourceRow({
+  story,
+  feeds,
+  className,
+  tone = "default",
+}: {
+  story: ResolvedTopStory;
+  feeds: Record<string, Feed>;
+  className?: string;
+  tone?: "default" | "onImage";
+}) {
+  const uniqueFeedIds = Array.from(new Set(story.articles.map((a) => a.feedId)));
+  const latest = Math.max(...story.articles.map((a) => a.publishedAt));
+  return (
+    <div
+      data-testid="signal-card-sources"
+      className={cn(
+        "flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs",
+        tone === "onImage" ? "text-white/85" : "text-muted-foreground",
+        className,
+      )}
+    >
+      {uniqueFeedIds.map((feedId) => {
+        const feed = feeds[feedId];
+        if (!feed) return null;
+        return (
+          <span key={feedId} className="inline-flex items-center gap-1.5 min-w-0">
+            <FeedFavicon
+              siteUrl={feed.siteUrl || feed.url}
+              className={cn("size-3.5", tone === "onImage" && "size-4")}
+              avatar={tone === "onImage"}
+            />
+            <span className="truncate max-w-[8rem]">{feed.title}</span>
+          </span>
+        );
+      })}
+      <span className="ml-auto" data-testid="signal-card-date">
+        {formatRelative(latest)}
+      </span>
+    </div>
   );
 }
 

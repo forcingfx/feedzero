@@ -37,7 +37,7 @@ test.describe("Signal", () => {
         contentType: "application/json",
         body: JSON.stringify({
           content: [
-            { type: "text", text: '{"topStories":[],"swimlanes":[]}' },
+            { type: "text", text: '{"topStories":[]}' },
           ],
         }),
       }),

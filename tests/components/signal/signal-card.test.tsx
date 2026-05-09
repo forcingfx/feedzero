@@ -34,7 +34,7 @@ const FEEDS: Record<string, Feed> = {
 
 describe("SignalCard", () => {
   it("renders headline and blurb", () => {
-    render(<SignalCard story={STORY} feeds={FEEDS} variant="tile" onOpen={vi.fn()} />);
+    render(<SignalCard story={STORY} feeds={FEEDS} variant="hero" rank={1} onOpen={vi.fn()} />);
     expect(screen.getByText(/M5 chip leaps neural performance/)).toBeInTheDocument();
     expect(screen.getByText(/Apple unveils M5/)).toBeInTheDocument();
   });
@@ -42,31 +42,31 @@ describe("SignalCard", () => {
   it("clicking the card calls onOpen with the story", async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();
-    render(<SignalCard story={STORY} feeds={FEEDS} variant="hero" onOpen={onOpen} />);
+    render(<SignalCard story={STORY} feeds={FEEDS} variant="hero" rank={1} onOpen={onOpen} />);
     await user.click(screen.getByRole("article"));
     expect(onOpen).toHaveBeenCalledWith(STORY);
   });
 
   it("shows source-attribution row with one entry per unique feed", () => {
-    render(<SignalCard story={STORY} feeds={FEEDS} variant="tile" onOpen={vi.fn()} />);
+    render(<SignalCard story={STORY} feeds={FEEDS} variant="hero" rank={1} onOpen={vi.fn()} />);
     const sources = screen.getByTestId("signal-card-sources");
     expect(within(sources).getByText("TechCrunch")).toBeInTheDocument();
     expect(within(sources).getByText("The Verge")).toBeInTheDocument();
   });
 
   it("renders relative date", () => {
-    render(<SignalCard story={STORY} feeds={FEEDS} variant="tile" onOpen={vi.fn()} />);
+    render(<SignalCard story={STORY} feeds={FEEDS} variant="hero" rank={1} onOpen={vi.fn()} />);
     expect(screen.getByTestId("signal-card-date")).toBeInTheDocument();
   });
 
-  it("renders an image when an article has one", () => {
+  it("hero variant renders an image when an article has one", () => {
     const article: Article = {
       ...ARTICLE_A,
       content: '<img src="https://cdn.example.com/hero.jpg">',
     };
     const story: ResolvedTopStory = { ...STORY, articles: [article, ARTICLE_B] };
     const { container } = render(
-      <SignalCard story={story} feeds={FEEDS} variant="hero" onOpen={vi.fn()} />,
+      <SignalCard story={story} feeds={FEEDS} variant="hero" rank={1} onOpen={vi.fn()} />,
     );
     const img = container.querySelector('img[src="https://cdn.example.com/hero.jpg"]');
     expect(img).not.toBeNull();
@@ -79,37 +79,37 @@ describe("SignalCard", () => {
       content: '<img src="https://cdn.example.com/hero.jpg">',
     };
     const story: ResolvedTopStory = { ...STORY, articles: [article, ARTICLE_B] };
-    render(<SignalCard story={story} feeds={FEEDS} variant="hero" onOpen={vi.fn()} />);
+    render(<SignalCard story={story} feeds={FEEDS} variant="hero" rank={1} onOpen={vi.fn()} />);
     const heading = screen.getByText(/M5 chip leaps/);
     expect(heading.className).toMatch(/text-white/);
   });
 
   it("hero without image keeps default text color", () => {
-    render(<SignalCard story={STORY} feeds={FEEDS} variant="hero" onOpen={vi.fn()} />);
+    render(<SignalCard story={STORY} feeds={FEEDS} variant="hero" rank={1} onOpen={vi.fn()} />);
     const heading = screen.getByText(/M5 chip leaps/);
     expect(heading.className).not.toMatch(/text-white/);
   });
 
-  it("brief variant suppresses the image even if one is available", () => {
+  it("list-item variant shows the rank number", () => {
+    render(<SignalCard story={STORY} feeds={FEEDS} variant="list-item" rank={3} onOpen={vi.fn()} />);
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("list-item variant does not render an image even if one is available", () => {
     const article: Article = {
       ...ARTICLE_A,
       content: '<img src="https://cdn.example.com/hero.jpg">',
     };
     const story: ResolvedTopStory = { ...STORY, articles: [article, ARTICLE_B] };
     const { container } = render(
-      <SignalCard story={story} feeds={FEEDS} variant="brief" onOpen={vi.fn()} />,
+      <SignalCard story={story} feeds={FEEDS} variant="list-item" rank={2} onOpen={vi.fn()} />,
     );
     expect(container.querySelector('img[src^="https://cdn"]')).toBeNull();
   });
 
-  it("all variants are break-inside-avoid (CSS columns masonry)", () => {
-    for (const variant of ["hero", "tile", "brief"] as const) {
-      const { container, unmount } = render(
-        <SignalCard story={STORY} feeds={FEEDS} variant={variant} onOpen={vi.fn()} />,
-      );
-      const article = container.querySelector("article")!;
-      expect(article.className).toMatch(/break-inside-avoid/);
-      unmount();
-    }
+  it("list-item variant still renders headline and blurb", () => {
+    render(<SignalCard story={STORY} feeds={FEEDS} variant="list-item" rank={2} onOpen={vi.fn()} />);
+    expect(screen.getByText(/M5 chip leaps neural performance/)).toBeInTheDocument();
+    expect(screen.getByText(/Apple unveils M5/)).toBeInTheDocument();
   });
 });

@@ -8,7 +8,6 @@ import {
   SIGNAL_WINDOW_MS,
   type Frontpage,
   type FrontpageStory,
-  type Swimlane,
 } from "../core/signal/types.ts";
 import type { Article } from "../types";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
@@ -31,20 +30,10 @@ export interface ResolvedTopStory {
   articles: Article[];
 }
 
-/** A swimlane with article ids resolved to full Article objects. */
-export interface ResolvedSwimlane {
-  /** Stable id from the title + article id set. */
-  id: string;
-  title: string;
-  description?: string;
-  articles: Article[];
-}
-
 interface SignalStore {
   apiKey: string | null;
   status: SignalStatus;
   topStories: ResolvedTopStory[];
-  swimlanes: ResolvedSwimlane[];
   /** When the current frontpage was produced (epoch ms). Drives the 24h cache. */
   generatedAt: number | null;
   error: string | null;
@@ -58,7 +47,6 @@ export const useSignalStore = create<SignalStore>((set, get) => ({
   apiKey: null,
   status: "idle",
   topStories: [],
-  swimlanes: [],
   generatedAt: null,
   error: null,
 
@@ -81,7 +69,6 @@ export const useSignalStore = create<SignalStore>((set, get) => ({
       set({
         apiKey: null,
         topStories: [],
-        swimlanes: [],
         generatedAt: null,
         status: "idle",
       });
@@ -140,12 +127,15 @@ function readCache(): CachedFrontpage | null {
     if (
       typeof parsed?.generatedAt !== "number" ||
       !parsed?.frontpage ||
-      !Array.isArray(parsed.frontpage.topStories) ||
-      !Array.isArray(parsed.frontpage.swimlanes)
+      !Array.isArray(parsed.frontpage.topStories)
     ) {
       return null;
     }
-    return parsed as CachedFrontpage;
+    // Tolerate legacy caches that included a `swimlanes` key — strip it.
+    return {
+      generatedAt: parsed.generatedAt,
+      frontpage: { topStories: parsed.frontpage.topStories },
+    };
   } catch {
     return null;
   }
@@ -171,10 +161,8 @@ function applyFrontpage(
 ): void {
   const articleMap = new Map(articles.map((a) => [a.id, a]));
   const topStories = resolveTopStories(frontpage.topStories, articleMap);
-  const swimlanes = resolveSwimlanes(frontpage.swimlanes, articleMap);
-  const status: SignalStatus =
-    topStories.length === 0 && swimlanes.length === 0 ? "no-content" : "ready";
-  set({ status, topStories, swimlanes, generatedAt, error: null });
+  const status: SignalStatus = topStories.length === 0 ? "no-content" : "ready";
+  set({ status, topStories, generatedAt, error: null });
 }
 
 function resolveTopStories(
@@ -191,26 +179,6 @@ function resolveTopStories(
       id: story.articleIds.slice().sort().join("|"),
       headline: story.headline,
       blurb: story.blurb,
-      articles: resolved,
-    });
-  }
-  return out;
-}
-
-function resolveSwimlanes(
-  swimlanes: Swimlane[],
-  articleMap: Map<string, Article>,
-): ResolvedSwimlane[] {
-  const out: ResolvedSwimlane[] = [];
-  for (const lane of swimlanes) {
-    const resolved = lane.articleIds
-      .map((id) => articleMap.get(id))
-      .filter((a): a is Article => a !== undefined);
-    if (resolved.length === 0) continue;
-    out.push({
-      id: `${lane.title}::${lane.articleIds.slice().sort().join("|")}`,
-      title: lane.title,
-      description: lane.description,
       articles: resolved,
     });
   }

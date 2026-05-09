@@ -67,15 +67,12 @@ describe("generateFrontpage", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns ok with topStories AND swimlanes on a 200", async () => {
+  it("returns ok with an ordered list of top stories on a 200", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
       anthropicSuccess({
         topStories: [
           { headline: "Election results", blurb: "B.", articleIds: ["a1", "a2"] },
-        ],
-        swimlanes: [
-          { title: "Election coverage", articleIds: ["a1", "a2"] },
-          { title: "Tech this week", articleIds: ["a3"] },
+          { headline: "Rust ships", blurb: "B.", articleIds: ["a3"] },
         ],
       }),
     );
@@ -87,15 +84,14 @@ describe("generateFrontpage", () => {
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.topStories).toHaveLength(1);
-    expect(result.value.swimlanes).toHaveLength(2);
-    expect(result.value.swimlanes[0].title).toBe("Election coverage");
-    expect(result.value.swimlanes[1].title).toBe("Tech this week");
+    expect(result.value.topStories).toHaveLength(2);
+    expect(result.value.topStories[0].headline).toBe("Election results");
+    expect(result.value.topStories[1].headline).toBe("Rust ships");
   });
 
   it("uses Sonnet (not Haiku)", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(
-      anthropicSuccess({ topStories: [], swimlanes: [] }),
+      anthropicSuccess({ topStories: [] }),
     );
     globalThis.fetch = fetchSpy;
     await generateFrontpage(
@@ -110,7 +106,7 @@ describe("generateFrontpage", () => {
 
   it("sends real feed titles (not anonymized)", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(
-      anthropicSuccess({ topStories: [], swimlanes: [] }),
+      anthropicSuccess({ topStories: [] }),
     );
     globalThis.fetch = fetchSpy;
     await generateFrontpage(
@@ -128,7 +124,7 @@ describe("generateFrontpage", () => {
 
   it("includes folder names and article publish dates", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(
-      anthropicSuccess({ topStories: [], swimlanes: [] }),
+      anthropicSuccess({ topStories: [] }),
     );
     globalThis.fetch = fetchSpy;
     const dated = makeArticle({
@@ -151,7 +147,7 @@ describe("generateFrontpage", () => {
 
   it("includes today's date and recency rule in the prompt", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(
-      anthropicSuccess({ topStories: [], swimlanes: [] }),
+      anthropicSuccess({ topStories: [] }),
     );
     globalThis.fetch = fetchSpy;
     await generateFrontpage(
@@ -166,9 +162,43 @@ describe("generateFrontpage", () => {
     expect(userMessage.toLowerCase()).toMatch(/recent|recency|fresh/);
   });
 
+  it("asks for a top-10 list (or close to it)", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      anthropicSuccess({ topStories: [] }),
+    );
+    globalThis.fetch = fetchSpy;
+    await generateFrontpage(
+      ARTICLES,
+      { feeds: FEEDS, folders: FOLDERS },
+      KEY,
+      new AbortController().signal,
+    );
+    const userMessage = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)
+      .messages[0].content as string;
+    // Whether the prompt says "10 stories" or "the top ten" is a wording choice;
+    // the assertion is that it asks for ten, in some form.
+    expect(userMessage).toMatch(/\b(10|ten)\b/i);
+  });
+
+  it("does not mention swimlanes in the prompt or schema", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      anthropicSuccess({ topStories: [] }),
+    );
+    globalThis.fetch = fetchSpy;
+    await generateFrontpage(
+      ARTICLES,
+      { feeds: FEEDS, folders: FOLDERS },
+      KEY,
+      new AbortController().signal,
+    );
+    const userMessage = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)
+      .messages[0].content as string;
+    expect(userMessage.toLowerCase()).not.toMatch(/swimlane|topical lane/);
+  });
+
   it("instructs the LLM to balance coverage across folders", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(
-      anthropicSuccess({ topStories: [], swimlanes: [] }),
+      anthropicSuccess({ topStories: [] }),
     );
     globalThis.fetch = fetchSpy;
     await generateFrontpage(
@@ -189,7 +219,6 @@ describe("generateFrontpage", () => {
           { headline: "Real", blurb: "B.", articleIds: ["a1", "a2"] },
           { headline: "Hallucinated", blurb: "B.", articleIds: ["nonexistent"] },
         ],
-        swimlanes: [],
       }),
     );
     const result = await generateFrontpage(
@@ -201,28 +230,6 @@ describe("generateFrontpage", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.topStories).toHaveLength(1);
-  });
-
-  it("filters out swimlanes whose articleIds are all hallucinated", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      anthropicSuccess({
-        topStories: [],
-        swimlanes: [
-          { title: "Real lane", articleIds: ["a1", "a2"] },
-          { title: "Bogus", articleIds: ["nonexistent"] },
-        ],
-      }),
-    );
-    const result = await generateFrontpage(
-      ARTICLES,
-      { feeds: FEEDS, folders: FOLDERS },
-      KEY,
-      new AbortController().signal,
-    );
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.swimlanes).toHaveLength(1);
-    expect(result.value.swimlanes[0].title).toBe("Real lane");
   });
 
   it("returns err on 401", async () => {
@@ -290,10 +297,10 @@ describe("generateFrontpage", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("returns ok with empty topStories AND swimlanes when LLM produces nothing", async () => {
+  it("returns ok with empty topStories when LLM produces nothing", async () => {
     globalThis.fetch = vi
       .fn()
-      .mockResolvedValue(anthropicSuccess({ topStories: [], swimlanes: [] }));
+      .mockResolvedValue(anthropicSuccess({ topStories: [] }));
     const result = await generateFrontpage(
       ARTICLES,
       { feeds: FEEDS, folders: FOLDERS },
@@ -303,7 +310,6 @@ describe("generateFrontpage", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.topStories).toHaveLength(0);
-    expect(result.value.swimlanes).toHaveLength(0);
   });
 
   it("returns err if response JSON is malformed", async () => {
@@ -317,5 +323,61 @@ describe("generateFrontpage", () => {
       new AbortController().signal,
     );
     expect(result.ok).toBe(false);
+  });
+
+  it("requests enough output tokens to fit a full top-10 list without truncation", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      anthropicSuccess({ topStories: [] }),
+    );
+    globalThis.fetch = fetchSpy;
+    await generateFrontpage(
+      ARTICLES,
+      { feeds: FEEDS, folders: FOLDERS },
+      KEY,
+      new AbortController().signal,
+    );
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.max_tokens).toBeGreaterThanOrEqual(4000);
+  });
+
+  it("surfaces a clear error when the model hits max_tokens and the JSON is incomplete", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        content: [
+          {
+            type: "text",
+            text: '{"topStories":[{"headline":"Truncated","blurb":"x","articleIds":["a1"',
+          },
+        ],
+        stop_reason: "max_tokens",
+      }),
+    );
+    const result = await generateFrontpage(
+      ARTICLES,
+      { feeds: FEEDS, folders: FOLDERS },
+      KEY,
+      new AbortController().signal,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.toLowerCase()).toMatch(/cut off|truncat|too long/);
+  });
+
+  it("parses JSON wrapped in a markdown fence", async () => {
+    const fenced =
+      '```json\n{"topStories":[{"headline":"H","blurb":"B","articleIds":["a1"]}]}\n```';
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      jsonResponse({ content: [{ type: "text", text: fenced }] }),
+    );
+    const result = await generateFrontpage(
+      ARTICLES,
+      { feeds: FEEDS, folders: FOLDERS },
+      KEY,
+      new AbortController().signal,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.topStories).toHaveLength(1);
+    expect(result.value.topStories[0].headline).toBe("H");
   });
 });
