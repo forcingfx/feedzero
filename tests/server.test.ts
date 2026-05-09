@@ -4,11 +4,13 @@ import { SUPPORTED_METHODS } from "../src/core/sync/sync-handler";
 import { SUPPORTED_METHODS as PROXY_SUPPORTED_METHODS } from "../src/core/proxy/proxy-handler";
 import { SUPPORTED_METHODS as CATALOG_SUPPORTED_METHODS } from "../src/core/catalog/catalog-handler";
 import { SUPPORTED_METHODS as FEEDBACK_SUPPORTED_METHODS } from "../src/core/feedback/feedback-handler";
+import { SUPPORTED_METHODS as HEALTH_SUPPORTED_METHODS } from "../src/core/health/health-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
 import * as vercelPageExports from "../api/page";
 import * as vercelCatalogExports from "../api/catalog";
 import * as vercelFeedbackExports from "../api/feedback";
+import * as vercelHealthExports from "../api/health";
 
 // Mock fetch globally for proxy handler tests
 const mockFetch = vi.fn();
@@ -576,6 +578,83 @@ describe("server", () => {
       });
       // Endpoint is registered: status is whatever the handler returns,
       // not 404 (route missing) or 405 (method not allowed).
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(405);
+    });
+  });
+
+  describe("health endpoint", () => {
+    const ORIGINAL_ENV = { ...process.env };
+
+    beforeEach(() => {
+      process.env = { ...ORIGINAL_ENV };
+      delete process.env.MAINTENANCE_MODE;
+    });
+
+    it("GET /api/health returns 200 with ok:true", async () => {
+      const res = await createApp().request("/api/health");
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(typeof body.version).toBe("string");
+      expect(typeof body.time).toBe("string");
+    });
+
+    it("GET /api/health returns 503 when MAINTENANCE_MODE=1", async () => {
+      process.env.MAINTENANCE_MODE = "1";
+      const res = await createApp().request("/api/health");
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body.maintenance).toBe(true);
+    });
+
+    it("GET /api/health sets Cache-Control: no-store", async () => {
+      const res = await createApp().request("/api/health");
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+    });
+  });
+
+  describe("health routing contract", () => {
+    it("HEALTH_SUPPORTED_METHODS lists GET", () => {
+      expect(HEALTH_SUPPORTED_METHODS).toContain("GET");
+    });
+
+    it("Vercel api/health.ts exports a handler for every supported method", () => {
+      for (const method of HEALTH_SUPPORTED_METHODS) {
+        expect(
+          vercelHealthExports,
+          `api/health.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelHealthExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/health.ts does not export unsupported methods", () => {
+      const allHttpMethods = [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+      ];
+      const unsupported = allHttpMethods.filter(
+        (m) => !HEALTH_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelHealthExports,
+          `api/health.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts GET /api/health", async () => {
+      const app = createApp();
+      const res = await app.request("/api/health");
       expect(res.status).not.toBe(404);
       expect(res.status).not.toBe(405);
     });
