@@ -48,12 +48,8 @@ jobs:
           path: coverage/
           retention-days: 14
 
-      # Pre-existing high-severity vulnerabilities in dompurify, xmldom,
-      # fast-xml-* etc. block this on bootstrap. Relaxed to `critical` so the
-      # CI gate lands; high-severity deps are tracked as a must-fix-before-
-      # Phase-0 item in docs/internal/progress.md.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=critical
+        run: npm audit --omit=dev --audit-level=high
 
   build:
     name: Build (SPA + serverless functions)
