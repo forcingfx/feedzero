@@ -2,7 +2,6 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
   push:
     branches: [main]
 
@@ -32,16 +31,14 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      - name: Tests
-        run: npm test
-
-      # Coverage report is generated and uploaded for visibility but does not
-      # gate the build. Pre-existing coverage is below the 90% target stated in
-      # CLAUDE.md (~81% lines, ~76% functions). Tracked in
-      # docs/internal/progress.md as a follow-up: either close the gap or
-      # adjust thresholds intentionally and ratchet up.
-      - name: Coverage report (non-blocking)
-        run: npm run test:coverage || true
+      # Coverage thresholds are enforced. Floors live in vitest.config.js.
+      # Current floor (post-uplift): branches 83 / functions 75 / lines 82 /
+      # statements 82. Ratchet target: 90/83/90/90, blocked on UI-component
+      # coverage. Do NOT lower these numbers — that is a regression by
+      # definition. `test:coverage` runs the full suite, so the separate
+      # `npm test` step above is no longer needed.
+      - name: Tests with coverage (thresholds enforced)
+        run: npm run test:coverage
 
       - name: Upload coverage artifact
         if: always()
