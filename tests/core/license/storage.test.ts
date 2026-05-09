@@ -92,6 +92,61 @@ export function runStorageContractTests(
 
       expect(isOk(revoked) && revoked.value).toBe(true);
     });
+
+    it("listByCustomer returns every record issued for that customer", async () => {
+      const storage = makeStorage();
+      await storage.put(
+        makeRecord({ keyId: "lic_list_a", customerId: "cus_list" }),
+      );
+      await storage.put(
+        makeRecord({ keyId: "lic_list_b", customerId: "cus_list" }),
+      );
+      await storage.put(
+        makeRecord({ keyId: "lic_list_c", customerId: "cus_other" }),
+      );
+
+      const result = await storage.listByCustomer("cus_list");
+
+      expect(isOk(result) && result.value.map((r) => r.keyId).sort()).toEqual([
+        "lic_list_a",
+        "lic_list_b",
+      ]);
+    });
+
+    it("listByCustomer returns ok([]) for an unknown customer", async () => {
+      const storage = makeStorage();
+
+      const result = await storage.listByCustomer("cus_never_seen");
+
+      expect(isOk(result) && result.value).toEqual([]);
+    });
+
+    it("revokeAllForCustomer revokes every record for that customer", async () => {
+      const storage = makeStorage();
+      await storage.put(
+        makeRecord({ keyId: "lic_revall_a", customerId: "cus_revall" }),
+      );
+      await storage.put(
+        makeRecord({ keyId: "lic_revall_b", customerId: "cus_revall" }),
+      );
+      await storage.put(
+        makeRecord({ keyId: "lic_revall_c", customerId: "cus_other" }),
+      );
+
+      await storage.revokeAllForCustomer("cus_revall", "subscription_deleted");
+
+      const aRevoked = await storage.isRevoked("lic_revall_a");
+      const bRevoked = await storage.isRevoked("lic_revall_b");
+      const cRevoked = await storage.isRevoked("lic_revall_c");
+      expect(
+        isOk(aRevoked) &&
+          aRevoked.value &&
+          isOk(bRevoked) &&
+          bRevoked.value &&
+          isOk(cRevoked) &&
+          !cRevoked.value,
+      ).toBe(true);
+    });
   });
 }
 

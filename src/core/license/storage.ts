@@ -13,6 +13,12 @@ export interface LicenseRecord {
   keyId: string;
   /** Stripe customer id (e.g. `cus_...`). Used for re-issue and audit. */
   customerId: string;
+  /**
+   * Stripe subscription id (e.g. `sub_...`). Used to map renewal/cancellation
+   * webhook events back to the issued record. Optional only because records
+   * issued before this field was added do not carry it.
+   */
+  subscriptionId?: string;
   tier: "free" | "personal" | "pro";
   status: "active" | "revoked" | "expired";
   issuedAtSec: number;
@@ -41,8 +47,30 @@ export interface LicenseStorage {
    */
   get(keyId: string): Promise<Result<LicenseRecord | null>>;
 
+  /**
+   * Return every record issued for a customer, in unspecified order. Used by
+   * the issuer to map Stripe webhook events (which arrive keyed by customerId
+   * + subscriptionId) back to the corresponding records. Returns `ok([])`
+   * when the customer has no records.
+   *
+   * Production KV implementations should back this with a customerId →
+   * keyId secondary index rather than scanning all records.
+   */
+  listByCustomer(customerId: string): Promise<Result<LicenseRecord[]>>;
+
   /** Add to revocation deny-list. Idempotent. */
   revoke(keyId: string, reason: string): Promise<Result<void>>;
+
+  /**
+   * Add every record issued for a customer to the revocation deny-list.
+   * Idempotent. Used when a customer's subscription is fully cancelled and
+   * we want to invalidate every license they hold (re-issued tokens, lost
+   * device replacements, etc.) in one operation.
+   */
+  revokeAllForCustomer(
+    customerId: string,
+    reason: string,
+  ): Promise<Result<void>>;
 
   /**
    * Returns `ok(true)` if the keyId is on the deny-list, `ok(false)`
@@ -70,8 +98,28 @@ export class MemoryLicenseStorage implements LicenseStorage {
     return { ok: true, value: record ? { ...record } : null };
   }
 
+  async listByCustomer(
+    customerId: string,
+  ): Promise<Result<LicenseRecord[]>> {
+    const matches: LicenseRecord[] = [];
+    for (const record of this.records.values()) {
+      if (record.customerId === customerId) matches.push({ ...record });
+    }
+    return { ok: true, value: matches };
+  }
+
   async revoke(keyId: string, _reason: string): Promise<Result<void>> {
     this.denyList.add(keyId);
+    return { ok: true, value: undefined };
+  }
+
+  async revokeAllForCustomer(
+    customerId: string,
+    _reason: string,
+  ): Promise<Result<void>> {
+    for (const record of this.records.values()) {
+      if (record.customerId === customerId) this.denyList.add(record.keyId);
+    }
     return { ok: true, value: undefined };
   }
 

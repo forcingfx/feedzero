@@ -51,7 +51,20 @@ export class VercelKVLicenseStorage implements LicenseStorage {
     notWired();
   }
 
+  async listByCustomer(
+    _customerId: string,
+  ): Promise<Result<LicenseRecord[]>> {
+    notWired();
+  }
+
   async revoke(_keyId: string, _reason: string): Promise<Result<void>> {
+    notWired();
+  }
+
+  async revokeAllForCustomer(
+    _customerId: string,
+    _reason: string,
+  ): Promise<Result<void>> {
     notWired();
   }
 
