@@ -328,6 +328,71 @@ FeedZero exists to protect its users. It is used by journalists, activists, and 
 - **Clean code** — Self-evident naming, small single-responsibility functions, explicit error handling via Result types. Functions should do one thing and their name should say what that thing is. If you need a comment to explain *what* code does, rename or extract instead. Comments only for *why* — never *what*.
 - **Reliability and resilience** — The app must work. Core flows (adding feeds, reading articles, syncing) must never regress. Every deployment artifact must be tested. Every client-server boundary must have a contract test. If a mock replaces a real boundary, a separate test must verify the contract across that boundary.
 
+### Clean Code rules
+
+Adapted from [Wojtek Lukaszuk's clean-code summary](https://gist.github.com/wojteklu/73c6914cc446146b8b533c0988cf8d29), itself a distillation of Robert C. Martin's *Clean Code*. The rules below are the working code-review checklist for this project. They sit alongside (not above) the Principles in this section.
+
+**General**
+- Follow standard conventions of the language and the surrounding code.
+- Keep it simple. Reduce complexity as much as possible. Simpler is always better.
+- Apply the Boy Scout Rule. Leave every file you touched cleaner than you found it.
+- Always find the root cause. A symptom-fix that doesn't explain the symptom is a bug waiting to recur.
+
+**Design**
+- Push configurable data to high levels (caller-controlled, not hard-coded deep in helpers).
+- Prefer polymorphism / dispatch tables to long `if/else` or `switch`. State machines belong in dedicated modules, not scattered conditionals.
+- Use dependency injection. Functions and modules receive their collaborators rather than reaching for globals or singletons.
+- Follow the Law of Demeter. A function should only call methods on: its parameters, its own object, objects it created, and its direct collaborators. No `a.b().c().d()` chains.
+- Don't over-configure. Flags, options, and toggles are debt; only add them when there's a real second use case.
+
+**Names**
+- Descriptive, unambiguous, pronounceable, searchable. `i`/`j`/`tmp` only in tight loops where the meaning is obvious.
+- Replace magic numbers with named constants in `src/utils/constants.ts` or a near-the-call `const`.
+- Make meaningful distinctions: `userInfo` vs `userData` is a smell. Pick one and use it everywhere.
+- Avoid type-encoding prefixes (`strName`, `IUser`).
+
+**Functions**
+- Small. If a function spans more than one screen, extract.
+- Do one thing. The function's name should fully describe what it does.
+- Prefer fewer arguments. Three is plenty; four is suspicious; five is a refactor.
+- Have no side effects beyond what the name says. A function called `validateUrl()` must not also write to localStorage.
+- No flag arguments (`function foo(bar, isBaz)`). Split into two functions with intention-revealing names.
+
+**Comments**
+- Always try to explain yourself in code first. Rename, extract, restructure.
+- Don't repeat what the code says. `// increment counter` next to `counter++` is noise.
+- Don't leave commented-out code. Delete it. Git remembers.
+- Use comments for *why*: hidden constraints, surprising performance trade-offs, references to bug reports or external specs.
+
+**Structure**
+- Separate concepts vertically with blank lines.
+- Related code stays vertically dense.
+- Declare variables close to where they're used. Top-of-function declaration blocks are an anti-pattern.
+- Functions called by another function should appear below it (top-down readability).
+- Keep lines short. Long lines force horizontal scrolling and hide intent.
+- Don't horizontally align `=` or types. The first time someone renames a variable, the alignment breaks.
+
+**Objects and data structures**
+- Hide internal structure (encapsulation). Don't return mutable references that callers can mutate behind your back.
+- Prefer data structures (plain TypeScript types/interfaces) for transport between modules; reserve classes for behaviour with invariants.
+- Small. Few instance variables. Single responsibility.
+- Prefer composition over inheritance. Inheritance is a strong coupling we rarely need.
+
+**Tests**
+- One logical assertion per test. (Multiple `expect()` lines for one assertion are fine; multiple assertions are not.)
+- Readable. A test is a worked example of how to use the unit under test.
+- Independent. No test should require another to have run first.
+- Repeatable. Same input, same outcome, every time. No clocks, no random unless seeded, no external network in unit tests.
+- Fast. Slow tests stop being run. The full suite is currently ~9s — keep it that way.
+
+**Code smells to avoid (vocabulary for code review)**
+- **Rigidity** — a small change cascades into many.
+- **Fragility** — a change in one place breaks unrelated places.
+- **Immobility** — code can't be reused because it's tangled with its current context.
+- **Needless complexity** — anticipated requirements that haven't materialised.
+- **Needless repetition** — copy-pasted code instead of extraction.
+- **Opacity** — code whose intent isn't clear at a glance.
+
 ### Key Patterns
 
 - All core functions return `Result<T>` types — never throw for expected errors
