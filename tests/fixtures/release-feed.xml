@@ -3,12 +3,26 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-05-03T12:00:00Z</updated>
+  <updated>2026-05-09T12:00:00Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.8.0</id>
+    <title>v0.8.0 — First-launch reliability fix</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-05-09T12:00:00Z</published>
+    <updated>2026-05-09T12:00:00Z</updated>
+    <summary>A latent bug in the new-user initialization path that could leave the app marked as onboarded after a failed first init is fixed.</summary>
+    <content type="html"><![CDATA[<p>A latent bug in the new-user initialization path that could leave the app marked as onboarded after a failed first init is fixed.</p>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed first-launch initialization continuing to mark onboarding complete when the initial database setup failed (for example on browsers without Web Crypto, such as iOS Lockdown Mode). The error is now surfaced and onboarding is not marked complete, so the user is prompted to retry rather than landing in a half-initialized state.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.7.0</id>
     <title>v0.7.0 — Mobile bottom drawer, pill navigation, and the stats page</title>

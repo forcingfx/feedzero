@@ -1,6 +1,6 @@
 {
   "name": "feedzero",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Privacy-first RSS reader",
   "type": "module",
   "scripts": {

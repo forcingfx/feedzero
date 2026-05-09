@@ -48,7 +48,13 @@ function AppInit({ children }: { children: React.ReactNode }) {
       }
       generatePassphrase()
         .then((passphrase) => initialize(passphrase, { sync: false }))
-        .then(() => { completeOnboarding(); })
+        .then(() => {
+          // initialize() reports failures by setting `error` on the store
+          // without throwing. Don't mark onboarding complete in that case —
+          // the user needs to see the error and retry, not be promoted to a
+          // returning user with a half-initialized DB.
+          if (!useAppStore.getState().error) completeOnboarding();
+        })
         .catch((err) => {
           useAppStore.getState().setError(
             err instanceof Error ? err.message : "Initialization failed",
