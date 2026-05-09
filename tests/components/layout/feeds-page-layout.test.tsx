@@ -193,6 +193,49 @@ describe("FeedsPage layout — desktop", () => {
     expect(handles).toHaveLength(2);
   });
 
+  it("each ResizablePanel has a stable id so the layout library can persist sizes across re-renders", () => {
+    // Without stable ids, react-resizable-panels falls back to useId() and
+    // generates fresh keys on every mount/route change — which breaks
+    // persistence and causes a visible re-balance when the panel count
+    // changes (e.g. switching to /explore drops the reader panel).
+    const { container } = renderPage();
+    const panels = container.querySelectorAll("[data-panel]");
+    expect(panels).toHaveLength(3);
+    const ids = Array.from(panels).map((p) => p.getAttribute("id"));
+    expect(ids).toEqual(
+      expect.arrayContaining(["sidebar", "article-list", "reader"]),
+    );
+    // No id should be auto-generated (react useId values start with ":r")
+    for (const id of ids) {
+      expect(id).not.toMatch(/^:/);
+    }
+  });
+
+  it("uses the 3-panel layout id on the feeds route so widths persist independently of the explore layout", () => {
+    // The Group must carry a stable id matching the layout shape; switching
+    // to /explore (which drops the reader) must use a different id so widths
+    // for each layout are remembered separately.
+    const { container } = renderPage("/feeds/f1");
+    const group = container.querySelector("[data-slot='resizable-panel-group']");
+    expect(group).not.toBeNull();
+    expect(group!.getAttribute("id")).toBe("feedzero:layout:feeds");
+  });
+
+  it("uses the single-content layout id on the explore route", () => {
+    const { container } = renderPage("/explore");
+    const group = container.querySelector("[data-slot='resizable-panel-group']");
+    expect(group).not.toBeNull();
+    expect(group!.getAttribute("id")).toBe("feedzero:layout:single");
+  });
+
+  it("explore layout exposes stable ids for sidebar and explore panels", () => {
+    const { container } = renderPage("/explore");
+    const panels = container.querySelectorAll("[data-panel]");
+    expect(panels).toHaveLength(2);
+    const ids = Array.from(panels).map((p) => p.getAttribute("id"));
+    expect(ids).toEqual(expect.arrayContaining(["sidebar", "explore"]));
+  });
+
   it("sidebar CSS variable is at most 14rem so three panels fit at 1024px", () => {
     // At 1024px: sidebar (≤14rem = 224px) + article list (≥180px) + reader (≥200px)
     // = 224 + 180 + 200 = 604px — well within 1024px. If the sidebar grows beyond

@@ -6,7 +6,7 @@ import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, PANEL_LAYOUT_ID } from "@/utils/constants.ts";
 import { findNextArticle, findPrevArticle } from "@/lib/next-article.ts";
 import {
   ResizablePanelGroup,
@@ -293,12 +293,19 @@ export function FeedsPage() {
   // and participates naturally in the panel layout.
   const exploreOrEmpty = isExplorePage || feeds.length === 0;
   const showStats = isStatsPage;
+  // Distinct group ids per layout shape: react-resizable-panels persists
+  // panel widths under this id, so the 3-panel feeds layout and the 2-panel
+  // explore/stats layout must not share an id (otherwise switching layouts
+  // visibly rebalances the sidebar — see GitLab #13a).
+  const layoutId =
+    showStats || exploreOrEmpty ? PANEL_LAYOUT_ID.SINGLE : PANEL_LAYOUT_ID.FEEDS;
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
       <SidebarKeyboardToggle />
-      <ResizablePanelGroup direction="horizontal" className="h-svh">
+      <ResizablePanelGroup id={layoutId} direction="horizontal" className="h-svh">
         <ResizablePanel
+          id="sidebar"
           defaultSize="17%"
           minSize="150px"
           maxSize="280px"
@@ -312,13 +319,13 @@ export function FeedsPage() {
         </ResizablePanel>
         <ResizableHandle />
         {showStats ? (
-          <ResizablePanel className="overflow-hidden">
+          <ResizablePanel id="stats" className="overflow-hidden">
             <ScrollArea className="h-full">
               <Suspense><StatsPage /></Suspense>
             </ScrollArea>
           </ResizablePanel>
         ) : exploreOrEmpty ? (
-          <ResizablePanel className="overflow-hidden">
+          <ResizablePanel id="explore" className="overflow-hidden">
             <ScrollArea className="h-full">
               <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
             </ScrollArea>
@@ -326,6 +333,7 @@ export function FeedsPage() {
         ) : (
           <>
             <ResizablePanel
+              id="article-list"
               defaultSize="33%"
               minSize="180px"
               className="overflow-hidden"
@@ -334,6 +342,7 @@ export function FeedsPage() {
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel
+              id="reader"
               defaultSize="50%"
               minSize="200px"
               className="overflow-hidden"

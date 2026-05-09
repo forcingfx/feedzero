@@ -71,6 +71,19 @@ export const LOCAL_STORAGE = {
   AUTO_ORGANIZE_DISMISSED_COUNT: "feedzero:auto-organize-dismissed-count",
 } as const;
 
+/**
+ * Group ids for the desktop ResizablePanelGroup. Each layout shape gets its own
+ * id so react-resizable-panels persists widths independently — switching from
+ * the 3-panel feeds layout to the 2-panel explore/stats layout must not
+ * clobber the user's preferred sidebar/article-list/reader proportions.
+ */
+export const PANEL_LAYOUT_ID = {
+  /** 3-panel: sidebar + article list + reader. */
+  FEEDS: "feedzero:layout:feeds",
+  /** 2-panel: sidebar + single content area (explore or stats). */
+  SINGLE: "feedzero:layout:single",
+} as const;
+
 const textEncoder = new TextEncoder();
 
 export const SYNC = {
