@@ -7,6 +7,7 @@ import { SUPPORTED_METHODS as FEEDBACK_SUPPORTED_METHODS } from "../src/core/fee
 import { SUPPORTED_METHODS as HEALTH_SUPPORTED_METHODS } from "../src/core/health/health-handler";
 import { SUPPORTED_METHODS as STRIPE_SUPPORTED_METHODS } from "../src/core/stripe/webhook-handler";
 import { SUPPORTED_METHODS as LICENSE_VERIFY_SUPPORTED_METHODS } from "../src/core/license/verify-handler";
+import { SUPPORTED_METHODS as LICENSE_ISSUE_SUPPORTED_METHODS } from "../src/core/license/issue-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
 import * as vercelPageExports from "../api/page";
@@ -15,6 +16,7 @@ import * as vercelFeedbackExports from "../api/feedback";
 import * as vercelHealthExports from "../api/health";
 import * as vercelStripeWebhookExports from "../api/stripe/webhook";
 import * as vercelLicenseVerifyExports from "../api/license/verify";
+import * as vercelLicenseIssueExports from "../api/license/issue";
 import { signLicense, type SigningKey } from "../src/core/license/sign";
 import { MemoryLicenseStorage } from "../src/core/license/storage";
 import type { LicensePayload } from "../src/core/license/format";
@@ -765,6 +767,192 @@ describe("server", () => {
         body: JSON.stringify({ token: "fz_garbage.garbage" }),
       });
       // Endpoint registered: handler returns its own status (probably 401),
+      // never 404 (route missing) or 405 (method not allowed).
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(405);
+    });
+  });
+
+  describe("license issue admin endpoint", () => {
+    const SECRET = "this-is-a-test-signing-secret-32-bytes!";
+    const ADMIN_KEY = "admin_test_key_32+chars_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    const signingKey: SigningKey = { secret: SECRET };
+
+    it("POST /api/license/issue with valid admin token returns 200 + token + record", async () => {
+      const ORIGINAL = process.env.ADMIN_API_KEY;
+      process.env.ADMIN_API_KEY = ADMIN_KEY;
+      try {
+        const storage = new MemoryLicenseStorage();
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage,
+        });
+        const res = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ADMIN_KEY}`,
+          },
+          body: JSON.stringify({ customerId: "cus_admin_test", tier: "pro" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.ok).toBe(true);
+        expect(body.token).toMatch(/^fz_/);
+        expect(body.record.customerId).toBe("cus_admin_test");
+        expect(body.record.tier).toBe("pro");
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.ADMIN_API_KEY;
+        else process.env.ADMIN_API_KEY = ORIGINAL;
+      }
+    });
+
+    it("POST /api/license/issue without admin token returns 401", async () => {
+      const ORIGINAL = process.env.ADMIN_API_KEY;
+      process.env.ADMIN_API_KEY = ADMIN_KEY;
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const res = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ customerId: "cus_x", tier: "personal" }),
+        });
+        expect(res.status).toBe(401);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.ADMIN_API_KEY;
+        else process.env.ADMIN_API_KEY = ORIGINAL;
+      }
+    });
+
+    it("POST /api/license/issue returns 503 when ADMIN_API_KEY env is missing", async () => {
+      const ORIGINAL = process.env.ADMIN_API_KEY;
+      delete process.env.ADMIN_API_KEY;
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const res = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer anything",
+          },
+          body: JSON.stringify({ customerId: "cus_x", tier: "personal" }),
+        });
+        expect(res.status).toBe(503);
+      } finally {
+        if (ORIGINAL !== undefined) process.env.ADMIN_API_KEY = ORIGINAL;
+      }
+    });
+
+    it("POST /api/license/issue returns 503 when KILL_SIGNUPS=1", async () => {
+      const ORIG_ADMIN = process.env.ADMIN_API_KEY;
+      const ORIG_KILL = process.env.KILL_SIGNUPS;
+      process.env.ADMIN_API_KEY = ADMIN_KEY;
+      process.env.KILL_SIGNUPS = "1";
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const res = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ADMIN_KEY}`,
+          },
+          body: JSON.stringify({ customerId: "cus_x", tier: "personal" }),
+        });
+        expect(res.status).toBe(503);
+      } finally {
+        if (ORIG_ADMIN === undefined) delete process.env.ADMIN_API_KEY;
+        else process.env.ADMIN_API_KEY = ORIG_ADMIN;
+        if (ORIG_KILL === undefined) delete process.env.KILL_SIGNUPS;
+        else process.env.KILL_SIGNUPS = ORIG_KILL;
+      }
+    });
+
+    it("issued token roundtrips through /api/license/verify on the same app", async () => {
+      // Closes the e2e loop locally: admin issues a license, the same app's
+      // verify endpoint accepts it. This is the contract that lets us use
+      // PR T's endpoint as the Upstash e2e probe in production.
+      const ORIGINAL = process.env.ADMIN_API_KEY;
+      process.env.ADMIN_API_KEY = ADMIN_KEY;
+      try {
+        const storage = new MemoryLicenseStorage();
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage,
+        });
+        const issueRes = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ADMIN_KEY}`,
+          },
+          body: JSON.stringify({ customerId: "cus_roundtrip", tier: "personal" }),
+        });
+        const issueBody = await issueRes.json();
+        expect(issueBody.ok).toBe(true);
+
+        const verifyRes = await app.request("/api/license/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: issueBody.token }),
+        });
+        expect(verifyRes.status).toBe(200);
+        const verifyBody = await verifyRes.json();
+        expect(verifyBody.ok).toBe(true);
+        expect(verifyBody.license.customerId).toBe("cus_roundtrip");
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.ADMIN_API_KEY;
+        else process.env.ADMIN_API_KEY = ORIGINAL;
+      }
+    });
+  });
+
+  describe("license issue routing contract", () => {
+    it("LICENSE_ISSUE_SUPPORTED_METHODS lists POST", () => {
+      expect(LICENSE_ISSUE_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/license/issue.ts exports a handler for every supported method", () => {
+      for (const method of LICENSE_ISSUE_SUPPORTED_METHODS) {
+        expect(
+          vercelLicenseIssueExports,
+          `api/license/issue.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelLicenseIssueExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/license/issue.ts does not export unsupported methods", () => {
+      const allHttpMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+      const unsupported = allHttpMethods.filter(
+        (m) => !LICENSE_ISSUE_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelLicenseIssueExports,
+          `api/license/issue.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts POST /api/license/issue", async () => {
+      const app = createApp();
+      const res = await app.request("/api/license/issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      // Endpoint registered: handler returns its own status (401/503/etc),
       // never 404 (route missing) or 405 (method not allowed).
       expect(res.status).not.toBe(404);
       expect(res.status).not.toBe(405);
