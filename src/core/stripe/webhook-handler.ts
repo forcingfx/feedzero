@@ -14,7 +14,7 @@
  * [1] https://stripe.com/docs/webhooks#verify-manually
  */
 
-import type { Result } from "@/utils/result";
+import type { Result } from "../../utils/result";
 
 export interface LicenseIssuer {
   issue(args: {
@@ -47,6 +47,14 @@ export interface WebhookConfig {
   /** Replay-window tolerance in seconds. Default 300 (Stripe's recommendation). */
   toleranceSec?: number;
   issuer: LicenseIssuer;
+  /**
+   * Optional kill-switch probe. When it returns true, the handler returns
+   * 503 *after* signature verification but *before* dispatch. 503 makes
+   * Stripe back off and retry, so events queue up safely while the operator
+   * has signups paused (rather than being silently dropped). Defaults to
+   * always-allow.
+   */
+  killSignups?: () => boolean;
 }
 
 const DEFAULT_TOLERANCE_SEC = 300;
@@ -365,6 +373,12 @@ export async function handleStripeWebhook(
   const verified = await verifyAndParse(request, config);
   if (!verified.ok) {
     return jsonResponse({ ok: false, error: verified.error }, verified.status);
+  }
+
+  // Signature checked first so an attacker can't probe webhook behavior with
+  // unsigned requests once they learn the kill switch is flipped.
+  if (config.killSignups?.()) {
+    return jsonResponse({ ok: false, error: "signups disabled" }, 503);
   }
 
   const outcome = await dispatchEvent(verified.value.event, config.issuer);

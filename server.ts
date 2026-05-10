@@ -6,6 +6,15 @@ import { handleSyncStatsRequest } from "./src/core/sync/sync-stats-handler";
 import { handleFaviconRequest } from "./src/core/favicon/favicon-handler";
 import { handleCatalogRequest } from "./src/core/catalog/catalog-handler";
 import { handleHealthRequest } from "./src/core/health/health-handler";
+import { handleStripeWebhook } from "./src/core/stripe/webhook-handler";
+import { handleLicenseVerifyRequest } from "./src/core/license/verify-handler";
+import { LicenseIssuerImpl } from "./src/core/license/issuer";
+import {
+  MemoryLicenseStorage,
+  type LicenseStorage,
+} from "./src/core/license/storage";
+import type { SigningKey } from "./src/core/license/sign";
+import { isFlagEnabled } from "./src/core/flags/flags";
 import { createMemoryAdapter } from "./src/core/sync/adapters/memory-adapter";
 import { createMemoryCatalogAdapter } from "./src/core/catalog/adapters/memory-adapter";
 import { resolveAdapter } from "./src/core/sync/adapters/resolve-adapter";
@@ -13,6 +22,29 @@ import { createFeedCache } from "./src/core/proxy/feed-cache";
 import type { SyncStorageAdapter } from "./src/core/sync/types";
 import type { CatalogStorageAdapter } from "./src/core/catalog/catalog-types";
 import type { FeedCache } from "./src/core/proxy/feed-cache";
+
+/**
+ * Test- and runtime-injectable bundle of license dependencies.
+ * Tests pass a {@link MemoryLicenseStorage} + a known signing secret; the
+ * production runtime reads from env. Bundled together so callers don't have
+ * to thread three positional optional args.
+ */
+export interface LicenseDeps {
+  signingKey: SigningKey;
+  storage: LicenseStorage;
+  /** STRIPE_WEBHOOK_SECRET. Required for the webhook to verify signatures. */
+  webhookSigningSecret?: string;
+  /** Caller-injected for the verify handler in tests. Defaults to wallclock. */
+  nowSec?: number;
+}
+
+function buildLicenseDeps(): LicenseDeps {
+  return {
+    signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+    storage: new MemoryLicenseStorage(),
+    webhookSigningSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  };
+}
 
 /**
  * Simple in-memory rate limiter using a sliding window per IP.
@@ -45,9 +77,15 @@ export function createApp(
   adapter?: SyncStorageAdapter,
   feedCache?: FeedCache,
   catalogAdapter?: CatalogStorageAdapter,
+  licenseDeps?: LicenseDeps,
 ): Hono {
   const syncAdapter = adapter ?? createMemoryAdapter();
   const catalog = catalogAdapter ?? createMemoryCatalogAdapter();
+  const license = licenseDeps ?? buildLicenseDeps();
+  const issuer = new LicenseIssuerImpl({
+    signingKey: license.signingKey,
+    storage: license.storage,
+  });
   const app = new Hono();
   const isAllowed = createRateLimiter();
 
@@ -128,6 +166,22 @@ export function createApp(
   app.get("/api/catalog", (c) => handleCatalogRequest(c.req.raw, catalog));
   app.get("/api/health", (c) => handleHealthRequest(c.req.raw));
 
+  app.post("/api/stripe/webhook", (c) =>
+    handleStripeWebhook(c.req.raw, {
+      signingSecret: license.webhookSigningSecret ?? "",
+      issuer,
+      killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
+    }),
+  );
+
+  app.post("/api/license/verify", (c) =>
+    handleLicenseVerifyRequest(c.req.raw, {
+      signingKey: license.signingKey,
+      storage: license.storage,
+      nowSec: license.nowSec,
+    }),
+  );
+
   return app;
 }
 
@@ -135,11 +189,23 @@ export function createApp(
 async function startServer(): Promise<void> {
   const { serve } = await import("@hono/node-server");
   const { serveStatic } = await import("@hono/node-server/serve-static");
+  const { resolveLicenseStorage } = await import(
+    "./src/core/license/resolve-storage"
+  );
 
   const adapter = resolveAdapter();
   const cache = createFeedCache();
   const catalog = createMemoryCatalogAdapter();
-  const app = createApp(adapter, cache, catalog);
+  // Pre-resolve the license storage so createApp stays synchronous.
+  // Picks UpstashLicenseStorage when UPSTASH_REDIS_REST_URL+TOKEN are set,
+  // MemoryLicenseStorage otherwise (dev / self-hosted without Redis).
+  const licenseStorage = await resolveLicenseStorage();
+  const licenseDeps: LicenseDeps = {
+    signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+    storage: licenseStorage,
+    webhookSigningSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  };
+  const app = createApp(adapter, cache, catalog, licenseDeps);
 
   app.use("/*", serveStatic({ root: "./dist" }));
   app.get("/*", serveStatic({ path: "./dist/index.html" }));

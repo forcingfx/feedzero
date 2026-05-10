@@ -21,14 +21,14 @@
 import {
   decodeLicensePayload,
   type LicensePayload,
-} from "@/core/license/format";
-import type { SigningKey } from "@/core/license/sign";
+} from "./format";
+import type { SigningKey } from "./sign";
 import {
   hmacSha256,
   base64UrlEncode,
   base64UrlDecodeToString,
-} from "@/core/license/crypto";
-import { ok, err, type Result } from "@/utils/result";
+} from "./crypto";
+import { ok, err, type Result } from "../../utils/result";
 
 const TOKEN_PREFIX = "fz_";
 

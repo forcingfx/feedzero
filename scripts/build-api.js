@@ -21,9 +21,23 @@ import { tmpdir } from "os";
 import path from "path";
 
 const apiDir = path.resolve("api");
-const tsFiles = readdirSync(apiDir)
-  .filter((f) => f.endsWith(".ts"))
-  .map((f) => path.join(apiDir, f));
+
+/**
+ * Recursively collect every `.ts` file under api/. Vercel maps subdirectories
+ * to URL path segments (`api/stripe/webhook.ts` → `/api/stripe/webhook`), so
+ * nested layouts must be preserved in the bundled output.
+ */
+function collectTsFiles(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...collectTsFiles(full));
+    else if (entry.isFile() && entry.name.endsWith(".ts")) out.push(full);
+  }
+  return out;
+}
+
+const tsFiles = collectTsFiles(apiDir);
 
 if (tsFiles.length === 0) {
   throw new Error("No api/*.ts files found to bundle.");
@@ -37,46 +51,50 @@ try {
     entryPoints: tsFiles,
     bundle: true,
     outdir: tempOut,
+    outbase: apiDir,
     format: "esm",
     platform: "node",
     target: "node20",
     external: ["@vercel/blob"],
   });
 
+  // Map each source api/.../X.ts to its corresponding tempOut/.../X.js bundle.
+  // outbase=apiDir tells esbuild to mirror the subdir layout, so the relative
+  // path from apiDir is preserved (api/stripe/webhook.ts → tempOut/stripe/webhook.js).
+  const bundlePathFor = (tsFile) => {
+    const rel = path.relative(apiDir, tsFile);
+    return path.join(tempOut, rel.replace(/\.ts$/, ".js"));
+  };
+
   // Validate bundled output before overwriting source
   for (const tsFile of tsFiles) {
-    const baseName = path.basename(tsFile, ".ts");
-    const bundledPath = path.join(tempOut, baseName + ".js");
+    const bundledPath = bundlePathFor(tsFile);
     const bundledContent = readFileSync(bundledPath, "utf-8");
 
     if (!bundledContent || bundledContent.length === 0) {
-      throw new Error(`Empty bundle output for ${baseName}.js`);
+      throw new Error(`Empty bundle output for ${tsFile}`);
     }
     if (bundledContent.includes("../src/")) {
       throw new Error(
-        `Bundle for ${baseName}.js contains unbundled ../src/ imports`,
+        `Bundle for ${tsFile} contains unbundled ../src/ imports`,
       );
     }
   }
 
-  // Overwrite api/*.ts with bundled .js content (Vercel expects .ts extension).
+  // Overwrite api/.../*.ts with bundled .js content (Vercel expects .ts extension).
   // Prepend // @ts-nocheck because the bundled output is esbuild-emitted JS that
   // violates the project's strict tsconfig (implicit any, etc.) and gets pulled
   // into typecheck via tests/server.test.ts contract imports. The src/ originals
   // are still typechecked normally; bundles are build artifacts, not source.
   const TS_NOCHECK_HEADER = "// @ts-nocheck\n";
   for (const tsFile of tsFiles) {
-    const baseName = path.basename(tsFile, ".ts");
-    const bundledContent = readFileSync(
-      path.join(tempOut, baseName + ".js"),
-      "utf-8",
-    );
+    const bundledContent = readFileSync(bundlePathFor(tsFile), "utf-8");
     writeFileSync(tsFile, TS_NOCHECK_HEADER + bundledContent);
   }
 
   console.log(
     `Bundled ${tsFiles.length} API functions (in-place):`,
-    tsFiles.map((f) => path.basename(f)).join(", "),
+    tsFiles.map((f) => path.relative(apiDir, f)).join(", "),
   );
 } finally {
   // Clean up temp directory regardless of success or failure
