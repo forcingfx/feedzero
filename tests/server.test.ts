@@ -1033,6 +1033,43 @@ describe("server", () => {
     });
   });
 
+  describe("vercel wrapper structural invariants", () => {
+    // Tier 2 (Structural Assertion) tests. Vercel wrappers in api/*.ts are
+    // thin glue files whose only behavioral tests are routing contracts.
+    // But a wrapper can silently drop a critical option (e.g. eventStore for
+    // Stripe idempotency, adminApiKey for /api/license/issue) and still
+    // export POST cleanly — the routing contract passes, the handler tests
+    // pass, but production silently runs without that option. These tests
+    // assert the wrapper SOURCE references the options, catching that bug.
+    const fs = require("node:fs") as typeof import("node:fs");
+
+    it("api/stripe/webhook.ts wires eventStore for idempotency", () => {
+      const src = fs.readFileSync("api/stripe/webhook.ts", "utf8");
+      expect(src).toMatch(/resolveSeenEventStore/);
+      expect(src).toMatch(/eventStore/);
+    });
+
+    it("api/stripe/webhook.ts wires KILL_SIGNUPS gate", () => {
+      const src = fs.readFileSync("api/stripe/webhook.ts", "utf8");
+      expect(src).toMatch(/KILL_SIGNUPS/);
+    });
+
+    it("api/license/issue.ts wires ADMIN_API_KEY", () => {
+      const src = fs.readFileSync("api/license/issue.ts", "utf8");
+      expect(src).toMatch(/ADMIN_API_KEY/);
+    });
+
+    it("api/license/issue.ts wires KILL_SIGNUPS gate", () => {
+      const src = fs.readFileSync("api/license/issue.ts", "utf8");
+      expect(src).toMatch(/KILL_SIGNUPS/);
+    });
+
+    it("api/license/verify.ts wires resolveLicenseStorage (not raw MemoryLicenseStorage)", () => {
+      const src = fs.readFileSync("api/license/verify.ts", "utf8");
+      expect(src).toMatch(/resolveLicenseStorage/);
+    });
+  });
+
   describe("stripe webhook routing contract", () => {
     it("STRIPE_SUPPORTED_METHODS lists POST", () => {
       expect(STRIPE_SUPPORTED_METHODS).toContain("POST");
