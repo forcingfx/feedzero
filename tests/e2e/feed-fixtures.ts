@@ -149,16 +149,17 @@ export async function mockFeedEndpoint(page: Page, feedContent: string) {
   await page.route("**/api/feed*", (route) => {
     // The app auto-subscribes to the release-notes feed on first launch
     // (`CHANGELOG_FEED_URL = https://feedzero.app/releases.xml`). It goes
-    // through the same `/api/feed?url=...` proxy as user-added feeds. If we
-    // respond with `feedContent` here too, the release-notes feed lands in
-    // the sidebar with the SAME title as the test feed — selectors that
-    // filter by title resolve to two elements and Playwright fails with
-    // strict-mode violations.
+    // through the same `POST /api/feed` proxy as user-added feeds — the
+    // target URL travels in the JSON body, NOT the query string. If we
+    // respond with `feedContent` here too, the release-notes feed lands
+    // in the sidebar with the SAME title as the test feed and selectors
+    // filtering by title resolve to two elements (Playwright strict-mode
+    // violation).
     //
-    // Auto-subscribe is wrapped in try/catch (best-effort), so 404 here is
-    // silently swallowed and no rogue feed appears in the sidebar.
-    const url = route.request().url();
-    if (url.includes("releases.xml")) {
+    // Auto-subscribe is wrapped in try/catch (best-effort), so 404 here
+    // is silently swallowed and no rogue feed appears in the sidebar.
+    const targetUrl = readTargetUrlFromBody(route.request().postData());
+    if (targetUrl.includes("releases.xml")) {
       route.fulfill({ status: 404, body: "not found in test" });
       return;
     }
@@ -168,6 +169,21 @@ export async function mockFeedEndpoint(page: Page, feedContent: string) {
       body: feedContent,
     });
   });
+}
+
+/**
+ * The proxy POST body is `{"url":"<target>"}`. Returns the target URL,
+ * or "" if the body is missing/malformed (so the caller treats it as
+ * a non-release-notes URL and serves the regular fixture content).
+ */
+function readTargetUrlFromBody(rawBody: string | null): string {
+  if (!rawBody) return "";
+  try {
+    const parsed = JSON.parse(rawBody);
+    return typeof parsed?.url === "string" ? parsed.url : "";
+  } catch {
+    return "";
+  }
 }
 
 /**
