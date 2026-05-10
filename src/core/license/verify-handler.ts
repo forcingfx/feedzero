@@ -12,10 +12,10 @@
  * helpers share the same verify + revocation pipeline below the wire shape.
  */
 
-import { verifyLicense } from "@/core/license/verify";
-import type { LicensePayload } from "@/core/license/format";
-import type { SigningKey } from "@/core/license/sign";
-import type { LicenseStorage } from "@/core/license/storage";
+import { verifyLicense } from "./verify";
+import type { LicensePayload } from "./format";
+import type { SigningKey } from "./sign";
+import type { LicenseStorage } from "./storage";
 
 export const SUPPORTED_METHODS: readonly string[] = ["POST"];
 

@@ -14,7 +14,7 @@
  * [1] https://stripe.com/docs/webhooks#verify-manually
  */
 
-import type { Result } from "@/utils/result";
+import type { Result } from "../../utils/result";
 
 export interface LicenseIssuer {
   issue(args: {

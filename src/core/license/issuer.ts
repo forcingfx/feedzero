@@ -21,13 +21,13 @@
  * with the new expiry.
  */
 
-import { signLicense, type SigningKey } from "@/core/license/sign";
+import { signLicense, type SigningKey } from "./sign";
 import type {
   LicenseRecord,
   LicenseStorage,
-} from "@/core/license/storage";
-import type { LicenseIssuer } from "@/core/stripe/webhook-handler";
-import { ok, type Result } from "@/utils/result";
+} from "./storage";
+import type { LicenseIssuer } from "../stripe/webhook-handler";
+import { ok, type Result } from "../../utils/result";
 
 /** 31 days. Matches a typical Stripe billing cycle plus grace. */
 const DEFAULT_EXPIRY_SEC = 31 * 24 * 3600;

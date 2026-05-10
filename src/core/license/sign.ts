@@ -16,8 +16,8 @@
 import {
   encodeLicensePayload,
   type LicensePayload,
-} from "@/core/license/format";
-import { hmacSha256, base64UrlEncode } from "@/core/license/crypto";
+} from "./format";
+import { hmacSha256, base64UrlEncode } from "./crypto";
 
 /** Opaque wrapper so callers don't accidentally pass a stringly-typed token. */
 export interface SigningKey {
