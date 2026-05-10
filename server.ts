@@ -8,6 +8,7 @@ import { handleCatalogRequest } from "./src/core/catalog/catalog-handler";
 import { handleHealthRequest } from "./src/core/health/health-handler";
 import { handleStripeWebhook } from "./src/core/stripe/webhook-handler";
 import { handleLicenseVerifyRequest } from "./src/core/license/verify-handler";
+import { handleLicenseIssueRequest } from "./src/core/license/issue-handler";
 import { LicenseIssuerImpl } from "./src/core/license/issuer";
 import {
   MemoryLicenseStorage,
@@ -179,6 +180,14 @@ export function createApp(
       signingKey: license.signingKey,
       storage: license.storage,
       nowSec: license.nowSec,
+    }),
+  );
+
+  app.post("/api/license/issue", (c) =>
+    handleLicenseIssueRequest(c.req.raw, {
+      issuer,
+      adminApiKey: process.env.ADMIN_API_KEY ?? "",
+      killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
     }),
   );
 

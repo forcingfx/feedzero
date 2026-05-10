@@ -180,6 +180,21 @@ function apiProxyPlugin() {
         });
         await sendWebResponse(webRes, res);
       });
+
+      server.middlewares.use("/api/license/issue", async (req, res) => {
+        const { licenseIssuer } = await ensureLicenseDeps();
+        const [{ handleLicenseIssueRequest }, { isFlagEnabled }] = await Promise.all([
+          import("./src/core/license/issue-handler.ts"),
+          import("./src/core/flags/flags.ts"),
+        ]);
+        const webReq = await toWebRequest(req);
+        const webRes = await handleLicenseIssueRequest(webReq, {
+          issuer: licenseIssuer,
+          adminApiKey: process.env.ADMIN_API_KEY ?? "",
+          killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
+        });
+        await sendWebResponse(webRes, res);
+      });
     },
   };
 }
