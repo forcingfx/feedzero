@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, act } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -42,6 +42,7 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
 
 vi.mock("@/core/extractor/extractor.ts", () => ({
   extract: vi.fn(),
+  needsExtraction: vi.fn(() => false),
 }));
 
 let mockIsDesktop = true;
@@ -254,6 +255,69 @@ describe("FeedsPage layout — desktop", () => {
     expect(panels).toHaveLength(2);
     const ids = Array.from(panels).map((p) => p.getAttribute("id"));
     expect(ids).toEqual(expect.arrayContaining(["sidebar", "explore"]));
+  });
+
+  it("does not clobber selectedArticle to the previous URL article when articles mutates faster than React Router (PR #34 follow-up)", async () => {
+    // Repro: user is on /feeds/f1/articles/a0. They scroll down so a0 is
+    // off-screen, then click a15. Inside the click chain, ArticleList's
+    // handleSelect calls store.selectArticle(a15) — that updates the
+    // selectedArticle in Zustand AND triggers the auto-mark-as-read flush
+    // for the previously-selected article, which mutates the articles array.
+    // navigate('/articles/a15') is also called, but React Router's articleId
+    // (from useParams) doesn't always settle in the same render pass as
+    // Zustand updates — there's a window where `articles` has changed but
+    // `articleId` is still 'a0' (stale).
+    //
+    // The line-136 effect in feeds-page.tsx re-runs whenever `articles`
+    // changes. If it doesn't track which articleId it last synced from, it
+    // sees `selectedArticle.id === 'a15' !== articleId === 'a0'` and
+    // "fixes" the mismatch by selecting articles[0] — clobbering the
+    // user's just-clicked selection. Then articleId settles, the effect
+    // runs again, and selection bounces back to a15. The visible result
+    // is two scroll jumps and a flash of the wrong article.
+    const articles = Array.from({ length: 50 }, (_, i) => ({
+      id: `a${i}`,
+      feedId: "f1",
+      guid: `a${i}`,
+      title: `Article ${i}`,
+      link: `https://example.com/${i}`,
+      content: "",
+      summary: "",
+      author: "",
+      publishedAt: Date.now() - i * 1000,
+      read: false,
+      createdAt: Date.now(),
+    }));
+    useArticleStore.setState({
+      articles,
+      selectedArticle: articles[0],
+      isLoading: false,
+    });
+
+    renderPage("/feeds/f1/articles/a0");
+    // Let the initial sync settle so the effect records 'a0' as the
+    // last-synced articleId.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    // Simulate the post-click state: selectedArticle has just been switched
+    // to a15 by ArticleList's handleSelect, AND the articles array has been
+    // mutated by the auto-mark-as-read flush — but the URL articleId is
+    // still 'a0' because the navigate hasn't propagated through React
+    // Router yet.
+    await act(async () => {
+      useArticleStore.setState({
+        selectedArticle: articles[15],
+        articles: articles.map((a, i) =>
+          i === 15 ? { ...a, read: true } : a,
+        ),
+      });
+    });
+
+    // selectedArticle MUST still be a15. The line-136 effect must not
+    // re-sync from the stale articleId 'a0' and clobber the click result.
+    expect(useArticleStore.getState().selectedArticle?.id).toBe("a15");
   });
 
   it("explore layout's sidebar starts at the user's stored width (preserved across layout transitions)", async () => {
