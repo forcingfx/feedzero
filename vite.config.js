@@ -210,6 +210,35 @@ function apiProxyPlugin() {
         });
         await sendWebResponse(webRes, res);
       });
+
+      server.middlewares.use("/api/checkout/create-session", async (req, res) => {
+        const [
+          { handleCreateCheckoutSession },
+          { resolveAllowedPrices },
+          { isFlagEnabled },
+        ] = await Promise.all([
+          import("./src/core/stripe/checkout-handler.ts"),
+          import("./src/core/stripe/allowed-prices.ts"),
+          import("./src/core/flags/flags.ts"),
+        ]);
+        const webReq = await toWebRequest(req);
+        const webRes = await handleCreateCheckoutSession(webReq, {
+          // Lazy Stripe construction — handler short-circuits 4xx/503 paths
+          // before the SDK is touched, so dev/test without STRIPE_SECRET_KEY
+          // still hits clean 4xx responses instead of crashing the import.
+          client: {
+            create: async (params, opts) => {
+              const { default: Stripe } = await import("stripe");
+              const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+              const session = await stripe.checkout.sessions.create(params, opts);
+              return { url: session.url, id: session.id };
+            },
+          },
+          allowedPrices: resolveAllowedPrices(),
+          killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
+        });
+        await sendWebResponse(webRes, res);
+      });
     },
   };
 }

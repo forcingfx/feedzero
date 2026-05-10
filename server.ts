@@ -9,6 +9,8 @@ import { handleHealthRequest } from "./src/core/health/health-handler";
 import { handleStripeWebhook } from "./src/core/stripe/webhook-handler";
 import { handleLicenseVerifyRequest } from "./src/core/license/verify-handler";
 import { handleLicenseIssueRequest } from "./src/core/license/issue-handler";
+import { handleCreateCheckoutSession } from "./src/core/stripe/checkout-handler";
+import { resolveAllowedPrices } from "./src/core/stripe/allowed-prices";
 import type { SeenEventStore } from "./src/core/stripe/seen-event-store";
 import { LicenseIssuerImpl } from "./src/core/license/issuer";
 import {
@@ -209,6 +211,27 @@ export function createApp(
     handleLicenseIssueRequest(c.req.raw, {
       issuer,
       adminApiKey: process.env.ADMIN_API_KEY ?? "",
+      killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
+    }),
+  );
+
+  app.post("/api/checkout/create-session", (c) =>
+    handleCreateCheckoutSession(c.req.raw, {
+      // The Stripe SDK is constructed LAZILY inside `create` so that the
+      // handler's pre-checks (kill-switch, body validation, allowlist) can
+      // short-circuit before we ever touch the SDK. This keeps tests sane
+      // (no need to set STRIPE_SECRET_KEY just to test 400/503 paths) and
+      // means a missing STRIPE_SECRET_KEY surfaces as a clean 502 from the
+      // handler's catch block, not a crash.
+      client: {
+        create: async (params, opts) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.checkout.sessions.create(params, opts);
+          return { url: session.url, id: session.id };
+        },
+      },
+      allowedPrices: resolveAllowedPrices(),
       killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
     }),
   );
