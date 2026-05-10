@@ -16,8 +16,14 @@ import * as vercelCatalogExports from "../api/catalog";
 import * as vercelFeedbackExports from "../api/feedback";
 import * as vercelHealthExports from "../api/health";
 import * as vercelStripeWebhookExports from "../api/stripe/webhook";
-import * as vercelLicenseVerifyExports from "../api/license/verify";
-import * as vercelLicenseIssueExports from "../api/license/issue";
+// Both /api/license/verify and /api/license/issue resolve to the same Vercel
+// dynamic-route file (api/license/[action].ts) — consolidated to stay under
+// the Hobby-plan 12-functions ceiling. The wrapper dispatches internally by
+// the action segment. The two routing contracts assert against the same
+// module since they share the POST export.
+import * as vercelLicenseDynamicExports from "../api/license/[action]";
+const vercelLicenseVerifyExports = vercelLicenseDynamicExports;
+const vercelLicenseIssueExports = vercelLicenseDynamicExports;
 import * as vercelCheckoutExports from "../api/checkout/create-session";
 import { signLicense, type SigningKey } from "../src/core/license/sign";
 import { MemoryLicenseStorage } from "../src/core/license/storage";
@@ -1216,19 +1222,30 @@ describe("server", () => {
       expect(src).toMatch(/KILL_SIGNUPS/);
     });
 
-    it("api/license/issue.ts wires ADMIN_API_KEY", () => {
-      const src = fs.readFileSync("api/license/issue.ts", "utf8");
+    // verify + issue consolidated into api/license/[action].ts (Vercel
+    // dynamic route) to stay under the Hobby plan's 12-function ceiling.
+    // Both wiring assertions now check the single dispatcher file.
+    it("api/license/[action].ts wires ADMIN_API_KEY (issue branch)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
       expect(src).toMatch(/ADMIN_API_KEY/);
     });
 
-    it("api/license/issue.ts wires KILL_SIGNUPS gate", () => {
-      const src = fs.readFileSync("api/license/issue.ts", "utf8");
+    it("api/license/[action].ts wires KILL_SIGNUPS gate (issue branch)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
       expect(src).toMatch(/KILL_SIGNUPS/);
     });
 
-    it("api/license/verify.ts wires resolveLicenseStorage (not raw MemoryLicenseStorage)", () => {
-      const src = fs.readFileSync("api/license/verify.ts", "utf8");
+    it("api/license/[action].ts wires resolveLicenseStorage (verify + issue)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
       expect(src).toMatch(/resolveLicenseStorage/);
+    });
+
+    it("api/license/[action].ts dispatches both 'verify' and 'issue' actions", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
+      // Source must reference both action names so a regression that drops
+      // one branch is caught even if test traffic only exercises the other.
+      expect(src).toMatch(/['"`]verify['"`]/);
+      expect(src).toMatch(/['"`]issue['"`]/);
     });
 
     it("api/sync.ts wires LAUNCH_PAID_TIER gate (PR W)", () => {
