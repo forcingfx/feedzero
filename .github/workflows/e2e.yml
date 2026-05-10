@@ -3,6 +3,18 @@ name: E2E
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      # Skip e2e on changes that cannot affect runtime behaviour. Keeps the
+      # PR feedback loop fast for doc / template / config-only changes.
+      - 'docs/**'
+      - '*.md'
+      - '.github/CODEOWNERS'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/pull_request_template.md'
+      - '.github/dependabot.yml'
+      - 'SECURITY.md'
+      - 'CONTRIBUTING.md'
+      - 'LICENSE'
   push:
     branches: [main]
 
@@ -15,9 +27,15 @@ permissions:
 
 jobs:
   e2e:
-    name: Playwright E2E (chromium)
+    name: Playwright E2E (chromium) — shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
+    strategy:
+      # Don't kill remaining shards if one fails — we want to see all failures
+      # in a single CI cycle, not chase them shard-by-shard.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
 
@@ -29,17 +47,46 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Playwright config defines two projects (desktop + mobile), both Chromium.
-      - name: Install Playwright browser (chromium)
+      # Cache the browser binary by Playwright version. Reduces a ~30-60s
+      # download on every run to a ~2s restore. Cache key bumps automatically
+      # when Playwright is upgraded.
+      - name: Get Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install Playwright browser + system deps (cache miss)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
-        run: npm run test:e2e
+      # OS-level deps are not in the browser cache, so install them even on
+      # cache hits. `install-deps` is fast (~10s) and idempotent.
+      - name: Install Playwright OS deps (cache hit)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # PR runs: desktop only. Mobile-specific bugs are rare and main-branch
+      # CI catches them before deploy. This ~halves PR wall-clock.
+      - name: Run E2E tests — PR (desktop only)
+        if: github.event_name == 'pull_request'
+        run: npx playwright test --project=desktop --shard=${{ matrix.shard }}/4 --max-failures=5
+
+      # Main push: full matrix (desktop + mobile). Caught regressions can
+      # still trigger Vercel rollback before users notice.
+      - name: Run E2E tests — main push (desktop + mobile)
+        if: github.event_name == 'push'
+        run: npx playwright test --shard=${{ matrix.shard }}/4 --max-failures=5
 
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 14
