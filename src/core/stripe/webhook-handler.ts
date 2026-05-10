@@ -3,18 +3,19 @@
  *
  * Verifies the `Stripe-Signature` header against the raw request body using
  * HMAC-SHA256 (per Stripe's manual verification spec [1]), parses the event,
- * and dispatches to per-event methods on a {@link LicenseIssuer} collaborator.
+ * deduplicates by `event.id` if a {@link SeenEventStore} is configured, and
+ * dispatches to per-event methods on a {@link LicenseIssuer} collaborator.
  *
- * Idempotency is the responsibility of the {@link LicenseIssuer}
- * implementation. The natural idempotency key is `subscriptionId` for
- * issue/renewal flows. A future PR can add an
- * `event:processed:<event.id>` set if duplicate-delivery becomes a problem
- * in production.
+ * Stripe sends each event up to 3 days (live mode) on retry — without
+ * idempotency the issuer mints a duplicate license token on every retry.
+ * The dedup check happens AFTER signature verification so an attacker
+ * cannot fill the dedup store with garbage event IDs from unsigned probes.
  *
  * [1] https://stripe.com/docs/webhooks#verify-manually
  */
 
 import type { Result } from "../../utils/result";
+import type { SeenEventStore } from "./seen-event-store";
 
 export interface LicenseIssuer {
   issue(args: {
@@ -55,6 +56,14 @@ export interface WebhookConfig {
    * always-allow.
    */
   killSignups?: () => boolean;
+  /**
+   * Optional event-id dedup store. When configured, duplicate deliveries
+   * (Stripe retries the same `event.id`) return 200 without re-dispatching.
+   * When absent (e.g. tests, or if KV is unavailable), the handler falls
+   * back to always-dispatch — relying on the issuer's own per-subscription
+   * idempotency for safety.
+   */
+  eventStore?: SeenEventStore;
 }
 
 const DEFAULT_TOLERANCE_SEC = 300;
@@ -381,6 +390,22 @@ export async function handleStripeWebhook(
     return jsonResponse({ ok: false, error: "signups disabled" }, 503);
   }
 
-  const outcome = await dispatchEvent(verified.value.event, config.issuer);
+  // Event-id dedup. Runs after signature verification (so unsigned probes
+  // cannot pollute the dedup store) and after KILL_SIGNUPS (so a kill-switch
+  // 503 still makes Stripe retry without burning the eventId).
+  const event = verified.value.event;
+  if (config.eventStore && event.id) {
+    const newSeen = await config.eventStore.markSeenIfNew(event.id);
+    if (!newSeen.ok) {
+      // Storage failure — return 500 so Stripe retries.
+      return jsonResponse({ ok: false, error: newSeen.error }, 500);
+    }
+    if (!newSeen.value) {
+      // Duplicate delivery — Stripe doc: return 200 immediately, do not re-dispatch.
+      return jsonResponse({ ok: true, alreadyProcessed: true }, 200);
+    }
+  }
+
+  const outcome = await dispatchEvent(event, config.issuer);
   return jsonResponse(outcome.body, outcome.status);
 }

@@ -13,6 +13,7 @@ import {
   type StripeFixture,
 } from "@/core/stripe/test-fixtures";
 import { ok, err } from "@/utils/result";
+import { MemorySeenEventStore } from "@/core/stripe/seen-event-store";
 
 const ENDPOINT = "http://localhost/api/stripe/webhook";
 const SECRET = "whsec_test_secret_value";
@@ -308,6 +309,130 @@ describe("handleStripeWebhook", () => {
         postFixture(fixture, nowSec()),
         makeConfig(issuer, { killSignups: () => false }),
       );
+      expect(res.status).toBe(200);
+      expect(issuer.issue).toHaveBeenCalled();
+    });
+  });
+
+  describe("event idempotency", () => {
+    it("dispatches first delivery of an event to the issuer", async () => {
+      const eventStore = new MemorySeenEventStore();
+      const fixture = subscriptionCreatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        tier: "personal",
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer, { eventStore }),
+      );
+      expect(res.status).toBe(200);
+      expect(issuer.issue).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns 200 alreadyProcessed on duplicate delivery and does NOT re-dispatch", async () => {
+      // Simulates Stripe's automatic retry after a missed 2xx response.
+      // The issuer must be called exactly once across both deliveries.
+      const eventStore = new MemorySeenEventStore();
+      const fixture = subscriptionCreatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        tier: "personal",
+      });
+
+      const ts = nowSec();
+      const first = await handleStripeWebhook(
+        postFixture(fixture, ts),
+        makeConfig(issuer, { eventStore }),
+      );
+      expect(first.status).toBe(200);
+
+      const second = await handleStripeWebhook(
+        postFixture(fixture, ts),
+        makeConfig(issuer, { eventStore }),
+      );
+      expect(second.status).toBe(200);
+      const body = await second.json();
+      expect(body).toMatchObject({ ok: true, alreadyProcessed: true });
+
+      expect(issuer.issue).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns 500 when eventStore returns Result.err so Stripe retries", async () => {
+      const failingStore = {
+        markSeenIfNew: async () => err("upstash unreachable"),
+      };
+      const fixture = subscriptionCreatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        tier: "personal",
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer, { eventStore: failingStore }),
+      );
+      expect(res.status).toBe(500);
+      expect(issuer.issue).not.toHaveBeenCalled();
+    });
+
+    it("dispatches normally when no eventStore is configured (backward compat)", async () => {
+      // Existing call sites (and any future ones) that don't pass eventStore
+      // must keep working — no idempotency, but no crash either.
+      const fixture = subscriptionCreatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        tier: "personal",
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer),
+      );
+      expect(res.status).toBe(200);
+      expect(issuer.issue).toHaveBeenCalled();
+    });
+
+    it("dedup happens AFTER signature verification (auth-not-bypassable)", async () => {
+      // An attacker probing webhook behavior with bad signatures must not
+      // be able to fill the dedup store with garbage event IDs.
+      const calls: string[] = [];
+      const eventStore = {
+        markSeenIfNew: async (id: string) => {
+          calls.push(id);
+          return ok(true);
+        },
+      };
+      const req = new Request(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Stripe-Signature": "t=1,v1=deadbeef",
+        },
+        body: JSON.stringify({ id: "evt_attacker", type: "x" }),
+      });
+      const res = await handleStripeWebhook(
+        req,
+        makeConfig(issuer, { eventStore }),
+      );
+      expect(res.status).toBe(400);
+      expect(calls).toEqual([]); // store never touched
+    });
+
+    it("skips dedup for events without an id (defensive)", async () => {
+      // Stripe always sends event.id, but we guard against malformed input
+      // so a missing id doesn't crash the store call.
+      const eventStore = new MemorySeenEventStore();
+      const fixture = subscriptionCreatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        tier: "personal",
+      });
+      // Strip the id from the fixture event
+      delete (fixture.event as { id?: string }).id;
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer, { eventStore }),
+      );
+      // Should still process (no crash); we just don't dedup.
       expect(res.status).toBe(200);
       expect(issuer.issue).toHaveBeenCalled();
     });

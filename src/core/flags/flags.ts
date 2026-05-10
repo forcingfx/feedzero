@@ -26,7 +26,18 @@ export type FlagName =
   | "KILL_ALERTS"
   | "KILL_FETCHERS"
   | "KILL_SIGNUPS"
-  | "READONLY_SYNC";
+  | "READONLY_SYNC"
+  /**
+   * Master pre-launch gate for Phase 1 (paid tier). When unset/0, the paid
+   * features ship dormant: /api/sync stays free, frontend hides Subscribe.
+   * When set to "1", /api/sync requires a Bearer license (PR W) and the
+   * frontend reveals the Subscribe surface (PR Y, via VITE_*).
+   *
+   * Intentionally distinct from KILL_SIGNUPS, which is operational
+   * (turn off NEW signups during incident, paid tier still active for
+   * existing customers).
+   */
+  | "LAUNCH_PAID_TIER";
 
 /**
  * Returns true iff the named flag is enabled.

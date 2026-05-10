@@ -129,32 +129,35 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
-      // License + Stripe wiring. We share one resolved storage across both
+      // License + Stripe wiring. We share one resolved storage across all
       // endpoints so revocations performed via the webhook are immediately
-      // visible to /api/license/verify in the same dev session. The resolver
-      // picks Upstash if UPSTASH_REDIS_REST_URL+TOKEN are set, otherwise an
-      // in-memory store — dev typically runs without Upstash so this defaults
-      // to memory. Either way, both endpoints share the same instance.
+      // visible to /api/license/verify in the same dev session. The resolvers
+      // pick Upstash if UPSTASH_*/KV_REST_API_* env vars are set, otherwise
+      // in-memory — dev typically runs without Upstash so this defaults to
+      // memory. Same shape across all wrappers.
       let licenseStorage = null;
       let licenseIssuer = null;
+      let stripeEventStore = null;
 
       async function ensureLicenseDeps() {
         if (!licenseStorage) {
-          const [resolverMod, issuerMod] = await Promise.all([
+          const [resolverMod, issuerMod, eventResolverMod] = await Promise.all([
             import("./src/core/license/resolve-storage.ts"),
             import("./src/core/license/issuer.ts"),
+            import("./src/core/stripe/resolve-seen-event-store.ts"),
           ]);
           licenseStorage = await resolverMod.resolveLicenseStorage();
+          stripeEventStore = await eventResolverMod.resolveSeenEventStore();
           licenseIssuer = new issuerMod.LicenseIssuerImpl({
             signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
             storage: licenseStorage,
           });
         }
-        return { licenseStorage, licenseIssuer };
+        return { licenseStorage, licenseIssuer, stripeEventStore };
       }
 
       server.middlewares.use("/api/stripe/webhook", async (req, res) => {
-        const { licenseIssuer } = await ensureLicenseDeps();
+        const { licenseIssuer, stripeEventStore } = await ensureLicenseDeps();
         const [{ handleStripeWebhook }, { isFlagEnabled }] = await Promise.all([
           import("./src/core/stripe/webhook-handler.ts"),
           import("./src/core/flags/flags.ts"),
@@ -163,6 +166,7 @@ function apiProxyPlugin() {
         const webRes = await handleStripeWebhook(webReq, {
           signingSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
           issuer: licenseIssuer,
+          eventStore: stripeEventStore,
           killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
         });
         await sendWebResponse(webRes, res);

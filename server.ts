@@ -9,6 +9,7 @@ import { handleHealthRequest } from "./src/core/health/health-handler";
 import { handleStripeWebhook } from "./src/core/stripe/webhook-handler";
 import { handleLicenseVerifyRequest } from "./src/core/license/verify-handler";
 import { handleLicenseIssueRequest } from "./src/core/license/issue-handler";
+import type { SeenEventStore } from "./src/core/stripe/seen-event-store";
 import { LicenseIssuerImpl } from "./src/core/license/issuer";
 import {
   MemoryLicenseStorage,
@@ -37,6 +38,12 @@ export interface LicenseDeps {
   webhookSigningSecret?: string;
   /** Caller-injected for the verify handler in tests. Defaults to wallclock. */
   nowSec?: number;
+  /**
+   * Optional Stripe event-id dedup store. If present, the webhook handler
+   * skips re-dispatch on duplicate `event.id`. Tests typically pass a
+   * MemorySeenEventStore; production wires Upstash via resolveSeenEventStore.
+   */
+  eventStore?: SeenEventStore;
 }
 
 function buildLicenseDeps(): LicenseDeps {
@@ -171,6 +178,7 @@ export function createApp(
     handleStripeWebhook(c.req.raw, {
       signingSecret: license.webhookSigningSecret ?? "",
       issuer,
+      eventStore: license.eventStore,
       killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
     }),
   );
@@ -201,18 +209,25 @@ async function startServer(): Promise<void> {
   const { resolveLicenseStorage } = await import(
     "./src/core/license/resolve-storage"
   );
+  const { resolveSeenEventStore } = await import(
+    "./src/core/stripe/resolve-seen-event-store"
+  );
 
   const adapter = resolveAdapter();
   const cache = createFeedCache();
   const catalog = createMemoryCatalogAdapter();
-  // Pre-resolve the license storage so createApp stays synchronous.
-  // Picks UpstashLicenseStorage when UPSTASH_REDIS_REST_URL+TOKEN are set,
-  // MemoryLicenseStorage otherwise (dev / self-hosted without Redis).
-  const licenseStorage = await resolveLicenseStorage();
+  // Pre-resolve the license storage and Stripe-event dedup store so
+  // createApp stays synchronous. Both pick Upstash when UPSTASH_*/KV_* env
+  // vars are set, in-memory otherwise.
+  const [licenseStorage, eventStore] = await Promise.all([
+    resolveLicenseStorage(),
+    resolveSeenEventStore(),
+  ]);
   const licenseDeps: LicenseDeps = {
     signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
     storage: licenseStorage,
     webhookSigningSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    eventStore,
   };
   const app = createApp(adapter, cache, catalog, licenseDeps);
 

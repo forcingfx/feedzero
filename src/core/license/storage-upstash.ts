@@ -40,9 +40,15 @@ export interface UpstashClient {
   // record at the call site via the generic.
   get<T = unknown>(key: string): Promise<T | null>;
   // Upstash returns `"OK"` on success but the SDK types it `Promise<unknown>`
-  // because of optional NX/XX flags. We don't read the return value, so the
-  // permissive type is fine.
-  set(key: string, value: unknown): Promise<unknown>;
+  // because of optional NX/XX flags. The optional `opts` bag (nx, ex) is
+  // unused by the license adapter itself but matches the wider Upstash SDK
+  // signature so the same Redis client can be passed to other adapters
+  // (e.g. seen-event-store).
+  set(
+    key: string,
+    value: unknown,
+    opts?: { nx?: boolean; ex?: number },
+  ): Promise<unknown>;
   sadd(key: string, ...members: string[]): Promise<number>;
   smembers(key: string): Promise<string[]>;
   exists(key: string): Promise<number>;
