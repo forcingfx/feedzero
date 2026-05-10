@@ -27,8 +27,11 @@ function makeIssuer(): LicenseIssuer {
   };
 }
 
-function makeConfig(issuer: LicenseIssuer): WebhookConfig {
-  return { signingSecret: SECRET, issuer };
+function makeConfig(
+  issuer: LicenseIssuer,
+  overrides: Partial<WebhookConfig> = {},
+): WebhookConfig {
+  return { signingSecret: SECRET, issuer, ...overrides };
 }
 
 function postFixture(fixture: StripeFixture, ts: number): Request {
@@ -249,5 +252,64 @@ describe("handleStripeWebhook", () => {
       makeConfig(failingIssuer),
     );
     expect(res.status).toBe(500);
+  });
+
+  describe("KILL_SIGNUPS gating", () => {
+    it("returns 503 and skips issuer when killSignups returns true", async () => {
+      const fixture = subscriptionCreatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        tier: "personal",
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer, { killSignups: () => true }),
+      );
+      // 503 makes Stripe back off + retry — the event is preserved for replay
+      // once the operator clears the flag.
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body.ok).toBe(false);
+      expect(body.error).toMatch(/signups disabled/i);
+      expect(issuer.issue).not.toHaveBeenCalled();
+    });
+
+    it("verifies the signature BEFORE consulting killSignups (auth not bypassable)", async () => {
+      // An attacker who learns about the kill switch must not be able to
+      // probe webhook behavior with unsigned requests. Invalid signature
+      // takes precedence over kill switch.
+      const fixture = subscriptionCreatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        tier: "personal",
+      });
+      const req = new Request(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Stripe-Signature": "t=1,v1=deadbeef",
+        },
+        body: JSON.stringify(fixture.event),
+      });
+      const res = await handleStripeWebhook(
+        req,
+        makeConfig(issuer, { killSignups: () => true }),
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("processes normally when killSignups returns false", async () => {
+      const fixture = subscriptionCreatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        tier: "pro",
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer, { killSignups: () => false }),
+      );
+      expect(res.status).toBe(200);
+      expect(issuer.issue).toHaveBeenCalled();
+    });
   });
 });

@@ -5,12 +5,20 @@ import { SUPPORTED_METHODS as PROXY_SUPPORTED_METHODS } from "../src/core/proxy/
 import { SUPPORTED_METHODS as CATALOG_SUPPORTED_METHODS } from "../src/core/catalog/catalog-handler";
 import { SUPPORTED_METHODS as FEEDBACK_SUPPORTED_METHODS } from "../src/core/feedback/feedback-handler";
 import { SUPPORTED_METHODS as HEALTH_SUPPORTED_METHODS } from "../src/core/health/health-handler";
+import { SUPPORTED_METHODS as STRIPE_SUPPORTED_METHODS } from "../src/core/stripe/webhook-handler";
+import { SUPPORTED_METHODS as LICENSE_VERIFY_SUPPORTED_METHODS } from "../src/core/license/verify-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
 import * as vercelPageExports from "../api/page";
 import * as vercelCatalogExports from "../api/catalog";
 import * as vercelFeedbackExports from "../api/feedback";
 import * as vercelHealthExports from "../api/health";
+import * as vercelStripeWebhookExports from "../api/stripe/webhook";
+import * as vercelLicenseVerifyExports from "../api/license/verify";
+import { signLicense, type SigningKey } from "../src/core/license/sign";
+import { MemoryLicenseStorage } from "../src/core/license/storage";
+import type { LicensePayload } from "../src/core/license/format";
+import { subscriptionCreatedEvent } from "../src/core/stripe/test-fixtures";
 
 // Mock fetch globally for proxy handler tests
 const mockFetch = vi.fn();
@@ -655,6 +663,237 @@ describe("server", () => {
     it("Hono server accepts GET /api/health", async () => {
       const app = createApp();
       const res = await app.request("/api/health");
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(405);
+    });
+  });
+
+  describe("license verify endpoint", () => {
+    const SECRET = "this-is-a-test-signing-secret-32-bytes!";
+    const signingKey: SigningKey = { secret: SECRET };
+    const NOW = 1_750_000_000;
+    const validPayload: LicensePayload = {
+      tier: "pro",
+      expirySec: 1_800_000_000,
+      customerId: "cus_NQpJjB7ehjf2QH",
+      keyId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+      issuedAtSec: 1_700_000_000,
+    };
+
+    it("POST /api/license/verify returns 200 + license for a valid token", async () => {
+      const storage = new MemoryLicenseStorage();
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey,
+        storage,
+        nowSec: NOW,
+      });
+      const token = await signLicense(validPayload, signingKey);
+      const res = await app.request("/api/license/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(body.license).toEqual(validPayload);
+    });
+
+    it("POST /api/license/verify returns 401 for a revoked token", async () => {
+      const storage = new MemoryLicenseStorage();
+      await storage.revoke(validPayload.keyId, "test");
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey,
+        storage,
+        nowSec: NOW,
+      });
+      const token = await signLicense(validPayload, signingKey);
+      const res = await app.request("/api/license/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe("license verify routing contract", () => {
+    it("LICENSE_VERIFY_SUPPORTED_METHODS lists POST", () => {
+      expect(LICENSE_VERIFY_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/license/verify.ts exports a handler for every supported method", () => {
+      for (const method of LICENSE_VERIFY_SUPPORTED_METHODS) {
+        expect(
+          vercelLicenseVerifyExports,
+          `api/license/verify.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelLicenseVerifyExports as Record<string, unknown>)[
+            method
+          ],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/license/verify.ts does not export unsupported methods", () => {
+      const allHttpMethods = [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+      ];
+      const unsupported = allHttpMethods.filter(
+        (m) => !LICENSE_VERIFY_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelLicenseVerifyExports,
+          `api/license/verify.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts POST /api/license/verify", async () => {
+      const app = createApp();
+      const res = await app.request("/api/license/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: "fz_garbage.garbage" }),
+      });
+      // Endpoint registered: handler returns its own status (probably 401),
+      // never 404 (route missing) or 405 (method not allowed).
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(405);
+    });
+  });
+
+  describe("stripe webhook endpoint", () => {
+    const WEBHOOK_SECRET = "whsec_test_value";
+    const SIGNING_SECRET = "this-is-a-test-signing-secret-32-bytes!";
+    const signingKey: SigningKey = { secret: SIGNING_SECRET };
+
+    it("POST /api/stripe/webhook returns 400 for missing signature", async () => {
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey,
+        storage: new MemoryLicenseStorage(),
+        webhookSigningSecret: WEBHOOK_SECRET,
+      });
+      const res = await app.request("/api/stripe/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("POST /api/stripe/webhook returns 200 for a valid signed event", async () => {
+      const storage = new MemoryLicenseStorage();
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey,
+        storage,
+        webhookSigningSecret: WEBHOOK_SECRET,
+      });
+      const fixture = subscriptionCreatedEvent({
+        customerId: "cus_test",
+        subscriptionId: "sub_test",
+        tier: "personal",
+      });
+      const ts = Math.floor(Date.now() / 1000);
+      const res = await app.request("/api/stripe/webhook", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Stripe-Signature": fixture.signature(WEBHOOK_SECRET, ts),
+        },
+        body: JSON.stringify(fixture.event),
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it("POST /api/stripe/webhook returns 503 when KILL_SIGNUPS=1", async () => {
+      const ORIGINAL = process.env.KILL_SIGNUPS;
+      process.env.KILL_SIGNUPS = "1";
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+          webhookSigningSecret: WEBHOOK_SECRET,
+        });
+        const fixture = subscriptionCreatedEvent({
+          customerId: "cus_test",
+          subscriptionId: "sub_test",
+          tier: "personal",
+        });
+        const ts = Math.floor(Date.now() / 1000);
+        const res = await app.request("/api/stripe/webhook", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Stripe-Signature": fixture.signature(WEBHOOK_SECRET, ts),
+          },
+          body: JSON.stringify(fixture.event),
+        });
+        expect(res.status).toBe(503);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.KILL_SIGNUPS;
+        else process.env.KILL_SIGNUPS = ORIGINAL;
+      }
+    });
+  });
+
+  describe("stripe webhook routing contract", () => {
+    it("STRIPE_SUPPORTED_METHODS lists POST", () => {
+      expect(STRIPE_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/stripe/webhook.ts exports a handler for every supported method", () => {
+      for (const method of STRIPE_SUPPORTED_METHODS) {
+        expect(
+          vercelStripeWebhookExports,
+          `api/stripe/webhook.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelStripeWebhookExports as Record<string, unknown>)[
+            method
+          ],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/stripe/webhook.ts does not export unsupported methods", () => {
+      const allHttpMethods = [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+      ];
+      const unsupported = allHttpMethods.filter(
+        (m) => !STRIPE_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelStripeWebhookExports,
+          `api/stripe/webhook.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts POST /api/stripe/webhook", async () => {
+      const app = createApp();
+      const res = await app.request("/api/stripe/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      // Endpoint registered: handler returns its own status (400 for missing
+      // signature), never 404 (route missing) or 405 (method not allowed).
       expect(res.status).not.toBe(404);
       expect(res.status).not.toBe(405);
     });

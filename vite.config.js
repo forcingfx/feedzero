@@ -155,6 +155,55 @@ function apiProxyPlugin() {
         const webRes = await handleHealthRequest(webReq);
         await sendWebResponse(webRes, res);
       });
+
+      // License + Stripe wiring. We share one MemoryLicenseStorage across both
+      // endpoints so revocations performed via the webhook are immediately
+      // visible to /api/license/verify in the same dev session.
+      let licenseStorage = null;
+      let licenseIssuer = null;
+
+      async function ensureLicenseDeps() {
+        if (!licenseStorage) {
+          const [storageMod, issuerMod] = await Promise.all([
+            import("./src/core/license/storage.ts"),
+            import("./src/core/license/issuer.ts"),
+          ]);
+          licenseStorage = new storageMod.MemoryLicenseStorage();
+          licenseIssuer = new issuerMod.LicenseIssuerImpl({
+            signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+            storage: licenseStorage,
+          });
+        }
+        return { licenseStorage, licenseIssuer };
+      }
+
+      server.middlewares.use("/api/stripe/webhook", async (req, res) => {
+        const { licenseIssuer } = await ensureLicenseDeps();
+        const [{ handleStripeWebhook }, { isFlagEnabled }] = await Promise.all([
+          import("./src/core/stripe/webhook-handler.ts"),
+          import("./src/core/flags/flags.ts"),
+        ]);
+        const webReq = await toWebRequest(req);
+        const webRes = await handleStripeWebhook(webReq, {
+          signingSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+          issuer: licenseIssuer,
+          killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
+        });
+        await sendWebResponse(webRes, res);
+      });
+
+      server.middlewares.use("/api/license/verify", async (req, res) => {
+        const { licenseStorage } = await ensureLicenseDeps();
+        const { handleLicenseVerifyRequest } = await import(
+          "./src/core/license/verify-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handleLicenseVerifyRequest(webReq, {
+          signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+          storage: licenseStorage,
+        });
+        await sendWebResponse(webRes, res);
+      });
     },
   };
 }
