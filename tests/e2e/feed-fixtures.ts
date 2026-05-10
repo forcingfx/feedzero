@@ -147,6 +147,21 @@ export async function mockFeedEndpoint(page: Page, feedContent: string) {
     : "text/xml";
 
   await page.route("**/api/feed*", (route) => {
+    // The app auto-subscribes to the release-notes feed on first launch
+    // (`CHANGELOG_FEED_URL = https://feedzero.app/releases.xml`). It goes
+    // through the same `/api/feed?url=...` proxy as user-added feeds. If we
+    // respond with `feedContent` here too, the release-notes feed lands in
+    // the sidebar with the SAME title as the test feed — selectors that
+    // filter by title resolve to two elements and Playwright fails with
+    // strict-mode violations.
+    //
+    // Auto-subscribe is wrapped in try/catch (best-effort), so 404 here is
+    // silently swallowed and no rogue feed appears in the sidebar.
+    const url = route.request().url();
+    if (url.includes("releases.xml")) {
+      route.fulfill({ status: 404, body: "not found in test" });
+      return;
+    }
     route.fulfill({
       status: 200,
       contentType,
