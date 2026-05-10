@@ -17,11 +17,11 @@
  * model) and §6.4 (kill switches / revocation).
  */
 
-import { verifyLicense } from "@/core/license/verify";
-import type { LicensePayload } from "@/core/license/format";
-import type { SigningKey } from "@/core/license/sign";
-import type { LicenseStorage } from "@/core/license/storage";
-import { ok, err, type Result } from "@/utils/result";
+import { verifyLicense } from "./verify";
+import type { LicensePayload } from "./format";
+import type { SigningKey } from "./sign";
+import type { LicenseStorage } from "./storage";
+import { ok, err, type Result } from "../../utils/result";
 
 export interface LicenseAuthContext {
   /** The verified payload, with revocation already checked. */
