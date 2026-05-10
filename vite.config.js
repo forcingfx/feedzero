@@ -2,34 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-
-/**
- * Converts a Node IncomingMessage to a Web Request object.
- */
-async function toWebRequest(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const bodyStr = Buffer.concat(chunks).toString();
-
-  const url = new URL(req.url, "http://localhost");
-  const hasBody = req.method !== "GET" && req.method !== "HEAD";
-  return new Request(url, {
-    method: req.method,
-    headers: { "Content-Type": req.headers["content-type"] || "" },
-    ...(hasBody ? { body: bodyStr } : {}),
-  });
-}
-
-/**
- * Sends a Web Response through a Node ServerResponse.
- */
-async function sendWebResponse(webRes, res) {
-  res.statusCode = webRes.status;
-  for (const [key, value] of webRes.headers.entries()) {
-    res.setHeader(key, value);
-  }
-  res.end(Buffer.from(await webRes.arrayBuffer()));
-}
+import { toWebRequest, sendWebResponse } from "./vite-dev-proxy.js";
 
 /**
  * Dev server API proxy plugin.
