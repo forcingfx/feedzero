@@ -175,8 +175,14 @@ export async function mockFeedEndpoint(page: Page, feedContent: string) {
  * The proxy POST body is `{"url":"<target>"}`. Returns the target URL,
  * or "" if the body is missing/malformed (so the caller treats it as
  * a non-release-notes URL and serves the regular fixture content).
+ *
+ * Exported so tests with their own inline `page.route("**\/api/feed*", ...)`
+ * mocks can apply the same release-notes-bypass guard. Without it, the
+ * first-launch auto-subscribe to https://feedzero.app/releases.xml is
+ * served the test feed body and a duplicate "Test Feed" entry lands in
+ * the sidebar, breaking title-based selectors with strict-mode violations.
  */
-function readTargetUrlFromBody(rawBody: string | null): string {
+export function readTargetUrlFromBody(rawBody: string | null): string {
   if (!rawBody) return "";
   try {
     const parsed = JSON.parse(rawBody);

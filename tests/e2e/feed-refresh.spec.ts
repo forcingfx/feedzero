@@ -3,6 +3,7 @@ import {
   SAMPLE_RSS,
   SAMPLE_RSS_UPDATED,
   mockFeedEndpoint,
+  readTargetUrlFromBody,
 } from "./feed-fixtures";
 
 /** Scoped selector for an article in the list. */
@@ -17,6 +18,14 @@ test.describe("Feed refresh", () => {
     // Use a mutable reference so we can swap the response
     let feedResponse = SAMPLE_RSS;
     await page.route("**/api/feed*", (route) => {
+      // Skip the first-launch release-notes auto-subscribe so it doesn't
+      // land a duplicate "Test Feed" entry — see feed-fixtures.ts
+      // readTargetUrlFromBody for the rationale.
+      const targetUrl = readTargetUrlFromBody(route.request().postData());
+      if (targetUrl.includes("releases.xml")) {
+        route.fulfill({ status: 404, body: "release-notes blocked in test" });
+        return;
+      }
       route.fulfill({
         status: 200,
         contentType: "text/xml",

@@ -74,8 +74,11 @@ test.describe("Content viewing", () => {
       timeout: 10000,
     });
 
-    // Toggle back to Feed
-    await page.getByRole("button", { name: "Feed" }).click();
+    // Toggle back to Feed.
+    // exact:true so we match the view-toggle button labelled "Feed", not
+    // the sidebar feed button labelled "Test Feed" (substring match would
+    // resolve to two elements and Playwright fails strict-mode).
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
     await expect(page.getByText("Short description only.")).toBeVisible({
       timeout: 5000,
     });

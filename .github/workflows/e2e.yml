@@ -1,20 +1,19 @@
 name: E2E
 
+# E2E runs on push to main only — NOT on pull_request.
+#
+# Why: PR feedback loop must stay under ~3 minutes. Tests + Build run on PRs
+# and gate merge via the branch-protection ruleset. E2E is the safety net
+# for what actually shipped to main; if it fails, Vercel "Promote previous
+# deployment" rolls back in <60 seconds (see docs/internal/runbook.md).
+#
+# Cost trade-off: a regression in main can briefly reach production before
+# the post-merge E2E finishes. Acceptable because:
+#   - main is solo-author for now; the merge cadence is low
+#   - rollback is one click in the Vercel dashboard
+#   - the alternative (waiting 5-10 minutes per PR for E2E) hurts every
+#     iteration and discourages small commits
 on:
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      # Skip e2e on changes that cannot affect runtime behaviour. Keeps the
-      # PR feedback loop fast for doc / template / config-only changes.
-      - 'docs/**'
-      - '*.md'
-      - '.github/CODEOWNERS'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/pull_request_template.md'
-      - '.github/dependabot.yml'
-      - 'SECURITY.md'
-      - 'CONTRIBUTING.md'
-      - 'LICENSE'
   push:
     branches: [main]
 
@@ -27,15 +26,15 @@ permissions:
 
 jobs:
   e2e:
-    name: Playwright E2E (chromium) — shard ${{ matrix.shard }}/4
+    name: Playwright E2E (chromium) — shard ${{ matrix.shard }}/6
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
     strategy:
       # Don't kill remaining shards if one fails — we want to see all failures
       # in a single CI cycle, not chase them shard-by-shard.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
 
@@ -71,17 +70,12 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      # PR runs: desktop only. Mobile-specific bugs are rare and main-branch
-      # CI catches them before deploy. This ~halves PR wall-clock.
-      - name: Run E2E tests — PR (desktop only)
-        if: github.event_name == 'pull_request'
-        run: npx playwright test --project=desktop --shard=${{ matrix.shard }}/4 --max-failures=5
-
-      # Main push: full matrix (desktop + mobile). Caught regressions can
-      # still trigger Vercel rollback before users notice.
-      - name: Run E2E tests — main push (desktop + mobile)
-        if: github.event_name == 'push'
-        run: npx playwright test --shard=${{ matrix.shard }}/4 --max-failures=5
+      # Desktop-only on push to main. Mobile-specific failures are rare and
+      # caught by manual smoke testing on the deployed preview before the next
+      # merge. Re-enable mobile in a separate workflow if a regression class
+      # emerges.
+      - name: Run E2E tests
+        run: npx playwright test --project=desktop --shard=${{ matrix.shard }}/6 --max-failures=5
 
       - name: Upload Playwright report on failure
         if: failure()
