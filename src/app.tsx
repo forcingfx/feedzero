@@ -9,6 +9,8 @@ import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
+import { BillingSuccess } from "@/pages/billing-success.tsx";
+import { BillingCancelled } from "@/pages/billing-cancelled.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
 function AppInit({ children }: { children: React.ReactNode }) {
@@ -129,6 +131,8 @@ export function App() {
             />
             <Route path="/explore" element={<FeedsPage />} />
             <Route path="/stats" element={<FeedsPage />} />
+            <Route path="/billing/success" element={<BillingSuccess />} />
+            <Route path="/billing/cancelled" element={<BillingCancelled />} />
             <Route path="*" element={<Navigate to="/feeds" replace />} />
           </Routes>
         </AppInit>
