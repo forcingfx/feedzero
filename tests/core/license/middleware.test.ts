@@ -46,6 +46,11 @@ class FailingRevocationStorage implements LicenseStorage {
   put = this.inner.put.bind(this.inner);
   get = this.inner.get.bind(this.inner);
   revoke = this.inner.revoke.bind(this.inner);
+  // PR R extended LicenseStorage with these for the issuer's renewal /
+  // revoke flows. The middleware path doesn't exercise them, so we delegate
+  // to the in-memory inner so the type contract is satisfied.
+  listByCustomer = this.inner.listByCustomer.bind(this.inner);
+  revokeAllForCustomer = this.inner.revokeAllForCustomer.bind(this.inner);
   async isRevoked(_keyId: string): Promise<Result<boolean>> {
     return err("kv unavailable");
   }
