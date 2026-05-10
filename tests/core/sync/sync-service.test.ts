@@ -139,7 +139,12 @@ describe("sync-service", () => {
       const [url, options] = fetchMock.mock.calls[0];
       expect(url).toMatch(/\/api\/sync$/);
       expect(options.method).toBe("PUT");
-      expect(options.headers["Content-Type"]).toBe("application/json");
+      // syncFetch wraps init.headers as a Headers instance — accept either shape.
+      const contentType =
+        options.headers instanceof Headers
+          ? options.headers.get("Content-Type")
+          : options.headers["Content-Type"];
+      expect(contentType).toBe("application/json");
 
       const body = JSON.parse(options.body);
       expect(body.vaultId).toMatch(/^[0-9a-f]{64}$/);
