@@ -1033,6 +1033,75 @@ describe("server", () => {
     });
   });
 
+  describe("/api/sync gating on LAUNCH_PAID_TIER (PR W)", () => {
+    const SECRET = "this-is-a-test-signing-secret-32-bytes!";
+    const signingKey: SigningKey = { secret: SECRET };
+
+    it("does NOT require license when LAUNCH_PAID_TIER is unset (current free behavior)", async () => {
+      const ORIGINAL = process.env.LAUNCH_PAID_TIER;
+      delete process.env.LAUNCH_PAID_TIER;
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const vaultId = "a".repeat(64);
+        const res = await app.request(`/api/sync?vaultId=${vaultId}`);
+        // 404 (vault doesn't exist) — proves auth gate skipped.
+        expect(res.status).toBe(404);
+      } finally {
+        if (ORIGINAL !== undefined) process.env.LAUNCH_PAID_TIER = ORIGINAL;
+      }
+    });
+
+    it("returns 401 on /api/sync GET without bearer when LAUNCH_PAID_TIER=1", async () => {
+      const ORIGINAL = process.env.LAUNCH_PAID_TIER;
+      process.env.LAUNCH_PAID_TIER = "1";
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const vaultId = "a".repeat(64);
+        const res = await app.request(`/api/sync?vaultId=${vaultId}`);
+        expect(res.status).toBe(401);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.LAUNCH_PAID_TIER;
+        else process.env.LAUNCH_PAID_TIER = ORIGINAL;
+      }
+    });
+
+    it("issued license token unlocks /api/sync when LAUNCH_PAID_TIER=1 (full e2e via createApp)", async () => {
+      const ORIGINAL = process.env.LAUNCH_PAID_TIER;
+      process.env.LAUNCH_PAID_TIER = "1";
+      try {
+        const storage = new MemoryLicenseStorage();
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage,
+        });
+        const validPayload: LicensePayload = {
+          tier: "personal",
+          expirySec: 1_800_000_000,
+          customerId: "cus_paywall_test",
+          keyId: "kid_pw_test_xxxxxxxxxxxxxxxxxx",
+          issuedAtSec: 1_700_000_000,
+        };
+        const token = await signLicense(validPayload, signingKey);
+
+        const vaultId = "a".repeat(64);
+        const res = await app.request(`/api/sync?vaultId=${vaultId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        // 404 (vault not found) — proves auth gate passed.
+        expect(res.status).toBe(404);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.LAUNCH_PAID_TIER;
+        else process.env.LAUNCH_PAID_TIER = ORIGINAL;
+      }
+    });
+  });
+
   describe("vercel wrapper structural invariants", () => {
     // Tier 2 (Structural Assertion) tests. Vercel wrappers in api/*.ts are
     // thin glue files whose only behavioral tests are routing contracts.
@@ -1067,6 +1136,12 @@ describe("server", () => {
     it("api/license/verify.ts wires resolveLicenseStorage (not raw MemoryLicenseStorage)", () => {
       const src = fs.readFileSync("api/license/verify.ts", "utf8");
       expect(src).toMatch(/resolveLicenseStorage/);
+    });
+
+    it("api/sync.ts wires LAUNCH_PAID_TIER gate (PR W)", () => {
+      const src = fs.readFileSync("api/sync.ts", "utf8");
+      expect(src).toMatch(/LAUNCH_PAID_TIER/);
+      expect(src).toMatch(/licenseAuth/);
     });
   });
 

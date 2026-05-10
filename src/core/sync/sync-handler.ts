@@ -1,5 +1,9 @@
 import { SYNC } from "../../utils/constants.ts";
 import type { SyncStorageAdapter } from "./types.ts";
+import {
+  authorizeLicense,
+  type LicenseAuthOptions,
+} from "../license/middleware";
 
 const VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -108,14 +112,39 @@ const methodHandlers: Record<string, MethodHandler> = {
 export const SUPPORTED_METHODS: readonly string[] = Object.keys(methodHandlers);
 
 /**
+ * Optional bag of dependencies for runtime gating. Today only `licenseAuth`
+ * is supported — when present, the handler runs {@link authorizeLicense}
+ * (signature + revocation check) before any data path. When absent, the
+ * handler behaves exactly as before (free sync, current default).
+ *
+ * The flag check (LAUNCH_PAID_TIER) lives in the wiring layer
+ * (server.ts / vite.config.js / api/sync.ts), not here — keeps the handler
+ * pure and the gate easy to flip without touching this file.
+ */
+export interface SyncHandlerOptions {
+  licenseAuth?: LicenseAuthOptions;
+}
+
+/**
  * Shared sync request handler using the Web standard Request/Response API.
  * Can be used by Vercel serverless functions, Hono, or any Web-compatible server.
  */
 export async function handleSyncRequest(
   request: Request,
   adapter: SyncStorageAdapter,
+  options: SyncHandlerOptions = {},
 ): Promise<Response> {
   const handler = methodHandlers[request.method];
   if (!handler) return errorResponse("Method not allowed", 405);
+
+  if (options.licenseAuth) {
+    const auth = await authorizeLicense(request, options.licenseAuth);
+    if (!auth.ok) {
+      // Surface the structured error for observability but use a stable
+      // message for clients ("license required" rather than internal text).
+      return errorResponse("license required", 401);
+    }
+  }
+
   return handler(request, adapter);
 }

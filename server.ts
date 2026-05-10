@@ -168,7 +168,21 @@ export function createApp(
     handleProxyRequest(c.req.raw, "image/x-icon", { cache: feedCache }),
   );
   app.get("/api/favicon", (c) => handleFaviconRequest(c.req.raw));
-  app.all("/api/sync", (c) => handleSyncRequest(c.req.raw, syncAdapter));
+  app.all("/api/sync", (c) =>
+    handleSyncRequest(c.req.raw, syncAdapter, {
+      // LAUNCH_PAID_TIER is the Phase 1 master gate. Off → free sync (current
+      // behavior). On → Bearer license required, missing/invalid → 401.
+      ...(isFlagEnabled("LAUNCH_PAID_TIER")
+        ? {
+            licenseAuth: {
+              signingKey: license.signingKey,
+              storage: license.storage,
+              nowSec: license.nowSec,
+            },
+          }
+        : {}),
+    }),
+  );
   app.get("/api/stats-sync", (c) => handleSyncStatsRequest(c.req.raw, syncAdapter));
   app.post("/api/feedback", (c) => handleFeedbackRequest(c.req.raw));
   app.get("/api/catalog", (c) => handleCatalogRequest(c.req.raw, catalog));
