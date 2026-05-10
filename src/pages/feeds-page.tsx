@@ -4,6 +4,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
+import { useSharedSidebarSize } from "@/hooks/use-shared-sidebar-size.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { ALL_FEEDS_ID, PANEL_LAYOUT_ID } from "@/utils/constants.ts";
@@ -299,6 +300,7 @@ export function FeedsPage() {
   // visibly rebalances the sidebar — see GitLab #13a).
   const layoutId =
     showStats || exploreOrEmpty ? PANEL_LAYOUT_ID.SINGLE : PANEL_LAYOUT_ID.FEEDS;
+  const sidebarSize = useSharedSidebarSize(layoutId);
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
@@ -306,10 +308,12 @@ export function FeedsPage() {
       <ResizablePanelGroup id={layoutId} direction="horizontal" className="h-svh">
         <ResizablePanel
           id="sidebar"
-          defaultSize="17%"
+          defaultSize={sidebarSize.defaultSize ?? "17%"}
           minSize="150px"
           maxSize="280px"
           className="overflow-hidden"
+          panelRef={sidebarSize.panelRef}
+          onResize={sidebarSize.onResize}
         >
           <AppSidebar
             collapsible="none"

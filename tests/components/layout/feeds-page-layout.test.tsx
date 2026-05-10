@@ -5,6 +5,26 @@ import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStorageMock,
+  writable: true,
+});
+
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -234,6 +254,37 @@ describe("FeedsPage layout — desktop", () => {
     expect(panels).toHaveLength(2);
     const ids = Array.from(panels).map((p) => p.getAttribute("id"));
     expect(ids).toEqual(expect.arrayContaining(["sidebar", "explore"]));
+  });
+
+  it("explore layout's sidebar starts at the user's stored width (preserved across layout transitions)", async () => {
+    // The sidebar width must be respected when entering the Explore tab.
+    // Distinct group ids per layout shape mean the library's per-group
+    // persistence does not share the sidebar size between the 3-panel feeds
+    // layout and the 2-panel explore/stats layout. The page reads the shared
+    // sidebar width from localStorage and applies it as the panel's
+    // defaultSize so /explore opens at the user's preferred width.
+    const hookModule = await import("@/hooks/use-shared-sidebar-size.ts");
+    const spy = vi.spyOn(hookModule, "useSharedSidebarSize");
+
+    const SIDEBAR_KEY = hookModule.SIDEBAR_SIZE_STORAGE_KEY;
+    window.localStorage.setItem(SIDEBAR_KEY, "27");
+
+    renderPage("/explore");
+
+    // The hook must be called with the active layout id so the persisted
+    // sidebar width re-applies after the layout transitions to /explore.
+    expect(spy).toHaveBeenCalled();
+    const lastCallLayoutKey = spy.mock.calls.at(-1)?.[0];
+    expect(lastCallLayoutKey).toBe("feedzero:layout:single");
+
+    // The hook returned a defaultSize derived from localStorage; that value
+    // must be the one the page hands to the sidebar panel.
+    const lastResult = spy.mock.results.at(-1)?.value;
+    expect(lastResult).toBeDefined();
+    expect(lastResult.defaultSize).toBe("27%");
+
+    window.localStorage.removeItem(SIDEBAR_KEY);
+    spy.mockRestore();
   });
 
   it("sidebar CSS variable is at most 14rem so three panels fit at 1024px", () => {
