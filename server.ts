@@ -189,11 +189,23 @@ export function createApp(
 async function startServer(): Promise<void> {
   const { serve } = await import("@hono/node-server");
   const { serveStatic } = await import("@hono/node-server/serve-static");
+  const { resolveLicenseStorage } = await import(
+    "./src/core/license/resolve-storage"
+  );
 
   const adapter = resolveAdapter();
   const cache = createFeedCache();
   const catalog = createMemoryCatalogAdapter();
-  const app = createApp(adapter, cache, catalog);
+  // Pre-resolve the license storage so createApp stays synchronous.
+  // Picks UpstashLicenseStorage when UPSTASH_REDIS_REST_URL+TOKEN are set,
+  // MemoryLicenseStorage otherwise (dev / self-hosted without Redis).
+  const licenseStorage = await resolveLicenseStorage();
+  const licenseDeps: LicenseDeps = {
+    signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+    storage: licenseStorage,
+    webhookSigningSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  };
+  const app = createApp(adapter, cache, catalog, licenseDeps);
 
   app.use("/*", serveStatic({ root: "./dist" }));
   app.get("/*", serveStatic({ path: "./dist/index.html" }));

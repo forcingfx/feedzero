@@ -156,19 +156,22 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
-      // License + Stripe wiring. We share one MemoryLicenseStorage across both
+      // License + Stripe wiring. We share one resolved storage across both
       // endpoints so revocations performed via the webhook are immediately
-      // visible to /api/license/verify in the same dev session.
+      // visible to /api/license/verify in the same dev session. The resolver
+      // picks Upstash if UPSTASH_REDIS_REST_URL+TOKEN are set, otherwise an
+      // in-memory store — dev typically runs without Upstash so this defaults
+      // to memory. Either way, both endpoints share the same instance.
       let licenseStorage = null;
       let licenseIssuer = null;
 
       async function ensureLicenseDeps() {
         if (!licenseStorage) {
-          const [storageMod, issuerMod] = await Promise.all([
-            import("./src/core/license/storage.ts"),
+          const [resolverMod, issuerMod] = await Promise.all([
+            import("./src/core/license/resolve-storage.ts"),
             import("./src/core/license/issuer.ts"),
           ]);
-          licenseStorage = new storageMod.MemoryLicenseStorage();
+          licenseStorage = await resolverMod.resolveLicenseStorage();
           licenseIssuer = new issuerMod.LicenseIssuerImpl({
             signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
             storage: licenseStorage,
