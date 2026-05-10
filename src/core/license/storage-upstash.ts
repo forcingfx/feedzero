@@ -144,25 +144,52 @@ export class UpstashLicenseStorage implements LicenseStorage {
 }
 
 /**
+ * Resolve Upstash REST credentials from either naming convention.
+ *
+ * Vercel's Marketplace Upstash integration auto-injects the legacy Vercel-KV
+ * names (KV_REST_API_URL / KV_REST_API_TOKEN) — both pairs point at the same
+ * Upstash REST endpoint, so we honor either. Canonical UPSTASH_* names take
+ * precedence when both are set, on the principle that an explicit override
+ * should beat an auto-injected default.
+ */
+function resolveUpstashCredentials(
+  env: Record<string, string | undefined>,
+): { url: string; token: string } | null {
+  const url = env.UPSTASH_REDIS_REST_URL ?? env.KV_REST_API_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN ?? env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  return { url, token };
+}
+
+/** True iff the env carries a usable Upstash REST credential pair. */
+export function hasUpstashCredentials(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return resolveUpstashCredentials(env) !== null;
+}
+
+/**
  * Build an UpstashLicenseStorage backed by the real `@upstash/redis` client.
- * Reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from the
- * provided env (defaults to process.env). Throws if either is missing —
- * fail-fast at startup is preferable to a silent no-op store.
+ * Reads credentials from `UPSTASH_REDIS_REST_URL`/`_TOKEN` or, if absent,
+ * the Vercel-Marketplace-injected `KV_REST_API_URL`/`_TOKEN`. Throws if
+ * neither pair is present — fail-fast at startup is preferable to a silent
+ * no-op store.
  */
 export async function createUpstashLicenseStorage(
   env: Record<string, string | undefined> = process.env,
 ): Promise<UpstashLicenseStorage> {
-  const url = env.UPSTASH_REDIS_REST_URL;
-  const token = env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) {
+  const creds = resolveUpstashCredentials(env);
+  if (!creds) {
     throw new Error(
-      "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set " +
-        "to use UpstashLicenseStorage. Configure via the Vercel Marketplace " +
-        "Upstash integration.",
+      "Upstash REST credentials not found. Set UPSTASH_REDIS_REST_URL + " +
+        "UPSTASH_REDIS_REST_TOKEN, or use the Vercel Marketplace Upstash " +
+        "integration which auto-injects KV_REST_API_URL + KV_REST_API_TOKEN.",
     );
   }
   // Dynamic import keeps the SDK out of the dev/test path when Upstash is
   // not configured — Vite would otherwise eagerly bundle it.
   const { Redis } = await import("@upstash/redis");
-  return new UpstashLicenseStorage(new Redis({ url, token }));
+  return new UpstashLicenseStorage(
+    new Redis({ url: creds.url, token: creds.token }),
+  );
 }
