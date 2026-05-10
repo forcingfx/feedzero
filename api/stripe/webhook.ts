@@ -7,9 +7,6 @@ import { isFlagEnabled } from "../../src/core/flags/flags";
 const signingSecret = process.env.LICENSE_SIGNING_KEY ?? "";
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 
-// Resolve storage and dedup store once at module load — Vercel keeps the
-// function instance warm across invocations so this isn't repeated per
-// request. Upstash when env vars are present, in-memory otherwise.
 const storagePromise = resolveLicenseStorage();
 const eventStorePromise = resolveSeenEventStore();
 const issuerPromise = storagePromise.then(

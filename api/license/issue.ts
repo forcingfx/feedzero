@@ -5,8 +5,6 @@ import { isFlagEnabled } from "../../src/core/flags/flags";
 
 const signingSecret = process.env.LICENSE_SIGNING_KEY ?? "";
 
-// Resolve storage once at module load — Vercel keeps the function instance
-// warm across invocations. Upstash in production, Memory in dev/preview.
 const storagePromise = resolveLicenseStorage();
 const issuerPromise = storagePromise.then(
   (storage) =>
