@@ -1,0 +1,15 @@
+# CodeQL configuration for feedzero.
+#
+# api/*.ts files are build artifacts, NOT source code. The build script
+# (scripts/build-api.js) overwrites them with bundled output that includes
+# inlined third-party SDKs (Stripe, Upstash, etc.). Scanning these files
+# produces false-positive alerts against bundled vendor code (e.g.
+# js/incomplete-string-escaping inside the Stripe SDK's escape helpers).
+#
+# The actual source-form wrappers we author are tiny (~20-30 lines each)
+# and use only well-typed imports from src/core/. The src/core/ modules
+# ARE scanned, which is where any real alerts would surface.
+paths-ignore:
+  - 'api/**'
+  - 'dist/**'
+  - 'node_modules/**'

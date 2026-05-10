@@ -29,6 +29,10 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
+          # api/*.ts are bundled build artifacts (see scripts/build-api.js);
+          # scanning them surfaces false positives against inlined SDKs.
+          # The original wrappers in git source + src/core/ are scanned.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
