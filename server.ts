@@ -8,6 +8,10 @@ import { handleCatalogRequest } from "./src/core/catalog/catalog-handler";
 import { handleHealthRequest } from "./src/core/health/health-handler";
 import { handleStripeWebhook } from "./src/core/stripe/webhook-handler";
 import { handleLicenseVerifyRequest } from "./src/core/license/verify-handler";
+import { handleLicenseIssueRequest } from "./src/core/license/issue-handler";
+import { handleCreateCheckoutSession } from "./src/core/stripe/checkout-handler";
+import { resolveAllowedPrices } from "./src/core/stripe/allowed-prices";
+import type { SeenEventStore } from "./src/core/stripe/seen-event-store";
 import { LicenseIssuerImpl } from "./src/core/license/issuer";
 import {
   MemoryLicenseStorage,
@@ -36,6 +40,12 @@ export interface LicenseDeps {
   webhookSigningSecret?: string;
   /** Caller-injected for the verify handler in tests. Defaults to wallclock. */
   nowSec?: number;
+  /**
+   * Optional Stripe event-id dedup store. If present, the webhook handler
+   * skips re-dispatch on duplicate `event.id`. Tests typically pass a
+   * MemorySeenEventStore; production wires Upstash via resolveSeenEventStore.
+   */
+  eventStore?: SeenEventStore;
 }
 
 function buildLicenseDeps(): LicenseDeps {
@@ -160,7 +170,21 @@ export function createApp(
     handleProxyRequest(c.req.raw, "image/x-icon", { cache: feedCache }),
   );
   app.get("/api/favicon", (c) => handleFaviconRequest(c.req.raw));
-  app.all("/api/sync", (c) => handleSyncRequest(c.req.raw, syncAdapter));
+  app.all("/api/sync", (c) =>
+    handleSyncRequest(c.req.raw, syncAdapter, {
+      // LAUNCH_PAID_TIER is the Phase 1 master gate. Off → free sync (current
+      // behavior). On → Bearer license required, missing/invalid → 401.
+      ...(isFlagEnabled("LAUNCH_PAID_TIER")
+        ? {
+            licenseAuth: {
+              signingKey: license.signingKey,
+              storage: license.storage,
+              nowSec: license.nowSec,
+            },
+          }
+        : {}),
+    }),
+  );
   app.get("/api/stats-sync", (c) => handleSyncStatsRequest(c.req.raw, syncAdapter));
   app.post("/api/feedback", (c) => handleFeedbackRequest(c.req.raw));
   app.get("/api/catalog", (c) => handleCatalogRequest(c.req.raw, catalog));
@@ -170,6 +194,7 @@ export function createApp(
     handleStripeWebhook(c.req.raw, {
       signingSecret: license.webhookSigningSecret ?? "",
       issuer,
+      eventStore: license.eventStore,
       killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
     }),
   );
@@ -179,6 +204,35 @@ export function createApp(
       signingKey: license.signingKey,
       storage: license.storage,
       nowSec: license.nowSec,
+    }),
+  );
+
+  app.post("/api/license/issue", (c) =>
+    handleLicenseIssueRequest(c.req.raw, {
+      issuer,
+      adminApiKey: process.env.ADMIN_API_KEY ?? "",
+      killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
+    }),
+  );
+
+  app.post("/api/checkout/create-session", (c) =>
+    handleCreateCheckoutSession(c.req.raw, {
+      // The Stripe SDK is constructed LAZILY inside `create` so that the
+      // handler's pre-checks (kill-switch, body validation, allowlist) can
+      // short-circuit before we ever touch the SDK. This keeps tests sane
+      // (no need to set STRIPE_SECRET_KEY just to test 400/503 paths) and
+      // means a missing STRIPE_SECRET_KEY surfaces as a clean 502 from the
+      // handler's catch block, not a crash.
+      client: {
+        create: async (params, opts) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.checkout.sessions.create(params, opts);
+          return { url: session.url, id: session.id };
+        },
+      },
+      allowedPrices: resolveAllowedPrices(),
+      killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
     }),
   );
 
@@ -192,18 +246,25 @@ async function startServer(): Promise<void> {
   const { resolveLicenseStorage } = await import(
     "./src/core/license/resolve-storage"
   );
+  const { resolveSeenEventStore } = await import(
+    "./src/core/stripe/resolve-seen-event-store"
+  );
 
   const adapter = resolveAdapter();
   const cache = createFeedCache();
   const catalog = createMemoryCatalogAdapter();
-  // Pre-resolve the license storage so createApp stays synchronous.
-  // Picks UpstashLicenseStorage when UPSTASH_REDIS_REST_URL+TOKEN are set,
-  // MemoryLicenseStorage otherwise (dev / self-hosted without Redis).
-  const licenseStorage = await resolveLicenseStorage();
+  // Pre-resolve the license storage and Stripe-event dedup store so
+  // createApp stays synchronous. Both pick Upstash when UPSTASH_*/KV_* env
+  // vars are set, in-memory otherwise.
+  const [licenseStorage, eventStore] = await Promise.all([
+    resolveLicenseStorage(),
+    resolveSeenEventStore(),
+  ]);
   const licenseDeps: LicenseDeps = {
     signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
     storage: licenseStorage,
     webhookSigningSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    eventStore,
   };
   const app = createApp(adapter, cache, catalog, licenseDeps);
 

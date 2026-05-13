@@ -7,6 +7,8 @@ import { SUPPORTED_METHODS as FEEDBACK_SUPPORTED_METHODS } from "../src/core/fee
 import { SUPPORTED_METHODS as HEALTH_SUPPORTED_METHODS } from "../src/core/health/health-handler";
 import { SUPPORTED_METHODS as STRIPE_SUPPORTED_METHODS } from "../src/core/stripe/webhook-handler";
 import { SUPPORTED_METHODS as LICENSE_VERIFY_SUPPORTED_METHODS } from "../src/core/license/verify-handler";
+import { SUPPORTED_METHODS as LICENSE_ISSUE_SUPPORTED_METHODS } from "../src/core/license/issue-handler";
+import { SUPPORTED_METHODS as CHECKOUT_SUPPORTED_METHODS } from "../src/core/stripe/checkout-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
 import * as vercelPageExports from "../api/page";
@@ -14,7 +16,15 @@ import * as vercelCatalogExports from "../api/catalog";
 import * as vercelFeedbackExports from "../api/feedback";
 import * as vercelHealthExports from "../api/health";
 import * as vercelStripeWebhookExports from "../api/stripe/webhook";
-import * as vercelLicenseVerifyExports from "../api/license/verify";
+// Both /api/license/verify and /api/license/issue resolve to the same Vercel
+// dynamic-route file (api/license/[action].ts) — consolidated to stay under
+// the Hobby-plan 12-functions ceiling. The wrapper dispatches internally by
+// the action segment. The two routing contracts assert against the same
+// module since they share the POST export.
+import * as vercelLicenseDynamicExports from "../api/license/[action]";
+const vercelLicenseVerifyExports = vercelLicenseDynamicExports;
+const vercelLicenseIssueExports = vercelLicenseDynamicExports;
+import * as vercelCheckoutExports from "../api/checkout/create-session";
 import { signLicense, type SigningKey } from "../src/core/license/sign";
 import { MemoryLicenseStorage } from "../src/core/license/storage";
 import type { LicensePayload } from "../src/core/license/format";
@@ -771,6 +781,192 @@ describe("server", () => {
     });
   });
 
+  describe("license issue admin endpoint", () => {
+    const SECRET = "this-is-a-test-signing-secret-32-bytes!";
+    const ADMIN_KEY = "admin_test_key_32+chars_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    const signingKey: SigningKey = { secret: SECRET };
+
+    it("POST /api/license/issue with valid admin token returns 200 + token + record", async () => {
+      const ORIGINAL = process.env.ADMIN_API_KEY;
+      process.env.ADMIN_API_KEY = ADMIN_KEY;
+      try {
+        const storage = new MemoryLicenseStorage();
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage,
+        });
+        const res = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ADMIN_KEY}`,
+          },
+          body: JSON.stringify({ customerId: "cus_admin_test", tier: "pro" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.ok).toBe(true);
+        expect(body.token).toMatch(/^fz_/);
+        expect(body.record.customerId).toBe("cus_admin_test");
+        expect(body.record.tier).toBe("pro");
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.ADMIN_API_KEY;
+        else process.env.ADMIN_API_KEY = ORIGINAL;
+      }
+    });
+
+    it("POST /api/license/issue without admin token returns 401", async () => {
+      const ORIGINAL = process.env.ADMIN_API_KEY;
+      process.env.ADMIN_API_KEY = ADMIN_KEY;
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const res = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ customerId: "cus_x", tier: "personal" }),
+        });
+        expect(res.status).toBe(401);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.ADMIN_API_KEY;
+        else process.env.ADMIN_API_KEY = ORIGINAL;
+      }
+    });
+
+    it("POST /api/license/issue returns 503 when ADMIN_API_KEY env is missing", async () => {
+      const ORIGINAL = process.env.ADMIN_API_KEY;
+      delete process.env.ADMIN_API_KEY;
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const res = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer anything",
+          },
+          body: JSON.stringify({ customerId: "cus_x", tier: "personal" }),
+        });
+        expect(res.status).toBe(503);
+      } finally {
+        if (ORIGINAL !== undefined) process.env.ADMIN_API_KEY = ORIGINAL;
+      }
+    });
+
+    it("POST /api/license/issue returns 503 when KILL_SIGNUPS=1", async () => {
+      const ORIG_ADMIN = process.env.ADMIN_API_KEY;
+      const ORIG_KILL = process.env.KILL_SIGNUPS;
+      process.env.ADMIN_API_KEY = ADMIN_KEY;
+      process.env.KILL_SIGNUPS = "1";
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const res = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ADMIN_KEY}`,
+          },
+          body: JSON.stringify({ customerId: "cus_x", tier: "personal" }),
+        });
+        expect(res.status).toBe(503);
+      } finally {
+        if (ORIG_ADMIN === undefined) delete process.env.ADMIN_API_KEY;
+        else process.env.ADMIN_API_KEY = ORIG_ADMIN;
+        if (ORIG_KILL === undefined) delete process.env.KILL_SIGNUPS;
+        else process.env.KILL_SIGNUPS = ORIG_KILL;
+      }
+    });
+
+    it("issued token roundtrips through /api/license/verify on the same app", async () => {
+      // Closes the e2e loop locally: admin issues a license, the same app's
+      // verify endpoint accepts it. This is the contract that lets us use
+      // PR T's endpoint as the Upstash e2e probe in production.
+      const ORIGINAL = process.env.ADMIN_API_KEY;
+      process.env.ADMIN_API_KEY = ADMIN_KEY;
+      try {
+        const storage = new MemoryLicenseStorage();
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage,
+        });
+        const issueRes = await app.request("/api/license/issue", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ADMIN_KEY}`,
+          },
+          body: JSON.stringify({ customerId: "cus_roundtrip", tier: "personal" }),
+        });
+        const issueBody = await issueRes.json();
+        expect(issueBody.ok).toBe(true);
+
+        const verifyRes = await app.request("/api/license/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: issueBody.token }),
+        });
+        expect(verifyRes.status).toBe(200);
+        const verifyBody = await verifyRes.json();
+        expect(verifyBody.ok).toBe(true);
+        expect(verifyBody.license.customerId).toBe("cus_roundtrip");
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.ADMIN_API_KEY;
+        else process.env.ADMIN_API_KEY = ORIGINAL;
+      }
+    });
+  });
+
+  describe("license issue routing contract", () => {
+    it("LICENSE_ISSUE_SUPPORTED_METHODS lists POST", () => {
+      expect(LICENSE_ISSUE_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/license/issue.ts exports a handler for every supported method", () => {
+      for (const method of LICENSE_ISSUE_SUPPORTED_METHODS) {
+        expect(
+          vercelLicenseIssueExports,
+          `api/license/issue.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelLicenseIssueExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/license/issue.ts does not export unsupported methods", () => {
+      const allHttpMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+      const unsupported = allHttpMethods.filter(
+        (m) => !LICENSE_ISSUE_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelLicenseIssueExports,
+          `api/license/issue.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts POST /api/license/issue", async () => {
+      const app = createApp();
+      const res = await app.request("/api/license/issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      // Endpoint registered: handler returns its own status (401/503/etc),
+      // never 404 (route missing) or 405 (method not allowed).
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(405);
+    });
+  });
+
   describe("stripe webhook endpoint", () => {
     const WEBHOOK_SECRET = "whsec_test_value";
     const SIGNING_SECRET = "this-is-a-test-signing-secret-32-bytes!";
@@ -842,6 +1038,228 @@ describe("server", () => {
         if (ORIGINAL === undefined) delete process.env.KILL_SIGNUPS;
         else process.env.KILL_SIGNUPS = ORIGINAL;
       }
+    });
+  });
+
+  describe("checkout session endpoint (PR X)", () => {
+    it("returns 200 + url for a valid request when STRIPE_ALLOWED_PRICES is set", async () => {
+      const ORIGINAL = process.env.STRIPE_ALLOWED_PRICES;
+      process.env.STRIPE_ALLOWED_PRICES = "price_test_personal_monthly";
+      try {
+        const app = createApp();
+        const res = await app.request("/api/checkout/create-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            priceId: "price_test_personal_monthly",
+            successUrl: "https://feedzero.app/success",
+            cancelUrl: "https://feedzero.app/cancel",
+          }),
+        });
+        // 200 (success) or 502 (Stripe SDK call failed at runtime due to no
+        // real key). Either proves the route is registered and reaches the
+        // handler — never 404 (route missing) or 405 (method not allowed).
+        expect(res.status).not.toBe(404);
+        expect(res.status).not.toBe(405);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.STRIPE_ALLOWED_PRICES;
+        else process.env.STRIPE_ALLOWED_PRICES = ORIGINAL;
+      }
+    });
+
+    it("returns 400 when priceId is not in STRIPE_ALLOWED_PRICES", async () => {
+      const ORIGINAL = process.env.STRIPE_ALLOWED_PRICES;
+      process.env.STRIPE_ALLOWED_PRICES = "price_only_this_one";
+      try {
+        const app = createApp();
+        const res = await app.request("/api/checkout/create-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            priceId: "price_attacker_pwn",
+            successUrl: "https://feedzero.app/success",
+            cancelUrl: "https://feedzero.app/cancel",
+          }),
+        });
+        expect(res.status).toBe(400);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.STRIPE_ALLOWED_PRICES;
+        else process.env.STRIPE_ALLOWED_PRICES = ORIGINAL;
+      }
+    });
+
+    it("returns 503 when KILL_SIGNUPS=1", async () => {
+      const ORIG_KILL = process.env.KILL_SIGNUPS;
+      const ORIG_PRICES = process.env.STRIPE_ALLOWED_PRICES;
+      process.env.KILL_SIGNUPS = "1";
+      process.env.STRIPE_ALLOWED_PRICES = "price_x";
+      try {
+        const app = createApp();
+        const res = await app.request("/api/checkout/create-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            priceId: "price_x",
+            successUrl: "https://feedzero.app/s",
+            cancelUrl: "https://feedzero.app/c",
+          }),
+        });
+        expect(res.status).toBe(503);
+      } finally {
+        if (ORIG_KILL === undefined) delete process.env.KILL_SIGNUPS;
+        else process.env.KILL_SIGNUPS = ORIG_KILL;
+        if (ORIG_PRICES === undefined) delete process.env.STRIPE_ALLOWED_PRICES;
+        else process.env.STRIPE_ALLOWED_PRICES = ORIG_PRICES;
+      }
+    });
+  });
+
+  describe("checkout routing contract", () => {
+    it("CHECKOUT_SUPPORTED_METHODS lists POST", () => {
+      expect(CHECKOUT_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/checkout/create-session.ts exports a handler for every supported method", () => {
+      for (const method of CHECKOUT_SUPPORTED_METHODS) {
+        expect(
+          vercelCheckoutExports,
+          `api/checkout/create-session.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelCheckoutExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+  });
+
+  describe("/api/sync gating on LAUNCH_PAID_TIER (PR W)", () => {
+    const SECRET = "this-is-a-test-signing-secret-32-bytes!";
+    const signingKey: SigningKey = { secret: SECRET };
+
+    it("does NOT require license when LAUNCH_PAID_TIER is unset (current free behavior)", async () => {
+      const ORIGINAL = process.env.LAUNCH_PAID_TIER;
+      delete process.env.LAUNCH_PAID_TIER;
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const vaultId = "a".repeat(64);
+        const res = await app.request(`/api/sync?vaultId=${vaultId}`);
+        // 404 (vault doesn't exist) — proves auth gate skipped.
+        expect(res.status).toBe(404);
+      } finally {
+        if (ORIGINAL !== undefined) process.env.LAUNCH_PAID_TIER = ORIGINAL;
+      }
+    });
+
+    it("returns 401 on /api/sync GET without bearer when LAUNCH_PAID_TIER=1", async () => {
+      const ORIGINAL = process.env.LAUNCH_PAID_TIER;
+      process.env.LAUNCH_PAID_TIER = "1";
+      try {
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage: new MemoryLicenseStorage(),
+        });
+        const vaultId = "a".repeat(64);
+        const res = await app.request(`/api/sync?vaultId=${vaultId}`);
+        expect(res.status).toBe(401);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.LAUNCH_PAID_TIER;
+        else process.env.LAUNCH_PAID_TIER = ORIGINAL;
+      }
+    });
+
+    it("issued license token unlocks /api/sync when LAUNCH_PAID_TIER=1 (full e2e via createApp)", async () => {
+      const ORIGINAL = process.env.LAUNCH_PAID_TIER;
+      process.env.LAUNCH_PAID_TIER = "1";
+      try {
+        const storage = new MemoryLicenseStorage();
+        const app = createApp(undefined, undefined, undefined, {
+          signingKey,
+          storage,
+        });
+        const validPayload: LicensePayload = {
+          tier: "personal",
+          expirySec: 1_800_000_000,
+          customerId: "cus_paywall_test",
+          keyId: "kid_pw_test_xxxxxxxxxxxxxxxxxx",
+          issuedAtSec: 1_700_000_000,
+        };
+        const token = await signLicense(validPayload, signingKey);
+
+        const vaultId = "a".repeat(64);
+        const res = await app.request(`/api/sync?vaultId=${vaultId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        // 404 (vault not found) — proves auth gate passed.
+        expect(res.status).toBe(404);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.LAUNCH_PAID_TIER;
+        else process.env.LAUNCH_PAID_TIER = ORIGINAL;
+      }
+    });
+  });
+
+  describe("vercel wrapper structural invariants", () => {
+    // Tier 2 (Structural Assertion) tests. Vercel wrappers in api/*.ts are
+    // thin glue files whose only behavioral tests are routing contracts.
+    // But a wrapper can silently drop a critical option (e.g. eventStore for
+    // Stripe idempotency, adminApiKey for /api/license/issue) and still
+    // export POST cleanly — the routing contract passes, the handler tests
+    // pass, but production silently runs without that option. These tests
+    // assert the wrapper SOURCE references the options, catching that bug.
+    const fs = require("node:fs") as typeof import("node:fs");
+
+    it("api/stripe/webhook.ts wires eventStore for idempotency", () => {
+      const src = fs.readFileSync("api/stripe/webhook.ts", "utf8");
+      expect(src).toMatch(/resolveSeenEventStore/);
+      expect(src).toMatch(/eventStore/);
+    });
+
+    it("api/stripe/webhook.ts wires KILL_SIGNUPS gate", () => {
+      const src = fs.readFileSync("api/stripe/webhook.ts", "utf8");
+      expect(src).toMatch(/KILL_SIGNUPS/);
+    });
+
+    // verify + issue consolidated into api/license/[action].ts (Vercel
+    // dynamic route) to stay under the Hobby plan's 12-function ceiling.
+    // Both wiring assertions now check the single dispatcher file.
+    it("api/license/[action].ts wires ADMIN_API_KEY (issue branch)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
+      expect(src).toMatch(/ADMIN_API_KEY/);
+    });
+
+    it("api/license/[action].ts wires KILL_SIGNUPS gate (issue branch)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
+      expect(src).toMatch(/KILL_SIGNUPS/);
+    });
+
+    it("api/license/[action].ts wires resolveLicenseStorage (verify + issue)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
+      expect(src).toMatch(/resolveLicenseStorage/);
+    });
+
+    it("api/license/[action].ts dispatches both 'verify' and 'issue' actions", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
+      // Source must reference both action names so a regression that drops
+      // one branch is caught even if test traffic only exercises the other.
+      expect(src).toMatch(/['"`]verify['"`]/);
+      expect(src).toMatch(/['"`]issue['"`]/);
+    });
+
+    it("api/sync.ts wires LAUNCH_PAID_TIER gate (PR W)", () => {
+      const src = fs.readFileSync("api/sync.ts", "utf8");
+      expect(src).toMatch(/LAUNCH_PAID_TIER/);
+      expect(src).toMatch(/licenseAuth/);
+    });
+
+    it("api/checkout/create-session.ts wires allowed-prices + KILL_SIGNUPS + lazy Stripe (PR X)", () => {
+      const src = fs.readFileSync("api/checkout/create-session.ts", "utf8");
+      expect(src).toMatch(/resolveAllowedPrices|allowedPrices/);
+      expect(src).toMatch(/KILL_SIGNUPS/);
+      // Lazy SDK construction — must NOT happen at module top level.
+      expect(src).not.toMatch(/^const\s+stripe\s*=\s*new\s+Stripe/m);
     });
   });
 

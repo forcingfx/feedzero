@@ -55,7 +55,11 @@ try {
     format: "esm",
     platform: "node",
     target: "node20",
-    external: ["@vercel/blob"],
+    // Externals: packages Vercel installs from production deps at deploy
+    // time. Marking them external avoids inlining — which both balloons
+    // wrapper size (Stripe SDK is ~700KB inlined) and pulls in Node-specific
+    // code paths esbuild handles poorly (causing Vercel deploy errors).
+    external: ["@vercel/blob", "stripe", "@upstash/redis"],
   });
 
   // Map each source api/.../X.ts to its corresponding tempOut/.../X.js bundle.

@@ -20,6 +20,7 @@ describe("resolveAdapter", () => {
     process.env = { ...originalEnv };
     delete process.env.SYNC_STORAGE;
     delete process.env.DATA_DIR;
+    delete process.env.BLOB_READ_WRITE_TOKEN;
   });
 
   afterEach(() => {
@@ -73,5 +74,44 @@ describe("resolveAdapter", () => {
     );
     resolveAdapter("filesystem");
     expect(createFilesystemAdapter).toHaveBeenCalledWith("/env/data");
+  });
+
+  describe("auto-detect via BLOB_READ_WRITE_TOKEN (hotfix for prod regression)", () => {
+    // Context: Vercel auto-injects BLOB_READ_WRITE_TOKEN when the project has
+    // Vercel Blob configured. Its presence IS the production signal that we
+    // want the blob adapter. Previously we required SYNC_STORAGE to be
+    // exactly "vercel-blob" — a string the operator had to remember to set.
+    // PR W's source-form `api/sync.ts` exposed this fragility; if
+    // SYNC_STORAGE was anything other than the exact string, we silently
+    // fell through to filesystem, which can't mkdir in a Vercel Lambda.
+
+    it("auto-detects vercel-blob when BLOB_READ_WRITE_TOKEN is set and SYNC_STORAGE is unset", () => {
+      process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test_token";
+      const adapter = resolveAdapter() as unknown as { type: string };
+      expect(adapter.type).toBe("vercel-blob");
+    });
+
+    it("explicit SYNC_STORAGE=filesystem overrides auto-detect", () => {
+      // Self-hoster on Vercel who wants the FS adapter anyway (unlikely but
+      // legitimate): explicit env wins over auto-detect.
+      process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test_token";
+      process.env.SYNC_STORAGE = "filesystem";
+      const adapter = resolveAdapter() as unknown as { type: string };
+      expect(adapter.type).toBe("filesystem");
+    });
+
+    it("explicit storage arg overrides auto-detect", () => {
+      // Tests pass storage arg directly; auto-detect must not intrude.
+      process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test_token";
+      const adapter = resolveAdapter("memory") as unknown as { type: string };
+      expect(adapter.type).toBe("memory");
+    });
+
+    it("self-hosted (no BLOB token, no SYNC_STORAGE) still defaults to filesystem", () => {
+      // Regression guard: the autodetect must not change behavior for
+      // self-hosters who run without Vercel Blob.
+      const adapter = resolveAdapter() as unknown as { type: string };
+      expect(adapter.type).toBe("filesystem");
+    });
   });
 });

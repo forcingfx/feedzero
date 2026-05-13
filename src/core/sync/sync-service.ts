@@ -9,6 +9,7 @@ import {
   decryptVault,
 } from "./vault-crypto.ts";
 import type { VaultData, EncryptedVault } from "./types.ts";
+import { syncFetch } from "./sync-fetch.ts";
 
 /** Pre-derived sync credentials, avoiding the need to store the raw passphrase. */
 export interface SyncCredentials {
@@ -125,7 +126,7 @@ export async function pushVault(auth: SyncAuth): Promise<Result<number>> {
       }),
     );
 
-    const response = await fetch("/api/sync", {
+    const response = await syncFetch("/api/sync", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body,
@@ -152,7 +153,7 @@ export async function deleteVault(auth: SyncAuth): Promise<Result<boolean>> {
     const vaultIdResult = await resolveVaultId(auth);
     if (!vaultIdResult.ok) return vaultIdResult;
 
-    const response = await fetch(`/api/sync?vaultId=${vaultIdResult.value}`, {
+    const response = await syncFetch(`/api/sync?vaultId=${vaultIdResult.value}`, {
       method: "DELETE",
     });
 
@@ -178,7 +179,7 @@ export async function pullVault(auth: SyncAuth): Promise<Result<VaultData>> {
     if (!credsResult.ok) return credsResult;
     const { vaultId, vaultKey } = credsResult.value;
 
-    const response = await fetch(`/api/sync?vaultId=${vaultId}`);
+    const response = await syncFetch(`/api/sync?vaultId=${vaultId}`);
 
     if (!response.ok) {
       const text = await response.text();
@@ -208,7 +209,7 @@ export async function checkVaultExists(
     const vaultIdResult = await resolveVaultId(auth);
     if (!vaultIdResult.ok) return vaultIdResult;
 
-    const response = await fetch(`/api/sync?vaultId=${vaultIdResult.value}`, {
+    const response = await syncFetch(`/api/sync?vaultId=${vaultIdResult.value}`, {
       method: "HEAD",
     });
 

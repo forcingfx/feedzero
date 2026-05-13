@@ -99,8 +99,19 @@ function apiProxyPlugin() {
 
       server.middlewares.use("/api/sync", async (req, res) => {
         const { syncHandler, syncAdapter } = await ensureSyncHandler();
+        const { licenseStorage } = await ensureLicenseDeps();
+        const { isFlagEnabled } = await import("./src/core/flags/flags.ts");
         const webReq = await toWebRequest(req);
-        const webRes = await syncHandler(webReq, syncAdapter);
+        // PR W: when LAUNCH_PAID_TIER=1, /api/sync requires a Bearer license.
+        const opts = isFlagEnabled("LAUNCH_PAID_TIER")
+          ? {
+              licenseAuth: {
+                signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+                storage: licenseStorage,
+              },
+            }
+          : {};
+        const webRes = await syncHandler(webReq, syncAdapter, opts);
         await sendWebResponse(webRes, res);
       });
 
@@ -129,32 +140,35 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
-      // License + Stripe wiring. We share one resolved storage across both
+      // License + Stripe wiring. We share one resolved storage across all
       // endpoints so revocations performed via the webhook are immediately
-      // visible to /api/license/verify in the same dev session. The resolver
-      // picks Upstash if UPSTASH_REDIS_REST_URL+TOKEN are set, otherwise an
-      // in-memory store — dev typically runs without Upstash so this defaults
-      // to memory. Either way, both endpoints share the same instance.
+      // visible to /api/license/verify in the same dev session. The resolvers
+      // pick Upstash if UPSTASH_*/KV_REST_API_* env vars are set, otherwise
+      // in-memory — dev typically runs without Upstash so this defaults to
+      // memory. Same shape across all wrappers.
       let licenseStorage = null;
       let licenseIssuer = null;
+      let stripeEventStore = null;
 
       async function ensureLicenseDeps() {
         if (!licenseStorage) {
-          const [resolverMod, issuerMod] = await Promise.all([
+          const [resolverMod, issuerMod, eventResolverMod] = await Promise.all([
             import("./src/core/license/resolve-storage.ts"),
             import("./src/core/license/issuer.ts"),
+            import("./src/core/stripe/resolve-seen-event-store.ts"),
           ]);
           licenseStorage = await resolverMod.resolveLicenseStorage();
+          stripeEventStore = await eventResolverMod.resolveSeenEventStore();
           licenseIssuer = new issuerMod.LicenseIssuerImpl({
             signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
             storage: licenseStorage,
           });
         }
-        return { licenseStorage, licenseIssuer };
+        return { licenseStorage, licenseIssuer, stripeEventStore };
       }
 
       server.middlewares.use("/api/stripe/webhook", async (req, res) => {
-        const { licenseIssuer } = await ensureLicenseDeps();
+        const { licenseIssuer, stripeEventStore } = await ensureLicenseDeps();
         const [{ handleStripeWebhook }, { isFlagEnabled }] = await Promise.all([
           import("./src/core/stripe/webhook-handler.ts"),
           import("./src/core/flags/flags.ts"),
@@ -163,6 +177,7 @@ function apiProxyPlugin() {
         const webRes = await handleStripeWebhook(webReq, {
           signingSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
           issuer: licenseIssuer,
+          eventStore: stripeEventStore,
           killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
         });
         await sendWebResponse(webRes, res);
@@ -177,6 +192,50 @@ function apiProxyPlugin() {
         const webRes = await handleLicenseVerifyRequest(webReq, {
           signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
           storage: licenseStorage,
+        });
+        await sendWebResponse(webRes, res);
+      });
+
+      server.middlewares.use("/api/license/issue", async (req, res) => {
+        const { licenseIssuer } = await ensureLicenseDeps();
+        const [{ handleLicenseIssueRequest }, { isFlagEnabled }] = await Promise.all([
+          import("./src/core/license/issue-handler.ts"),
+          import("./src/core/flags/flags.ts"),
+        ]);
+        const webReq = await toWebRequest(req);
+        const webRes = await handleLicenseIssueRequest(webReq, {
+          issuer: licenseIssuer,
+          adminApiKey: process.env.ADMIN_API_KEY ?? "",
+          killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
+        });
+        await sendWebResponse(webRes, res);
+      });
+
+      server.middlewares.use("/api/checkout/create-session", async (req, res) => {
+        const [
+          { handleCreateCheckoutSession },
+          { resolveAllowedPrices },
+          { isFlagEnabled },
+        ] = await Promise.all([
+          import("./src/core/stripe/checkout-handler.ts"),
+          import("./src/core/stripe/allowed-prices.ts"),
+          import("./src/core/flags/flags.ts"),
+        ]);
+        const webReq = await toWebRequest(req);
+        const webRes = await handleCreateCheckoutSession(webReq, {
+          // Lazy Stripe construction — handler short-circuits 4xx/503 paths
+          // before the SDK is touched, so dev/test without STRIPE_SECRET_KEY
+          // still hits clean 4xx responses instead of crashing the import.
+          client: {
+            create: async (params, opts) => {
+              const { default: Stripe } = await import("stripe");
+              const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+              const session = await stripe.checkout.sessions.create(params, opts);
+              return { url: session.url, id: session.id };
+            },
+          },
+          allowedPrices: resolveAllowedPrices(),
+          killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
         });
         await sendWebResponse(webRes, res);
       });
