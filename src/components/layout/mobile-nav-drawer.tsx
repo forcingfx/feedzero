@@ -95,7 +95,19 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
           <SidebarProvider defaultOpen={false} className="block min-h-0">
             <div
               data-testid="drawer-scroll"
-              className="overflow-y-auto overflow-x-hidden pb-[calc(env(safe-area-inset-bottom)_+_2rem)]"
+              // Padding-bottom = home-indicator inset + iOS toolbar slack + breathing room.
+              // - `env(safe-area-inset-bottom)`: iPhone home-indicator strip (~34px on
+              //   modern iPhones in PWA / no-toolbar contexts).
+              // - `calc(100vh - 100dvh)`: iOS Safari's dynamic bottom toolbar
+              //   (~70-80px on iPhones). Zero when the toolbar is collapsed. The
+              //   prior fix omitted this — leaving the last drawer row occluded
+              //   when the toolbar was up. See `tests/components/layout/mobile-nav-drawer.test.tsx`
+              //   for the regression guard.
+              // - `2rem`: visual breathing room so the last row isn't pressed against
+              //   the very edge.
+              // Vaul positions the outer Drawer.Content itself; the only place we
+              // can reliably enforce safe-area is here on the inner scroll.
+              className="overflow-y-auto overflow-x-hidden pb-[calc(env(safe-area-inset-bottom)_+_(100vh_-_100dvh)_+_2rem)]"
               style={{ height: "calc(85dvh - 1.25rem)" }}
             >
               <div data-testid="drawer-section" className="w-full py-1 px-3">

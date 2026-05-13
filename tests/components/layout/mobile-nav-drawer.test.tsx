@@ -196,6 +196,73 @@ describe("MobileNavDrawer", () => {
     expect(scroll.className).toContain("overflow-x-hidden");
   });
 
+  describe("browser-chrome occlusion fix (permanent regression guard)", () => {
+    // Context (2026-05-13 second mobile bug report): on iOS Safari with the
+    // bottom toolbar visible, the drawer's bottom content was hidden behind
+    // the toolbar. The outer Drawer.Content is positioned by vaul (which
+    // overrides any inline `bottom`/`height` style we pass), so the fix
+    // lives on the INNER scroll container's `padding-bottom`. The previous
+    // fix used `env(safe-area-inset-bottom) + 2rem` — that covers the
+    // home-indicator strip but the fixed `2rem` is too small for iOS
+    // Safari's dynamic bottom toolbar (~70-80px on iPhones).
+    //
+    // Permanent fix: extend the padding-bottom to include
+    //   `calc(100vh - 100dvh)`
+    // which evaluates to the toolbar height when the iOS Safari toolbar is
+    // visible and 0 when it isn't. Combined with the existing
+    // `env(safe-area-inset-bottom)` for the home indicator and the visual
+    // `2rem` breathing room, the last scrollable item is always reachable.
+    //
+    // These tests pin the CSS expression shape structurally. happy-dom
+    // doesn't compute the visual viewport, so we assert the expression is
+    // present rather than the resolved pixel offset.
+
+    async function getDrawerScroll(): Promise<HTMLElement> {
+      const { container } = renderDrawer();
+      await userEvent.click(screen.getByTestId("drawer-handle-strip"));
+      const scroll = await waitFor(() => {
+        const s = container.ownerDocument.querySelector(
+          "[data-testid='drawer-scroll']",
+        );
+        if (!s) throw new Error("drawer scroll not mounted");
+        return s as HTMLElement;
+      });
+      return scroll;
+    }
+
+    it("inner scroll padding-bottom includes env(safe-area-inset-bottom) for the iOS home indicator", async () => {
+      const scroll = await getDrawerScroll();
+      expect(scroll.getAttribute("class") ?? "").toContain(
+        "safe-area-inset-bottom",
+      );
+    });
+
+    it("inner scroll padding-bottom includes (100vh - 100dvh) for the iOS Safari bottom toolbar", async () => {
+      // The bug we're preventing: a previous version used only
+      // `env(safe-area-inset-bottom) + 2rem` which left the last drawer
+      // item occluded by the iOS Safari toolbar (~75px). The fix adds
+      // `(100vh - 100dvh)` so the padding grows with the toolbar.
+      // Tailwind arbitrary values use `_` to escape spaces in className
+      // tokens — the regex tolerates either separator.
+      const scroll = await getDrawerScroll();
+      expect(scroll.getAttribute("class") ?? "").toMatch(
+        /100vh[\s_]*-[\s_]*100dvh/,
+      );
+    });
+
+    it("padding-bottom is delivered via Tailwind arbitrary-value `pb-[calc(...)]` (not split into multiple utilities)", async () => {
+      // Pins the single-source-of-truth shape: the entire expression is in
+      // ONE `pb-[calc(…)]` token. A future "let's split this into a CSS
+      // var" refactor would still need to surface the safe-area + toolbar
+      // expressions somewhere; this test fails if the `pb-[calc(...)]`
+      // token disappears entirely so the reviewer is forced to confirm
+      // the alternative form covers both insets.
+      const scroll = await getDrawerScroll();
+      const className = scroll.getAttribute("class") ?? "";
+      expect(className).toMatch(/pb-\[calc\(/);
+    });
+  });
+
   it("toggles open when feedzero:toggle-sidebar event is dispatched", async () => {
     const { container } = renderDrawer();
     const doc = container.ownerDocument;
