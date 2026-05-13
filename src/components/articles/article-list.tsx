@@ -28,6 +28,22 @@ const ESTIMATED_ITEM_SIZE = 72;
  */
 const OVERSCAN = 8;
 
+/**
+ * Returns true when the row for `articleId` is in the DOM and lies fully
+ * within the scroll container's viewport. If the row hasn't been rendered
+ * (e.g. selection restored from URL before the virtualizer mounts it), the
+ * caller must treat the item as not visible and scroll to it.
+ */
+function isItemVisible(scrollEl: HTMLElement, articleId: string): boolean {
+  const itemEl = scrollEl.querySelector<HTMLElement>(
+    `[data-id="${CSS.escape(articleId)}"]`,
+  );
+  if (!itemEl) return false;
+  const item = itemEl.getBoundingClientRect();
+  const container = scrollEl.getBoundingClientRect();
+  return item.top >= container.top && item.bottom <= container.bottom;
+}
+
 export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
@@ -60,15 +76,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   // onArticleSelect (from props) are stable. Passing a stable handler into
   // memoized ArticleItem lets React skip re-rendering items whose props did
   // not change — critical when the list has thousands of entries.
-  //
-  // skipNextAutoScroll: when the user CLICKS an article, the resulting
-  // selection change must not trigger the auto-scroll-into-view effect
-  // below. The clicked item is by definition visible, and re-anchoring the
-  // virtualizer to it shifts the scroll position out from under the user.
-  const skipNextAutoScroll = useRef(false);
   const handleSelect = useCallback(
     (article: Article) => {
-      skipNextAutoScroll.current = true;
       selectArticle(article);
       if (onArticleSelect) onArticleSelect(article);
     },
@@ -83,27 +92,22 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     getItemKey: (index) => articles[index]?.id ?? index,
   });
 
-  // Keep the selected article in view. Covers j/k keyboard nav (which selects
-  // off-screen items once the user scrolls) and the initial reveal of a
-  // selection that was restored from URL state. NOT for click-driven
-  // selection — see skipNextAutoScroll above.
-  //
-  // Deps are intentionally limited to `selectedId`: the auto-scroll must
-  // run only when the selection itself changes, not when the `articles`
-  // array reference changes. If we depended on `articles`, any unrelated
-  // mutation (auto-mark-as-read after selection, refresh, sync push) would
-  // re-fire the effect with the click-skip flag already consumed, and
-  // re-anchor the list to the previously-selected (now off-screen) article
-  // — see GitLab #12. We read the latest articles via a ref instead.
+  // Keep the selected article in view, but only when the user can't already
+  // see it. Selection changes flow in from many places — clicks, keyboard
+  // nav, URL restoration, external store mutations during sync push or
+  // auto-mark-as-read. A flag set in the click handler protects only one of
+  // those paths; any other path would re-fire the effect and re-anchor the
+  // virtualizer to the new selection, scrolling the user's viewport even
+  // when the new article is already visible. Checking visibility before
+  // scrolling is the invariant that holds across every call site.
   const articlesRef = useRef(articles);
   articlesRef.current = articles;
   const selectedId = selectedArticle?.id;
   useEffect(() => {
     if (!selectedId) return;
-    if (skipNextAutoScroll.current) {
-      skipNextAutoScroll.current = false;
-      return;
-    }
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    if (isItemVisible(scrollEl, selectedId)) return;
     const index = articlesRef.current.findIndex((a) => a.id === selectedId);
     if (index !== -1) virtualizer.scrollToIndex(index, { align: "auto" });
   }, [selectedId, virtualizer]);

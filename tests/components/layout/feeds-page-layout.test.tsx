@@ -1,9 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, act } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
+
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStorageMock,
+  writable: true,
+});
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -22,6 +42,7 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
 
 vi.mock("@/core/extractor/extractor.ts", () => ({
   extract: vi.fn(),
+  needsExtraction: vi.fn(() => false),
 }));
 
 let mockIsDesktop = true;
@@ -234,6 +255,100 @@ describe("FeedsPage layout — desktop", () => {
     expect(panels).toHaveLength(2);
     const ids = Array.from(panels).map((p) => p.getAttribute("id"));
     expect(ids).toEqual(expect.arrayContaining(["sidebar", "explore"]));
+  });
+
+  it("does not clobber selectedArticle to the previous URL article when articles mutates faster than React Router (PR #34 follow-up)", async () => {
+    // Repro: user is on /feeds/f1/articles/a0. They scroll down so a0 is
+    // off-screen, then click a15. Inside the click chain, ArticleList's
+    // handleSelect calls store.selectArticle(a15) — that updates the
+    // selectedArticle in Zustand AND triggers the auto-mark-as-read flush
+    // for the previously-selected article, which mutates the articles array.
+    // navigate('/articles/a15') is also called, but React Router's articleId
+    // (from useParams) doesn't always settle in the same render pass as
+    // Zustand updates — there's a window where `articles` has changed but
+    // `articleId` is still 'a0' (stale).
+    //
+    // The line-136 effect in feeds-page.tsx re-runs whenever `articles`
+    // changes. If it doesn't track which articleId it last synced from, it
+    // sees `selectedArticle.id === 'a15' !== articleId === 'a0'` and
+    // "fixes" the mismatch by selecting articles[0] — clobbering the
+    // user's just-clicked selection. Then articleId settles, the effect
+    // runs again, and selection bounces back to a15. The visible result
+    // is two scroll jumps and a flash of the wrong article.
+    const articles = Array.from({ length: 50 }, (_, i) => ({
+      id: `a${i}`,
+      feedId: "f1",
+      guid: `a${i}`,
+      title: `Article ${i}`,
+      link: `https://example.com/${i}`,
+      content: "",
+      summary: "",
+      author: "",
+      publishedAt: Date.now() - i * 1000,
+      read: false,
+      createdAt: Date.now(),
+    }));
+    useArticleStore.setState({
+      articles,
+      selectedArticle: articles[0],
+      isLoading: false,
+    });
+
+    renderPage("/feeds/f1/articles/a0");
+    // Let the initial sync settle so the effect records 'a0' as the
+    // last-synced articleId.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    // Simulate the post-click state: selectedArticle has just been switched
+    // to a15 by ArticleList's handleSelect, AND the articles array has been
+    // mutated by the auto-mark-as-read flush — but the URL articleId is
+    // still 'a0' because the navigate hasn't propagated through React
+    // Router yet.
+    await act(async () => {
+      useArticleStore.setState({
+        selectedArticle: articles[15],
+        articles: articles.map((a, i) =>
+          i === 15 ? { ...a, read: true } : a,
+        ),
+      });
+    });
+
+    // selectedArticle MUST still be a15. The line-136 effect must not
+    // re-sync from the stale articleId 'a0' and clobber the click result.
+    expect(useArticleStore.getState().selectedArticle?.id).toBe("a15");
+  });
+
+  it("explore layout's sidebar starts at the user's stored width (preserved across layout transitions)", async () => {
+    // The sidebar width must be respected when entering the Explore tab.
+    // Distinct group ids per layout shape mean the library's per-group
+    // persistence does not share the sidebar size between the 3-panel feeds
+    // layout and the 2-panel explore/stats layout. The page reads the shared
+    // sidebar width from localStorage and applies it as the panel's
+    // defaultSize so /explore opens at the user's preferred width.
+    const hookModule = await import("@/hooks/use-shared-sidebar-size.ts");
+    const spy = vi.spyOn(hookModule, "useSharedSidebarSize");
+
+    const SIDEBAR_KEY = hookModule.SIDEBAR_SIZE_STORAGE_KEY;
+    window.localStorage.setItem(SIDEBAR_KEY, "27");
+
+    renderPage("/explore");
+
+    // The hook must be called with the active layout id so the persisted
+    // sidebar width re-applies after the layout transitions to /explore.
+    expect(spy).toHaveBeenCalled();
+    const lastCallLayoutKey = spy.mock.calls.at(-1)?.[0];
+    expect(lastCallLayoutKey).toBe("feedzero:layout:single");
+
+    // The hook returned a defaultSize derived from localStorage; that value
+    // must be the one the page hands to the sidebar panel.
+    const lastResult = spy.mock.results.at(-1)?.value;
+    expect(lastResult).toBeDefined();
+    expect(lastResult.defaultSize).toBe("27%");
+
+    window.localStorage.removeItem(SIDEBAR_KEY);
+    spy.mockRestore();
   });
 
   it("sidebar CSS variable is at most 14rem so three panels fit at 1024px", () => {

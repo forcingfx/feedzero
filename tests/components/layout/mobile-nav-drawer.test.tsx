@@ -164,6 +164,26 @@ describe("MobileNavDrawer", () => {
     expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
   });
 
+  it("drawer body content has horizontal padding so feed/settings rows don't run edge-to-edge", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
+    const { container } = renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+
+    const scroll = await waitFor(() => {
+      const s = container.ownerDocument.querySelector("[data-testid='drawer-scroll']");
+      if (!s) throw new Error("scroll not mounted");
+      return s;
+    });
+    // Both the feed nav body and the settings list must sit inside a wrapper
+    // with horizontal padding so the rows don't touch the screen edges.
+    const paddedSections = scroll.querySelectorAll("[data-testid='drawer-section']");
+    expect(paddedSections.length).toBeGreaterThanOrEqual(2);
+    for (const section of paddedSections) {
+      expect(section.className).toMatch(/\bpx-\d/);
+    }
+  });
+
   it("drawer scroll container prevents horizontal scrolling", async () => {
     const user = userEvent.setup();
     const { container } = renderDrawer();

@@ -4,6 +4,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
+import { useSharedSidebarSize } from "@/hooks/use-shared-sidebar-size.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { ALL_FEEDS_ID, PANEL_LAYOUT_ID } from "@/utils/constants.ts";
@@ -89,6 +90,15 @@ export function FeedsPage() {
   // Track whether user explicitly navigated back (to suppress auto-select)
   const skipAutoSelectRef = useRef(false);
 
+  // Track which articleId the line-136 effect last synced selectedArticle
+  // from. Used to skip re-syncing when the effect re-fires for an unchanged
+  // articleId — typically because `articles` mutated (mark-as-read flush
+  // inside selectArticle, refresh, sync push) while React Router's
+  // useParams articleId hasn't yet caught up to a recent navigate(). Without
+  // this guard, the effect would clobber the freshly set selection with the
+  // article matching the previous URL.
+  const lastSyncedArticleIdRef = useRef<string | undefined>(undefined);
+
   // Whenever no feedId is in the URL (and we're not explicitly on /explore),
   // land on the All items article list. Even with zero feeds the list is the
   // expected home — the auto-subscribe to the release notes feed populates
@@ -110,6 +120,9 @@ export function FeedsPage() {
   useEffect(() => {
     if (!feedId || feedId === loadedFeedRef.current) return;
     loadedFeedRef.current = feedId;
+    // Reset the URL-sync ref so the new feed's first article load is treated
+    // as a fresh sync (the previous feed's articleId is no longer relevant).
+    lastSyncedArticleIdRef.current = undefined;
     selectFeed(feedId);
     selectArticle(null);
     // On mobile, if the reader panel is visible (container scrolled right),
@@ -133,14 +146,28 @@ export function FeedsPage() {
   // Article sync + auto-select (single effect replaces three cascading effects).
   // Waits until loading completes, then either syncs articleId from URL
   // or auto-selects the first article. No cascading navigations.
+  //
+  // The `articles` dep is required so the effect re-runs once the articles
+  // list has loaded (initial mount with empty articles → articles populate
+  // later → effect must fire to sync from URL). But it must NOT re-sync
+  // from URL every time `articles` mutates for unrelated reasons (the
+  // mark-as-read flush inside selectArticle, refresh, sync push). When
+  // those mutations happen during a click, `articleId` from useParams may
+  // still be the previously-selected article's id (React Router's state
+  // hasn't caught up to a just-issued navigate) — re-syncing in that
+  // window would clobber the click result with the previous article.
+  // `lastSyncedArticleIdRef` gates the sync so it only runs when articleId
+  // itself actually changed.
   useEffect(() => {
     if (!feedId || isLoadingArticles || articles.length === 0) return;
 
     if (articleId) {
-      const current = useArticleStore.getState().selectedArticle;
-      if (current?.id === articleId) return;
+      if (lastSyncedArticleIdRef.current === articleId) return;
       const article = articles.find((a) => a.id === articleId);
-      if (article) selectArticle(article);
+      if (article) {
+        selectArticle(article);
+        lastSyncedArticleIdRef.current = articleId;
+      }
     } else if (isDesktop && !skipAutoSelectRef.current) {
       navigate(`/feeds/${feedId}/articles/${articles[0].id}`, {
         replace: true,
@@ -299,6 +326,7 @@ export function FeedsPage() {
   // visibly rebalances the sidebar — see GitLab #13a).
   const layoutId =
     showStats || exploreOrEmpty ? PANEL_LAYOUT_ID.SINGLE : PANEL_LAYOUT_ID.FEEDS;
+  const sidebarSize = useSharedSidebarSize(layoutId);
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
@@ -306,10 +334,12 @@ export function FeedsPage() {
       <ResizablePanelGroup id={layoutId} direction="horizontal" className="h-svh">
         <ResizablePanel
           id="sidebar"
-          defaultSize="17%"
+          defaultSize={sidebarSize.defaultSize ?? "17%"}
           minSize="150px"
           maxSize="280px"
           className="overflow-hidden"
+          panelRef={sidebarSize.panelRef}
+          onResize={sidebarSize.onResize}
         >
           <AppSidebar
             collapsible="none"

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -210,6 +210,50 @@ describe("ArticleList", () => {
     expect(list).not.toBeNull();
     // pb-12 = 48px ≥ pill height (h-7 = 28px) + bottom offset (bottom-3 = 12px).
     expect(list!.className).toContain("pb-12");
+  });
+
+  it("changing selection to a visible article does not scroll the list (regardless of which call site triggers the change)", async () => {
+    // The auto-scroll-into-view effect must only fire when the new selection
+    // is *not* already visible. Click handlers, keyboard navigation, URL
+    // restoration, and external store mutations all flow through the same
+    // selectedArticle → effect path. The previous flag-based opt-out only
+    // covered ArticleList's own click handler; selection changes from
+    // anywhere else (URL navigation, external store updates) would re-fire
+    // the effect with the flag already false, scrolling away from the user's
+    // current viewport.
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    const articles = Array.from({ length: 200 }, (_, i) =>
+      mockArticle(`a${i}`, `Article ${i}`),
+    );
+    // Pre-select the first article — already read.
+    useArticleStore.setState({
+      articles: articles.map((a) =>
+        a.id === "a0" ? { ...a, read: true } : a,
+      ),
+      selectedArticle: { ...articles[0], read: true },
+      isLoading: false,
+    });
+
+    const { container } = render(<ArticleList />);
+    const scrollEl = container.querySelector(".overflow-y-auto") as HTMLElement;
+    const scrollToSpy = vi.fn();
+    scrollEl.scrollTo = scrollToSpy as unknown as typeof scrollEl.scrollTo;
+    scrollEl.scrollBy = vi.fn() as unknown as typeof scrollEl.scrollBy;
+
+    // Switch the selection externally — bypasses handleSelect entirely.
+    // a1 is in the rendered window and visible, so no scroll should occur.
+    const target = useArticleStore.getState().articles[1];
+    expect(target.id).toBe("a1");
+    await act(async () => {
+      useArticleStore.setState({ selectedArticle: target });
+    });
+
+    expect(scrollToSpy).not.toHaveBeenCalled();
   });
 
   it("clicking a visible article does not re-anchor the virtualizer to the previously-selected (off-screen) article (GitLab #12)", async () => {

@@ -98,7 +98,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
               className="overflow-y-auto overflow-x-hidden pb-[calc(env(safe-area-inset-bottom)_+_2rem)]"
               style={{ height: "calc(85dvh - 1.25rem)" }}
             >
-              <div className="w-full py-1">
+              <div data-testid="drawer-section" className="w-full py-1 px-3">
                 <SidebarBody
                   onFeedSelect={handleSelect}
                   onBeforeNavigate={() => setOpen(false)}
@@ -110,7 +110,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                 the drawer bottom gets covered by iOS Safari browser chrome —
                 listing every option in-flow keeps them all reachable with one tap.
               */}
-              <div className="border-t mt-2">
+              <div data-testid="drawer-section" className="border-t mt-2 px-3 py-1">
                 <SettingsMenu
                   variant="list"
                   hasFeeds={feeds.length > 0}
