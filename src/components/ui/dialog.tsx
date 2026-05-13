@@ -59,7 +59,17 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
+          // Layout + animation (unchanged from shadcn baseline).
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
+          // Mobile keyboard handling. `100dvh` is the dynamic viewport
+          // height — it shrinks when the iOS Safari soft keyboard opens
+          // (iOS 15.4+, Chrome 108+, Firefox 101+). Combined with the
+          // `interactive-widget=resizes-content` viewport meta in
+          // index.html, this keeps centered dialogs above the keyboard
+          // line. `overflow-y-auto` guarantees focused inputs can still
+          // scroll into view on older browsers that don't shrink dvh.
+          // See tests/components/ui/dialog-mobile-keyboard.test.tsx.
+          "max-h-[calc(100dvh-2rem)] overflow-y-auto",
           className,
         )}
         {...props}
