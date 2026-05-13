@@ -16,8 +16,11 @@ import { verifyLicense } from "./verify";
 import type { LicensePayload } from "./format";
 import type { SigningKey } from "./sign";
 import type { LicenseStorage } from "./storage";
+import { newTraceId } from "../../utils/trace-id";
+import { logError } from "../../utils/log-error";
 
 export const SUPPORTED_METHODS: readonly string[] = ["POST"];
+const ROUTE = "/api/license/verify";
 
 export interface VerifyHandlerOptions {
   signingKey: SigningKey;
@@ -33,46 +36,91 @@ interface OkBody {
 interface ErrBody {
   ok: false;
   error: string;
+  traceId: string;
 }
 
 const JSON_HEADERS = { "Content-Type": "application/json" } as const;
 
-function jsonResponse(body: OkBody | ErrBody, status: number): Response {
+function okResponse(body: OkBody, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+}
+
+/**
+ * 4xx response — surfaces traceId for support correlation, no server log.
+ */
+function clientError(
+  message: string,
+  status: number,
+  traceId: string,
+): Response {
+  return new Response(
+    JSON.stringify({ ok: false, error: message, traceId } satisfies ErrBody),
+    { status, headers: JSON_HEADERS },
+  );
+}
+
+/**
+ * 5xx response — surfaces traceId AND emits a structured server-log line.
+ */
+function serverError(
+  message: string,
+  errClass: string,
+  status: number,
+  traceId: string,
+  method: string,
+): Response {
+  logError({
+    route: ROUTE,
+    method,
+    status,
+    traceId,
+    errClass,
+    errMsg: message,
+  });
+  return new Response(
+    JSON.stringify({ ok: false, error: message, traceId } satisfies ErrBody),
+    { status, headers: JSON_HEADERS },
+  );
 }
 
 export async function handleLicenseVerifyRequest(
   request: Request,
   options: VerifyHandlerOptions,
 ): Promise<Response> {
-  if (request.method !== "POST") {
-    return jsonResponse({ ok: false, error: "method not allowed" }, 405);
+  const traceId = newTraceId();
+  const method = request.method;
+
+  if (method !== "POST") {
+    return clientError("method not allowed", 405, traceId);
   }
 
   const tokenResult = await readTokenFromBody(request);
   if (!tokenResult.ok) {
-    return jsonResponse({ ok: false, error: tokenResult.error }, 400);
+    return clientError(tokenResult.error, 400, traceId);
   }
 
   const verified = await verifyLicense(tokenResult.token, options.signingKey, {
     nowSec: options.nowSec,
   });
   if (!verified.ok) {
-    return jsonResponse({ ok: false, error: verified.error }, 401);
+    return clientError(verified.error, 401, traceId);
   }
 
   const revoked = await options.storage.isRevoked(verified.value.keyId);
   if (!revoked.ok) {
-    return jsonResponse(
-      { ok: false, error: `license storage error: ${revoked.error}` },
+    return serverError(
+      `license storage error: ${revoked.error}`,
+      "LicenseStorageError",
       503,
+      traceId,
+      method,
     );
   }
   if (revoked.value) {
-    return jsonResponse({ ok: false, error: "license revoked" }, 401);
+    return clientError("license revoked", 401, traceId);
   }
 
-  return jsonResponse({ ok: true, license: verified.value }, 200);
+  return okResponse({ ok: true, license: verified.value }, 200);
 }
 
 type TokenRead =

@@ -40,3 +40,14 @@ export async function resolveLicenseStorage(
   }
   return new MemoryLicenseStorage();
 }
+
+/**
+ * Label form of `resolveLicenseStorage` for module-load logging. Stays in
+ * sync with the resolver above because both consult the same
+ * `hasUpstashCredentials` predicate.
+ */
+export function describeLicenseStorageMode(
+  env: Record<string, string | undefined> = process.env,
+): "upstash" | "memory" {
+  return hasUpstashCredentials(env) ? "upstash" : "memory";
+}

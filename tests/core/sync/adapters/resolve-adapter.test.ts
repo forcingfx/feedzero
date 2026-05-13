@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { resolveAdapter } from "@/core/sync/adapters/resolve-adapter";
+import {
+  resolveAdapter,
+  describeAdapterMode,
+} from "@/core/sync/adapters/resolve-adapter";
 
 vi.mock("@/core/sync/adapters/filesystem-adapter", () => ({
   createFilesystemAdapter: vi.fn(() => ({ type: "filesystem" })),
@@ -112,6 +115,37 @@ describe("resolveAdapter", () => {
       // self-hosters who run without Vercel Blob.
       const adapter = resolveAdapter() as unknown as { type: string };
       expect(adapter.type).toBe("filesystem");
+    });
+  });
+
+  describe("describeAdapterMode (Step A — module-load adapter logging)", () => {
+    // The mode label is what gets surfaced at module load in api/sync.ts.
+    // It MUST agree with the actual adapter chosen by resolveAdapter() —
+    // otherwise the log line lies and observability is worse than nothing.
+
+    it("returns 'filesystem' when nothing is configured", () => {
+      expect(describeAdapterMode()).toBe("filesystem");
+    });
+
+    it("returns 'vercel-blob' when BLOB_READ_WRITE_TOKEN is present (auto-detect)", () => {
+      process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test";
+      expect(describeAdapterMode()).toBe("vercel-blob");
+    });
+
+    it("returns SYNC_STORAGE value when set (explicit override)", () => {
+      process.env.SYNC_STORAGE = "memory";
+      expect(describeAdapterMode()).toBe("memory");
+    });
+
+    it("agrees with resolveAdapter under the same env (no drift)", () => {
+      // The KEY invariant: if describeAdapterMode says 'vercel-blob',
+      // resolveAdapter must actually return the vercel-blob adapter.
+      // This test pins them together so a future edit to one without the
+      // other fails immediately.
+      process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test";
+      const label = describeAdapterMode();
+      const adapter = resolveAdapter() as unknown as { type: string };
+      expect(label).toBe(adapter.type);
     });
   });
 });

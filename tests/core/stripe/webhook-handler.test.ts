@@ -437,4 +437,110 @@ describe("handleStripeWebhook", () => {
       expect(issuer.issue).toHaveBeenCalled();
     });
   });
+
+  describe("observability — traceId + structured error logging", () => {
+    it("includes a traceId in 400 invalid-signature response body", async () => {
+      const res = await handleStripeWebhook(
+        new Request(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Stripe-Signature": "garbage-not-stripe-format",
+          },
+          body: JSON.stringify({ type: "x" }),
+        }),
+        makeConfig(issuer),
+      );
+      const body = await res.json();
+      expect(res.status).toBe(400);
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("includes a traceId in 500 storage-error response and writes a structured log", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const brokenEventStore = {
+          async markSeenIfNew() {
+            return err("eventStore down");
+          },
+        };
+        const fixture = subscriptionCreatedEvent({
+          customerId: CUSTOMER_ID,
+          subscriptionId: SUBSCRIPTION_ID,
+          tier: "personal",
+        });
+        const res = await handleStripeWebhook(
+          postFixture(fixture, nowSec()),
+          makeConfig(issuer, { eventStore: brokenEventStore }),
+        );
+        const body = await res.json();
+        expect(res.status).toBe(500);
+        expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
+        expect(logged.route).toBe("/api/stripe/webhook");
+        expect(logged.method).toBe("POST");
+        expect(logged.status).toBe(500);
+        expect(logged.traceId).toBe(body.traceId);
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("includes a traceId in 500 issuer-failure response and writes a structured log", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const brokenIssuer: LicenseIssuer = {
+          issue: vi.fn(async () => err("issuer down")),
+          revoke: vi.fn(async () => ok(undefined)),
+          recordRenewal: vi.fn(async () => ok(undefined)),
+        };
+        const fixture = subscriptionCreatedEvent({
+          customerId: CUSTOMER_ID,
+          subscriptionId: SUBSCRIPTION_ID,
+          tier: "personal",
+        });
+        const res = await handleStripeWebhook(
+          postFixture(fixture, nowSec()),
+          makeConfig(brokenIssuer),
+        );
+        const body = await res.json();
+        expect(res.status).toBe(500);
+        expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
+        expect(logged.errClass).toBeTruthy();
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("does NOT write a structured log on 400 client errors (invalid signature)", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        await handleStripeWebhook(
+          new Request(ENDPOINT, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Stripe-Signature": "garbage",
+            },
+            body: JSON.stringify({}),
+          }),
+          makeConfig(issuer),
+        );
+        expect(consoleError).not.toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+  });
 });

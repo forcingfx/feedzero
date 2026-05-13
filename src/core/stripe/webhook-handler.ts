@@ -16,6 +16,10 @@
 
 import type { Result } from "../../utils/result";
 import type { SeenEventStore } from "./seen-event-store";
+import { newTraceId } from "../../utils/trace-id";
+import { logError } from "../../utils/log-error";
+
+const ROUTE = "/api/stripe/webhook";
 
 export interface LicenseIssuer {
   issue(args: {
@@ -197,6 +201,25 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
+function clientError(
+  message: string,
+  status: number,
+  traceId: string,
+): Response {
+  return jsonResponse({ ok: false, error: message, traceId }, status);
+}
+
+function serverError(
+  message: string,
+  errClass: string,
+  status: number,
+  traceId: string,
+  method: string,
+): Response {
+  logError({ route: ROUTE, method, status, traceId, errClass, errMsg: message });
+  return jsonResponse({ ok: false, error: message, traceId }, status);
+}
+
 interface DispatchOutcome {
   status: number;
   body: unknown;
@@ -375,19 +398,22 @@ export async function handleStripeWebhook(
   request: Request,
   config: WebhookConfig,
 ): Promise<Response> {
-  if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+  const traceId = newTraceId();
+  const method = request.method;
+
+  if (method !== "POST") {
+    return clientError("method not allowed", 405, traceId);
   }
 
   const verified = await verifyAndParse(request, config);
   if (!verified.ok) {
-    return jsonResponse({ ok: false, error: verified.error }, verified.status);
+    return clientError(verified.error, verified.status, traceId);
   }
 
   // Signature checked first so an attacker can't probe webhook behavior with
   // unsigned requests once they learn the kill switch is flipped.
   if (config.killSignups?.()) {
-    return jsonResponse({ ok: false, error: "signups disabled" }, 503);
+    return clientError("signups disabled", 503, traceId);
   }
 
   // Event-id dedup. Runs after signature verification (so unsigned probes
@@ -398,7 +424,7 @@ export async function handleStripeWebhook(
     const newSeen = await config.eventStore.markSeenIfNew(event.id);
     if (!newSeen.ok) {
       // Storage failure — return 500 so Stripe retries.
-      return jsonResponse({ ok: false, error: newSeen.error }, 500);
+      return serverError(newSeen.error, "EventStoreError", 500, traceId, method);
     }
     if (!newSeen.value) {
       // Duplicate delivery — Stripe doc: return 200 immediately, do not re-dispatch.
@@ -407,5 +433,14 @@ export async function handleStripeWebhook(
   }
 
   const outcome = await dispatchEvent(event, config.issuer);
+  if (outcome.status >= 500) {
+    // Issuer or downstream failure — log + return same status. We re-shape
+    // the body to include traceId rather than passing outcome.body through.
+    const errMsg =
+      typeof (outcome.body as { error?: unknown })?.error === "string"
+        ? (outcome.body as { error: string }).error
+        : "dispatch failed";
+    return serverError(errMsg, "DispatchFailed", outcome.status, traceId, method);
+  }
   return jsonResponse(outcome.body, outcome.status);
 }

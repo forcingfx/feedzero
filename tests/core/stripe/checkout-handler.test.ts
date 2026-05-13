@@ -219,4 +219,74 @@ describe("checkout handler — success path", () => {
     const body = await res.json();
     expect(body.ok).toBe(false);
   });
+
+  describe("observability — traceId + structured error logging", () => {
+    it("includes a traceId in 400 invalid-priceId response body", async () => {
+      const res = await handleCreateCheckoutSession(
+        postBody({
+          priceId: "price_NOT_in_allowlist",
+          successUrl: "https://feedzero.app/s",
+          cancelUrl: "https://feedzero.app/c",
+        }),
+        { client: fakeStripeClient(), allowedPrices: ALLOWED_PRICES },
+      );
+      const body = await res.json();
+      expect(res.status).toBe(400);
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("includes a traceId in 502 stripe-failure response and writes a structured log", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const res = await handleCreateCheckoutSession(
+          postBody({
+            priceId: "price_personal_monthly_test",
+            successUrl: "https://feedzero.app/s",
+            cancelUrl: "https://feedzero.app/c",
+          }),
+          {
+            client: {
+              create: async () => {
+                throw new Error("Stripe API down");
+              },
+            },
+            allowedPrices: ALLOWED_PRICES,
+          },
+        );
+        const body = await res.json();
+        expect(res.status).toBe(502);
+        expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
+        expect(logged.route).toBe("/api/checkout/create-session");
+        expect(logged.method).toBe("POST");
+        expect(logged.status).toBe(502);
+        expect(logged.traceId).toBe(body.traceId);
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("does NOT write a structured log on 4xx client errors", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        await handleCreateCheckoutSession(
+          postBody({
+            priceId: "price_NOT_in_allowlist",
+            successUrl: "https://feedzero.app/s",
+            cancelUrl: "https://feedzero.app/c",
+          }),
+          { client: fakeStripeClient(), allowedPrices: ALLOWED_PRICES },
+        );
+        expect(consoleError).not.toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+  });
 });

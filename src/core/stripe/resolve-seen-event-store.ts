@@ -34,3 +34,10 @@ export async function resolveSeenEventStore(
     new Redis({ url: url as string, token: token as string }),
   );
 }
+
+/** Label form of `resolveSeenEventStore` for module-load logging. */
+export function describeSeenEventStoreMode(
+  env: Record<string, string | undefined> = process.env,
+): "upstash" | "memory" {
+  return hasUpstashCredentials(env) ? "upstash" : "memory";
+}

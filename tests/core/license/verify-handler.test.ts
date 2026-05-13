@@ -1,11 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   handleLicenseVerifyRequest,
   SUPPORTED_METHODS,
 } from "@/core/license/verify-handler";
 import { signLicense, type SigningKey } from "@/core/license/sign";
-import { MemoryLicenseStorage } from "@/core/license/storage";
+import { MemoryLicenseStorage, type LicenseStorage } from "@/core/license/storage";
 import type { LicensePayload } from "@/core/license/format";
+import { err } from "@/utils/result";
 
 const SECRET = "this-is-a-test-signing-secret-32-bytes!";
 const key: SigningKey = { secret: SECRET };
@@ -131,5 +132,99 @@ describe("license verify handler", () => {
     );
     const text = await res.text();
     expect(text).not.toContain(SECRET);
+  });
+
+  describe("observability — traceId + structured error logging", () => {
+    function brokenStorage(): LicenseStorage {
+      return {
+        async put() { return err("storage down"); },
+        async get() { return err("storage down"); },
+        async listByCustomer() { return err("storage down"); },
+        async revoke() { return err("storage down"); },
+        async revokeAllForCustomer() { return err("storage down"); },
+        async isRevoked() { return err("storage down"); },
+      };
+    }
+
+    it("includes a traceId in 400 client-error response body", async () => {
+      const storage = new MemoryLicenseStorage();
+      const res = await handleLicenseVerifyRequest(
+        new Request("https://feedzero.app/api/license/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "not-json",
+        }),
+        { signingKey: key, storage, nowSec: NOW },
+      );
+      const body = await res.json();
+      expect(res.status).toBe(400);
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("includes a traceId in 401 invalid-token response body", async () => {
+      const storage = new MemoryLicenseStorage();
+      const res = await handleLicenseVerifyRequest(
+        postBody({ token: "not-a-real-token" }),
+        { signingKey: key, storage, nowSec: NOW },
+      );
+      const body = await res.json();
+      expect(res.status).toBe(401);
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("includes a traceId in 503 storage-error response body and writes a structured log", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const token = await signLicense(validPayload, key);
+        const res = await handleLicenseVerifyRequest(
+          postBody({ token }),
+          { signingKey: key, storage: brokenStorage(), nowSec: NOW },
+        );
+        const body = await res.json();
+        expect(res.status).toBe(503);
+        expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
+        expect(logged.route).toBe("/api/license/verify");
+        expect(logged.method).toBe("POST");
+        expect(logged.status).toBe(503);
+        expect(logged.traceId).toBe(body.traceId);
+        expect(typeof logged.errClass).toBe("string");
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("does NOT write a structured log on 4xx client errors", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const storage = new MemoryLicenseStorage();
+        await handleLicenseVerifyRequest(
+          postBody({ token: "not-a-real-token" }),
+          { signingKey: key, storage, nowSec: NOW },
+        );
+        expect(consoleError).not.toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("emits a fresh traceId per request", async () => {
+      const storage = new MemoryLicenseStorage();
+      const r1 = await (await handleLicenseVerifyRequest(
+        postBody({ token: "bad" }),
+        { signingKey: key, storage, nowSec: NOW },
+      )).json();
+      const r2 = await (await handleLicenseVerifyRequest(
+        postBody({ token: "bad" }),
+        { signingKey: key, storage, nowSec: NOW },
+      )).json();
+      expect(r1.traceId).not.toBe(r2.traceId);
+    });
   });
 });

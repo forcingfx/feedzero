@@ -1,12 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   handleLicenseIssueRequest,
   SUPPORTED_METHODS,
 } from "@/core/license/issue-handler";
 import { LicenseIssuerImpl } from "@/core/license/issuer";
-import { MemoryLicenseStorage } from "@/core/license/storage";
+import { MemoryLicenseStorage, type LicenseStorage } from "@/core/license/storage";
 import type { SigningKey } from "@/core/license/sign";
 import { verifyLicense } from "@/core/license/verify";
+import { err } from "@/utils/result";
 
 const SECRET = "this-is-a-test-signing-secret-32-bytes!";
 const ADMIN_KEY = "admin_test_key_with_enough_entropy_to_be_realistic_64ch";
@@ -297,6 +298,97 @@ describe("license issue handler — success path", () => {
     );
     const stored = await storage.get("kid_deterministic_for_test");
     expect(stored.ok && stored.value?.expirySec).toBe(customExpiry);
+  });
+
+  describe("observability — traceId + structured error logging", () => {
+    function brokenStorage(): LicenseStorage {
+      return {
+        async put() { return err("storage down"); },
+        async get() { return err("storage down"); },
+        async listByCustomer() { return err("storage down"); },
+        async revoke() { return err("storage down"); },
+        async revokeAllForCustomer() { return err("storage down"); },
+        async isRevoked() { return err("storage down"); },
+      };
+    }
+
+    function buildBrokenIssuer() {
+      return new LicenseIssuerImpl({
+        signingKey,
+        storage: brokenStorage(),
+        nowSec: () => NOW,
+        generateKeyId: () => "kid_deterministic_for_test",
+      });
+    }
+
+    it("includes a traceId in 401 unauthorized response body", async () => {
+      const { issuer } = buildIssuer();
+      const res = await handleLicenseIssueRequest(
+        postBody({ customerId: "cus_x", tier: "personal" }),
+        { issuer, adminApiKey: ADMIN_KEY },
+      );
+      const body = await res.json();
+      expect(res.status).toBe(401);
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("includes a traceId in 503 not-configured response body", async () => {
+      const { issuer } = buildIssuer();
+      const res = await handleLicenseIssueRequest(
+        postBody(
+          { customerId: "cus_x", tier: "personal" },
+          { Authorization: "Bearer anything" },
+        ),
+        { issuer, adminApiKey: "" }, // empty key → 503 not configured
+      );
+      const body = await res.json();
+      expect(res.status).toBe(503);
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("includes a traceId in 500 issue-failure response and writes a structured log", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const issuer = buildBrokenIssuer();
+        const res = await handleLicenseIssueRequest(
+          postBody(
+            { customerId: "cus_x", tier: "personal" },
+            { Authorization: `Bearer ${ADMIN_KEY}` },
+          ),
+          { issuer, adminApiKey: ADMIN_KEY },
+        );
+        const body = await res.json();
+        expect(res.status).toBe(500);
+        expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
+        expect(logged.route).toBe("/api/license/issue");
+        expect(logged.method).toBe("POST");
+        expect(logged.status).toBe(500);
+        expect(logged.traceId).toBe(body.traceId);
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("does NOT write a structured log on 4xx client errors (e.g. 401)", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const { issuer } = buildIssuer();
+        await handleLicenseIssueRequest(
+          postBody({ customerId: "cus_x", tier: "personal" }),
+          { issuer, adminApiKey: ADMIN_KEY },
+        );
+        expect(consoleError).not.toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
   });
 
   it("does not log the wire token (handler is pure, no side channels)", async () => {

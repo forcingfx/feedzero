@@ -28,7 +28,11 @@
  * `STRIPE_SECRET_KEY` and passes it in.
  */
 
+import { newTraceId } from "../../utils/trace-id";
+import { logError } from "../../utils/log-error";
+
 export const SUPPORTED_METHODS: readonly string[] = ["POST"];
+const ROUTE = "/api/checkout/create-session";
 
 /**
  * Minimal subset of `stripe.checkout.sessions.create` we depend on. Defining
@@ -65,12 +69,38 @@ interface OkBody {
 interface ErrBody {
   ok: false;
   error: string;
+  traceId: string;
 }
 
 const JSON_HEADERS = { "Content-Type": "application/json" } as const;
 
-function jsonResponse(body: OkBody | ErrBody, status: number): Response {
+function okResponse(body: OkBody, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+}
+
+function clientError(
+  message: string,
+  status: number,
+  traceId: string,
+): Response {
+  return new Response(
+    JSON.stringify({ ok: false, error: message, traceId } satisfies ErrBody),
+    { status, headers: JSON_HEADERS },
+  );
+}
+
+function serverError(
+  message: string,
+  errClass: string,
+  status: number,
+  traceId: string,
+  method: string,
+): Response {
+  logError({ route: ROUTE, method, status, traceId, errClass, errMsg: message });
+  return new Response(
+    JSON.stringify({ ok: false, error: message, traceId } satisfies ErrBody),
+    { status, headers: JSON_HEADERS },
+  );
 }
 
 interface CreateArgs {
@@ -157,17 +187,20 @@ export async function handleCreateCheckoutSession(
   request: Request,
   options: CheckoutHandlerOptions,
 ): Promise<Response> {
-  if (request.method !== "POST") {
-    return jsonResponse({ ok: false, error: "method not allowed" }, 405);
+  const traceId = newTraceId();
+  const method = request.method;
+
+  if (method !== "POST") {
+    return clientError("method not allowed", 405, traceId);
   }
 
   if (options.killSignups?.()) {
-    return jsonResponse({ ok: false, error: "signups disabled" }, 503);
+    return clientError("signups disabled", 503, traceId);
   }
 
   const parsed = await parseBody(request, options.allowedPrices);
   if (!parsed.ok) {
-    return jsonResponse({ ok: false, error: parsed.error }, 400);
+    return clientError(parsed.error, 400, traceId);
   }
 
   let session;
@@ -186,20 +219,26 @@ export async function handleCreateCheckoutSession(
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return jsonResponse(
-      { ok: false, error: `stripe checkout failed: ${message}` },
+    return serverError(
+      `stripe checkout failed: ${message}`,
+      "StripeApiError",
       502,
+      traceId,
+      method,
     );
   }
 
   if (!session.url) {
-    return jsonResponse(
-      { ok: false, error: "stripe returned no checkout url" },
+    return serverError(
+      "stripe returned no checkout url",
+      "StripeNoUrl",
       502,
+      traceId,
+      method,
     );
   }
 
-  return jsonResponse(
+  return okResponse(
     { ok: true, url: session.url, sessionId: session.id },
     200,
   );

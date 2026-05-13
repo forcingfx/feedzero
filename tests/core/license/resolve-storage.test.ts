@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { resolveLicenseStorage } from "../../../src/core/license/resolve-storage";
+import {
+  resolveLicenseStorage,
+  describeLicenseStorageMode,
+} from "../../../src/core/license/resolve-storage";
 import { MemoryLicenseStorage } from "../../../src/core/license/storage";
 import { UpstashLicenseStorage } from "../../../src/core/license/storage-upstash";
 
@@ -45,5 +48,29 @@ describe("resolveLicenseStorage", () => {
       KV_REST_API_TOKEN: "legacy-tok",
     });
     expect(storage).toBeInstanceOf(UpstashLicenseStorage);
+  });
+});
+
+describe("describeLicenseStorageMode (Step A — module-load logging)", () => {
+  it("returns 'memory' when Upstash env is missing", () => {
+    expect(describeLicenseStorageMode({})).toBe("memory");
+  });
+
+  it("returns 'upstash' when canonical UPSTASH_* env is set", () => {
+    expect(
+      describeLicenseStorageMode({
+        UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+        UPSTASH_REDIS_REST_TOKEN: "tok",
+      }),
+    ).toBe("upstash");
+  });
+
+  it("returns 'upstash' when only legacy KV_REST_API_* is set", () => {
+    expect(
+      describeLicenseStorageMode({
+        KV_REST_API_URL: "https://example.upstash.io",
+        KV_REST_API_TOKEN: "tok",
+      }),
+    ).toBe("upstash");
   });
 });

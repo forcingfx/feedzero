@@ -25,8 +25,11 @@
 
 import { LicenseIssuerImpl } from "./issuer";
 import type { LicenseRecord } from "./storage";
+import { newTraceId } from "../../utils/trace-id";
+import { logError } from "../../utils/log-error";
 
 export const SUPPORTED_METHODS: readonly string[] = ["POST"];
+const ROUTE = "/api/license/issue";
 
 export interface IssueHandlerOptions {
   issuer: LicenseIssuerImpl;
@@ -48,13 +51,39 @@ interface OkBody {
 interface ErrBody {
   ok: false;
   error: string;
+  traceId: string;
 }
 
 const JSON_HEADERS = { "Content-Type": "application/json" } as const;
 const BEARER_SCHEME = "Bearer ";
 
-function jsonResponse(body: OkBody | ErrBody, status: number): Response {
+function okResponse(body: OkBody, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+}
+
+function clientError(
+  message: string,
+  status: number,
+  traceId: string,
+): Response {
+  return new Response(
+    JSON.stringify({ ok: false, error: message, traceId } satisfies ErrBody),
+    { status, headers: JSON_HEADERS },
+  );
+}
+
+function serverError(
+  message: string,
+  errClass: string,
+  status: number,
+  traceId: string,
+  method: string,
+): Response {
+  logError({ route: ROUTE, method, status, traceId, errClass, errMsg: message });
+  return new Response(
+    JSON.stringify({ ok: false, error: message, traceId } satisfies ErrBody),
+    { status, headers: JSON_HEADERS },
+  );
 }
 
 /**
@@ -160,8 +189,11 @@ export async function handleLicenseIssueRequest(
   request: Request,
   options: IssueHandlerOptions,
 ): Promise<Response> {
-  if (request.method !== "POST") {
-    return jsonResponse({ ok: false, error: "method not allowed" }, 405);
+  const traceId = newTraceId();
+  const method = request.method;
+
+  if (method !== "POST") {
+    return clientError("method not allowed", 405, traceId);
   }
 
   const auth = checkAdminAuth(
@@ -169,16 +201,22 @@ export async function handleLicenseIssueRequest(
     options.adminApiKey,
   );
   if (!auth.ok) {
-    return jsonResponse({ ok: false, error: auth.error }, auth.status);
+    // 503 ("admin endpoint not configured") is a server-config issue:
+    // empty adminApiKey at boot is operator-actionable. 401 paths are
+    // unauthenticated callers — client-side, no log.
+    if (auth.status === 503) {
+      return serverError(auth.error, "AdminEndpointNotConfigured", 503, traceId, method);
+    }
+    return clientError(auth.error, auth.status, traceId);
   }
 
   if (options.killSignups?.()) {
-    return jsonResponse({ ok: false, error: "signups disabled" }, 503);
+    return clientError("signups disabled", 503, traceId);
   }
 
   const body = await readIssueArgsFromBody(request);
   if (!body.ok) {
-    return jsonResponse({ ok: false, error: body.error }, 400);
+    return clientError(body.error, 400, traceId);
   }
 
   // Issuer needs a non-optional subscriptionId. Empty string is a sentinel
@@ -192,13 +230,16 @@ export async function handleLicenseIssueRequest(
     ...(body.args.expirySec !== undefined ? { expirySec: body.args.expirySec } : {}),
   });
   if (!issueResult.ok) {
-    return jsonResponse(
-      { ok: false, error: `issue failed: ${issueResult.error}` },
+    return serverError(
+      `issue failed: ${issueResult.error}`,
+      "IssueFailed",
       500,
+      traceId,
+      method,
     );
   }
 
-  return jsonResponse(
+  return okResponse(
     { ok: true, token: issueResult.value.token, record: issueResult.value.record },
     200,
   );

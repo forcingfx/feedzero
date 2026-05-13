@@ -1,4 +1,6 @@
 import { SYNC } from "../../utils/constants.ts";
+import { newTraceId } from "../../utils/trace-id.ts";
+import { logError } from "../../utils/log-error.ts";
 import type { SyncStorageAdapter } from "./types.ts";
 import {
   authorizeLicense,
@@ -6,6 +8,7 @@ import {
 } from "../license/middleware";
 
 const VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;
+const ROUTE = "/api/sync";
 
 const API_HEADERS = {
   "Content-Type": "application/json",
@@ -13,12 +16,60 @@ const API_HEADERS = {
   "X-Content-Type-Options": "nosniff",
 } as const;
 
+/**
+ * Per-request context threaded through the per-method handlers. Holds the
+ * traceId we mint at entry so every error path can echo it back to the
+ * client AND write it to the structured server log.
+ */
+interface RequestContext {
+  traceId: string;
+  method: string;
+}
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: API_HEADERS });
 }
 
-function errorResponse(message: string, status: number): Response {
-  return jsonResponse({ ok: false, error: message }, status);
+/**
+ * 4xx response — surfaces traceId to the client (so they can quote it in
+ * a support report) but does NOT write a server-side log line. Client
+ * errors are not ops-actionable; logging them inflates the error log.
+ */
+function clientError(
+  message: string,
+  status: number,
+  ctx: RequestContext,
+): Response {
+  return jsonResponse(
+    { ok: false, error: message, traceId: ctx.traceId },
+    status,
+  );
+}
+
+/**
+ * 5xx response — surfaces traceId to the client AND writes a single-line
+ * JSON to the server log via the allow-list logger. The {route, method,
+ * status, traceId, errClass, errMsg} tuple is enough to correlate a user
+ * report to the failing request without leaking vaultId or any other PII.
+ */
+function serverError(
+  message: string,
+  errClass: string,
+  status: number,
+  ctx: RequestContext,
+): Response {
+  logError({
+    route: ROUTE,
+    method: ctx.method,
+    status,
+    traceId: ctx.traceId,
+    errClass,
+    errMsg: message,
+  });
+  return jsonResponse(
+    { ok: false, error: message, traceId: ctx.traceId },
+    status,
+  );
 }
 
 function validateVaultId(vaultId: string | null): string | null {
@@ -29,15 +80,18 @@ function validateVaultId(vaultId: string | null): string | null {
 async function handleGet(
   request: Request,
   adapter: SyncStorageAdapter,
+  ctx: RequestContext,
 ): Promise<Response> {
   const url = new URL(request.url);
   const rawId = url.searchParams.get("vaultId");
   const vaultId = validateVaultId(rawId);
-  if (!vaultId) return errorResponse("Invalid or missing vaultId", 400);
+  if (!vaultId) return clientError("Invalid or missing vaultId", 400, ctx);
 
   const result = await adapter.get(vaultId);
-  if (!result.ok) return errorResponse(result.error, 500);
-  if (result.value === null) return errorResponse("Vault not found", 404);
+  if (!result.ok) {
+    return serverError(result.error, "AdapterGetFailed", 500, ctx);
+  }
+  if (result.value === null) return clientError("Vault not found", 404, ctx);
 
   return new Response(result.value, { status: 200, headers: API_HEADERS });
 }
@@ -45,26 +99,29 @@ async function handleGet(
 async function handlePut(
   request: Request,
   adapter: SyncStorageAdapter,
+  ctx: RequestContext,
 ): Promise<Response> {
   const text = await request.text();
   if (text.length > SYNC.MAX_VAULT_SIZE) {
-    return errorResponse("Payload too large", 413);
+    return clientError("Payload too large", 413, ctx);
   }
 
   let body: { vaultId?: string; vault?: unknown };
   try {
     body = JSON.parse(text);
   } catch {
-    return errorResponse("Invalid JSON", 400);
+    return clientError("Invalid JSON", 400, ctx);
   }
 
   const vaultId = validateVaultId(body.vaultId ?? null);
-  if (!vaultId) return errorResponse("Invalid or missing vaultId", 400);
-  if (!body.vault) return errorResponse("Missing vault data", 400);
+  if (!vaultId) return clientError("Invalid or missing vaultId", 400, ctx);
+  if (!body.vault) return clientError("Missing vault data", 400, ctx);
 
   const data = JSON.stringify({ ok: true, vault: body.vault });
   const result = await adapter.put(vaultId, data);
-  if (!result.ok) return errorResponse(result.error, 500);
+  if (!result.ok) {
+    return serverError(result.error, "AdapterPutFailed", 500, ctx);
+  }
 
   return jsonResponse({ ok: true, updatedAt: Date.now() });
 }
@@ -72,14 +129,17 @@ async function handlePut(
 async function handleDelete(
   request: Request,
   adapter: SyncStorageAdapter,
+  ctx: RequestContext,
 ): Promise<Response> {
   const url = new URL(request.url);
   const rawId = url.searchParams.get("vaultId");
   const vaultId = validateVaultId(rawId);
-  if (!vaultId) return errorResponse("Invalid or missing vaultId", 400);
+  if (!vaultId) return clientError("Invalid or missing vaultId", 400, ctx);
 
   const result = await adapter.delete(vaultId);
-  if (!result.ok) return errorResponse(result.error, 500);
+  if (!result.ok) {
+    return serverError(result.error, "AdapterDeleteFailed", 500, ctx);
+  }
 
   return jsonResponse({ ok: true });
 }
@@ -87,6 +147,7 @@ async function handleDelete(
 type MethodHandler = (
   request: Request,
   adapter: SyncStorageAdapter,
+  ctx: RequestContext,
 ) => Promise<Response>;
 
 /**
@@ -134,17 +195,23 @@ export async function handleSyncRequest(
   adapter: SyncStorageAdapter,
   options: SyncHandlerOptions = {},
 ): Promise<Response> {
+  const ctx: RequestContext = {
+    traceId: newTraceId(),
+    method: request.method,
+  };
+
   const handler = methodHandlers[request.method];
-  if (!handler) return errorResponse("Method not allowed", 405);
+  if (!handler) return clientError("Method not allowed", 405, ctx);
 
   if (options.licenseAuth) {
     const auth = await authorizeLicense(request, options.licenseAuth);
     if (!auth.ok) {
-      // Surface the structured error for observability but use a stable
-      // message for clients ("license required" rather than internal text).
-      return errorResponse("license required", 401);
+      // Stable client-facing message ("license required") regardless of
+      // the underlying authorizeLicense reason. The traceId in the body
+      // is the support-ticket bridge to the runtime log.
+      return clientError("license required", 401, ctx);
     }
   }
 
-  return handler(request, adapter);
+  return handler(request, adapter, ctx);
 }

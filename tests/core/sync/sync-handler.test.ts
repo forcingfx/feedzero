@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { handleSyncRequest } from "@/core/sync/sync-handler";
 import { createMemoryAdapter } from "@/core/sync/adapters/memory-adapter";
 import type { SyncStorageAdapter } from "@/core/sync/types";
+import { err } from "@/utils/result";
 
 describe("sync-handler", () => {
   let adapter: SyncStorageAdapter;
@@ -257,6 +258,129 @@ describe("sync-handler", () => {
       });
       const response = await handleSyncRequest(request, adapter);
       expect(response.status).toBe(405);
+    });
+  });
+
+  describe("observability — traceId + structured error logging", () => {
+    // Observability foundation for the silent-launch monetization stack.
+    // Pattern (mirrored across all 5 monetization handlers):
+    //   - Every non-2xx response body carries a `traceId` so user reports
+    //     can be correlated to runtime logs by grep.
+    //   - Every 5xx path also writes a single-line JSON via logError() so
+    //     ops can grep Vercel logs for {route, status, traceId, errClass}.
+    //   - 4xx (client error) paths get traceId in the body but NOT a
+    //     server-side log — they aren't actionable for ops.
+
+    function makeBrokenAdapter(): SyncStorageAdapter {
+      return {
+        async get() { return err("adapter down"); },
+        async put() { return err("adapter down"); },
+        async delete() { return err("adapter down"); },
+        async count() { return err("adapter down"); },
+      };
+    }
+
+    it("includes a traceId in 400 client-error response body", async () => {
+      const response = await handleSyncRequest(
+        new Request("http://localhost/api/sync", { method: "GET" }),
+        adapter,
+      );
+      const body = await response.json();
+      expect(response.status).toBe(400);
+      expect(typeof body.traceId).toBe("string");
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("includes a traceId in 404 not-found response body", async () => {
+      const vaultId = "a".repeat(64);
+      const response = await handleSyncRequest(
+        makeGetRequest(vaultId),
+        adapter,
+      );
+      const body = await response.json();
+      expect(response.status).toBe(404);
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("includes a traceId in 500 server-error response body", async () => {
+      const vaultId = "c".repeat(64);
+      const response = await handleSyncRequest(
+        makePutRequest({ vaultId, vault: { v: 1 } }),
+        makeBrokenAdapter(),
+      );
+      const body = await response.json();
+      expect(response.status).toBe(500);
+      expect(body.traceId).toMatch(/^req_[0-9a-f]+$/);
+    });
+
+    it("emits a fresh traceId per request (no correlation across requests)", async () => {
+      const vaultId = "a".repeat(64);
+      const r1 = await (await handleSyncRequest(makeGetRequest(vaultId), adapter)).json();
+      const r2 = await (await handleSyncRequest(makeGetRequest(vaultId), adapter)).json();
+      expect(r1.traceId).not.toBe(r2.traceId);
+    });
+
+    it("writes a structured error log on the 500 path", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const vaultId = "c".repeat(64);
+        const response = await handleSyncRequest(
+          makePutRequest({ vaultId, vault: { v: 1 } }),
+          makeBrokenAdapter(),
+        );
+        const body = await response.json();
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
+        expect(logged.route).toBe("/api/sync");
+        expect(logged.method).toBe("PUT");
+        expect(logged.status).toBe(500);
+        expect(logged.traceId).toBe(body.traceId);
+        expect(typeof logged.errClass).toBe("string");
+        expect(typeof logged.errMsg).toBe("string");
+        expect(typeof logged.ts).toBe("string");
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("does NOT write a structured log on 4xx client errors", async () => {
+      // 4xx isn't ops-actionable. Keeping it out of the error log keeps the
+      // log clean for genuine 5xx incidents.
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        await handleSyncRequest(
+          new Request("http://localhost/api/sync", { method: "GET" }),
+          adapter,
+        );
+        expect(consoleError).not.toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("does NOT log vaultId or any PII in the error log", async () => {
+      // Floor: even though the caller chose what to put in errMsg, the
+      // logger's allow-list drops any unknown field. This test guards against
+      // a future regression where someone widens the allow-list.
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const vaultId = "d".repeat(64);
+        await handleSyncRequest(
+          makePutRequest({ vaultId, vault: { v: 1 } }),
+          makeBrokenAdapter(),
+        );
+        const raw = consoleError.mock.calls[0][0] as string;
+        expect(raw).not.toContain(vaultId);
+      } finally {
+        consoleError.mockRestore();
+      }
     });
   });
 
