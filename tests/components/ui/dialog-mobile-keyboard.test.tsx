@@ -56,4 +56,25 @@ describe("DialogContent — mobile keyboard cover prevention", () => {
     const className = content?.getAttribute("class") ?? "";
     expect(className).toContain("overflow-y-auto");
   });
+
+  it("anchors top to 50dvh (dynamic viewport), NOT 50% of the layout viewport", () => {
+    // Follow-up to PR #44 (2026-05-14 user report): the original fix made
+    // the dialog SIZE keyboard-aware via max-h: 100dvh, but POSITION stayed
+    // at top: 50% of the layout viewport. On iOS Safari the layout viewport
+    // extends behind the keyboard, so the dialog's center sat mid-layout-
+    // viewport (visually too low when keyboard is up). Result: input was
+    // visible but the buttons below it (Back / Enable sync) were hidden
+    // behind the keyboard.
+    //
+    // Fix: top-[50dvh] tracks the dynamic viewport — when keyboard opens
+    // and dvh shrinks, the dialog's center moves up to stay in the visible
+    // area. Combined with translate-y: -50%, the dialog ends up centered
+    // in the visible area above the keyboard.
+    const { baseElement } = mountOpenDialog();
+    const content = baseElement.querySelector('[role="dialog"]');
+    const className = content?.getAttribute("class") ?? "";
+    expect(className).toMatch(/top-\[50dvh\]/);
+    // The bug was specifically `top-[50%]` — assert it's gone.
+    expect(className).not.toMatch(/top-\[50%\]/);
+  });
 });

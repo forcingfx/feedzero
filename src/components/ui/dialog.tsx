@@ -59,8 +59,17 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          // Layout + animation (unchanged from shadcn baseline).
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
+          // Layout + animation. Vertical anchor uses `top-[50dvh]`, NOT the
+          // shadcn baseline's `top-[50%]`. `dvh` is the dynamic viewport
+          // height — it shrinks when iOS Safari's soft keyboard rises, so
+          // the dialog's center stays in the *visible* area. With the
+          // baseline `top-[50%]` the dialog was anchored to the layout
+          // viewport (which doesn't shrink on iOS), and although PR #44
+          // sized the dialog correctly via max-h:100dvh, the bottom buttons
+          // (Back / Enable sync etc.) still slid behind the keyboard.
+          // `translate-y-[-50%]` shifts the dialog up by half its own
+          // height so its center sits on the 50dvh anchor.
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50dvh] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
           // Mobile keyboard handling. `100dvh` is the dynamic viewport
           // height — it shrinks when the iOS Safari soft keyboard opens
           // (iOS 15.4+, Chrome 108+, Firefox 101+). Combined with the
