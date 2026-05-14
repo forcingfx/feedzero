@@ -3,9 +3,12 @@ import { CheckCheck } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { useAppStore } from "@/stores/app-store.ts";
 import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { ArticleItem } from "./article-item.tsx";
+import { ArticleGroupStack } from "./article-group-stack.tsx";
+import { groupArticles, type ArticleListEntry } from "@/lib/group-articles.ts";
 import type { Article } from "@/types/index.ts";
 
 interface ArticleListProps {
@@ -52,7 +55,20 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectArticle = useArticleStore((s) => s.selectArticle);
   const markAllAsRead = useArticleStore((s) => s.markAllAsRead);
   const isLoading = useArticleStore((s) => s.isLoading);
+  const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // When grouping is enabled, walk the (sorted) articles list and fold same-
+  // feed flood runs into ArticleGroup entries. When disabled, every article
+  // is wrapped in a no-op ArticleEntry so the virtualizer can iterate one
+  // shape regardless of the toggle state.
+  const entries: ArticleListEntry[] = useMemo(
+    () =>
+      groupArticleFloods
+        ? groupArticles(articles)
+        : articles.map((article) => ({ kind: "article", article })),
+    [articles, groupArticleFloods],
+  );
 
   // True for ALL_FEEDS_ID and folder-aggregated feed ids. Both render
   // articles from multiple feeds, so each article must show its own
@@ -85,11 +101,19 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   );
 
   const virtualizer = useVirtualizer({
-    count: articles.length,
+    count: entries.length,
     getScrollElement: () => scrollRef.current,
+    // Estimates only matter until measureElement reports the real height.
+    // A collapsed group is a single ArticleItem plus a few ghost-card
+    // pixels, so the singleton estimate is close enough to avoid a
+    // perceptible scrollbar jump on first paint.
     estimateSize: () => ESTIMATED_ITEM_SIZE,
     overscan: OVERSCAN,
-    getItemKey: (index) => articles[index]?.id ?? index,
+    getItemKey: (index) => {
+      const entry = entries[index];
+      if (!entry) return index;
+      return entry.kind === "group" ? entry.id : entry.article.id;
+    },
   });
 
   // Keep the selected article in view, but only when the user can't already
@@ -100,15 +124,23 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   // virtualizer to the new selection, scrolling the user's viewport even
   // when the new article is already visible. Checking visibility before
   // scrolling is the invariant that holds across every call site.
-  const articlesRef = useRef(articles);
-  articlesRef.current = articles;
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
   const selectedId = selectedArticle?.id;
   useEffect(() => {
     if (!selectedId) return;
     const scrollEl = scrollRef.current;
     if (!scrollEl) return;
     if (isItemVisible(scrollEl, selectedId)) return;
-    const index = articlesRef.current.findIndex((a) => a.id === selectedId);
+    // For grouped entries, treat the group's row as the scroll target when
+    // any of its members is the selection — the user must expand the stack
+    // to actually see the inner article. Avoids hiding the selection
+    // entirely off-screen during flood collapses.
+    const index = entriesRef.current.findIndex((entry) =>
+      entry.kind === "article"
+        ? entry.article.id === selectedId
+        : entry.articles.some((a) => a.id === selectedId),
+    );
     if (index !== -1) virtualizer.scrollToIndex(index, { align: "auto" });
   }, [selectedId, virtualizer]);
 
@@ -152,8 +184,16 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
         style={{ height: totalSize }}
       >
         {virtualItems.map((virtualItem) => {
-          const article = articles[virtualItem.index];
-          if (!article) return null;
+          const entry = entries[virtualItem.index];
+          if (!entry) return null;
+          const feedId =
+            entry.kind === "article" ? entry.article.feedId : entry.feedId;
+          const feedTitle = isAggregatedView
+            ? feedsById[feedId]?.title
+            : undefined;
+          const feedSiteUrl = isAggregatedView
+            ? feedsById[feedId]?.siteUrl
+            : undefined;
           return (
             <div
               key={virtualItem.key}
@@ -167,21 +207,23 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              <ArticleItem
-                article={article}
-                isSelected={article.id === selectedArticle?.id}
-                onSelect={handleSelect}
-                feedTitle={
-                  isAggregatedView
-                    ? feedsById[article.feedId]?.title
-                    : undefined
-                }
-                feedSiteUrl={
-                  isAggregatedView
-                    ? feedsById[article.feedId]?.siteUrl
-                    : undefined
-                }
-              />
+              {entry.kind === "article" ? (
+                <ArticleItem
+                  article={entry.article}
+                  isSelected={entry.article.id === selectedArticle?.id}
+                  onSelect={handleSelect}
+                  feedTitle={feedTitle}
+                  feedSiteUrl={feedSiteUrl}
+                />
+              ) : (
+                <ArticleGroupStack
+                  group={entry}
+                  selectedArticleId={selectedArticle?.id}
+                  onSelect={handleSelect}
+                  feedTitle={feedTitle}
+                  feedSiteUrl={feedSiteUrl}
+                />
+              )}
             </div>
           );
         })}

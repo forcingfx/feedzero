@@ -69,6 +69,19 @@ export const LOCAL_STORAGE = {
   FEED_CUSTOM_ORDER: "feedzero:feed-custom-order",
   FOLDER_CUSTOM_ORDER: "feedzero:folder-custom-order",
   AUTO_ORGANIZE_DISMISSED_COUNT: "feedzero:auto-organize-dismissed-count",
+  GROUP_ARTICLE_FLOODS: "feedzero:group-article-floods",
+} as const;
+
+/**
+ * Article-flood grouping thresholds. When at least MIN_GROUP_SIZE
+ * consecutive articles from the same feed (in publishedAt-desc order)
+ * have adjacent gaps ≤ WINDOW_MS, the article list collapses them into
+ * a stacked group. Pairwise rule — long bursts at 1-minute intervals
+ * stay as one stack even if first→last spans much more than WINDOW_MS.
+ */
+export const ARTICLE_GROUPING = {
+  WINDOW_MS: 10 * 60 * 1000,
+  MIN_GROUP_SIZE: 3,
 } as const;
 
 /**

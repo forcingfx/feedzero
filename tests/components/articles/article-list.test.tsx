@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { useAppStore } from "@/stores/app-store.ts";
 import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
 import {
   installVirtualizerShims,
@@ -67,6 +68,11 @@ describe("ArticleList", () => {
       selectedArticle: null,
       isLoading: false,
     });
+    // Disable flood-grouping for the historical assertions — many of them
+    // build long lists of articles with identical publishedAt + feedId, which
+    // would otherwise collapse into a single stacked group. The dedicated
+    // "article grouping" describe below explicitly opts in.
+    useAppStore.setState({ groupArticleFloods: false });
   });
 
   afterEach(() => {
@@ -486,6 +492,43 @@ describe("ArticleList", () => {
       expect(favicons[1].getAttribute("src")).toBe(
         "/api/favicon?domain=f2.com",
       );
+    });
+  });
+
+  describe("article grouping (flood collapse)", () => {
+    it("collapses 4 same-feed articles within the window into one stacked group", () => {
+      // 4 articles from one feed, 1-minute apart → meets MIN_GROUP_SIZE=3
+      // and stays within WINDOW_MS=10min pairwise. With grouping ON, only
+      // the top card is exposed as role="option"; a "+3 more" chevron
+      // gives the user the expand affordance.
+      const now = 10_000_000;
+      const minute = 60_000;
+      const articles = [
+        { ...mockArticle("a1", "Latest", false, "f1"), publishedAt: now },
+        { ...mockArticle("a2", "Second", false, "f1"), publishedAt: now - 1 * minute },
+        { ...mockArticle("a3", "Third", false, "f1"), publishedAt: now - 2 * minute },
+        { ...mockArticle("a4", "Fourth", false, "f1"), publishedAt: now - 3 * minute },
+      ];
+      useFeedStore.setState({
+        feeds: [],
+        selectedFeedId: "f1",
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles,
+        selectedArticle: null,
+        isLoading: false,
+      });
+      useAppStore.setState({ groupArticleFloods: true });
+
+      render(<ArticleList />);
+
+      // Only the top card surfaces as a role=option; the rest are inside
+      // the collapsed group until expanded.
+      expect(screen.getAllByRole("option")).toHaveLength(1);
+      expect(screen.getByText("Latest")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Show 3 more/ })).toBeInTheDocument();
     });
   });
 });

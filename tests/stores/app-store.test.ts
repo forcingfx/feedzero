@@ -126,6 +126,30 @@ describe("app-store", () => {
     });
   });
 
+  describe("groupArticleFloods preference", () => {
+    it("defaults to true (feature on)", () => {
+      expect(useAppStore.getState().groupArticleFloods).toBe(true);
+    });
+
+    it("setGroupArticleFloods(false) updates state and writes 'false' to localStorage", () => {
+      useAppStore.getState().setGroupArticleFloods(false);
+      expect(useAppStore.getState().groupArticleFloods).toBe(false);
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "feedzero:group-article-floods",
+        "false",
+      );
+    });
+
+    it("setGroupArticleFloods(true) writes 'true' (used when user re-enables after disabling)", () => {
+      useAppStore.getState().setGroupArticleFloods(true);
+      expect(useAppStore.getState().groupArticleFloods).toBe(true);
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "feedzero:group-article-floods",
+        "true",
+      );
+    });
+  });
+
   describe("initializeReturningUser", () => {
     beforeEach(() => {
       useSyncStore.setState({
