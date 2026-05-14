@@ -236,3 +236,104 @@ describe("proxyFetch ↔ handleProxyRequest contract", () => {
     expect(SUPPORTED_METHODS).toContain("POST");
   });
 });
+
+describe("handleProxyRequest — rate limiting", () => {
+  // Production-defense layer. Without this, a single client could hammer
+  // the proxy unbounded and the catalog counts would be indistinguishable
+  // from "popular feed" traffic. Opt-in via the `rateLimit` option so
+  // self-host / dev paths are unaffected.
+
+  function makeRequest(): Request {
+    return new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-forwarded-for": "203.0.113.42",
+      },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+  }
+
+  it("short-circuits with 429 when the limiter denies the request", async () => {
+    const denyLimiter = {
+      async check() {
+        return { allowed: false as const, retryAfterSec: 42 };
+      },
+    };
+    const clientIdFor = async () => "cli_test1234";
+    const res = await handleProxyRequest(makeRequest(), "text/xml", {
+      rateLimit: { limiter: denyLimiter, clientIdFor },
+    });
+    expect(res.status).toBe(429);
+  });
+
+  it("includes a Retry-After header on 429", async () => {
+    // RFC 6585 §4: 429 responses SHOULD include Retry-After. Clients
+    // (and well-behaved bots) read this header to back off correctly.
+    const denyLimiter = {
+      async check() {
+        return { allowed: false as const, retryAfterSec: 42 };
+      },
+    };
+    const clientIdFor = async () => "cli_test1234";
+    const res = await handleProxyRequest(makeRequest(), "text/xml", {
+      rateLimit: { limiter: denyLimiter, clientIdFor },
+    });
+    expect(res.headers.get("Retry-After")).toBe("42");
+  });
+
+  it("passes through to the proxy when the limiter allows the request", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("<rss>ok</rss>", {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+    const allowLimiter = {
+      async check() {
+        return { allowed: true as const };
+      },
+    };
+    const clientIdFor = async () => "cli_test1234";
+    const res = await handleProxyRequest(makeRequest(), "text/xml", {
+      rateLimit: { limiter: allowLimiter, clientIdFor },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("checks the limiter BEFORE URL validation (so invalid URLs still count)", async () => {
+    // Why: an attacker spraying invalid URLs should still consume their
+    // rate-limit budget. Otherwise they can probe the proxy unbounded.
+    let checkCount = 0;
+    const limiter = {
+      async check() {
+        checkCount++;
+        return { allowed: true as const };
+      },
+    };
+    const clientIdFor = async () => "cli_test1234";
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "http://10.0.0.1/internal" }), // SSRF target
+    });
+    const res = await handleProxyRequest(req, "text/xml", {
+      rateLimit: { limiter, clientIdFor },
+    });
+    expect(res.status).toBe(403);
+    expect(checkCount).toBe(1);
+  });
+
+  it("does not rate-limit when no limiter is configured (current default)", async () => {
+    // Opt-in: existing test paths and self-hosters running without Upstash
+    // must not be affected by this PR.
+    fetchSpy.mockResolvedValue(
+      new Response("<rss>ok</rss>", {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+    const res = await handleProxyRequest(makeRequest(), "text/xml");
+    expect(res.status).toBe(200);
+  });
+});

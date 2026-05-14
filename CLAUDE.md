@@ -258,7 +258,9 @@ No ESLint or Prettier configuration exists in the project. TypeScript strict mod
 
 ## Development Workflow
 
-This project follows **Red-Green-Refactor (RGR)** — the TDD cycle where you write a failing test (red), make it pass with minimal code (green), then clean up (refactor). Every feature follows this exact sequence. **No step may be skipped or reordered.**
+This project follows **Red-Green-Refactor-Smoke (RGR+S)** — the TDD cycle where you write a failing test (red), make it pass with minimal code (green), clean up (refactor), and verify the change works against the real deployed system after merge (smoke). Every feature follows this exact sequence. **No step may be skipped or reordered.**
+
+Why we added SMOKE on top of standard RGR: two production bugs (2026-05-12 sync regression, 2026-05-14 stats-always-zero) shared a class — code was internally correct (unit tests green) but the *system* was wrong (stale env var, in-memory adapter resetting on every cold start). Unit tests cannot see this category: they run in a single process, against in-memory fakes, in <10s. Only a test that hits the *deployed* system against *real* infrastructure can. See [Smoke tests](#smoke-tests) below.
 
 1. **PLAN** — Gherkin-style stories, minimal scope. Confirm with user before proceeding.
 
@@ -288,6 +290,29 @@ This project follows **Red-Green-Refactor (RGR)** — the TDD cycle where you wr
    - ⛔ **STOP: Re-run `npm test` after refactoring. All tests must still pass.**
 
 6. **DOCUMENT** — Review the `docs/` folder. Update `docs/architecture.md`, `docs/data-schema.md`, and relevant feature docs in `docs/features/` to reflect what changed. Create a new feature doc from `docs/features/TEMPLATE.md` for any new feature. Update ADRs in `docs/decisions/` if architectural decisions were made.
+
+7. **SMOKE** — For any change that affects production behavior (endpoint handlers, data layer, adapter resolution, deployment artifacts), add a smoke test under `tests/smoke/` that exercises the **live deployed system** after merge. The smoke test asserts the feature works against real production infrastructure — not mocked adapters, not a dev server. Catches the class of bug where the code is correct but the deployed environment is wrong (config drift, missing env vars, wrong adapter resolved, serverless state not shared across lambdas).
+   - Smoke tests are skipped by default. Run with `SMOKE_TESTS=1 npx vitest run tests/smoke/<name>` after Vercel reports the deploy is Ready.
+   - The smoke test for a feature is part of the feature's definition of done. A PR that introduces or modifies a production code path without a corresponding smoke test is incomplete.
+   - ⛔ **STOP: If the smoke test fails after deploy, revert or roll forward with a fix immediately.** A merged PR isn't done until its smoke test passes against prod. "It passed CI" does not mean "it works in production."
+   - See [Smoke tests](#smoke-tests) for what to assert, what NOT to assert, and the anonymity floor.
+
+## Smoke tests
+
+Smoke tests live in `tests/smoke/` and run only when the `SMOKE_TESTS=1` env var is set. They are **not** part of `npm test`. They:
+
+- Hit real production URLs (`https://my.feedzero.app/api/*`) via `fetch`.
+- Assert system-level invariants the unit suite cannot check: "adapter X actually resolves to Upstash in prod", "rate limit 429s appear after N requests", "vault PUT then GET returns the same bytes against the real backend".
+- Are tolerant of test-induced side effects: a smoke test that exhausts a rate-limit bucket must wait for the window to reset before asserting "normal traffic works".
+- Run with `SMOKE_BASE_URL` overridable for staging / preview environments.
+
+What NOT to assert in smoke tests:
+- Unit-level behavior (function returns X for Y) — that's the RED step's job.
+- UI rendering (use Playwright E2E).
+- Per-user state (smoke tests are stateless and parallelizable).
+- Anything that would log raw IPs, user emails, license token values, or vault ciphertext. Smoke tests honor the same anonymity floor as production logs.
+
+Reference pattern: `tests/smoke/release-feed.test.ts` (fetches the live release feed), `tests/smoke/rate-limiter.test.ts` (verifies the proxy rate limiter engages against prod).
 
 ## Commit Messages
 

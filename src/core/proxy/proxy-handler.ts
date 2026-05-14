@@ -10,6 +10,26 @@ import { cleanFeedContent } from "../cleaner/cleaner.ts";
  */
 export const SUPPORTED_METHODS: readonly string[] = ["GET", "POST"];
 
+/**
+ * Per-client rate-limit hook. Caller injects a `limiter` and a
+ * `clientIdFor` function that derives the bucket key from the Request.
+ * The handler calls these BEFORE URL validation so invalid-URL probing
+ * still consumes the bucket. Returns 429 with `Retry-After` on deny.
+ * Both fields are required when `rateLimit` is set.
+ *
+ * Why an interface, not a concrete limiter type: keeps proxy-handler
+ * decoupled from the production Upstash limiter (and from `@upstash/redis`)
+ * so unit tests inject a fake.
+ */
+export interface ProxyRateLimit {
+  limiter: {
+    check(
+      clientId: string,
+    ): Promise<{ allowed: boolean; retryAfterSec?: number }>;
+  };
+  clientIdFor(req: Request): Promise<string>;
+}
+
 export interface ProxyOptions {
   /** Optional feed cache for deduplication across users. */
   cache?: FeedCache;
@@ -17,6 +37,14 @@ export interface ProxyOptions {
   catalogAdapter?: CatalogStorageAdapter;
   /** Strip trackers and tracking params from feed content before returning. */
   cleanContent?: boolean;
+  /**
+   * Optional per-client rate limiter. When set, the handler checks the
+   * limiter at request entry (before URL validation) and short-circuits
+   * with 429 if the client is over budget. Opt-in: omitting this leaves
+   * behavior unchanged (matches self-host / dev paths that don't run
+   * an Upstash-backed limiter).
+   */
+  rateLimit?: ProxyRateLimit;
 }
 
 /**
@@ -29,6 +57,27 @@ export async function handleProxyRequest(
   defaultContentType: string,
   options?: ProxyOptions,
 ): Promise<Response> {
+  // Rate-limit BEFORE URL validation so an attacker spraying invalid URLs
+  // still consumes their bucket. See rate-limiter test
+  // "checks the limiter BEFORE URL validation" for the regression guard.
+  if (options?.rateLimit) {
+    const clientId = await options.rateLimit.clientIdFor(req);
+    const result = await options.rateLimit.limiter.check(clientId);
+    if (!result.allowed) {
+      // RFC 6585 §4: 429 SHOULD include Retry-After. We always send it.
+      return new Response(
+        JSON.stringify({ ok: false, error: "rate limit exceeded" }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "Retry-After": String(result.retryAfterSec ?? 60),
+          },
+        },
+      );
+    }
+  }
+
   const target = await extractTargetUrl(req);
 
   const validation = validateProxyUrl(target);

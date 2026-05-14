@@ -3,28 +3,32 @@ import {
   resolveCatalogStorage,
   describeCatalogStorageMode,
 } from "../src/core/catalog/resolve-catalog-storage";
+import {
+  resolveProxyRateLimiter,
+  describeRateLimiterMode,
+} from "../src/core/proxy/resolve-rate-limiter";
 
-// Module-load logging — surfaces which catalog backend resolved. Before
-// the persistent-catalog fix, this lambda ran an in-memory adapter that
-// silently dropped all upserts on every cold start, which is why the
-// stats page showed zero feeds tracked. The log line catches a future
-// regression to memory mode on the first deploy.
-console.log(`[feed-proxy] catalog=${describeCatalogStorageMode()}`);
+// Module-load logging — surfaces which catalog backend resolved and
+// whether the rate limiter is active. Mirrors PR #43's pattern.
+console.log(
+  `[feed-proxy] catalog=${describeCatalogStorageMode()} ratelimit=${describeRateLimiterMode()}`,
+);
 
 const catalogPromise = resolveCatalogStorage();
+const rateLimitPromise = resolveProxyRateLimiter();
 
 async function dispatch(
   req: Request,
   contentType: string,
 ): Promise<Response> {
-  const catalogAdapter = await catalogPromise;
-  // `cleanContent: true` mirrors server.ts (the Hono entry point used for
-  // self-hosting). `catalogAdapter` is fire-and-forget: the proxy returns
-  // the feed response immediately and the catalog upsert runs in the
-  // background. Failures are swallowed.
+  const [catalogAdapter, rateLimit] = await Promise.all([
+    catalogPromise,
+    rateLimitPromise,
+  ]);
   return handleProxyRequest(req, contentType, {
     catalogAdapter,
     cleanContent: true,
+    ...(rateLimit ? { rateLimit } : {}),
   });
 }
 
