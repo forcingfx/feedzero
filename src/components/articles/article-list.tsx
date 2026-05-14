@@ -3,10 +3,29 @@ import { CheckCheck } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { useAppStore } from "@/stores/app-store.ts";
 import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { ArticleItem } from "./article-item.tsx";
+import { ArticleGroupSummaryRow } from "./article-group-summary-row.tsx";
+import { groupArticles } from "@/lib/group-articles.ts";
 import type { Article } from "@/types/index.ts";
+
+/**
+ * Flat list-entry shape: every row the virtualizer renders is either a
+ * real article (a normal ArticleItem) or a summary row (the "+N more
+ * from <feed>" / "Collapse" toggle). Keeping these uniform-shape lets
+ * the virtualizer treat all rows identically.
+ */
+type FlatEntry =
+  | { kind: "article"; article: Article }
+  | {
+      kind: "summary";
+      groupId: string;
+      feedId: string;
+      hiddenCount: number;
+      open: boolean;
+    };
 
 interface ArticleListProps {
   onArticleSelect?: (article: Article) => void;
@@ -52,14 +71,82 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectArticle = useArticleStore((s) => s.selectArticle);
   const markAllAsRead = useArticleStore((s) => s.markAllAsRead);
   const isLoading = useArticleStore((s) => s.isLoading);
+  const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // True for ALL_FEEDS_ID and folder-aggregated feed ids. Both render
   // articles from multiple feeds, so each article must show its own
-  // feed title + favicon.
+  // feed title + favicon. Grouping is also gated on this — single-feed
+  // views never collapse floods.
   const isAggregatedView = selectedFeedId
     ? isAggregatedFeedId(selectedFeedId)
     : false;
+
+  // Per-feed expand state for flood groups. Keyed by stable group id so a
+  // re-render with the same group (e.g. after a read flip) preserves the
+  // user's choice. Switching feeds replaces the entries entirely, which
+  // resets back to all-collapsed via the empty initial Set.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleGroup = useCallback((groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
+
+  // Walk the sorted articles through groupArticles(), then flatten each
+  // group into a sequence the virtualizer can iterate as uniform rows.
+  // Collapsed group → [topArticle, summaryRow]. Expanded group →
+  // [allArticles, collapseSummaryRow]. The summary row is interactive
+  // but NOT role="option", so keyboard nav (j/k) walks article → article
+  // and skips summaries.
+  //
+  // Grouping is gated on aggregated views ONLY (/feeds/all + folder
+  // views). In a single-feed view the user has already chosen to focus
+  // on that source, so collapsing floods would just hide content they
+  // explicitly asked to see.
+  const entries: FlatEntry[] = useMemo(() => {
+    if (!groupArticleFloods || !isAggregatedView) {
+      return articles.map((article) => ({
+        kind: "article" as const,
+        article,
+      }));
+    }
+    const out: FlatEntry[] = [];
+    for (const grouped of groupArticles(articles)) {
+      if (grouped.kind === "article") {
+        out.push({ kind: "article", article: grouped.article });
+        continue;
+      }
+      const isOpen = expandedGroups.has(grouped.id);
+      if (isOpen) {
+        for (const article of grouped.articles) {
+          out.push({ kind: "article", article });
+        }
+        out.push({
+          kind: "summary",
+          groupId: grouped.id,
+          feedId: grouped.feedId,
+          hiddenCount: grouped.articles.length - 1,
+          open: true,
+        });
+      } else {
+        out.push({ kind: "article", article: grouped.articles[0]! });
+        out.push({
+          kind: "summary",
+          groupId: grouped.id,
+          feedId: grouped.feedId,
+          hiddenCount: grouped.articles.length - 1,
+          open: false,
+        });
+      }
+    }
+    return out;
+  }, [articles, groupArticleFloods, isAggregatedView, expandedGroups]);
 
   const unreadCount = useMemo(() => {
     let count = 0;
@@ -85,11 +172,22 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   );
 
   const virtualizer = useVirtualizer({
-    count: articles.length,
+    count: entries.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ESTIMATED_ITEM_SIZE,
     overscan: OVERSCAN,
-    getItemKey: (index) => articles[index]?.id ?? index,
+    getItemKey: (index) => {
+      const entry = entries[index];
+      if (!entry) return index;
+      // Summary rows get a deterministic key per (group, open-state) so
+      // the virtualizer remounts when toggling — otherwise React would
+      // reuse the same node and the label/icon swap would still happen,
+      // but a fresh remount is cheaper than the alternative of fighting
+      // memoisation.
+      return entry.kind === "summary"
+        ? `summary:${entry.groupId}:${entry.open ? "open" : "closed"}`
+        : entry.article.id;
+    },
   });
 
   // Keep the selected article in view, but only when the user can't already
@@ -100,15 +198,17 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   // virtualizer to the new selection, scrolling the user's viewport even
   // when the new article is already visible. Checking visibility before
   // scrolling is the invariant that holds across every call site.
-  const articlesRef = useRef(articles);
-  articlesRef.current = articles;
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
   const selectedId = selectedArticle?.id;
   useEffect(() => {
     if (!selectedId) return;
     const scrollEl = scrollRef.current;
     if (!scrollEl) return;
     if (isItemVisible(scrollEl, selectedId)) return;
-    const index = articlesRef.current.findIndex((a) => a.id === selectedId);
+    const index = entriesRef.current.findIndex(
+      (entry) => entry.kind === "article" && entry.article.id === selectedId,
+    );
     if (index !== -1) virtualizer.scrollToIndex(index, { align: "auto" });
   }, [selectedId, virtualizer]);
 
@@ -152,8 +252,20 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
         style={{ height: totalSize }}
       >
         {virtualItems.map((virtualItem) => {
-          const article = articles[virtualItem.index];
-          if (!article) return null;
+          const entry = entries[virtualItem.index];
+          if (!entry) return null;
+          const feedId =
+            entry.kind === "article" ? entry.article.feedId : entry.feedId;
+          // Always pass the source feed's title to the summary row so it
+          // can render "+N more from <Feed>" regardless of view mode —
+          // per-feed views skip the title on ArticleItem (redundant) but
+          // the summary row benefits from it as the dominant
+          // disambiguator.
+          const summaryFeedTitle = feedsById[feedId]?.title;
+          const itemFeedTitle = isAggregatedView ? summaryFeedTitle : undefined;
+          const itemFeedSiteUrl = isAggregatedView
+            ? feedsById[feedId]?.siteUrl
+            : undefined;
           return (
             <div
               key={virtualItem.key}
@@ -167,21 +279,22 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              <ArticleItem
-                article={article}
-                isSelected={article.id === selectedArticle?.id}
-                onSelect={handleSelect}
-                feedTitle={
-                  isAggregatedView
-                    ? feedsById[article.feedId]?.title
-                    : undefined
-                }
-                feedSiteUrl={
-                  isAggregatedView
-                    ? feedsById[article.feedId]?.siteUrl
-                    : undefined
-                }
-              />
+              {entry.kind === "article" ? (
+                <ArticleItem
+                  article={entry.article}
+                  isSelected={entry.article.id === selectedArticle?.id}
+                  onSelect={handleSelect}
+                  feedTitle={itemFeedTitle}
+                  feedSiteUrl={itemFeedSiteUrl}
+                />
+              ) : (
+                <ArticleGroupSummaryRow
+                  open={entry.open}
+                  hiddenCount={entry.hiddenCount}
+                  feedTitle={summaryFeedTitle}
+                  onToggle={() => toggleGroup(entry.groupId)}
+                />
+              )}
             </div>
           );
         })}

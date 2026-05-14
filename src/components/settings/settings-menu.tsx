@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import {
   Cloud,
   Keyboard,
+  Layers,
   Loader2,
   MessageSquare,
   Sparkles,
   Wand2,
 } from "lucide-react";
 import { useSyncStore } from "@/stores/sync-store.ts";
+import { useAppStore } from "@/stores/app-store.ts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +61,8 @@ export function SettingsMenu(props: SettingsMenuProps) {
 
   const syncStatus = useSyncStore((s) => s.status);
   const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
+  const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
+  const setGroupArticleFloods = useAppStore((s) => s.setGroupArticleFloods);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [autoOrganizeOpen, setAutoOrganizeOpen] = useState(false);
@@ -116,6 +120,22 @@ export function SettingsMenu(props: SettingsMenuProps) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setGroupArticleFloods(!groupArticleFloods)}
+            >
+              <Layers className="size-4" />
+              <span className="flex-1">Group article floods</span>
+              <Switch
+                size="sm"
+                checked={groupArticleFloods}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setGroupArticleFloods(!groupArticleFloods);
+                }}
+              />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => setShortcutsOpen(true)}>
               <Keyboard className="size-4" />
@@ -192,6 +212,25 @@ export function SettingsMenu(props: SettingsMenuProps) {
               <span>Auto-organize feeds</span>
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setGroupArticleFloods(!groupArticleFloods);
+            }}
+          >
+            <div className="flex items-center gap-2 flex-1">
+              <Layers className="size-4" />
+              <span>Group article floods</span>
+            </div>
+            <Switch
+              size="sm"
+              checked={groupArticleFloods}
+              onClick={(e) => {
+                e.stopPropagation();
+                setGroupArticleFloods(!groupArticleFloods);
+              }}
+            />
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setShortcutsOpen(true)}>
             <Keyboard className="size-4" />
             <span>Keyboard shortcuts</span>

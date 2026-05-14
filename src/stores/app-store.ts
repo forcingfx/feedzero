@@ -11,6 +11,8 @@ interface AppStore {
   isDbReady: boolean;
   error: string | null;
   hasCompletedOnboarding: boolean | null;
+  /** When true, the article list collapses same-feed flood runs into stacks. */
+  groupArticleFloods: boolean;
   /** Initialize a fresh DB for new users (onboarding). */
   initialize: (passphrase: string, options?: { sync: boolean }) => Promise<void>;
   /** Restore DB for returning users from stored keys. */
@@ -18,13 +20,28 @@ interface AppStore {
   setError: (error: string | null) => void;
   completeOnboarding: () => void;
   checkOnboardingStatus: () => void;
+  setGroupArticleFloods: (next: boolean) => void;
   resetApp: () => Promise<void>;
+}
+
+/**
+ * Default-on: only an explicit "false" disables the feature. Any other
+ * value (missing key, parse failure, "true") falls through to true so
+ * a fresh browser opts users into the better default UX.
+ */
+function readGroupArticleFloods(): boolean {
+  try {
+    return localStorage.getItem(LOCAL_STORAGE.GROUP_ARTICLE_FLOODS) !== "false";
+  } catch {
+    return true;
+  }
 }
 
 export const useAppStore = create<AppStore>((set) => ({
   isDbReady: false,
   error: null,
   hasCompletedOnboarding: null,
+  groupArticleFloods: readGroupArticleFloods(),
 
   initialize: async (passphrase, options) => {
     const result = await initFresh(passphrase, options);
@@ -75,6 +92,15 @@ export const useAppStore = create<AppStore>((set) => ({
     const completed =
       localStorage.getItem(LOCAL_STORAGE.ONBOARDING_COMPLETE) === "true";
     set({ hasCompletedOnboarding: completed });
+  },
+
+  setGroupArticleFloods: (next) => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE.GROUP_ARTICLE_FLOODS, String(next));
+    } catch {
+      /* ignore — fall back to in-memory state only */
+    }
+    set({ groupArticleFloods: next });
   },
 
   resetApp: async () => {

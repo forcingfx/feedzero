@@ -69,6 +69,22 @@ export const LOCAL_STORAGE = {
   FEED_CUSTOM_ORDER: "feedzero:feed-custom-order",
   FOLDER_CUSTOM_ORDER: "feedzero:folder-custom-order",
   AUTO_ORGANIZE_DISMISSED_COUNT: "feedzero:auto-organize-dismissed-count",
+  GROUP_ARTICLE_FLOODS: "feedzero:group-article-floods",
+} as const;
+
+/**
+ * Article-flood grouping thresholds. When at least MIN_GROUP_SIZE
+ * consecutive articles from the same feed (in publishedAt-desc order)
+ * have adjacent gaps ≤ WINDOW_MS, the article list collapses them into
+ * a single-row summary in aggregated views. Pairwise rule — long bursts
+ * at 1-minute intervals stay as one group even if first→last spans much
+ * more than WINDOW_MS. Grouping only applies to multi-feed views
+ * (/feeds/all and folder views); single-feed views never collapse since
+ * the user has already chosen to focus on that feed.
+ */
+export const ARTICLE_GROUPING = {
+  WINDOW_MS: 10 * 60 * 1000,
+  MIN_GROUP_SIZE: 5,
 } as const;
 
 /**
