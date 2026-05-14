@@ -7,18 +7,7 @@ import { test, expect, type Page } from "@playwright/test";
  * with 100 feeds and pushes. Device B (separate browser context, SAME
  * derived keys) pulls and verifies all 100 feeds arrived intact.
  *
- * STATUS: `test.fixme()` — this test currently fails against the local
- * dev server. The failure exposes what looks like a real cross-device
- * sync bug, NOT a flaky test. See the "Investigation findings" block
- * inside the test body for details. Run with:
- *
- *     npx playwright test tests/e2e/sync-100-feeds.spec.ts --project=desktop
- *
- * The fixme() marker keeps CI green while preserving the test as the
- * authoritative spec for what "sync at scale" must do. When the
- * underlying issue is fixed, switch `test.fixme()` back to `test()`.
- *
- * Strategy (all of this works correctly):
+ * Strategy:
  *  - Derive keys ONCE up front via the project's own key-material
  *    module in a throwaway browser context. No Node-side
  *    reimplementation that could drift from the real derivation.
@@ -32,12 +21,17 @@ import { test, expect, type Page } from "@playwright/test";
  *  - /api/sync is NOT mocked: goes to the Vite dev server's in-memory
  *    adapter, shared across both contexts via the dev-server process.
  *
+ * Wait pattern: Pre-pin the store hooks to `window.__sync` via a setup
+ * `evaluate`, then `waitForFunction` reads them synchronously. Earlier
+ * the wait used an async predicate that dynamically imported the store
+ * modules each poll; that pattern bailed out after the first false
+ * return and the test continued mid-pull, observing the empty DB.
+ *
  * What this test does NOT cover (out of scope, separate tests):
  *  - Real Upstash latency at scale → tests/smoke/sync-large-vault.test.ts
+ *  - Cross-device round-trip data layer → tests/core/sync/cross-device-roundtrip.test.ts
  *  - Vault encryption correctness → tests/core/sync/vault-crypto.test.ts
  *  - Onboarding UI flow → tests/e2e/sync.spec.ts (existing)
- *  - Conflict resolution between simultaneous pushes (separate test)
- *  - Recovery from partial push failure (separate test)
  */
 
 // Four non-EFF-wordlist tokens. Real passphrases use the EFF wordlist;
@@ -111,64 +105,10 @@ async function preSetSyncIdentity(
 }
 
 test.describe("Sync at scale — 100 feeds across two devices", () => {
-  /**
-   * KNOWN-FAILING — see investigation findings inside.
-   *
-   * To run anyway: change `test.fixme` to `test` and execute. The
-   * failure is at the "Device B sees 100 feeds" assertion.
-   */
-  test.fixme(
+  test(
     "Device A pushes 100 feeds; Device B pulls them all",
     async ({ browser }) => {
       test.setTimeout(180_000);
-
-      /* ==========================================================
-       * INVESTIGATION FINDINGS (2026-05-14, this session)
-       * ==========================================================
-       *
-       * What we verified works:
-       *  - Two-context derived-key injection: vaultId is identical
-       *    across both contexts (the spec for "same user, two devices").
-       *  - Device A's full flow: init → restoreSync sets credentials →
-       *    100x addFeed() succeeds → push() returns status="synced",
-       *    error=null. The dev server's in-memory adapter reports
-       *    >= 1 vault stored, and GET /api/sync?vaultId=<id> returns
-       *    ~79KB of ciphertext (consistent with 100 encrypted feeds).
-       *  - Device B's init: credentials reconstructed identically,
-       *    isDbReady flips to true, sync-store status flips to
-       *    "synced" (meaning pull() believed it succeeded).
-       *
-       * What fails:
-       *  - After Device B's status flips to "synced", BOTH the
-       *    in-memory feed-store AND IndexedDB show 0 feeds. A page
-       *    reload + explicit loadFeeds() doesn't recover them either.
-       *
-       * Hypothesis (needs investigation in src/core/sync/sync-service.ts):
-       *  pull() retrieves the vault, decryptVault() likely succeeds
-       *  (otherwise status would be "error"), but the importAll() step
-       *  that applies the decrypted VaultData to IndexedDB either:
-       *    (a) silently no-ops on the dev-server / memory-adapter path,
-       *    (b) writes to a different DB instance than the one
-       *        feed-store reads from, or
-       *    (c) throws an error that's caught and swallowed without
-       *        updating status.
-       *
-       * Reproducer:
-       *   Switch `test.fixme(...)` to `test(...)` and re-run. Watch
-       *   the diagnostic that the original investigation added — vault
-       *   ciphertext is large, but Device B's IndexedDB count via
-       *   getFeeds() is 0.
-       *
-       * Investigation next steps:
-       *  1. Add a console.log inside pullVault's importAll path to
-       *     confirm it actually runs and writes.
-       *  2. Verify the encrypted feed table name and key derivation
-       *     match between Device A's write and Device B's read.
-       *  3. If importAll runs but doesn't persist, check Dexie's
-       *     transaction completion — possibly a fire-and-forget that
-       *     status flips before the write commits.
-       * ==========================================================
-       */
 
       // === STEP 1: Derive sync keys via the project's own module ===
       const setupCtx = await browser.newContext();
@@ -255,15 +195,30 @@ test.describe("Sync at scale — 100 feeds across two devices", () => {
       await pageB.goto("/feeds");
 
       // Wait for sync init + pull to settle.
+      // Use a sync polling condition that reads from window — async
+      // dynamic imports inside waitForFunction's evaluator seem to
+      // cause Playwright to bail after the first false return.
+      await pageB.evaluate(async () => {
+        const [appMod, syncMod] = await Promise.all([
+          import("/src/stores/app-store.ts"),
+          import("/src/stores/sync-store.ts"),
+        ]);
+        (window as unknown as {
+          __sync: { app: typeof appMod.useAppStore; sync: typeof syncMod.useSyncStore };
+        }).__sync = { app: appMod.useAppStore, sync: syncMod.useSyncStore };
+      });
       await pageB.waitForFunction(
-        async () => {
-          const [appMod, syncMod] = await Promise.all([
-            import("/src/stores/app-store.ts"),
-            import("/src/stores/sync-store.ts"),
-          ]);
+        () => {
+          const w = window as unknown as {
+            __sync: {
+              app: { getState: () => { isDbReady: boolean } };
+              sync: { getState: () => { status: string } };
+            };
+          };
+          if (!w.__sync) return false;
           return (
-            appMod.useAppStore.getState().isDbReady &&
-            syncMod.useSyncStore.getState().status === "synced"
+            w.__sync.app.getState().isDbReady &&
+            w.__sync.sync.getState().status === "synced"
           );
         },
         undefined,

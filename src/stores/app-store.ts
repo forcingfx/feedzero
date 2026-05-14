@@ -37,6 +37,15 @@ function readGroupArticleFloods(): boolean {
   }
 }
 
+// Dedup concurrent boot-time calls. AppInit's effect 1 fires twice in
+// React StrictMode (dev), and could plausibly fire from a remount in
+// other contexts (fast refresh, suspense). Without this guard, a second
+// call's restore() can race the first call's pull(); if the canary check
+// fails, the second call runs destroy() — which deletes both IndexedDB
+// AND the server vault. Catastrophic data loss masked as a "sync didn't
+// work" symptom. Reproducer: tests/e2e/sync-100-feeds.spec.ts.
+let initReturningUserInFlight: Promise<void> | null = null;
+
 export const useAppStore = create<AppStore>((set) => ({
   isDbReady: false,
   error: null,
@@ -58,27 +67,42 @@ export const useAppStore = create<AppStore>((set) => ({
   },
 
   initializeReturningUser: async () => {
-    const status = await restore();
+    if (initReturningUserInFlight) return initReturningUserInFlight;
 
-    if (status.status !== "ready") {
-      // Keys missing or invalid — clean slate, re-onboard
-      await destroy();
-      set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
-      return;
-    }
+    initReturningUserInFlight = (async () => {
+      const status = await restore();
 
-    if (status.credentials) {
-      useSyncStore.setState({ credentials: status.credentials });
-    }
-
-    set({ isDbReady: true, error: null });
-
-    if (status.isSyncUser) {
-      await useSyncStore.getState().pull();
-      if (useSyncStore.getState().status !== "error") {
-        useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+      if (status.status !== "ready") {
+        // Keys missing or invalid — clean slate, re-onboard
+        await destroy();
+        set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
+        return;
       }
-    }
+
+      if (status.credentials) {
+        useSyncStore.setState({ credentials: status.credentials });
+      }
+
+      // For sync users, finish the initial pull BEFORE flipping isDbReady.
+      // AppInit's `isDbReady` effect kicks off loadFeeds + refreshAll the
+      // moment the flag goes true; if we set it before the pull settles,
+      // refreshAll's own pull() races with this one and importAll's
+      // clear+bulkPut sequences interleave, leaving a window where feeds
+      // appear absent. See tests/e2e/sync-100-feeds.spec.ts for the
+      // reproducer.
+      if (status.isSyncUser) {
+        await useSyncStore.getState().pull();
+        if (useSyncStore.getState().status !== "error") {
+          useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+        }
+      }
+
+      set({ isDbReady: true, error: null });
+    })().finally(() => {
+      initReturningUserInFlight = null;
+    });
+
+    return initReturningUserInFlight;
   },
 
   setError: (error) => set({ error }),

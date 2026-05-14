@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
+import { useSyncStore } from "@/stores/sync-store.ts";
 import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
@@ -81,7 +82,13 @@ function AppInit({ children }: { children: React.ReactNode }) {
         }
         preloadArticles();
       });
-      refreshAll();
+      // Sync users: initializeReturningUser already pulled the cloud vault,
+      // so an immediate refreshAll() would do a redundant second pull whose
+      // importAll's clear+bulkPut window races with consumers reading feeds.
+      // Local users still get auto-refresh on boot (no pull involved).
+      if (!useSyncStore.getState().credentials) {
+        refreshAll();
+      }
     }
   }, [isDbReady, loadFeeds, refreshAll, preloadArticles, addFeed]);
 

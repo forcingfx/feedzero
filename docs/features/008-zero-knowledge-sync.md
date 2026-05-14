@@ -124,9 +124,9 @@ Same passphrase always produces same vault ID and same encryption key. No extern
 ### Flow
 
 1. **Push**: `exportAll()` from IndexedDB -> serialize to `VaultData` -> `encryptVault()` with AES-GCM-256 -> PUT `/api/sync` with vault ID + ciphertext
-2. **Pull**: GET `/api/sync?vaultId=<hex>` -> `decryptVault()` -> `importAll()` into IndexedDB
+2. **Pull**: GET `/api/sync?vaultId=<hex>` -> `decryptVault()` -> `importAll()` into IndexedDB. `importAll`'s clear+bulkPut runs in a single Dexie `rw` transaction so concurrent callers serialize at the storage layer and never expose the mid-clear empty state.
 3. **Delete**: DELETE `/api/sync?vaultId=<hex>` -> removes encrypted blob from server
-4. **Startup (sync user)**: Pull first, then load from local DB
+4. **Startup (sync user)**: `initializeReturningUser` awaits the initial `pull()` before flipping `isDbReady=true`. This makes `AppInit`'s `isDbReady` effect run on settled state; no race between init's pull and the boot-time loadFeeds. Also: concurrent `pull()` callers share a single in-flight promise (sync-store's `inFlightPull`), and the boot effect skips `refreshAll` for sync users since init's pull already brought in cloud state.
 5. **Refresh all (sync user)**: Pull vault -> reload feeds from DB -> refresh all feeds -> reload feeds -> push
 6. **After mutations**: Debounced push (5s after last change)
 7. **Disable sync**: Delete server vault -> clear localStorage keys -> reset store to local-only

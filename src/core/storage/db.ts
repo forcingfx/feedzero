@@ -446,7 +446,16 @@ export async function exportAll(): Promise<
 
 /**
  * Clear all feeds and articles, then import the provided data.
- * Uses bulk operations for performance.
+ * Atomic: clear+bulkPut runs inside a single Dexie rw transaction so
+ * concurrent callers (e.g. a strict-mode double-fired sync pull or a
+ * boot-time refreshAll racing with initializeReturningUser) serialize
+ * at the storage layer. Without the transaction, interleaved clear and
+ * bulkPut sequences leave an observable window where the tables look
+ * empty — which is the bug reproduced by tests/e2e/sync-100-feeds.spec.ts.
+ *
+ * Encryption happens BEFORE the transaction: Dexie's transactional zone
+ * only allows awaits on Dexie operations, so awaiting Web Crypto inside
+ * would render the transaction inactive.
  */
 export async function importAll(
   feeds: Feed[],
@@ -454,14 +463,22 @@ export async function importAll(
 ): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
-    await ctx.db.table("feeds").clear();
-    await ctx.db.table("articles").clear();
 
-    const feedRecords = await encryptRecords(feeds);
-    await ctx.db.table("feeds").bulkPut(feedRecords);
+    const [feedRecords, articleRecords] = await Promise.all([
+      encryptRecords(feeds),
+      encryptRecords(articles),
+    ]);
 
-    const articleRecords = await encryptRecords(articles);
-    await ctx.db.table("articles").bulkPut(articleRecords);
+    await ctx.db.transaction(
+      "rw",
+      [ctx.db.table("feeds"), ctx.db.table("articles")],
+      async () => {
+        await ctx.db.table("feeds").clear();
+        await ctx.db.table("articles").clear();
+        await ctx.db.table("feeds").bulkPut(feedRecords);
+        await ctx.db.table("articles").bulkPut(articleRecords);
+      },
+    );
 
     return ok(true);
   } catch (e) {

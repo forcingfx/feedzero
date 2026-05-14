@@ -49,6 +49,13 @@ interface SyncStore {
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let jitterTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Concurrent pull() callers share a single in-flight pull. Without this,
+// AppInit's initializeReturningUser pull and the auto-fired refreshAll
+// pull run back-to-back: the second one's importAll clears the tables
+// and races readers. See tests/e2e/sync-100-feeds.spec.ts for the
+// reproducer.
+let inFlightPull: Promise<void> | null = null;
+
 function clearPendingTimers(): void {
   if (debounceTimer) {
     clearTimeout(debounceTimer);
@@ -164,23 +171,30 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   pull: async () => {
+    if (inFlightPull) return inFlightPull;
     const { credentials } = get();
     if (!credentials) return;
 
-    set({ status: "syncing", error: null });
-    const pullResult = await pullVault(credentials);
-    if (!pullResult.ok) {
-      set({ status: "error", error: pullResult.error });
-      return;
-    }
+    inFlightPull = (async () => {
+      set({ status: "syncing", error: null });
+      const pullResult = await pullVault(credentials);
+      if (!pullResult.ok) {
+        set({ status: "error", error: pullResult.error });
+        return;
+      }
 
-    const importResult = await importVault(pullResult.value);
-    if (!importResult.ok) {
-      set({ status: "error", error: importResult.error });
-      return;
-    }
+      const importResult = await importVault(pullResult.value);
+      if (!importResult.ok) {
+        set({ status: "error", error: importResult.error });
+        return;
+      }
 
-    set({ status: "synced", lastSyncedAt: Date.now(), error: null });
+      set({ status: "synced", lastSyncedAt: Date.now(), error: null });
+    })().finally(() => {
+      inFlightPull = null;
+    });
+
+    return inFlightPull;
   },
 
   scheduleSyncPush: () => {
