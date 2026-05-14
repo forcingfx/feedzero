@@ -1,0 +1,69 @@
+name: Preview Smoke (sync cross-device)
+
+# Run the cross-device sync smoke test against every successful Vercel
+# preview deployment. Gates merge to main via branch protection — the
+# cross-device sync contract is verified against real production
+# infrastructure (Upstash + Vercel function chain) on each PR before
+# promotion.
+#
+# Why deployment_status (not pull_request): the test needs a deployed
+# URL. Triggering on pull_request would require polling Vercel until
+# the preview was Ready, which is brittle. deployment_status fires
+# exactly when Vercel marks "success". For PR branches Vercel emits
+# environment "Preview"; for main it emits "Production".
+#
+# Required check: add "Sync cross-device smoke" to the branch
+# protection rules for `main`. Without that, the workflow's pass/fail
+# is informational only and does not block merge.
+on:
+  deployment_status:
+
+concurrency:
+  # Global serialize across all PRs. The smoke test uses a fixed
+  # sentinel vaultId (`dddd...`); two parallel runs would race on
+  # PUT/GET. With a single global group + no cancel-in-progress,
+  # runs queue and each PR still gets a fresh smoke result. The
+  # repo's low PR cadence makes this trade-off cheap.
+  group: preview-smoke-sync-cross-device
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Needed so the workflow's check_run status attaches to the
+  # deployment's SHA, which is what branch protection consults on
+  # the PR.
+  statuses: write
+
+jobs:
+  sync-cross-device:
+    name: Sync cross-device smoke
+    # Only run on successful Vercel preview deployments. Production
+    # deployments are covered by the post-merge E2E + manual operator
+    # smoke per CLAUDE.md's RGR+S workflow.
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      contains(fromJSON('["Preview", "preview"]'), github.event.deployment.environment)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the SHA Vercel actually deployed, not main HEAD.
+          ref: ${{ github.event.deployment.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run cross-device sync smoke against the preview deploy
+        env:
+          SMOKE_TESTS: '1'
+          # Vercel populates `target_url` (and `environment_url`) with
+          # the canonical preview URL like
+          # https://feedzero-<pr-N>-<hash>.vercel.app
+          SMOKE_BASE_URL: ${{ github.event.deployment_status.target_url }}
+        run: npx vitest run tests/smoke/sync-cross-device.test.ts
