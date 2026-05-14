@@ -138,13 +138,33 @@ All API handlers use the Web standard `Request -> Response` pattern via shared h
 
 Endpoints:
 
-- `POST /api/feed` (body: `{ "url": "..." }`) — Proxies RSS/Atom/JSON feed requests (CORS bypass). Uses POST to keep URLs out of query strings and server logs.
-- `POST /api/page` (body: `{ "url": "..." }`) — Proxies web page requests for full-text extraction.
-- `/api/sync` — GET retrieves encrypted vault, HEAD checks vault existence, PUT stores encrypted vault, DELETE removes encrypted vault
+- `POST /api/feed` (body: `{ "url": "..." }`) — Proxies RSS/Atom/JSON feed requests (CORS bypass). Rate-limited per hashed client (300/min default).
+- `POST /api/page` (body: `{ "url": "..." }`) — Proxies web page requests for full-text extraction. Rate-limited.
+- `/api/sync` — GET / HEAD / PUT / DELETE encrypted vault. Storage: Upstash KV (`vault:<vaultId>`).
+- `/api/catalog` — `action=count`, `action=popular`, `?url=<...>` lookup. Storage: Upstash KV (`catalog:feed:*` + `catalog:ranking` sorted set).
+- `/api/stats-sync` — Vault count for the public stats page. Reads the same backend as `/api/sync`.
+- `POST /api/license/verify`, `POST /api/license/issue` — License Bearer-token verification and (admin-only) issuance. Storage: Upstash KV (`license:record:*`, `license:revoked:*`, `customer:*:keys`).
+- `POST /api/stripe/webhook` — Stripe webhook receiver with signature verification + event-id dedup. Dedup store: Upstash KV (`seen-event:<eventId>`).
+- `POST /api/checkout/create-session` — Stripe Checkout Session creation with priceId allowlist.
+- `GET /api/health`, `GET /api/icon`, `POST /api/feedback`, `GET /api/favicon` — Operational endpoints.
+
+### Production data layer: Upstash KV
+
+Per [ADR 008](decisions/008-upstash-as-production-data-layer.md), five distinct server-side concerns share one Upstash REST KV instance with non-overlapping key prefixes (`license:*`, `customer:*`, `vault:*`, `seen-event:*`, `catalog:*`, `ratelimit:*`). The credential cascade `UPSTASH_REDIS_REST_URL/TOKEN` → `KV_REST_API_URL/TOKEN` → memory fallback is shared by every adapter, so an operator configures Upstash once and all five subsystems pick it up.
+
+This consolidation replaced the prior architecture (Vercel Blob for sync, separate Upstash for license/event-store, in-memory for catalog) after two production-down incidents in May 2026 demonstrated that "multiple production backends" was a recurring failure mode. See [the postmortems](incidents/) for the case studies.
 
 ### SSRF Protection
 
 All proxy endpoints block internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16-31.x, 192.168.x, 169.254.169.254) and only allow http/https protocols.
+
+### Proxy Rate Limiting
+
+`/api/feed` and `/api/page` rate-limit at 300 requests per 60-second window per hashed client. Client ID = SHA-256 of `${ip}|${userAgent}|${salt}`, salt sourced from `RATE_LIMIT_HASH_SALT` env var (fallback `LICENSE_SIGNING_KEY`). Counter stored as `ratelimit:cli_<8-hex>` in Upstash with TTL = window length. Fails open on Upstash errors (a broken limiter shouldn't take the proxy down). 429 responses include `Retry-After` (RFC 6585). See [ADR 010](decisions/010-proxy-rate-limiter.md).
+
+### Observability
+
+Every monetization handler (sync, license/verify, license/issue, stripe/webhook, checkout) mints a `traceId` at request entry (`req_<8-hex>`), includes it in every non-2xx response body, and emits a structured `console.error` JSON line on every 5xx via an allow-list logger. Each `api/*.ts` wrapper writes a module-load log line surfacing which adapter resolved (`[sync] adapter=upstash`, etc.). See [ADR 009](decisions/009-observability-trace-id-pattern.md).
 
 ## Styling
 

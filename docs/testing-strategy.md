@@ -2,26 +2,32 @@
 
 ## Overview
 
-FeedZero uses a three-tier testing strategy to catch regressions at different levels of abstraction:
+FeedZero uses a four-tier testing strategy to catch regressions at different levels of abstraction:
 
 1. **Unit/Integration tests** (Vitest + happy-dom) — Fast, isolated tests for core modules, stores, and component behavior
 2. **Structural assertion tests** (Vitest + React Testing Library) — Verify critical CSS classes, ARIA attributes, and component composition in rendered output
 3. **E2E tests** (Playwright + Chromium) — Exercise the full app in real desktop and mobile browser viewports
+4. **SMOKE tests** (Vitest + node env, run on demand) — Exercise the **live deployed production system** after merge. Catch the class of bug where the code is internally correct (1-3 all pass) but the deployed environment is wrong: config drift, missing env vars, wrong adapter resolved, serverless state not shared across lambdas. See [ADR 011](decisions/011-smoke-tests-in-rgr.md) for the workflow change that codifies SMOKE as step 7 of the RGR cycle.
 
 ## Test Pyramid
 
 ```
-           ┌──────────────┐
-           │   E2E Tests   │  9 spec files, 56 tests
-           │  (Playwright)  │  Real browser, desktop + mobile
-           ├───────────────┤
-           │  Structural    │  7 test files, ~57 tests
-           │  Assertions    │  CSS classes, ARIA, DOM composition
-           ├───────────────┤
-           │  Unit /        │  ~50 test files, ~500+ tests
-           │  Integration   │  Core modules, stores, components
-           └───────────────┘
+        ┌────────────────────┐
+        │  SMOKE (production) │  9 test files, run on demand
+        │  Live deployed env  │  Real Upstash, real Vercel lambdas
+        ├─────────────────────┤
+        │   E2E Tests          │  9 spec files, 56 tests
+        │  (Playwright)        │  Real browser, desktop + mobile
+        ├──────────────────────┤
+        │  Structural          │  ~10 test files
+        │  Assertions          │  CSS classes, ARIA, DOM composition
+        ├──────────────────────┤
+        │  Unit /              │  ~140 test files, 1900+ tests
+        │  Integration         │  Core modules, stores, components
+        └──────────────────────┘
 ```
+
+SMOKE sits ABOVE E2E because it asserts the production system; E2E asserts the dev-server-and-mocks system. SMOKE catches what E2E cannot.
 
 ## Running Tests
 
@@ -199,3 +205,79 @@ Branch coverage is set to 83% because many core modules have untested error-reco
 
 1. Existing tests should continue to pass (no new tests needed unless behavior changes)
 2. If refactoring changes DOM structure, update structural assertions
+
+### For an API endpoint or adapter change (mandatory SMOKE)
+
+Per [ADR 011](decisions/011-smoke-tests-in-rgr.md), every change to an API endpoint handler, adapter resolver, storage adapter, or `api/*.ts` wrapper must ship with a smoke test under `tests/smoke/`. The smoke test runs against the live deployed system after merge and catches the class of bug unit tests structurally cannot see.
+
+## Tier 4 — SMOKE Tests
+
+### What SMOKE asserts
+
+System-level invariants that only become observable against the real deployed environment:
+
+- **Real SDK behavior.** The Upstash sync adapter unit tests used a fake client that returned strings as-is; the real SDK auto-deserializes JSON strings into objects. The unit suite passed; production returned `"[object Object]"` for every vault GET. Caught by `tests/smoke/sync.test.ts` on first run.
+- **Cross-lambda persistence.** `api/feed.ts` (proxy) and `api/catalog.ts` (reader) are separate Vercel Lambdas with separate memory. Unit tests run in a single process — "same instance" is the default. `tests/smoke/catalog.test.ts` triggers a proxy upsert then reads the catalog from the reader lambda; passes iff both lambdas share a real backend.
+- **Config drift.** Production env vars can diverge from the code's assumptions. `tests/smoke/stats-sync.test.ts` asserts `vaults > 0`; would have caught the 2026-05-12 sync regression where production had a stale `SYNC_STORAGE` override the resolver didn't recognize.
+- **Observability contract.** The `traceId` in error response bodies (per [ADR 009](decisions/009-observability-trace-id-pattern.md)) must survive the deployment-artifact pipeline. Smoke tests assert traceId is present in the live 4xx and 5xx response bodies.
+- **Defensive paths.** 429s from the rate limiter, 400s on invalid Stripe signatures, 400s on invalid checkout priceIds, etc. — verified against the live endpoint, not a mock.
+
+### What SMOKE does NOT assert
+
+- Internal function return values (use Tier 1)
+- Component rendering (use Tier 2/3)
+- Per-user UI state (use Tier 3)
+- **Success paths that mutate production state.** Don't issue a real license, don't create a real Stripe Checkout session, don't send valid signed Stripe webhooks. Smoke tests focus on the defensive paths and the read-side correctness.
+
+### File structure
+
+```ts
+// @vitest-environment node
+import { describe, it, expect } from "vitest";
+
+const SKIP = !process.env.SMOKE_TESTS;
+const BASE_URL = process.env.SMOKE_BASE_URL ?? "https://my.feedzero.app";
+
+describe.skipIf(SKIP)("production /api/<name> (live)", () => {
+  it("<system-level invariant>", async () => {
+    // hit BASE_URL/api/... and assert
+  }, 10_000); // generous timeout for network round trips
+});
+```
+
+`@vitest-environment node` is required — happy-dom enforces CORS on `fetch`, which blocks cross-origin requests to `my.feedzero.app` from `localhost`. Node's native `fetch` doesn't.
+
+`SMOKE_BASE_URL` is overridable so the same tests can run against staging / preview deployments.
+
+### Running SMOKE tests
+
+```bash
+# Run all smoke tests against production
+SMOKE_TESTS=1 npx vitest run tests/smoke/
+
+# Run one specific endpoint's smoke test
+SMOKE_TESTS=1 npx vitest run tests/smoke/sync.test.ts
+
+# Run against a Vercel preview deploy
+SMOKE_TESTS=1 SMOKE_BASE_URL=https://feedzero-pr-99-...vercel.app npx vitest run tests/smoke/
+```
+
+Smoke tests are **NOT** part of `npm test`. They require network access, consume real rate-limit budget, and their result depends on the state of external services.
+
+### Existing smoke tests
+
+| File | What it asserts |
+|---|---|
+| `tests/smoke/sync.test.ts` | PUT → GET → DELETE → GET 404 roundtrip with traceId observability |
+| `tests/smoke/catalog.test.ts` | Cross-lambda persistence; count > 0; populated leaderboard |
+| `tests/smoke/stats-sync.test.ts` | Vaults count > 0 (catches wrong-adapter regression) |
+| `tests/smoke/license-verify.test.ts` | 401/400 + traceId on invalid input; 405 on non-POST |
+| `tests/smoke/stripe-webhook.test.ts` | 400 + traceId on missing/malformed signature |
+| `tests/smoke/checkout.test.ts` | 400 + traceId on invalid priceId / `javascript:` URL |
+| `tests/smoke/health.test.ts` | 200 + `{ok:true}` |
+| `tests/smoke/rate-limiter.test.ts` | 320-request burst → mix of 200s + 429s + Retry-After |
+| `tests/smoke/release-feed.test.ts` | Live release feed parses against our parser |
+
+### When SMOKE runs in the RGR cycle
+
+Step 7 of the RGR+S cycle, after the PR has merged and Vercel has deployed. If the smoke test fails, **revert or roll forward with a fix immediately** — the PR isn't done until SMOKE passes against prod. "It passed CI" is not "it works in production".
