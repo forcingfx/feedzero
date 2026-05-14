@@ -83,7 +83,7 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/core/parser/sanitizer.ts** — DOMPurify wrapper with allowlisted tags/attrs.
 - **src/core/opml/opml-service.ts** — OPML import/export via feedsmith's `parseOpml`/`generateOpml`. Returns `Result<T>`.
 - **src/core/opml/url-list-parser.ts** — Parses plain-text URL lists (one URL per line) as an alternative import format.
-- **src/core/feedback/feedback-handler.ts** — Server-side handler for user feedback submissions. Creates GitLab issues via API. Requires `GITLAB_FEEDBACK_TOKEN` and `GITLAB_PROJECT_ID` env vars.
+- **src/core/feedback/feedback-handler.ts** — Server-side handler for user feedback submissions. Creates GitHub issues via REST API. Requires `GITHUB_FEEDBACK_TOKEN` (fine-grained PAT with `issues: write` on the target repo) and `GITHUB_REPO` (e.g. `forcingfx/feedzero`) env vars.
 - **src/core/sync/sync-stats-handler.ts** — Server-side handler returning vault count statistics. No user-identifiable information exposed.
 
 ### Zustand Stores
@@ -240,7 +240,7 @@ All API handlers use the Web standard `Request → Response` pattern via shared 
 
 **Three-entry-point rule:** Every API endpoint has three consumers (Hono, Vite, Vercel). When changing request format, HTTP method, headers, or URL structure, all three entry points MUST be updated and verified. The Vercel `api/*.ts` wrappers MUST export a named function for every HTTP method the shared handler supports. This is enforced by routing contract tests in `server.test.ts` — if you add a method to the shared handler, the test will fail until the Vercel wrapper exports it too. Never deploy without this verification.
 
-**Endpoints**: `POST /api/feed` with `{"url":"..."}` body (feed proxy), `POST /api/page` with `{"url":"..."}` body (page proxy), `/api/sync` (GET/PUT/DELETE/HEAD encrypted vault), `GET /api/icon` (favicon proxy), `POST /api/feedback` (user feedback → GitLab issue, requires `GITLAB_FEEDBACK_TOKEN` + `GITLAB_PROJECT_ID`), `GET /api/stats-sync` (vault count stats).
+**Endpoints**: `POST /api/feed` with `{"url":"..."}` body (feed proxy), `POST /api/page` with `{"url":"..."}` body (page proxy), `/api/sync` (GET/PUT/DELETE/HEAD encrypted vault), `GET /api/icon` (favicon proxy), `POST /api/feedback` (user feedback → GitHub issue, requires `GITHUB_FEEDBACK_TOKEN` + `GITHUB_REPO`), `GET /api/stats-sync` (vault count stats).
 
 **SSRF protections** — The proxy blocks requests to internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http:`/`https:` protocols. Do not weaken these checks.
 
