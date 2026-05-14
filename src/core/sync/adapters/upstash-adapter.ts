@@ -88,7 +88,17 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
   async get(vaultId: string): Promise<Result<string | null>> {
     return tryUpstash(async () => {
       const value = await this.client.get<string>(vaultKey(vaultId));
-      return value ?? null;
+      if (value === null || value === undefined) return null;
+      // Defensive re-stringification. The production Upstash client is
+      // constructed with `automaticDeserialization: false` so this branch
+      // is normally a no-op (`typeof value === "string"`). But if a
+      // future SDK upgrade, env-tweak, or refactor reintroduces
+      // auto-deserialization, we still return a string here — without
+      // this, `Response(obj)` renders the literal "[object Object]"
+      // and every cloud-pull silently corrupts the vault. Belt and
+      // suspenders. See the unit regression test in this file's
+      // "auto-deserialization off" describe block.
+      return typeof value === "string" ? value : JSON.stringify(value);
     });
   }
 
@@ -168,6 +178,19 @@ export async function createUpstashSyncAdapter(
   // not configured — Vite would otherwise eagerly bundle it.
   const { Redis } = await import("@upstash/redis");
   return new UpstashSyncAdapter(
-    new Redis({ url: creds.url, token: creds.token }),
+    new Redis({
+      url: creds.url,
+      token: creds.token,
+      // CRITICAL: vault payloads are already JSON-serialized strings
+      // produced by `sync-handler.ts:handlePut` and consumed by GET as
+      // raw strings. The Upstash SDK's default behavior is to auto-parse
+      // any stored string that looks like JSON back into a JS object on
+      // GET — that turns our `'{"ok":true,"vault":{...}}'` string into
+      // an Object, which `new Response(obj, ...)` then renders as the
+      // literal `"[object Object]"`. Bug live since PR #45; caught only
+      // by the post-deploy smoke test in `tests/smoke/sync.test.ts`.
+      // See README of @upstash/redis for the flag's full semantics.
+      automaticDeserialization: false,
+    }),
   );
 }
