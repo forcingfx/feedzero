@@ -253,6 +253,63 @@ describe("UpstashSyncAdapter", () => {
     });
   });
 
+  describe("auto-deserialization off (production-real round trip)", () => {
+    // CRITICAL regression test for the bug caught by the post-deploy
+    // smoke test on 2026-05-14: the real Upstash REST client auto-parses
+    // any stored string that looks like JSON back into a JS object on
+    // GET. The previous fake test client returned strings as-is, which
+    // hid the bug. This test SIMULATES the real client's behavior — and
+    // asserts the adapter still preserves the round-trip.
+
+    function autoDeserializingClient(): UpstashSyncClient {
+      // Mirrors the @upstash/redis SDK's default-on auto-deserialization
+      // behavior: anything that parses as JSON gets returned as the
+      // parsed object. The real client only does this when
+      // `automaticDeserialization` is left at its default (true).
+      const store = new Map<string, string>();
+      return {
+        async get<T = string>(key: string): Promise<T | null> {
+          if (!store.has(key)) return null;
+          const raw = store.get(key) as string;
+          try {
+            return JSON.parse(raw) as T;
+          } catch {
+            return raw as unknown as T;
+          }
+        },
+        async set(key, value) {
+          store.set(key, String(value));
+          return "OK";
+        },
+        async del() { return 1; },
+        async scan() { return [0, []]; },
+      };
+    }
+
+    it("PUT then GET preserves the exact JSON string the handler stored", async () => {
+      // The sync-handler does `JSON.stringify({ ok: true, vault })` and
+      // passes the resulting STRING to `adapter.put`. On GET, the adapter
+      // must return that SAME STRING unchanged — not a parsed object —
+      // because the handler hands the value directly to `new Response()`.
+      // If we return a parsed object instead, Response coerces it to
+      // "[object Object]" and every vault read in production is corrupt.
+      const adapter = new UpstashSyncAdapter(autoDeserializingClient());
+      const payload = JSON.stringify({
+        ok: true,
+        vault: { version: 1, iv: [1, 2, 3], ciphertext: "test" },
+      });
+      await adapter.put(VAULT_ID, payload);
+
+      const result = await adapter.get(VAULT_ID);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      // The exact assertion that production was failing: the value must
+      // be a STRING, not an object.
+      expect(typeof result.value).toBe("string");
+      expect(result.value).toBe(payload);
+    });
+  });
+
   describe("isolation from license storage (same Redis, different keyspace)", () => {
     // Defensive: sync vault keys must never collide with license storage
     // keys. The license adapter uses `license:record:*`, `license:revoked:*`,
