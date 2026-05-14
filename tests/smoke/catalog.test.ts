@@ -46,20 +46,32 @@ describe.skipIf(SKIP)("production /api/catalog (live)", () => {
     // Drain body so the lambda can complete the upsert.
     await proxyRes.arrayBuffer();
 
-    // 3. Give the fire-and-forget upsert a moment to settle. Empirically
-    //    Vercel keeps the lambda alive long enough for the Upstash write
-    //    to complete (~50-100ms), but we wait a few seconds defensively.
-    await new Promise((r) => setTimeout(r, 3_000));
+    // 3. Poll for the upsert to land. Fire-and-forget upserts in Vercel
+    //    Lambda complete on a timescale that varies with cold-start state
+    //    (50ms warm, several seconds cold). A fixed wait either over-waits
+    //    or under-waits depending on lambda state. Polling at 1s intervals
+    //    is more robust than a fixed sleep.
+    const POLL_INTERVAL_MS = 1_000;
+    const MAX_POLLS = 15;
+    let afterCount = beforeCount;
+    let afterBody: { ok: boolean; feed: { url: string; requestCount: number } } | null = null;
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      const after = await fetch(
+        `${BASE_URL}/api/catalog?url=${encodeURIComponent(SENTINEL_FEED)}`,
+      );
+      if (after.status !== 200) continue;
+      afterBody = await after.json();
+      if (afterBody && afterBody.ok) {
+        afterCount = afterBody.feed.requestCount;
+        if (afterCount > beforeCount) break;
+      }
+    }
 
-    // 4. AFTER state — requestCount must have incremented.
-    const after = await fetch(
-      `${BASE_URL}/api/catalog?url=${encodeURIComponent(SENTINEL_FEED)}`,
-    );
-    expect(after.status).toBe(200);
-    const afterBody = await after.json();
-    expect(afterBody.ok).toBe(true);
-    expect(afterBody.feed.url).toBe(SENTINEL_FEED);
-    expect(afterBody.feed.requestCount).toBeGreaterThan(beforeCount);
+    expect(afterBody).not.toBeNull();
+    expect(afterBody!.ok).toBe(true);
+    expect(afterBody!.feed.url).toBe(SENTINEL_FEED);
+    expect(afterCount).toBeGreaterThan(beforeCount);
   }, 30_000);
 
   it("/api/catalog?action=count returns a positive integer", async () => {
