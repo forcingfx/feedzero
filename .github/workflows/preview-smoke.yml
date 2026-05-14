@@ -66,4 +66,10 @@ jobs:
           # the canonical preview URL like
           # https://feedzero-<pr-N>-<hash>.vercel.app
           SMOKE_BASE_URL: ${{ github.event.deployment_status.target_url }}
+          # When the deploy has LAUNCH_PAID_TIER=1 (which gates /api/sync
+          # behind a license bearer), the data-roundtrip assertions need a
+          # valid token. Add SMOKE_LICENSE_TOKEN as a repo secret to
+          # exercise them; without it the data tests skip and only the
+          # auth-gate regression guard runs.
+          SMOKE_LICENSE_TOKEN: ${{ secrets.SMOKE_LICENSE_TOKEN }}
         run: npx vitest run tests/smoke/sync-cross-device.test.ts

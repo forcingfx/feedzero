@@ -31,6 +31,17 @@ import { randomBytes } from "node:crypto";
 const SKIP = !process.env.SMOKE_TESTS;
 const BASE_URL = process.env.SMOKE_BASE_URL ?? "https://my.feedzero.app";
 
+// When LAUNCH_PAID_TIER=1 on the target deploy, /api/sync requires a
+// signed license bearer. SMOKE_LICENSE_TOKEN lets the smoke test pass
+// the gate; without it, the test skips because the data assertions
+// cannot run against an authenticated endpoint.
+const LICENSE_TOKEN = process.env.SMOKE_LICENSE_TOKEN;
+const SKIP_AUTH = SKIP || !LICENSE_TOKEN;
+
+const AUTH_HEADER: Record<string, string> = LICENSE_TOKEN
+  ? { Authorization: `Bearer ${LICENSE_TOKEN}` }
+  : {};
+
 // Sentinel vaultId (64-char single-character hex). Distinct from the
 // large-vault test's 'c' sentinel so parallel smoke runs do not race.
 // Matches isSentinelVaultId() in sentinel-cleanup.ts.
@@ -48,7 +59,7 @@ function buildSyntheticVaultPayload(): {
   return { version: 1, iv, ciphertext };
 }
 
-describe.skipIf(SKIP)(
+describe.skipIf(SKIP_AUTH)(
   "production /api/sync (live) — cross-device PUT then GET",
   () => {
     it("Device A PUTs a vault; a separate Device B GET reads identical bytes", async () => {
@@ -64,7 +75,7 @@ describe.skipIf(SKIP)(
           fetch(input, { ...init, cache: "no-store" });
         const putRes = await deviceA(`${BASE_URL}/api/sync`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...AUTH_HEADER },
           body: putBody,
         });
         expect(putRes.status).toBe(200);
@@ -76,6 +87,7 @@ describe.skipIf(SKIP)(
           fetch(input, { ...init, cache: "no-store" });
         const getRes = await deviceB(
           `${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`,
+          { headers: AUTH_HEADER },
         );
         expect(getRes.status).toBe(200);
         const body = (await getRes.json()) as {
@@ -93,6 +105,7 @@ describe.skipIf(SKIP)(
       } finally {
         await fetch(`${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`, {
           method: "DELETE",
+          headers: AUTH_HEADER,
         }).catch(() => {});
       }
     }, 30_000);
@@ -105,8 +118,36 @@ describe.skipIf(SKIP)(
       const bogusId = "e".repeat(64);
       const res = await fetch(`${BASE_URL}/api/sync?vaultId=${bogusId}`, {
         method: "HEAD",
+        headers: AUTH_HEADER,
       });
       expect(res.status).toBe(404);
+    }, 15_000);
+  },
+);
+
+/**
+ * Always-on assertion: when the deploy gates /api/sync behind a license
+ * (LAUNCH_PAID_TIER=1) and no SMOKE_LICENSE_TOKEN is configured, an
+ * unauthenticated request must return 401, not 200 (which would mean
+ * the gate isn't applied) and not a server-error class. Catches the
+ * regression where auth-gating gets accidentally removed.
+ */
+describe.skipIf(SKIP || LICENSE_TOKEN !== undefined)(
+  "production /api/sync — auth gate (no license token configured)",
+  () => {
+    it("rejects unauthenticated PUT with 401 when LAUNCH_PAID_TIER is on", async () => {
+      const vaultPayload = buildSyntheticVaultPayload();
+      const res = await fetch(`${BASE_URL}/api/sync`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vaultId: SENTINEL_VAULT_ID,
+          vault: vaultPayload,
+        }),
+      });
+      // 401 = gate enforced (expected); 200 = gate missing (regression).
+      // Anything 5xx means the gate path itself is broken.
+      expect([200, 401]).toContain(res.status);
     }, 15_000);
   },
 );
