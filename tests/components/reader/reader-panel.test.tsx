@@ -240,7 +240,8 @@ describe("ReaderPanel", () => {
     expect(contentWrapper!.className).toContain("overflow-x-hidden");
   });
 
-  it("sticky nav bar is not inside the overflow-x-hidden content area", () => {
+  it("sticky nav bar (mobile) is not inside the overflow-x-hidden content area", () => {
+    mockIsDesktop = false;
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -256,7 +257,8 @@ describe("ReaderPanel", () => {
     expect(contentArea!.contains(navBar)).toBe(false);
   });
 
-  it("nav pills are rounded-full for floating appearance", () => {
+  it("nav pills are rounded-full for floating appearance (mobile)", () => {
+    mockIsDesktop = false;
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -268,7 +270,8 @@ describe("ReaderPanel", () => {
     expect(pill.className).toContain("rounded-full");
   });
 
-  it("nav pills bar has no border-t (floating, not a separator bar)", () => {
+  it("nav pills bar has no border-t (mobile floating, not a separator bar)", () => {
+    mockIsDesktop = false;
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -335,17 +338,34 @@ describe("ReaderPanel", () => {
     });
   });
 
-  describe("desktop navigation pills", () => {
+  describe("mobile navigation pills", () => {
     const nextArt = { ...mockArticle(), id: "a2", title: "Next Article" };
     const prevArt = { ...mockArticle(), id: "a0", title: "Prev Article" };
 
     beforeEach(() => {
-      mockIsDesktop = true;
+      // Pills are mobile-only. On desktop the user has the article list
+      // panel always visible plus j/k shortcuts — the pills are redundant
+      // and clutter the reader. Mobile keeps them as the primary nav
+      // affordance since the article list isn't on screen.
+      mockIsDesktop = false;
       useArticleStore.setState({
         selectedArticle: mockArticle(),
         articles: [],
         isLoading: false,
       });
+    });
+
+    it("does NOT render prev/next pills on desktop", () => {
+      mockIsDesktop = true;
+      render(
+        <ReaderPanel
+          nextArticle={nextArt}
+          prevArticle={prevArt}
+          onNavigate={vi.fn()}
+        />,
+      );
+      expect(screen.queryByTestId("next-pill")).toBeNull();
+      expect(screen.queryByTestId("prev-pill")).toBeNull();
     });
 
     it("shows next pill when nextArticle prop provided", () => {
@@ -368,20 +388,6 @@ describe("ReaderPanel", () => {
       render(<ReaderPanel />);
       expect(screen.queryByTestId("next-pill")).toBeNull();
       expect(screen.queryByTestId("prev-pill")).toBeNull();
-    });
-
-    it("next pill shows j kbd hint", () => {
-      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
-      const pill = screen.getByTestId("next-pill");
-      expect(pill.querySelector("kbd")).toBeTruthy();
-      expect(pill.querySelector("kbd")!.textContent).toBe("j");
-    });
-
-    it("prev pill shows k kbd hint", () => {
-      render(<ReaderPanel prevArticle={prevArt} onNavigate={vi.fn()} />);
-      const pill = screen.getByTestId("prev-pill");
-      expect(pill.querySelector("kbd")).toBeTruthy();
-      expect(pill.querySelector("kbd")!.textContent).toBe("k");
     });
 
     it("clicking next pill calls onNavigate with nextArticle", async () => {

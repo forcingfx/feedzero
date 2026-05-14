@@ -82,53 +82,53 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
     </div>
   );
 
-  // navPills depends only on props — safe to compute before early returns so
-  // the back button is always visible (even while the article is loading).
-  const navPills = onNavigate && (prevArticle || nextArticle || onBack) ? (
-    <div
-      data-testid="nav-pills-bar"
-      className="flex items-center gap-2 px-4 pb-4 pt-2 shrink-0"
-    >
-      {onBack && (
-        <Button
-          data-testid="back-pill"
-          variant="outline"
-          size="sm"
-          className="shrink-0 rounded-full h-8 px-3 gap-1 bg-background/95 backdrop-blur-sm shadow-md"
-          onClick={onBack}
-        >
-          <ChevronLeft className="size-3.5 shrink-0" />
-          {isDesktop && "Back"}
-        </Button>
-      )}
-      {prevArticle && (
-        <Button
-          data-testid="prev-pill"
-          variant="outline"
-          size="sm"
-          className="flex-1 min-w-0 flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm"
-          onClick={() => onNavigate(prevArticle)}
-        >
-          <ChevronLeft className="size-3.5 shrink-0" />
-          {isDesktop && <Kbd className="shrink-0">k</Kbd>}
-          <span className="truncate">{decodeEntities(prevArticle.title)}</span>
-        </Button>
-      )}
-      {nextArticle && (
-        <Button
-          data-testid="next-pill"
-          variant="outline"
-          size="sm"
-          className="flex-1 min-w-0 flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm"
-          onClick={() => onNavigate(nextArticle)}
-        >
-          <span className="truncate">{decodeEntities(nextArticle.title)}</span>
-          {isDesktop && <Kbd className="shrink-0">j</Kbd>}
-          <ChevronRight className="size-3.5 shrink-0" />
-        </Button>
-      )}
-    </div>
-  ) : null;
+  // Navigation pills (back / prev / next) are mobile-only. Desktop keeps
+  // the article list panel always visible plus j/k keyboard shortcuts —
+  // the pills would just clutter the reader. On mobile the reader takes
+  // the full screen, so the pills are the primary nav affordance.
+  const navPills =
+    !isDesktop && onNavigate && (prevArticle || nextArticle || onBack) ? (
+      <div
+        data-testid="nav-pills-bar"
+        className="flex items-center gap-2 px-4 pb-4 pt-2 shrink-0"
+      >
+        {onBack && (
+          <Button
+            data-testid="back-pill"
+            variant="outline"
+            size="sm"
+            className="shrink-0 rounded-full h-8 px-3 gap-1 bg-background/95 backdrop-blur-sm shadow-md"
+            onClick={onBack}
+          >
+            <ChevronLeft className="size-3.5 shrink-0" />
+          </Button>
+        )}
+        {prevArticle && (
+          <Button
+            data-testid="prev-pill"
+            variant="outline"
+            size="sm"
+            className="flex-1 min-w-0 flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm"
+            onClick={() => onNavigate(prevArticle)}
+          >
+            <ChevronLeft className="size-3.5 shrink-0" />
+            <span className="truncate">{decodeEntities(prevArticle.title)}</span>
+          </Button>
+        )}
+        {nextArticle && (
+          <Button
+            data-testid="next-pill"
+            variant="outline"
+            size="sm"
+            className="flex-1 min-w-0 flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm"
+            onClick={() => onNavigate(nextArticle)}
+          >
+            <span className="truncate">{decodeEntities(nextArticle.title)}</span>
+            <ChevronRight className="size-3.5 shrink-0" />
+          </Button>
+        )}
+      </div>
+    ) : null;
 
   // Wraps empty/loading states in the flex column so layout is stable and the
   // nav bar (including back button) is always visible when onNavigate is provided.
