@@ -496,27 +496,27 @@ describe("ArticleList", () => {
   });
 
   describe("article grouping (flood collapse)", () => {
-    it("collapses 4 same-feed articles within the window into one stacked group", () => {
-      // 4 articles from one feed, 1-minute apart → meets MIN_GROUP_SIZE=3
-      // and stays within WINDOW_MS=10min pairwise. With grouping ON, only
-      // the top card is exposed as role="option"; a "+3 more" chevron
-      // gives the user the expand affordance.
-      const now = 10_000_000;
-      const minute = 60_000;
-      const articles = [
-        { ...mockArticle("a1", "Latest", false, "f1"), publishedAt: now },
-        { ...mockArticle("a2", "Second", false, "f1"), publishedAt: now - 1 * minute },
-        { ...mockArticle("a3", "Third", false, "f1"), publishedAt: now - 2 * minute },
-        { ...mockArticle("a4", "Fourth", false, "f1"), publishedAt: now - 3 * minute },
-      ];
+    const now = 10_000_000;
+    const minute = 60_000;
+    /** 6 same-feed articles, each 1 minute apart. Meets MIN_GROUP_SIZE=5. */
+    const floodArticles = [
+      { ...mockArticle("a1", "Latest", false, "f1"), publishedAt: now },
+      { ...mockArticle("a2", "Second", false, "f1"), publishedAt: now - 1 * minute },
+      { ...mockArticle("a3", "Third", false, "f1"), publishedAt: now - 2 * minute },
+      { ...mockArticle("a4", "Fourth", false, "f1"), publishedAt: now - 3 * minute },
+      { ...mockArticle("a5", "Fifth", false, "f1"), publishedAt: now - 4 * minute },
+      { ...mockArticle("a6", "Sixth", false, "f1"), publishedAt: now - 5 * minute },
+    ];
+
+    it("does NOT group in a single-feed view, even with a 6-article flood", () => {
       useFeedStore.setState({
-        feeds: [],
+        feeds: [mockFeed("f1", "Feed One")],
         selectedFeedId: "f1",
         isLoading: false,
         error: null,
       });
       useArticleStore.setState({
-        articles,
+        articles: floodArticles,
         selectedArticle: null,
         isLoading: false,
       });
@@ -524,11 +524,88 @@ describe("ArticleList", () => {
 
       render(<ArticleList />);
 
-      // Only the top card surfaces as a role=option; the rest are inside
-      // the collapsed group until expanded.
+      // Per-feed view: grouping is intentionally disabled — the user
+      // has already chosen to focus on this feed.
+      expect(screen.getAllByRole("option")).toHaveLength(6);
+      expect(
+        screen.queryByRole("button", { name: /Show .* more/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("collapses a 6-article flood in /feeds/all (aggregated view) into one row + summary", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Aggregator")],
+        selectedFeedId: ALL_FEEDS_ID,
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles: floodArticles,
+        selectedArticle: null,
+        isLoading: false,
+      });
+      useAppStore.setState({ groupArticleFloods: true });
+
+      render(<ArticleList />);
+
+      // Aggregated view: only the top article is a role=option; the
+      // remaining 5 are hidden behind the summary row.
       expect(screen.getAllByRole("option")).toHaveLength(1);
       expect(screen.getByText("Latest")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Show 3 more/ })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Show 5 more.*Aggregator/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("does NOT group when the flood is below MIN_GROUP_SIZE (4 articles)", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Aggregator")],
+        selectedFeedId: ALL_FEEDS_ID,
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles: floodArticles.slice(0, 4),
+        selectedArticle: null,
+        isLoading: false,
+      });
+      useAppStore.setState({ groupArticleFloods: true });
+
+      render(<ArticleList />);
+      expect(screen.getAllByRole("option")).toHaveLength(4);
+      expect(
+        screen.queryByRole("button", { name: /Show .* more/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("clicking the summary row expands the group inline", async () => {
+      const user = userEvent.setup();
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Aggregator")],
+        selectedFeedId: ALL_FEEDS_ID,
+        isLoading: false,
+        error: null,
+      });
+      useArticleStore.setState({
+        articles: floodArticles,
+        selectedArticle: null,
+        isLoading: false,
+      });
+      useAppStore.setState({ groupArticleFloods: true });
+
+      render(<ArticleList />);
+      await user.click(
+        screen.getByRole("button", { name: /Show 5 more/ }),
+      );
+
+      // All 6 articles now appear as separate role=option rows.
+      expect(screen.getAllByRole("option")).toHaveLength(6);
+      expect(screen.getByText("Latest")).toBeInTheDocument();
+      expect(screen.getByText("Sixth")).toBeInTheDocument();
+      // The summary row now acts as the collapser.
+      expect(
+        screen.getByRole("button", { name: /Collapse/ }),
+      ).toBeInTheDocument();
     });
   });
 });

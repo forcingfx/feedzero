@@ -37,58 +37,66 @@ describe("groupArticles", () => {
     expect(result[0]).toEqual({ kind: "article", article: a });
   });
 
-  it("does NOT group 2 same-feed articles within the window (below MIN_GROUP_SIZE)", () => {
+  it("does NOT group 4 same-feed articles within the window (below MIN_GROUP_SIZE=5)", () => {
     const now = 1_000_000;
     const articles = [
       makeArticle({ id: "1", publishedAt: now }),
-      makeArticle({ id: "2", publishedAt: now - 5 * MIN }),
+      makeArticle({ id: "2", publishedAt: now - 1 * MIN }),
+      makeArticle({ id: "3", publishedAt: now - 2 * MIN }),
+      makeArticle({ id: "4", publishedAt: now - 3 * MIN }),
     ];
     const result = groupArticles(articles);
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(4);
     expect(result.every((e) => e.kind === "article")).toBe(true);
   });
 
-  it("groups 3 same-feed articles within the window into one ArticleGroup", () => {
+  it("groups 5 same-feed articles within the window into one ArticleGroup", () => {
     const now = 1_000_000;
     const articles = [
       makeArticle({ id: "1", publishedAt: now }),
-      makeArticle({ id: "2", publishedAt: now - 3 * MIN }),
-      makeArticle({ id: "3", publishedAt: now - 6 * MIN }),
+      makeArticle({ id: "2", publishedAt: now - 1 * MIN }),
+      makeArticle({ id: "3", publishedAt: now - 2 * MIN }),
+      makeArticle({ id: "4", publishedAt: now - 3 * MIN }),
+      makeArticle({ id: "5", publishedAt: now - 4 * MIN }),
     ];
     const result = groupArticles(articles);
     expect(result).toHaveLength(1);
     expect(result[0].kind).toBe("group");
     const group = result[0] as ArticleGroup;
-    expect(group.articles).toHaveLength(3);
+    expect(group.articles).toHaveLength(5);
     expect(group.feedId).toBe("feed-a");
   });
 
   it("keeps a long burst as ONE group when all pairwise gaps stay within window (>10min head→tail)", () => {
-    // 4 articles, each 8 minutes apart. Pairwise within window; head→tail is 24 minutes.
+    // 6 articles, each 8 minutes apart. Pairwise within window; head→tail is 40 minutes.
     const now = 10_000_000;
     const articles = [
       makeArticle({ id: "1", publishedAt: now }),
       makeArticle({ id: "2", publishedAt: now - 8 * MIN }),
       makeArticle({ id: "3", publishedAt: now - 16 * MIN }),
       makeArticle({ id: "4", publishedAt: now - 24 * MIN }),
+      makeArticle({ id: "5", publishedAt: now - 32 * MIN }),
+      makeArticle({ id: "6", publishedAt: now - 40 * MIN }),
     ];
     const result = groupArticles(articles);
     expect(result).toHaveLength(1);
-    expect((result[0] as ArticleGroup).articles).toHaveLength(4);
+    expect((result[0] as ArticleGroup).articles).toHaveLength(6);
   });
 
   it("breaks a run at an adjacent gap larger than WINDOW_MS", () => {
-    // Adjacent deltas: 5, 11, 5. The 11-minute gap breaks the run.
+    // 6 same-feed articles. The 11-minute gap between #3 and #4 breaks
+    // the run into two sub-runs, neither of which reaches MIN_GROUP_SIZE=5.
     const now = 10_000_000;
     const articles = [
       makeArticle({ id: "1", publishedAt: now }),
-      makeArticle({ id: "2", publishedAt: now - 5 * MIN }),
-      makeArticle({ id: "3", publishedAt: now - 16 * MIN }), // 11min gap from 2
-      makeArticle({ id: "4", publishedAt: now - 21 * MIN }),
+      makeArticle({ id: "2", publishedAt: now - 1 * MIN }),
+      makeArticle({ id: "3", publishedAt: now - 2 * MIN }),
+      makeArticle({ id: "4", publishedAt: now - 13 * MIN }), // 11min gap
+      makeArticle({ id: "5", publishedAt: now - 14 * MIN }),
+      makeArticle({ id: "6", publishedAt: now - 15 * MIN }),
     ];
     const result = groupArticles(articles);
-    // 1 + 2 below threshold; 3 + 4 below threshold → all 4 as singletons.
-    expect(result).toHaveLength(4);
+    expect(result).toHaveLength(6);
     expect(result.every((e) => e.kind === "article")).toBe(true);
   });
 
@@ -100,15 +108,17 @@ describe("groupArticles", () => {
       makeArticle({ id: "3", feedId: "feed-a", publishedAt: now - 2 * MIN }),
       makeArticle({ id: "4", feedId: "feed-a", publishedAt: now - 3 * MIN }),
       makeArticle({ id: "5", feedId: "feed-a", publishedAt: now - 4 * MIN }),
+      makeArticle({ id: "6", feedId: "feed-a", publishedAt: now - 5 * MIN }),
+      makeArticle({ id: "7", feedId: "feed-a", publishedAt: now - 6 * MIN }),
     ];
     const result = groupArticles(articles);
-    // 1 (feed-a singleton), 2 (feed-b singleton), then 3+4+5 as a group of 3.
+    // 1 (feed-a singleton), 2 (feed-b singleton), then 3-7 as a group of 5.
     expect(result).toHaveLength(3);
     expect(result[0]).toMatchObject({ kind: "article", article: { id: "1" } });
     expect(result[1]).toMatchObject({ kind: "article", article: { id: "2" } });
     expect(result[2].kind).toBe("group");
     const group = result[2] as ArticleGroup;
-    expect(group.articles.map((a) => a.id)).toEqual(["3", "4", "5"]);
+    expect(group.articles.map((a) => a.id)).toEqual(["3", "4", "5", "6", "7"]);
   });
 
   it("MIN_GROUP_SIZE override of 2 groups pairs", () => {
@@ -138,13 +148,17 @@ describe("groupArticles", () => {
   });
 
   it("never groups when either side has publishedAt <= 0 (bad-timestamp gate)", () => {
+    // 5+ articles so the count threshold is satisfied; the timestamp gate
+    // is what must prevent grouping here.
     const articles = [
       makeArticle({ id: "1", publishedAt: 0 }),
       makeArticle({ id: "2", publishedAt: 0 }),
       makeArticle({ id: "3", publishedAt: 0 }),
+      makeArticle({ id: "4", publishedAt: 0 }),
+      makeArticle({ id: "5", publishedAt: 0 }),
     ];
     const result = groupArticles(articles);
-    expect(result).toHaveLength(3);
+    expect(result).toHaveLength(5);
     expect(result.every((e) => e.kind === "article")).toBe(true);
   });
 
@@ -154,26 +168,32 @@ describe("groupArticles", () => {
       makeArticle({ id: "1", publishedAt: now }),
       makeArticle({ id: "2", publishedAt: now - MIN }),
       makeArticle({ id: "3", publishedAt: now - 2 * MIN }),
+      makeArticle({ id: "4", publishedAt: now - 3 * MIN }),
+      makeArticle({ id: "5", publishedAt: now - 4 * MIN }),
     ];
     const r1 = groupArticles(articles)[0] as ArticleGroup;
     const r2 = groupArticles(articles)[0] as ArticleGroup;
     expect(r1.id).toBe(r2.id);
     // Sanity: the id encodes feedId, head id, and length
-    expect(r1.id).toBe("g:feed-a:1:3");
+    expect(r1.id).toBe("g:feed-a:1:5");
   });
 
   it("preserves publishedAt-desc order inside the group", () => {
     const now = 1_000_000;
     const articles = [
       makeArticle({ id: "newest", publishedAt: now }),
-      makeArticle({ id: "middle", publishedAt: now - MIN }),
-      makeArticle({ id: "oldest", publishedAt: now - 2 * MIN }),
+      makeArticle({ id: "two", publishedAt: now - MIN }),
+      makeArticle({ id: "three", publishedAt: now - 2 * MIN }),
+      makeArticle({ id: "four", publishedAt: now - 3 * MIN }),
+      makeArticle({ id: "oldest", publishedAt: now - 4 * MIN }),
     ];
     const result = groupArticles(articles);
     const group = result[0] as ArticleGroup;
     expect(group.articles.map((a) => a.id)).toEqual([
       "newest",
-      "middle",
+      "two",
+      "three",
+      "four",
       "oldest",
     ]);
   });
