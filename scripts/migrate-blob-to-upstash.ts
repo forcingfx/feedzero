@@ -39,11 +39,16 @@ import {
   type UpstashSetClient,
 } from "../src/core/sync/migration/blob-to-upstash.ts";
 
-function parseArgs(): { execute: boolean; deleteBlob: boolean } {
+function parseArgs(): {
+  execute: boolean;
+  deleteBlob: boolean;
+  skipExisting: boolean;
+} {
   const args = process.argv.slice(2);
   return {
     execute: args.includes("--execute"),
     deleteBlob: args.includes("--delete-blob"),
+    skipExisting: args.includes("--skip-existing"),
   };
 }
 
@@ -61,7 +66,7 @@ function resolveUpstashCreds(): { url: string; token: string } {
 }
 
 async function main(): Promise<void> {
-  const { execute, deleteBlob } = parseArgs();
+  const { execute, deleteBlob, skipExisting } = parseArgs();
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error(
@@ -117,24 +122,30 @@ async function main(): Promise<void> {
     async set(key, value) {
       return upstash.set(key, value);
     },
+    async get(key) {
+      const value = await upstash.get<string>(key);
+      return value ?? null;
+    },
   };
 
   // Top-of-run banner so the operator knows what mode is active. Dry-run
   // mode is the cheap-to-trust default; execute is loud.
+  const skipNote = skipExisting ? " (--skip-existing: leaves fresh Upstash data intact)" : "";
   if (!execute) {
-    console.log("[migrate] DRY-RUN — no writes. Pass --execute to actually migrate.");
+    console.log(`[migrate] DRY-RUN — no writes. Pass --execute to actually migrate.${skipNote}`);
   } else if (deleteBlob) {
-    console.log("[migrate] EXECUTE + DELETE-BLOB — writes to Upstash, deletes Blob originals after each success.");
+    console.log(`[migrate] EXECUTE + DELETE-BLOB — writes to Upstash, deletes Blob originals after each success.${skipNote}`);
   } else {
-    console.log("[migrate] EXECUTE — writes to Upstash, leaves Blob originals in place.");
+    console.log(`[migrate] EXECUTE — writes to Upstash, leaves Blob originals in place.${skipNote}`);
   }
 
   const start = Date.now();
   const result = await migrateBlobVaultsToUpstash(blobClient, upstashClient, {
     execute,
     deleteBlob,
+    skipExisting,
     onProgress: (event) => {
-      const label = event.action.toUpperCase().padEnd(10);
+      const label = event.action.toUpperCase().padEnd(18);
       const msg = event.error ? ` — ${event.error}` : "";
       console.log(`[migrate] ${label} vault:${event.vaultId.slice(0, 12)}…${msg}`);
     },
@@ -143,11 +154,12 @@ async function main(): Promise<void> {
 
   console.log("");
   console.log("[migrate] === Summary ===");
-  console.log(`[migrate]   found:    ${result.found}`);
-  console.log(`[migrate]   skipped:  ${result.skipped} (non-vault files under vaults/)`);
-  console.log(`[migrate]   migrated: ${result.migrated}`);
-  console.log(`[migrate]   deleted:  ${result.deleted}`);
-  console.log(`[migrate]   failed:   ${result.failed.length}`);
+  console.log(`[migrate]   found:           ${result.found}`);
+  console.log(`[migrate]   skipped:         ${result.skipped} (non-vault files under vaults/)`);
+  console.log(`[migrate]   skippedExisting: ${result.skippedExisting} (already in Upstash; --skip-existing)`);
+  console.log(`[migrate]   migrated:        ${result.migrated}`);
+  console.log(`[migrate]   deleted:         ${result.deleted}`);
+  console.log(`[migrate]   failed:          ${result.failed.length}`);
   if (result.failed.length > 0) {
     for (const failure of result.failed) {
       console.log(`[migrate]     - vault:${failure.vaultId.slice(0, 12)}… — ${failure.error}`);

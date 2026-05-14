@@ -272,6 +272,98 @@ describe("migrateBlobVaultsToUpstash", () => {
     });
   });
 
+  describe("skip-if-present (idempotent, post-hoc safety)", () => {
+    // After the first migration run we discovered that ~4 vaults existed
+    // in BOTH Blob and Upstash (users who had pre-#45 vaults AND re-pushed
+    // to Upstash after #45). The naive script overwrote the Upstash entry
+    // with the older Blob copy — a small data-staleness window until the
+    // client re-pushed. This option closes that window: skip if the
+    // Upstash key already exists.
+
+    function fakeUpstashWithGet(
+      existing: Record<string, string> = {},
+    ): UpstashSetClient & {
+      store: Map<string, string>;
+      get(key: string): Promise<string | null>;
+    } {
+      const store = new Map(Object.entries(existing));
+      return {
+        store,
+        async get(key: string) {
+          return store.has(key) ? (store.get(key) as string) : null;
+        },
+        async set(key, value) {
+          store.set(key, String(value));
+          return "OK";
+        },
+      };
+    }
+
+    it("skips vaults already present in Upstash when skipExisting:true", async () => {
+      const blob = fakeBlobClient(
+        [
+          { pathname: `vaults/${VAULT_ID_A}.json`, url: "https://blob/a", size: 100 },
+          { pathname: `vaults/${VAULT_ID_B}.json`, url: "https://blob/b", size: 100 },
+        ],
+        { "https://blob/a": SAMPLE_PAYLOAD_A, "https://blob/b": SAMPLE_PAYLOAD_B },
+      );
+      const upstash = fakeUpstashWithGet({
+        [`vault:${VAULT_ID_A}`]: "FRESH_FROM_UPSTASH_DO_NOT_OVERWRITE",
+      });
+
+      const result = await migrateBlobVaultsToUpstash(blob, upstash, {
+        execute: true,
+        skipExisting: true,
+      });
+
+      expect(result.found).toBe(2);
+      expect(result.migrated).toBe(1); // only VAULT_ID_B
+      expect(result.skippedExisting).toBe(1); // VAULT_ID_A
+      // The fresh Upstash value must be intact.
+      expect(upstash.store.get(`vault:${VAULT_ID_A}`)).toBe(
+        "FRESH_FROM_UPSTASH_DO_NOT_OVERWRITE",
+      );
+      expect(upstash.store.get(`vault:${VAULT_ID_B}`)).toBe(SAMPLE_PAYLOAD_B);
+    });
+
+    it("default (skipExisting:false) preserves the prior overwrite behavior", async () => {
+      // Old behavior: overwrite. Kept as default for backward compat with
+      // the (already-run) initial migration; new runs should opt in.
+      const blob = fakeBlobClient(
+        [{ pathname: `vaults/${VAULT_ID_A}.json`, url: "https://blob/a", size: 100 }],
+        { "https://blob/a": SAMPLE_PAYLOAD_A },
+      );
+      const upstash = fakeUpstashWithGet({
+        [`vault:${VAULT_ID_A}`]: "fresh",
+      });
+      await migrateBlobVaultsToUpstash(blob, upstash, { execute: true });
+      // Overwrote with Blob copy.
+      expect(upstash.store.get(`vault:${VAULT_ID_A}`)).toBe(SAMPLE_PAYLOAD_A);
+    });
+
+    it("skipExisting also prevents deleting the Blob original (we'd be deleting a backup)", async () => {
+      // If we skip the Upstash write because Upstash already has a fresher
+      // copy, the Blob copy is the OLDER one — and we shouldn't delete it
+      // (it's not authoritative, but it's still a backup). Delete only
+      // fires after a successful WRITE this run.
+      const blob = fakeBlobClient(
+        [{ pathname: `vaults/${VAULT_ID_A}.json`, url: "https://blob/a", size: 100 }],
+        { "https://blob/a": SAMPLE_PAYLOAD_A },
+      );
+      const upstash = fakeUpstashWithGet({
+        [`vault:${VAULT_ID_A}`]: "fresh",
+      });
+      const result = await migrateBlobVaultsToUpstash(blob, upstash, {
+        execute: true,
+        skipExisting: true,
+        deleteBlob: true,
+      });
+      expect(result.skippedExisting).toBe(1);
+      expect(result.deleted).toBe(0);
+      expect(blob.deleted).toEqual([]);
+    });
+  });
+
   describe("pagination", () => {
     it("iterates Blob's paginated list until hasMore is false", async () => {
       // Production Vercel Blob returns ~1000 per page. The migration must

@@ -71,6 +71,14 @@ export interface BlobListClient {
  */
 export interface UpstashSetClient {
   set(key: string, value: unknown): Promise<unknown>;
+  /**
+   * Required only when `skipExisting: true`. Returns the current value
+   * at the key, or `null` if absent. The migration uses this to detect
+   * post-#45 re-pushes that shouldn't be overwritten by the older Blob
+   * copy. Optional on the type so callers that never use skipExisting
+   * can pass a `set`-only client; runtime guards check before calling.
+   */
+  get?(key: string): Promise<string | null>;
 }
 
 export interface MigrateOptions {
@@ -79,10 +87,18 @@ export interface MigrateOptions {
   /** When true AND execute, deletes the Blob original after a successful
    *  Upstash write. Has no effect in dry-run. */
   deleteBlob?: boolean;
+  /**
+   * When true AND execute, skip any vault whose key already exists in
+   * Upstash. Default false (overwrite behavior matches the initial
+   * migration run). Use this on subsequent runs to avoid clobbering
+   * post-#45 client re-pushes with the older Blob copy. Requires the
+   * upstash client to expose `get`.
+   */
+  skipExisting?: boolean;
   /** Optional callback for per-vault progress logging. */
   onProgress?: (event: {
     vaultId: string;
-    action: "migrated" | "deleted" | "skipped" | "failed";
+    action: "migrated" | "deleted" | "skipped" | "skippedExisting" | "failed";
     error?: string;
   }) => void;
 }
@@ -94,6 +110,8 @@ export interface MigrateResult {
   skipped: number;
   /** Successfully written to Upstash. Always 0 in dry-run. */
   migrated: number;
+  /** Vaults skipped because they already exist in Upstash (skipExisting). */
+  skippedExisting: number;
   /** Successfully deleted from Blob after Upstash write. Requires
    *  execute=true AND deleteBlob=true. */
   deleted: number;
@@ -109,12 +127,14 @@ export async function migrateBlobVaultsToUpstash(
 ): Promise<MigrateResult> {
   const execute = options.execute ?? false;
   const deleteBlob = (options.deleteBlob ?? false) && execute;
+  const skipExisting = (options.skipExisting ?? false) && execute;
   const onProgress = options.onProgress ?? (() => {});
 
   const result: MigrateResult = {
     found: 0,
     skipped: 0,
     migrated: 0,
+    skippedExisting: 0,
     deleted: 0,
     failed: [],
   };
@@ -138,6 +158,17 @@ export async function migrateBlobVaultsToUpstash(
       if (!execute) {
         // Dry-run: we'd migrate this, but write nothing.
         continue;
+      }
+
+      // Skip-if-present check. Runs before the Blob read so we don't
+      // waste an HTTP round-trip on data we're not going to write.
+      if (skipExisting && upstash.get) {
+        const existing = await upstash.get(VAULT_KEY_PREFIX + vaultId);
+        if (existing !== null) {
+          result.skippedExisting += 1;
+          onProgress({ vaultId, action: "skippedExisting" });
+          continue;
+        }
       }
 
       // Read → write → (optional) delete. Any step's failure is
