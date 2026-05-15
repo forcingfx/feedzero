@@ -13,6 +13,11 @@ import {
   handleLicenseRetrieveRequest,
   type SessionRetriever,
 } from "./src/core/license/retrieve-handler";
+import {
+  handlePortalRequest,
+  type PortalClient,
+  type PortalSessionRetriever,
+} from "./src/core/stripe/portal-handler";
 import { handleCreateCheckoutSession } from "./src/core/stripe/checkout-handler";
 import { resolveAllowedPrices } from "./src/core/stripe/allowed-prices";
 import type { SeenEventStore } from "./src/core/stripe/seen-event-store";
@@ -56,6 +61,13 @@ export interface LicenseDeps {
    * don't construct it on startup.
    */
   sessions?: SessionRetriever;
+  /**
+   * Optional Stripe Customer Portal session creator for `/api/billing/portal`.
+   * Tests pass a fake; production lazy-constructs via the Stripe SDK.
+   */
+  portal?: PortalClient;
+  /** Optional override for the portal handler's session retriever. */
+  portalSessions?: PortalSessionRetriever;
 }
 
 function buildLicenseDeps(): LicenseDeps {
@@ -241,6 +253,34 @@ export function createApp(
       },
       storage: license.storage,
       signingKey: license.signingKey,
+      nowSec: license.nowSec,
+    }),
+  );
+
+  app.post("/api/billing/portal", (c) =>
+    handlePortalRequest(c.req.raw, {
+      portal: license.portal ?? {
+        create: async (params) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.billingPortal.sessions.create(params);
+          return { url: session.url };
+        },
+      },
+      sessions: license.portalSessions ?? {
+        retrieve: async (sessionId: string) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.checkout.sessions.retrieve(sessionId);
+          const customer =
+            typeof session.customer === "string"
+              ? session.customer
+              : session.customer?.id ?? null;
+          return { customer };
+        },
+      },
+      signingKey: license.signingKey,
+      storage: license.storage,
       nowSec: license.nowSec,
     }),
   );

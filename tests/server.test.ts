@@ -9,6 +9,7 @@ import { SUPPORTED_METHODS as STRIPE_SUPPORTED_METHODS } from "../src/core/strip
 import { SUPPORTED_METHODS as LICENSE_VERIFY_SUPPORTED_METHODS } from "../src/core/license/verify-handler";
 import { SUPPORTED_METHODS as LICENSE_ISSUE_SUPPORTED_METHODS } from "../src/core/license/issue-handler";
 import { SUPPORTED_METHODS as LICENSE_RETRIEVE_SUPPORTED_METHODS } from "../src/core/license/retrieve-handler";
+import { SUPPORTED_METHODS as PORTAL_SUPPORTED_METHODS } from "../src/core/stripe/portal-handler";
 import { SUPPORTED_METHODS as CHECKOUT_SUPPORTED_METHODS } from "../src/core/stripe/checkout-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
@@ -27,6 +28,7 @@ const vercelLicenseVerifyExports = vercelLicenseDynamicExports;
 const vercelLicenseIssueExports = vercelLicenseDynamicExports;
 const vercelLicenseRetrieveExports = vercelLicenseDynamicExports;
 import * as vercelCheckoutExports from "../api/checkout/create-session";
+import * as vercelPortalExports from "../api/billing/portal";
 import { signLicense, type SigningKey } from "../src/core/license/sign";
 import { MemoryLicenseStorage } from "../src/core/license/storage";
 import type { LicensePayload } from "../src/core/license/format";
@@ -1002,6 +1004,61 @@ describe("server", () => {
         body: JSON.stringify({ sessionId: "cs_test_abc123" }),
       });
       expect(res.status).toBe(202);
+    });
+  });
+
+  describe("billing portal routing contract", () => {
+    it("PORTAL_SUPPORTED_METHODS lists POST", () => {
+      expect(PORTAL_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/billing/portal.ts exports a handler for every supported method", () => {
+      for (const method of PORTAL_SUPPORTED_METHODS) {
+        expect(
+          vercelPortalExports,
+          `api/billing/portal.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelPortalExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/billing/portal.ts does not export unsupported methods", () => {
+      const allHttpMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+      const unsupported = allHttpMethods.filter(
+        (m) => !PORTAL_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelPortalExports,
+          `api/billing/portal.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts POST /api/billing/portal", async () => {
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey: { secret: "this-is-a-test-signing-secret-32-bytes!" },
+        storage: new MemoryLicenseStorage(),
+        portalSessions: {
+          retrieve: async () => ({ customer: "cus_test_portal" }),
+        },
+        portal: {
+          create: async () => ({ url: "https://billing.stripe.com/p/session_test" }),
+        },
+      });
+      const res = await app.request("/api/billing/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "cs_test_abc123",
+          returnUrl: "https://my.feedzero.app/settings",
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.url).toMatch(/billing\.stripe\.com/);
     });
   });
 

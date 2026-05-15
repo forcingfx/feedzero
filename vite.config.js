@@ -244,6 +244,39 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
+      server.middlewares.use("/api/billing/portal", async (req, res) => {
+        const { licenseStorage } = await ensureLicenseDeps();
+        const { handlePortalRequest } = await import(
+          "./src/core/stripe/portal-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handlePortalRequest(webReq, {
+          portal: {
+            create: async (params) => {
+              const { default: Stripe } = await import("stripe");
+              const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+              const session = await stripe.billingPortal.sessions.create(params);
+              return { url: session.url };
+            },
+          },
+          sessions: {
+            retrieve: async (sessionId) => {
+              const { default: Stripe } = await import("stripe");
+              const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+              const session = await stripe.checkout.sessions.retrieve(sessionId);
+              const customer =
+                typeof session.customer === "string"
+                  ? session.customer
+                  : session.customer?.id ?? null;
+              return { customer };
+            },
+          },
+          signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+          storage: licenseStorage,
+        });
+        await sendWebResponse(webRes, res);
+      });
+
       server.middlewares.use("/api/checkout/create-session", async (req, res) => {
         const [
           { handleCreateCheckoutSession },
