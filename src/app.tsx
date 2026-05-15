@@ -12,6 +12,7 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { BillingSuccess } from "@/pages/billing-success.tsx";
 import { BillingCancelled } from "@/pages/billing-cancelled.tsx";
+import { SubscribeDeeplink } from "@/components/billing/subscribe-deeplink.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
 function AppInit({ children }: { children: React.ReactNode }) {
@@ -121,7 +122,20 @@ function AppInit({ children }: { children: React.ReactNode }) {
     return <div className="p-4 text-muted-foreground">Loading…</div>;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <SubscribeDeeplink
+        paidTierVisible={import.meta.env.VITE_PAID_TIER_VISIBLE === "1"}
+        priceIds={{
+          personalMonthly:
+            import.meta.env.VITE_PRICE_PERSONAL_MONTHLY ?? "",
+          personalYearly:
+            import.meta.env.VITE_PRICE_PERSONAL_YEARLY ?? "",
+        }}
+      />
+      {children}
+    </>
+  );
 }
 
 export function App() {
