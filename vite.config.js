@@ -244,7 +244,7 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
-      server.middlewares.use("/api/billing/portal", async (req, res) => {
+      server.middlewares.use("/api/license/portal", async (req, res) => {
         const { licenseStorage } = await ensureLicenseDeps();
         const { handlePortalRequest } = await import(
           "./src/core/stripe/portal-handler.ts"

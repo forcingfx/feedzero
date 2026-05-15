@@ -1,6 +1,7 @@
 import { handleLicenseVerifyRequest } from "../../src/core/license/verify-handler";
 import { handleLicenseIssueRequest } from "../../src/core/license/issue-handler";
 import { handleLicenseRetrieveRequest } from "../../src/core/license/retrieve-handler";
+import { handlePortalRequest } from "../../src/core/stripe/portal-handler";
 import { LicenseIssuerImpl } from "../../src/core/license/issuer";
 import { resolveLicenseStorage } from "../../src/core/license/resolve-storage";
 import { isFlagEnabled } from "../../src/core/flags/flags";
@@ -17,11 +18,15 @@ const issuerPromise = storagePromise.then(
 );
 
 /**
- * Vercel dynamic route catching /api/license/{verify,issue,retrieve}.
- * Consolidated into one function (instead of three separate files) so we
- * stay under the Hobby plan's 12-function-per-deployment ceiling. Each
- * branch delegates to the existing shared handler — same logic, same tests,
- * same behavior; only the file boundary changed.
+ * Vercel dynamic route catching /api/license/{verify,issue,retrieve,portal}.
+ * Consolidated into one function (instead of four separate files) so we stay
+ * under the Hobby plan's 12-function-per-deployment ceiling. Each branch
+ * delegates to the existing shared handler — same logic, same tests, same
+ * behavior; only the file boundary changed.
+ *
+ * `portal` is co-located here for hosting-boundary reasons, not semantic
+ * ones: Stripe Customer Portal sessions are billing operations, but
+ * keeping them under /api/license/* keeps the function count tight.
  */
 export async function POST(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -61,6 +66,34 @@ export async function POST(req: Request): Promise<Response> {
       },
       storage,
       signingKey: { secret: signingSecret },
+    });
+  }
+
+  if (action === "portal") {
+    const storage = await storagePromise;
+    return handlePortalRequest(req, {
+      sessions: {
+        retrieve: async (sessionId: string) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.checkout.sessions.retrieve(sessionId);
+          const customer =
+            typeof session.customer === "string"
+              ? session.customer
+              : session.customer?.id ?? null;
+          return { customer };
+        },
+      },
+      portal: {
+        create: async (params) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.billingPortal.sessions.create(params);
+          return { url: session.url };
+        },
+      },
+      signingKey: { secret: signingSecret },
+      storage,
     });
   }
 

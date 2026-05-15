@@ -47,7 +47,7 @@ export function BillingSuccess() {
     setPortalBusy(true);
     setPortalError(null);
     try {
-      const res = await fetch("/api/billing/portal", {
+      const res = await fetch("/api/license/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -224,11 +224,11 @@ describe("BillingSuccess page", () => {
       vi.restoreAllMocks();
     });
 
-    it("POSTs to /api/billing/portal with sessionId + returnUrl and redirects to the URL", async () => {
+    it("POSTs to /api/license/portal with sessionId + returnUrl and redirects to the URL", async () => {
       const fetchMock = vi.fn(
         async (input: RequestInfo | URL, _init?: RequestInit) => {
           const url = typeof input === "string" ? input : input.toString();
-          if (url.includes("/api/billing/portal")) {
+          if (url.includes("/api/license/portal")) {
             return new Response(
               JSON.stringify({
                 ok: true,
@@ -266,7 +266,7 @@ describe("BillingSuccess page", () => {
 
         await waitFor(() => {
           const portalCall = fetchMock.mock.calls.find((c) =>
-            c[0].toString().includes("/api/billing/portal"),
+            c[0].toString().includes("/api/license/portal"),
           );
           expect(portalCall).toBeDefined();
         });
@@ -275,7 +275,7 @@ describe("BillingSuccess page", () => {
           [RequestInfo | URL, RequestInit?]
         >;
         const portalCall = portalCalls.find((c) =>
-          c[0].toString().includes("/api/billing/portal"),
+          c[0].toString().includes("/api/license/portal"),
         )!;
         const body = JSON.parse(portalCall[1]?.body as string);
         expect(body.sessionId).toBe("cs_test_xyz");

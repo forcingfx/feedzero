@@ -28,7 +28,10 @@ const vercelLicenseVerifyExports = vercelLicenseDynamicExports;
 const vercelLicenseIssueExports = vercelLicenseDynamicExports;
 const vercelLicenseRetrieveExports = vercelLicenseDynamicExports;
 import * as vercelCheckoutExports from "../api/checkout/create-session";
-import * as vercelPortalExports from "../api/billing/portal";
+// /api/license/portal is served by the same dynamic-route file as verify,
+// issue, retrieve — consolidated to stay under the Hobby plan's 12-function
+// ceiling. Alias for parity with the other contract tests.
+const vercelPortalExports = vercelLicenseDynamicExports;
 import { signLicense, type SigningKey } from "../src/core/license/sign";
 import { MemoryLicenseStorage } from "../src/core/license/storage";
 import type { LicensePayload } from "../src/core/license/format";
@@ -1007,16 +1010,16 @@ describe("server", () => {
     });
   });
 
-  describe("billing portal routing contract", () => {
+  describe("billing portal routing contract (now at /api/license/portal)", () => {
     it("PORTAL_SUPPORTED_METHODS lists POST", () => {
       expect(PORTAL_SUPPORTED_METHODS).toContain("POST");
     });
 
-    it("Vercel api/billing/portal.ts exports a handler for every supported method", () => {
+    it("Vercel api/license/[action].ts exports POST (portal is one of the dispatched actions)", () => {
       for (const method of PORTAL_SUPPORTED_METHODS) {
         expect(
           vercelPortalExports,
-          `api/billing/portal.ts is missing export for ${method}`,
+          `api/license/[action].ts is missing export for ${method}`,
         ).toHaveProperty(method);
         expect(
           typeof (vercelPortalExports as Record<string, unknown>)[method],
@@ -1024,20 +1027,7 @@ describe("server", () => {
       }
     });
 
-    it("Vercel api/billing/portal.ts does not export unsupported methods", () => {
-      const allHttpMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
-      const unsupported = allHttpMethods.filter(
-        (m) => !PORTAL_SUPPORTED_METHODS.includes(m),
-      );
-      for (const method of unsupported) {
-        expect(
-          vercelPortalExports,
-          `api/billing/portal.ts should not export ${method}`,
-        ).not.toHaveProperty(method);
-      }
-    });
-
-    it("Hono server accepts POST /api/billing/portal", async () => {
+    it("Hono server accepts POST /api/license/portal", async () => {
       const app = createApp(undefined, undefined, undefined, {
         signingKey: { secret: "this-is-a-test-signing-secret-32-bytes!" },
         storage: new MemoryLicenseStorage(),
@@ -1048,7 +1038,7 @@ describe("server", () => {
           create: async () => ({ url: "https://billing.stripe.com/p/session_test" }),
         },
       });
-      const res = await app.request("/api/billing/portal", {
+      const res = await app.request("/api/license/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1059,6 +1049,16 @@ describe("server", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.url).toMatch(/billing\.stripe\.com/);
+    });
+
+    it("Hono server returns 404 for the OLD /api/billing/portal URL (route removed)", async () => {
+      const app = createApp();
+      const res = await app.request("/api/billing/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "cs_test_xyz", returnUrl: "https://x" }),
+      });
+      expect(res.status).toBe(404);
     });
   });
 
@@ -1335,15 +1335,16 @@ describe("server", () => {
       expect(src).toMatch(/resolveLicenseStorage/);
     });
 
-    it("api/license/[action].ts dispatches 'verify', 'issue', and 'retrieve' actions", () => {
+    it("api/license/[action].ts dispatches 'verify', 'issue', 'retrieve', and 'portal' actions", () => {
       const src = fs.readFileSync("api/license/[action].ts", "utf8");
       // Source must reference every action name so a regression that drops
       // one branch is caught even if test traffic only exercises the others.
       expect(src).toMatch(/['"`]verify['"`]/);
       expect(src).toMatch(/['"`]issue['"`]/);
       expect(src).toMatch(/['"`]retrieve['"`]/);
-      // And it must import the retrieve handler (not just match the string).
+      expect(src).toMatch(/['"`]portal['"`]/);
       expect(src).toMatch(/handleLicenseRetrieveRequest/);
+      expect(src).toMatch(/handlePortalRequest/);
     });
 
     it("api/sync.ts wires LAUNCH_PAID_TIER gate (PR W)", () => {

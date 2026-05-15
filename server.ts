@@ -257,7 +257,7 @@ export function createApp(
     }),
   );
 
-  app.post("/api/billing/portal", (c) =>
+  app.post("/api/license/portal", (c) =>
     handlePortalRequest(c.req.raw, {
       portal: license.portal ?? {
         create: async (params) => {
