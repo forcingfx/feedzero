@@ -101,6 +101,15 @@ Feature: Zero-knowledge cloud sync
     Given any sync operation
     Then the server only stores/retrieves opaque encrypted blobs
     And vault IDs are derived from the passphrase (not the data)
+
+  Scenario: Restore from cloud after stale local state
+    Given a sync-enabled user whose local state has drifted from the cloud
+    When they click "Restore from cloud" in the Data & Storage dialog
+    And confirm the replace
+    Then the cloud vault is pulled and imported into local storage
+    And the feed and article stores refresh in place
+    And a toast reports "Restored N feeds from cloud."
+    And the dialog closes
 ```
 
 ## Architecture
@@ -167,7 +176,7 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 | `src/core/sync/adapters/filesystem-adapter.ts` | Filesystem storage adapter |
 | `src/core/sync/adapters/vercel-blob-adapter.ts` | Vercel Blob storage adapter |
 | `src/core/sync/adapters/resolve-adapter.ts` | Reads `SYNC_STORAGE` env var, returns adapter |
-| `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce + 0-30s jitter), `logout`, `switchToExistingCloud`. Stores `credentials: SyncCredentials | null` (not raw passphrase). |
+| `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `forceResync` (user-initiated "replace local with cloud"), `scheduleSyncPush` (5s debounce + 0-30s jitter), `logout`, `switchToExistingCloud`. Stores `credentials: SyncCredentials | null` (not raw passphrase). |
 | `server.ts` | Hono standalone server |
 | `api/sync.ts` | Vercel serverless wrapper (pre-bundled during build, ADR 007) |
 

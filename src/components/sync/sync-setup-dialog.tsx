@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   LogOut,
   KeyRound,
+  DownloadCloud,
 } from "lucide-react";
 import {
   Dialog,
@@ -31,7 +32,8 @@ type DialogView =
   | "existing"
   | "confirm-delete"
   | "confirm-disable"
-  | "confirm-logout";
+  | "confirm-logout"
+  | "confirm-restore";
 
 interface ConfirmationViewProps {
   open: boolean;
@@ -111,6 +113,7 @@ export function SyncSetupDialog() {
   const enableSync = useSyncStore((s) => s.enableSync);
   const disableSync = useSyncStore((s) => s.disableSync);
   const logout = useSyncStore((s) => s.logout);
+  const forceResync = useSyncStore((s) => s.forceResync);
   const switchToExistingCloud = useSyncStore((s) => s.switchToExistingCloud);
   const resetApp = useAppStore((s) => s.resetApp);
   const localFeedCount = useFeedStore((s) => s.feeds.length);
@@ -122,6 +125,7 @@ export function SyncSetupDialog() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDisabling, setIsDisabling] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -130,6 +134,7 @@ export function SyncSetupDialog() {
       setIsDeleting(false);
       setIsDisabling(false);
       setIsLoggingOut(false);
+      setIsRestoring(false);
     }
   }, [open]);
 
@@ -161,6 +166,19 @@ export function SyncSetupDialog() {
     setIsLoggingOut(true);
     await logout();
     handleOpenChange(false);
+  }
+
+  async function handleRestore() {
+    setIsRestoring(true);
+    const result = await forceResync();
+    setIsRestoring(false);
+    if (result.ok) {
+      toast(`Restored ${result.value.feedCount} feeds from cloud.`);
+      handleOpenChange(false);
+    } else {
+      toast.error(`Restore failed: ${result.error}`);
+      setView("status");
+    }
   }
 
   const getStatusDescription = () => {
@@ -245,6 +263,28 @@ export function SyncSetupDialog() {
     );
   }
 
+  if (view === "confirm-restore") {
+    return (
+      <ConfirmationView
+        open={open}
+        onOpenChange={handleOpenChange}
+        icon={
+          <div className="flex size-12 items-center justify-center rounded-full bg-blue-100">
+            <DownloadCloud className="size-6 text-blue-600" />
+          </div>
+        }
+        title="Restore from cloud?"
+        description="This will replace your local feeds and articles with what's stored in the cloud. Use this if a device shows the wrong feed list after sync."
+        confirmLabel="Restore"
+        loadingLabel="Restoring..."
+        confirmIcon={<DownloadCloud className="mr-2 size-4" />}
+        isLoading={isRestoring}
+        onConfirm={handleRestore}
+        onCancel={() => setView("status")}
+      />
+    );
+  }
+
   if (view === "confirm-logout") {
     return (
       <ConfirmationView
@@ -308,6 +348,15 @@ export function SyncSetupDialog() {
             >
               <CloudOff className="mr-2 size-4" />
               Switch to local only
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setView("confirm-restore")}
+              disabled={status === "syncing"}
+            >
+              <DownloadCloud className="mr-2 size-4" />
+              Restore from cloud
             </Button>
             <Button
               variant="outline"
