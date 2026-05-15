@@ -219,6 +219,31 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
+      server.middlewares.use("/api/license/retrieve", async (req, res) => {
+        const { licenseStorage } = await ensureLicenseDeps();
+        const { handleLicenseRetrieveRequest } = await import(
+          "./src/core/license/retrieve-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handleLicenseRetrieveRequest(webReq, {
+          sessions: {
+            retrieve: async (sessionId) => {
+              const { default: Stripe } = await import("stripe");
+              const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+              const session = await stripe.checkout.sessions.retrieve(sessionId);
+              const customer =
+                typeof session.customer === "string"
+                  ? session.customer
+                  : session.customer?.id ?? null;
+              return { customer };
+            },
+          },
+          storage: licenseStorage,
+          signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+        });
+        await sendWebResponse(webRes, res);
+      });
+
       server.middlewares.use("/api/checkout/create-session", async (req, res) => {
         const [
           { handleCreateCheckoutSession },

@@ -9,6 +9,10 @@ import { handleHealthRequest } from "./src/core/health/health-handler";
 import { handleStripeWebhook } from "./src/core/stripe/webhook-handler";
 import { handleLicenseVerifyRequest } from "./src/core/license/verify-handler";
 import { handleLicenseIssueRequest } from "./src/core/license/issue-handler";
+import {
+  handleLicenseRetrieveRequest,
+  type SessionRetriever,
+} from "./src/core/license/retrieve-handler";
 import { handleCreateCheckoutSession } from "./src/core/stripe/checkout-handler";
 import { resolveAllowedPrices } from "./src/core/stripe/allowed-prices";
 import type { SeenEventStore } from "./src/core/stripe/seen-event-store";
@@ -46,6 +50,12 @@ export interface LicenseDeps {
    * MemorySeenEventStore; production wires Upstash via resolveSeenEventStore.
    */
   eventStore?: SeenEventStore;
+  /**
+   * Optional Stripe Checkout session retriever for `/api/license/retrieve`.
+   * Tests pass a fake; production wraps the live Stripe SDK lazily so we
+   * don't construct it on startup.
+   */
+  sessions?: SessionRetriever;
 }
 
 function buildLicenseDeps(): LicenseDeps {
@@ -212,6 +222,26 @@ export function createApp(
       issuer,
       adminApiKey: process.env.ADMIN_API_KEY ?? "",
       killSignups: () => isFlagEnabled("KILL_SIGNUPS"),
+    }),
+  );
+
+  app.post("/api/license/retrieve", (c) =>
+    handleLicenseRetrieveRequest(c.req.raw, {
+      sessions: license.sessions ?? {
+        retrieve: async (sessionId: string) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.checkout.sessions.retrieve(sessionId);
+          const customer =
+            typeof session.customer === "string"
+              ? session.customer
+              : session.customer?.id ?? null;
+          return { customer };
+        },
+      },
+      storage: license.storage,
+      signingKey: license.signingKey,
+      nowSec: license.nowSec,
     }),
   );
 
