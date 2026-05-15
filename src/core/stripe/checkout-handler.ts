@@ -46,6 +46,15 @@ export interface CheckoutClient {
       success_url: string;
       cancel_url: string;
       customer_email?: string;
+      /**
+       * Force the customer to check a "I agree to the Terms" box before pay.
+       * Stripe docs: https://docs.stripe.com/api/checkout/sessions/create
+       * Requires a Terms of Service URL set in Dashboard → Settings → Public
+       * details. Our Terms (feedzero.app/legal/terms § 6) embed the Art. 16(m)
+       * waiver of the EU 14-day withdrawal right for digital subscriptions —
+       * without this checkbox the waiver is unenforceable.
+       */
+      consent_collection?: { terms_of_service: "required" | "none" };
     },
     opts?: { idempotencyKey?: string },
   ): Promise<{ url: string | null; id: string }>;
@@ -211,6 +220,10 @@ export async function handleCreateCheckoutSession(
         line_items: [{ price: parsed.args.priceId, quantity: 1 }],
         success_url: parsed.args.successUrl,
         cancel_url: parsed.args.cancelUrl,
+        // Force the EU 14-day-withdrawal-waiver checkbox. See the
+        // CheckoutClient.create JSDoc for the why; without this, the waiver
+        // text in our Terms is unenforceable against an EU consumer.
+        consent_collection: { terms_of_service: "required" },
         ...(parsed.args.customerEmail
           ? { customer_email: parsed.args.customerEmail }
           : {}),

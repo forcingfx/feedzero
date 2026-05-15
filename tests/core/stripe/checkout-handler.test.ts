@@ -161,6 +161,33 @@ describe("checkout handler — success path", () => {
     );
   });
 
+  it("passes consent_collection.terms_of_service='required' so EU customers explicitly accept Terms (which embed the Art. 16(m) withdrawal-right waiver)", async () => {
+    // Stripe docs (https://docs.stripe.com/api/checkout/sessions/create):
+    //   "If set to `required`, it requires customers to check a terms of
+    //   service checkbox before being able to pay. There must be a valid
+    //   terms of service URL set in your Dashboard settings."
+    //
+    // Without this parameter, an EU consumer can later dispute and recover
+    // a refund regardless of usage by arguing they never waived the 14-day
+    // withdrawal right. The waiver text itself lives in our linked Terms
+    // (feedzero-landing/legal/terms/index.html § 6).
+    const create = vi.fn(async () => ({ url: "https://x", id: "y" }));
+    await handleCreateCheckoutSession(
+      postBody({
+        priceId: "price_personal_monthly_test",
+        successUrl: "https://feedzero.app/s",
+        cancelUrl: "https://feedzero.app/c",
+      }),
+      { client: { create }, allowedPrices: ALLOWED_PRICES },
+    );
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        consent_collection: { terms_of_service: "required" },
+      }),
+      expect.anything(),
+    );
+  });
+
   it("forwards optional customerEmail when provided", async () => {
     const create = vi.fn(async () => ({ url: "https://x", id: "y" }));
     await handleCreateCheckoutSession(
