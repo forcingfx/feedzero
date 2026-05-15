@@ -42,6 +42,23 @@ const AUTH_HEADER: Record<string, string> = LICENSE_TOKEN
   ? { Authorization: `Bearer ${LICENSE_TOKEN}` }
   : {};
 
+// Vercel Preview Deployment Protection 401s every request at the edge
+// before our app code runs. The Protection Bypass for Automation
+// feature exempts requests carrying this header from the gate. The
+// secret is configured in Vercel project settings and mirrored as a
+// GHA secret. Header name is the literal value Vercel documents.
+// Empty / absent → no header sent (production base URLs don't need it).
+const PROTECTION_BYPASS = process.env.VERCEL_PROTECTION_BYPASS;
+const BYPASS_HEADER: Record<string, string> = PROTECTION_BYPASS
+  ? {
+      "x-vercel-protection-bypass": PROTECTION_BYPASS,
+      // Tells Vercel to also set a bypass cookie on this response so
+      // follow-up requests within the same fetch session don't need
+      // the header repeatedly. Harmless if Vercel ignores it.
+      "x-vercel-set-bypass-cookie": "true",
+    }
+  : {};
+
 // Sentinel vaultId (64-char single-character hex). Distinct from the
 // large-vault test's 'c' sentinel so parallel smoke runs do not race.
 // Matches isSentinelVaultId() in sentinel-cleanup.ts.
@@ -75,7 +92,11 @@ describe.skipIf(SKIP_AUTH)(
           fetch(input, { ...init, cache: "no-store" });
         const putRes = await deviceA(`${BASE_URL}/api/sync`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json", ...AUTH_HEADER },
+          headers: {
+            "Content-Type": "application/json",
+            ...BYPASS_HEADER,
+            ...AUTH_HEADER,
+          },
           body: putBody,
         });
         expect(putRes.status).toBe(200);
@@ -87,7 +108,7 @@ describe.skipIf(SKIP_AUTH)(
           fetch(input, { ...init, cache: "no-store" });
         const getRes = await deviceB(
           `${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`,
-          { headers: AUTH_HEADER },
+          { headers: { ...BYPASS_HEADER, ...AUTH_HEADER } },
         );
         expect(getRes.status).toBe(200);
         const body = (await getRes.json()) as {
@@ -105,7 +126,7 @@ describe.skipIf(SKIP_AUTH)(
       } finally {
         await fetch(`${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`, {
           method: "DELETE",
-          headers: AUTH_HEADER,
+          headers: { ...BYPASS_HEADER, ...AUTH_HEADER },
         }).catch(() => {});
       }
     }, 30_000);
@@ -118,7 +139,7 @@ describe.skipIf(SKIP_AUTH)(
       const bogusId = "e".repeat(64);
       const res = await fetch(`${BASE_URL}/api/sync?vaultId=${bogusId}`, {
         method: "HEAD",
-        headers: AUTH_HEADER,
+        headers: { ...BYPASS_HEADER, ...AUTH_HEADER },
       });
       expect(res.status).toBe(404);
     }, 15_000);
@@ -139,7 +160,11 @@ describe.skipIf(SKIP || LICENSE_TOKEN !== undefined)(
       const vaultPayload = buildSyntheticVaultPayload();
       const res = await fetch(`${BASE_URL}/api/sync`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        // Bypass header is still required to get past Vercel Preview
+        // Protection (which 401s at the edge). The auth-gate assertion
+        // is specifically about the app's bearer check, not Vercel's
+        // platform-level protection.
+        headers: { "Content-Type": "application/json", ...BYPASS_HEADER },
         body: JSON.stringify({
           vaultId: SENTINEL_VAULT_ID,
           vault: vaultPayload,

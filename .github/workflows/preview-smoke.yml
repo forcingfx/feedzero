@@ -72,4 +72,10 @@ jobs:
           # exercise them; without it the data tests skip and only the
           # auth-gate regression guard runs.
           SMOKE_LICENSE_TOKEN: ${{ secrets.SMOKE_LICENSE_TOKEN }}
+          # Vercel Preview Deployment Protection 401s every request at
+          # the edge before app code runs. The Protection Bypass for
+          # Automation token (configured in Vercel project settings)
+          # exempts CI requests carrying the x-vercel-protection-bypass
+          # header. Required for any smoke run against a preview URL.
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: npx vitest run tests/smoke/sync-cross-device.test.ts
