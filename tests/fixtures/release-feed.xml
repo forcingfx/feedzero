@@ -3,12 +3,63 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-05-09T12:00:00Z</updated>
+  <updated>2026-05-15T12:00:00Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.8.2</id>
+    <title>v0.8.2 — Article flood grouping, cloud restore, and sync race fix</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-05-15T12:00:00Z</published>
+    <updated>2026-05-15T12:00:00Z</updated>
+    <summary>Flooding feeds no longer drown out everything else in aggregated views, a Restore-from-cloud button recovers from drifted local state, and a cross-device sync race that left Device B with the wrong feed list is fixed.</summary>
+    <content type="html"><![CDATA[<p>Flooding feeds no longer drown out everything else in aggregated views, a Restore-from-cloud button recovers from drifted local state, and a cross-device sync race that left Device B with the wrong feed list is fixed.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added inline grouping for same-feed article floods in aggregated views (All items and folder views). Runs of three or more consecutive articles from the same feed within ten-minute pairwise gaps collapse to a summary row with a chevron; expanding inline reveals the full list. Disabled in per-feed views and behind a Settings toggle if undesired.</li>
+  <li>Added a <code>Restore from cloud</code> button to the Data &amp; Storage dialog. Replaces local feeds and articles with the cloud vault without deleting and recreating the vault, which is the recovery path when a device's local state drifts from what the cloud knows.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed a cross-device sync race where a second device could mark its status as synced without the cloud feeds materializing locally. Concurrent pulls now share a single in-flight request and the import is transactional, so the article list never serves a half-imported state.</li>
+  <li>Fixed the prev/next reader navigation pills appearing on desktop, where they duplicated existing keyboard shortcuts and sidebar navigation. The pills remain on mobile, where the touch surface is needed.</li>
+  <li>Fixed dialog buttons being pushed off-screen on iOS when the soft keyboard opens. Dialogs are now anchored to the dynamic viewport height so the action row stays reachable regardless of keyboard state.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+  <entry>
+    <id>feedzero:release:0.8.1</id>
+    <title>v0.8.1 — Server reliability, observability, and rate limiting</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-05-14T13:00:00Z</published>
+    <updated>2026-05-14T13:00:00Z</updated>
+    <summary>Three production bugs fixed across cloud sync, the public stats page, and mobile dialogs. Server-side storage consolidated onto a single backend. Every error response now carries a trace identifier for support.</summary>
+    <content type="html"><![CDATA[<p>Three production bugs fixed across cloud sync, the public stats page, and mobile dialogs. Server-side storage consolidated onto a single backend. Every error response now carries a trace identifier for support.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added per-client rate limiting on the feed and page proxies. Default 300 requests per minute per client; returns <code>429 Retry-After</code> per RFC 6585 when exceeded.</li>
+  <li>Added a trace identifier (<code>req_</code> followed by 8 hex characters) to every non-2xx response from the monetization endpoints. Quote it in a support report and the issue can be looked up in the runtime logs.</li>
+  <li>Added structured single-line JSON logs on every 5xx server error, with an allow-listed field set (route, method, status, trace identifier, error class, error message). No personal data is ever logged.</li>
+  <li>Added module-load logs in each serverless function that surface which storage backend resolved at cold start. Any future regression where the wrong adapter is chosen becomes visible in the first deploy log.</li>
+  <li>Added production smoke tests for every server endpoint. Run with <code>SMOKE_TESTS=1 npx vitest run tests/smoke/</code>. The smoke layer is now a required phase of the standard development workflow.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Consolidated all server-side persistence (license records, vault sync, Stripe event deduplication, the feed catalog, and rate-limit counters) onto a single Upstash KV instance. Replaces a previous mix of Vercel Blob, separate Upstash, and in-memory adapters. Self-hosters not configuring Upstash continue to use the filesystem and memory adapters.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed cloud sync vault pulls returning the literal string <code>[object Object]</code> instead of the encrypted payload. The server was storing vaults correctly all along; only the read path was broken. Existing vaults are unaffected and now load correctly.</li>
+  <li>Fixed cloud sync pushes failing with a 500 error after a deployment-time configuration drift. Sync storage now self-detects the correct backend rather than relying on an exact environment-variable match.</li>
+  <li>Fixed the public stats page always showing zero feeds tracked. The feed catalog had no persistence layer and reset on every cold start; now backed by persistent storage so counts and the popular-feeds leaderboard populate correctly.</li>
+  <li>Fixed the mobile soft keyboard covering the bottom of every dialog, which made the cloud-sync passphrase entry unusable. The fix applies to every dialog in the app.</li>
+  <li>Fixed the mobile bottom navigation drawer being partially hidden behind iOS Safari's browser chrome. The drawer's bottom padding now grows dynamically with the toolbar height.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.8.0</id>
     <title>v0.8.0 — First-launch reliability fix</title>
