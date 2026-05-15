@@ -14,8 +14,7 @@
  *   # Pull the signing key from Vercel
  *   vercel env pull .env.production --environment=production
  *
- *   # Mint the token (5 years valid, "pro" tier)
- *   set -a; source .env.production; set +a
+ *   # Mint the token (script auto-loads .env.production if present)
  *   npx tsx scripts/mint-smoke-license.ts
  *
  *   # Copy the printed token. Add it as a GitHub Actions repo secret
@@ -31,14 +30,52 @@
  * authenticate. Generate a fresh one with this script.
  */
 
+import { readFileSync, existsSync } from "node:fs";
 import { signLicense } from "../src/core/license/sign";
+
+/**
+ * Parse a `.env`-style file into key/value pairs. Handles double-quoted
+ * values (the format Vercel CLI writes) so values containing shell
+ * metacharacters survive without being mangled by `source` / `sed`.
+ * Strips a single layer of surrounding `"..."` if present; leaves
+ * unquoted values as-is.
+ */
+function loadEnvFile(path: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const rawLine of readFileSync(path, "utf8").split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq < 0) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    if (
+      value.length >= 2 &&
+      value.startsWith('"') &&
+      value.endsWith('"')
+    ) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+// Auto-load .env.production if it exists. Avoids brittle shell sourcing.
+const ENV_FILE = ".env.production";
+if (existsSync(ENV_FILE) && !process.env.LICENSE_SIGNING_KEY) {
+  for (const [k, v] of Object.entries(loadEnvFile(ENV_FILE))) {
+    if (!(k in process.env)) process.env[k] = v;
+  }
+}
 
 const SIGNING_KEY = process.env.LICENSE_SIGNING_KEY;
 if (!SIGNING_KEY) {
   console.error(
     "[mint-smoke-license] LICENSE_SIGNING_KEY env var is required.\n" +
       "  Run: vercel env pull .env.production --environment=production\n" +
-      "  Then: set -a; source .env.production; set +a\n",
+      `  Then: npx tsx scripts/mint-smoke-license.ts\n` +
+      "  (The script auto-loads .env.production if present in cwd.)\n",
   );
   process.exit(1);
 }
