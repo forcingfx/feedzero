@@ -17,6 +17,12 @@ vi.mock("@/core/storage/db", () => ({
       hmacKeyJwk: { kty: "oct", k: "hmac-key" },
     },
   }),
+  // forceResync's UI-refresh path lazy-imports feed-store + article-store,
+  // which call into the db layer. Stubs below let those calls complete
+  // cleanly without booting fake-indexeddb.
+  getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 vi.mock("@/core/storage/crypto", () => ({
@@ -237,6 +243,91 @@ describe("SyncSetupDialog", () => {
         name: /switch to local only/i,
       });
       expect(button).toBeDisabled();
+    });
+  });
+
+  describe("restore from cloud", () => {
+    beforeEach(() => {
+      useSyncStore.setState({
+        status: "synced",
+        credentials: mockCredentials,
+        lastSyncedAt: Date.now(),
+        dialogOpen: true,
+      });
+    });
+
+    it("shows Restore from cloud button for synced users", () => {
+      render(<SyncSetupDialog />);
+      expect(
+        screen.getByRole("button", { name: /restore from cloud/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("clicking Restore from cloud shows a confirmation explaining the replace", async () => {
+      const user = userEvent.setup();
+      render(<SyncSetupDialog />);
+
+      await user.click(
+        screen.getByRole("button", { name: /restore from cloud/i }),
+      );
+
+      expect(
+        screen.getByText(/replace your local feeds and articles/i),
+      ).toBeInTheDocument();
+    });
+
+    it("disables Restore from cloud while syncing", () => {
+      useSyncStore.setState({
+        status: "syncing",
+        credentials: mockCredentials,
+        dialogOpen: true,
+      });
+
+      render(<SyncSetupDialog />);
+
+      const button = screen.getByRole("button", {
+        name: /restore from cloud/i,
+      });
+      expect(button).toBeDisabled();
+    });
+
+    it("confirming restore pulls the vault and closes the dialog on success", async () => {
+      const { pullVault } = await import("@/core/sync/sync-service");
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: true,
+        value: {
+          version: 1,
+          exportedAt: Date.now(),
+          feeds: [
+            {
+              id: "f1",
+              url: "https://example.com",
+              title: "Example",
+              description: "",
+              siteUrl: "",
+              createdAt: 0,
+              updatedAt: 0,
+            },
+          ],
+          articles: [],
+        },
+      });
+
+      const user = userEvent.setup();
+      render(<SyncSetupDialog />);
+
+      await user.click(
+        screen.getByRole("button", { name: /restore from cloud/i }),
+      );
+      // Confirm button inside the confirmation view
+      await user.click(
+        screen.getByRole("button", { name: /^restore$/i }),
+      );
+
+      // Dialog should close on success
+      expect(useSyncStore.getState().dialogOpen).toBe(false);
+      // Status should be back to synced after the import completes
+      expect(useSyncStore.getState().status).toBe("synced");
     });
   });
 });

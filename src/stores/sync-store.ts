@@ -38,6 +38,13 @@ interface SyncStore {
   logout: () => Promise<void>;
   push: () => Promise<void>;
   pull: () => Promise<void>;
+  /**
+   * Explicit "replace local with cloud" — bypasses pull's in-flight dedup
+   * and the debounced push timer, then refreshes the in-memory feed and
+   * article stores so the UI reflects the imported vault immediately.
+   * Used by the Settings → Restore from cloud button.
+   */
+  forceResync: () => Promise<Result<{ feedCount: number }>>;
   scheduleSyncPush: () => void;
   setDialogOpen: (open: boolean) => void;
   switchToExistingCloud: (
@@ -195,6 +202,42 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     });
 
     return inFlightPull;
+  },
+
+  forceResync: async () => {
+    const { credentials } = get();
+    if (!credentials) {
+      return err("Not signed in to cloud; cannot restore");
+    }
+
+    // Cancel any pending push so it can't fire after our import and
+    // overwrite cloud with stale local state.
+    clearPendingTimers();
+
+    set({ status: "syncing", error: null });
+
+    const pullResult = await pullVault(credentials);
+    if (!pullResult.ok) {
+      set({ status: "error", error: pullResult.error });
+      return err(pullResult.error);
+    }
+
+    const importResult = await importVault(pullResult.value);
+    if (!importResult.ok) {
+      set({ status: "error", error: importResult.error });
+      return err(importResult.error);
+    }
+
+    // Refresh in-memory stores so the UI shows the imported vault
+    // without waiting for the user to navigate. Lazy-imports avoid
+    // a circular dependency on app boot.
+    const { useFeedStore } = await import("./feed-store.ts");
+    await useFeedStore.getState().loadFeeds();
+    const { useArticleStore } = await import("./article-store.ts");
+    await useArticleStore.getState().preloadAll();
+
+    set({ status: "synced", lastSyncedAt: Date.now(), error: null });
+    return ok({ feedCount: pullResult.value.feeds.length });
   },
 
   scheduleSyncPush: () => {

@@ -212,6 +212,99 @@ describe("sync-store", () => {
     });
   });
 
+  describe("forceResync", () => {
+    it("returns err when no credentials are set", async () => {
+      useSyncStore.setState({ credentials: null });
+      const result = await useSyncStore.getState().forceResync();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/cloud/i);
+      }
+    });
+
+    it("pulls, imports, and reports feed count on success", async () => {
+      mockPullVault.mockResolvedValue({
+        ok: true,
+        value: {
+          version: 1,
+          exportedAt: Date.now(),
+          feeds: [
+            {
+              id: "f1",
+              url: "https://example.com",
+              title: "Example",
+              description: "",
+              siteUrl: "",
+              createdAt: 0,
+              updatedAt: 0,
+            },
+            {
+              id: "f2",
+              url: "https://example2.com",
+              title: "Example 2",
+              description: "",
+              siteUrl: "",
+              createdAt: 0,
+              updatedAt: 0,
+            },
+          ],
+          articles: [],
+        },
+      });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        status: "synced",
+      });
+
+      const result = await useSyncStore.getState().forceResync();
+
+      expect(mockPullVault).toHaveBeenCalledWith(mockCredentials);
+      expect(mockImportVault).toHaveBeenCalled();
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.feedCount).toBe(2);
+      expect(useSyncStore.getState().status).toBe("synced");
+    });
+
+    it("surfaces pull failure to status and result", async () => {
+      mockPullVault.mockResolvedValue({
+        ok: false,
+        error: "Vault not found",
+      });
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        status: "synced",
+      });
+
+      const result = await useSyncStore.getState().forceResync();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toBe("Vault not found");
+      expect(useSyncStore.getState().status).toBe("error");
+      expect(useSyncStore.getState().error).toBe("Vault not found");
+    });
+
+    it("surfaces import failure to status and result", async () => {
+      mockPullVault.mockResolvedValue({
+        ok: true,
+        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      });
+      mockImportVault.mockResolvedValue({
+        ok: false,
+        error: "Failed to import data: db not open",
+      });
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        status: "synced",
+      });
+
+      const result = await useSyncStore.getState().forceResync();
+
+      expect(result.ok).toBe(false);
+      expect(useSyncStore.getState().status).toBe("error");
+    });
+  });
+
   describe("logout", () => {
     it("destroys local state and resets stores", async () => {
       const { destroyLocal } = await import(
