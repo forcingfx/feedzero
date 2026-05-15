@@ -22,6 +22,15 @@ import path from "path";
 
 const apiDir = path.resolve("api");
 
+// Read the current package.json version so we can inline it into every
+// serverless bundle as `process.env.APP_VERSION`. Without this, the
+// /api/health endpoint reports "unknown" (the fallback in
+// src/core/health/health-handler.ts) and operators lose the canonical
+// "is the right code on prod" signal.
+const pkgVersion = JSON.parse(
+  readFileSync(path.resolve("package.json"), "utf-8"),
+).version;
+
 /**
  * Recursively collect every `.ts` file under api/. Vercel maps subdirectories
  * to URL path segments (`api/stripe/webhook.ts` → `/api/stripe/webhook`), so
@@ -60,6 +69,13 @@ try {
     // wrapper size (Stripe SDK is ~700KB inlined) and pulls in Node-specific
     // code paths esbuild handles poorly (causing Vercel deploy errors).
     external: ["@vercel/blob", "stripe", "@upstash/redis"],
+    // Inline `process.env.APP_VERSION` as a string literal so the health
+    // handler reports the build's version without depending on a Vercel
+    // env var being set. Tied to package.json — the release-bump commit
+    // is the single source of truth for what gets reported.
+    define: {
+      "process.env.APP_VERSION": JSON.stringify(pkgVersion),
+    },
   });
 
   // Map each source api/.../X.ts to its corresponding tempOut/.../X.js bundle.
