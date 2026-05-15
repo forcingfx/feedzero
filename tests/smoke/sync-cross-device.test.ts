@@ -48,15 +48,23 @@ const AUTH_HEADER: Record<string, string> = LICENSE_TOKEN
 // secret is configured in Vercel project settings and mirrored as a
 // GHA secret. Header name is the literal value Vercel documents.
 // Empty / absent → no header sent (production base URLs don't need it).
+//
+// NOT sending `x-vercel-set-bypass-cookie: true` because it causes
+// Vercel to do a redirect-then-set-cookie dance that Node fetch
+// follows in a loop ("redirect count exceeded"). The per-request
+// header-only mode works without a cookie session — each request
+// carries its own bypass.
 const PROTECTION_BYPASS = process.env.VERCEL_PROTECTION_BYPASS;
+if (process.env.SMOKE_TESTS && PROTECTION_BYPASS) {
+  // Diagnostic — confirms the secret reached the test env without
+  // leaking the value itself. Vercel bypass tokens are 32 chars.
+  // eslint-disable-next-line no-console
+  console.log(
+    `[smoke] VERCEL_PROTECTION_BYPASS length=${PROTECTION_BYPASS.length}`,
+  );
+}
 const BYPASS_HEADER: Record<string, string> = PROTECTION_BYPASS
-  ? {
-      "x-vercel-protection-bypass": PROTECTION_BYPASS,
-      // Tells Vercel to also set a bypass cookie on this response so
-      // follow-up requests within the same fetch session don't need
-      // the header repeatedly. Harmless if Vercel ignores it.
-      "x-vercel-set-bypass-cookie": "true",
-    }
+  ? { "x-vercel-protection-bypass": PROTECTION_BYPASS }
   : {};
 
 // Sentinel vaultId (64-char single-character hex). Distinct from the
