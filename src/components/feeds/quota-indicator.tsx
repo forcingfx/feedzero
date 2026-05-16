@@ -15,6 +15,7 @@ import { useFeedStore } from "@/stores/feed-store";
 import { useLicenseStore } from "@/stores/license-store";
 import { isSelfHosted } from "@/core/features/self-hosted";
 import { FREE_FEED_LIMIT } from "@/core/features/quotas";
+import { openUpgrade } from "@/lib/open-upgrade";
 import { cn } from "@/lib/utils";
 
 export function QuotaIndicator() {
@@ -37,12 +38,13 @@ export function QuotaIndicator() {
         {count} / {FREE_FEED_LIMIT} feeds
       </span>
       {atOrOverLimit && (
-        <a
-          href="/?subscribe=personal-monthly"
+        <button
+          type="button"
+          onClick={openUpgrade}
           className="text-primary font-medium hover:underline"
         >
           Upgrade
-        </a>
+        </button>
       )}
     </div>
   );

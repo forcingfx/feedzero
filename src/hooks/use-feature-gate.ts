@@ -7,8 +7,6 @@
  * so all gated components stay in sync.
  */
 
-import { useCallback } from "react";
-import { useNavigate } from "react-router";
 import { useLicenseStore } from "@/stores/license-store";
 import {
   gateState,
@@ -17,18 +15,15 @@ import {
 } from "@/core/features/feature-gates";
 import { isSelfHosted } from "@/core/features/self-hosted";
 import { isPaidTierActive } from "@/core/features/paid-tier-active";
+import { openUpgrade } from "@/lib/open-upgrade";
 
 export interface UseFeatureGate extends GateState {
-  /** Navigate to the Personal-monthly subscribe deeplink. */
+  /** Open the unified Settings dialog on the Account tab. */
   promptUpgrade: () => void;
 }
 
 export function useFeatureGate(feature: Feature): UseFeatureGate {
   const tier = useLicenseStore((s) => s.tier);
   const state = gateState(feature, tier, isSelfHosted(), isPaidTierActive());
-  const navigate = useNavigate();
-  const promptUpgrade = useCallback(() => {
-    navigate("/?subscribe=personal-monthly");
-  }, [navigate]);
-  return { ...state, promptUpgrade };
+  return { ...state, promptUpgrade: openUpgrade };
 }

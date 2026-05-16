@@ -64,16 +64,27 @@ describe("QuotaIndicator", () => {
     expect(screen.getByText(/25/)).toBeInTheDocument();
   });
 
-  it("offers an Upgrade link when at or above the limit", () => {
+  it("offers an Upgrade button when at or above the limit that opens Settings → Account", async () => {
+    // The Upgrade entry was an <a href="/?subscribe=…"> that jumped straight
+    // to Stripe Checkout, bypassing the Plan card. After PR B every in-app
+    // upgrade button funnels through openUpgrade() → Settings → Account so
+    // the user sees the tier comparison before commitment.
+    const { useSettingsStore } = await import("@/stores/settings-store.ts");
+    useSettingsStore.setState({ open: false, activeTab: "help" });
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
     seedFeeds(25);
     renderInRouter();
-    const upgrade = screen.getByRole("link", { name: /upgrade/i });
-    expect(upgrade.getAttribute("href")).toMatch(/subscribe=personal-monthly/);
+    const upgrade = screen.getByRole("button", { name: /upgrade/i });
+    await user.click(upgrade);
+    const s = useSettingsStore.getState();
+    expect(s.open).toBe(true);
+    expect(s.activeTab).toBe("account");
   });
 
-  it("does not offer an Upgrade link below the limit", () => {
+  it("does not offer an Upgrade button below the limit", () => {
     seedFeeds(20);
     renderInRouter();
-    expect(screen.queryByRole("link", { name: /upgrade/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /upgrade/i })).toBeNull();
   });
 });
