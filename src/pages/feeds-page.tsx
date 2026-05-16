@@ -349,12 +349,13 @@ export function FeedsPage() {
   // and participates naturally in the panel layout.
   const exploreOrEmpty = isExplorePage || feeds.length === 0;
   const showStats = isStatsPage;
-  // Distinct group ids per layout shape: react-resizable-panels persists
-  // panel widths under this id, so the 3-panel feeds layout and the 2-panel
-  // explore/stats layout must not share an id (otherwise switching layouts
-  // visibly rebalances the sidebar — see GitLab #13a).
-  const layoutId =
-    showStats || exploreOrEmpty ? PANEL_LAYOUT_ID.SINGLE : PANEL_LAYOUT_ID.FEEDS;
+  // Single stable layout id across all routes — PR F. With the same group
+  // id everywhere, react-resizable-panels preserves the sidebar's user-
+  // dragged width naturally as routes change (the per-route ids of the
+  // prior model made the sidebar visibly resize on every navigation).
+  // Each child panel still has its own stable `id` so the library tracks
+  // their sizes independently.
+  const layoutId = PANEL_LAYOUT_ID.MAIN;
   const sidebarSize = useSharedSidebarSize(layoutId);
 
   return (

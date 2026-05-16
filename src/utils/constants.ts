@@ -94,10 +94,21 @@ export const ARTICLE_GROUPING = {
  * clobber the user's preferred sidebar/article-list/reader proportions.
  */
 export const PANEL_LAYOUT_ID = {
-  /** 3-panel: sidebar + article list + reader. */
-  FEEDS: "feedzero:layout:feeds",
-  /** 2-panel: sidebar + single content area (explore or stats). */
-  SINGLE: "feedzero:layout:single",
+  /**
+   * Single stable layout id used across every route.
+   *
+   * react-resizable-panels persists panel sizes per group id, so a single
+   * stable id means the sidebar width is preserved naturally as the user
+   * navigates between /feeds, /explore, /stats. Conditionally-rendered
+   * child panels (reader on /feeds, single content on /explore) don't
+   * affect the sidebar's stored size because each panel has its own
+   * `id` within the group.
+   *
+   * Prior model used distinct ids per layout shape (`:feeds`, `:single`),
+   * which made the sidebar visibly resize on every navigation — that's
+   * the bug PR F fixed.
+   */
+  MAIN: "feedzero:layout:main",
 } as const;
 
 const textEncoder = new TextEncoder();
