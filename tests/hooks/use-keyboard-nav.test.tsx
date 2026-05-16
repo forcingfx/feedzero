@@ -3,6 +3,22 @@ import { renderHook } from "@testing-library/react";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
+import { useFeedStore } from "@/stores/feed-store.ts";
+import { toFolderFeedId } from "@/utils/constants.ts";
+
+type NavigateFeedEvent = CustomEvent<{ feedId: string }>;
+
+function captureNavigateFeedEvents() {
+  const ids: string[] = [];
+  const handler = (e: Event) => {
+    ids.push((e as NavigateFeedEvent).detail.feedId);
+  };
+  document.addEventListener("feedzero:navigate-feed", handler);
+  return {
+    ids,
+    cleanup: () => document.removeEventListener("feedzero:navigate-feed", handler),
+  };
+}
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -13,19 +29,6 @@ vi.mock("@/core/storage/db.ts", () => ({
 vi.mock("@/core/extractor/extractor.ts", () => ({
   extract: vi.fn(),
 }));
-
-function createSidebarButtons(count: number, activeIndex = -1): HTMLElement[] {
-  const buttons: HTMLElement[] = [];
-  for (let i = 0; i < count; i++) {
-    const btn = document.createElement("button");
-    btn.setAttribute("data-sidebar", "menu-button");
-    btn.setAttribute("data-active", i === activeIndex ? "true" : "false");
-    btn.textContent = `Feed ${i}`;
-    document.body.appendChild(btn);
-    buttons.push(btn);
-  }
-  return buttons;
-}
 
 function createListbox(itemCount: number, selectedIndex = -1): HTMLElement {
   const listbox = document.createElement("ul");
@@ -320,79 +323,117 @@ describe("useKeyboardNav", () => {
   });
 
   describe("feed navigation (u/i)", () => {
-    it("u clicks the next feed button", () => {
-      const buttons = createSidebarButtons(3, 0);
-      let clicked = -1;
-      buttons.forEach((btn, i) =>
-        btn.addEventListener("click", () => {
-          clicked = i;
-        }),
-      );
+    beforeEach(() => {
+      useFeedStore.setState({
+        feeds: [],
+        folders: [],
+        folderOpenState: {},
+        selectedFeedId: null,
+        feedSortMode: "name",
+        feedCustomOrder: [],
+        folderCustomOrder: [],
+      });
+    });
+
+    function seedFeeds(ids: string[]) {
+      useFeedStore.setState({
+        feeds: ids.map((id) => ({
+          id,
+          url: `https://${id}.com/feed`,
+          title: id,
+          description: "",
+          siteUrl: `https://${id}.com`,
+          createdAt: 0,
+          updatedAt: 0,
+        })),
+      });
+    }
+
+    it("u dispatches navigate-feed for the next unfiled feed", () => {
+      seedFeeds(["a", "b", "c"]);
+      useFeedStore.setState({ selectedFeedId: "a" });
+      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav());
 
       pressKey("u");
 
-      expect(clicked).toBe(1);
+      expect(ids).toEqual(["b"]);
+      cleanup();
     });
 
-    it("i clicks the previous feed button", () => {
-      const buttons = createSidebarButtons(3, 2);
-      let clicked = -1;
-      buttons.forEach((btn, i) =>
-        btn.addEventListener("click", () => {
-          clicked = i;
-        }),
-      );
+    it("i dispatches navigate-feed for the previous unfiled feed", () => {
+      seedFeeds(["a", "b", "c"]);
+      useFeedStore.setState({ selectedFeedId: "c" });
+      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav());
 
       pressKey("i");
 
-      expect(clicked).toBe(1);
+      expect(ids).toEqual(["b"]);
+      cleanup();
     });
 
-    it("u does not go past the last feed", () => {
-      const buttons = createSidebarButtons(3, 2);
-      let clicked = -1;
-      buttons.forEach((btn, i) =>
-        btn.addEventListener("click", () => {
-          clicked = i;
-        }),
-      );
+    it("u does not advance past the last feed in the logical list", () => {
+      seedFeeds(["a", "b", "c"]);
+      useFeedStore.setState({ selectedFeedId: "c" });
+      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav());
 
       pressKey("u");
 
-      expect(clicked).toBe(2);
+      expect(ids).toEqual(["c"]);
+      cleanup();
     });
 
-    it("i does not go before the first feed", () => {
-      const buttons = createSidebarButtons(3, 0);
-      let clicked = -1;
-      buttons.forEach((btn, i) =>
-        btn.addEventListener("click", () => {
-          clicked = i;
-        }),
-      );
-      renderHook(() => useKeyboardNav());
-
-      pressKey("i");
-
-      expect(clicked).toBe(0);
-    });
-
-    it("u selects first feed when none is active", () => {
-      const buttons = createSidebarButtons(3);
-      let clicked = -1;
-      buttons.forEach((btn, i) =>
-        btn.addEventListener("click", () => {
-          clicked = i;
-        }),
-      );
+    it("u selects the first feed when none is active", () => {
+      seedFeeds(["a", "b"]);
+      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav());
 
       pressKey("u");
 
-      expect(clicked).toBe(0);
+      expect(ids).toEqual(["a"]);
+      cleanup();
+    });
+
+    it("u traverses into a folder header after the last unfiled feed", () => {
+      useFeedStore.setState({
+        feeds: [
+          { id: "u1", url: "x", title: "u1", description: "", siteUrl: "", createdAt: 0, updatedAt: 0 },
+          { id: "f1", url: "y", title: "f1", description: "", siteUrl: "", createdAt: 0, updatedAt: 0, folderId: "fa" },
+        ],
+        folders: [{ id: "fa", name: "A", createdAt: 0 }],
+        folderOpenState: { fa: true },
+        selectedFeedId: "u1",
+      });
+      const { ids, cleanup } = captureNavigateFeedEvents();
+      renderHook(() => useKeyboardNav());
+
+      pressKey("u");
+
+      expect(ids).toEqual([toFolderFeedId("fa")]);
+      cleanup();
+    });
+
+    it("u entering a closed folder also opens that folder", () => {
+      useFeedStore.setState({
+        feeds: [
+          { id: "u1", url: "x", title: "u1", description: "", siteUrl: "", createdAt: 0, updatedAt: 0 },
+          { id: "f1", url: "y", title: "f1", description: "", siteUrl: "", createdAt: 0, updatedAt: 0, folderId: "fa" },
+        ],
+        folders: [{ id: "fa", name: "A", createdAt: 0 }],
+        folderOpenState: { fa: false },
+        // Already on the folder header, so the next press steps into its child.
+        selectedFeedId: toFolderFeedId("fa"),
+      });
+      const { ids, cleanup } = captureNavigateFeedEvents();
+      renderHook(() => useKeyboardNav());
+
+      pressKey("u");
+
+      expect(ids).toEqual(["f1"]);
+      expect(useFeedStore.getState().folderOpenState.fa).toBe(true);
+      cleanup();
     });
   });
 

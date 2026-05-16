@@ -2,6 +2,7 @@ import { useEffect, useCallback } from "react";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
+import { toFolderFeedId } from "@/utils/constants.ts";
 
 /**
  * Keyboard navigation hook for feed reader shortcuts.
@@ -117,16 +118,69 @@ function moveArticle(direction: 1 | -1) {
   }, 0);
 }
 
-function moveFeedFocus(direction: 1 | -1) {
-  const buttons = Array.from(
-    document.querySelectorAll<HTMLElement>('[data-sidebar="menu-button"]'),
-  );
-  if (buttons.length === 0) return;
+/**
+ * Build the ordered list of feed IDs that U / I should traverse, mirroring
+ * the sidebar's render order: unfiled feeds (sorted by the current mode),
+ * then for each folder its aggregated-feed id followed by its child feeds.
+ *
+ * The list is derived from feed-store state, not from the DOM, because
+ * Radix `Collapsible.Content` unmounts the children of a closed folder.
+ * A pure DOM walk would skip those feeds entirely; the store walk reaches
+ * them, and the caller auto-expands the folder before navigating in.
+ */
+function buildLogicalFeedList(): string[] {
+  const { feeds, folders, feedSortMode, feedCustomOrder, folderCustomOrder } =
+    useFeedStore.getState();
 
-  const activeIndex = buttons.findIndex(
-    (btn) => btn.getAttribute("data-active") === "true",
+  function applyCustomOrder<T extends { id: string }>(items: T[], order: string[]): T[] {
+    if (feedSortMode !== "custom") return items;
+    return [...items].sort((a, b) => {
+      const ai = order.indexOf(a.id);
+      const bi = order.indexOf(b.id);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }
+
+  const unfiled = applyCustomOrder(
+    feeds.filter((f) => !f.folderId),
+    feedCustomOrder,
   );
-  buttons[clampedIndex(activeIndex, direction, buttons.length)].click();
+  const orderedFolders = applyCustomOrder(folders, folderCustomOrder);
+
+  const ids: string[] = unfiled.map((f) => f.id);
+  for (const folder of orderedFolders) {
+    ids.push(toFolderFeedId(folder.id));
+    const children = applyCustomOrder(
+      feeds.filter((f) => f.folderId === folder.id),
+      feedCustomOrder,
+    );
+    for (const child of children) ids.push(child.id);
+  }
+  return ids;
+}
+
+function moveFeedFocus(direction: 1 | -1) {
+  const list = buildLogicalFeedList();
+  if (list.length === 0) return;
+  const { selectedFeedId, feeds, setFolderOpen } = useFeedStore.getState();
+  const currentIndex = selectedFeedId ? list.indexOf(selectedFeedId) : -1;
+  const nextIndex = clampedIndex(currentIndex, direction, list.length);
+  const nextId = list[nextIndex];
+
+  // If the next id is a child feed inside a folder, ensure that folder is
+  // open before we navigate — otherwise the user would be selecting a feed
+  // they cannot see in the sidebar.
+  const childFeed = feeds.find((f) => f.id === nextId);
+  if (childFeed?.folderId) {
+    setFolderOpen(childFeed.folderId, true);
+  }
+
+  document.dispatchEvent(
+    new CustomEvent("feedzero:navigate-feed", { detail: { feedId: nextId } }),
+  );
 }
 
 function openOriginal() {

@@ -83,6 +83,19 @@ export function FeedsPage() {
       document.removeEventListener("feedzero:navigate-explore", handler);
   }, [navigate]);
 
+  // U / I keyboard nav dispatches feedzero:navigate-feed with the next feed
+  // id (built from feed-store state so closed-folder children are reachable).
+  // Translate that into a URL push so feedId state propagates through React
+  // Router and the sidebar's data-active state updates.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ feedId: string }>).detail.feedId;
+      navigate(`/feeds/${id}`);
+    };
+    document.addEventListener("feedzero:navigate-feed", handler);
+    return () => document.removeEventListener("feedzero:navigate-feed", handler);
+  }, [navigate]);
+
   function handleFeedAdded(feedId: string) {
     handleFeedSelect(feedId);
   }
