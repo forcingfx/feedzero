@@ -27,25 +27,25 @@ describe("openSettings", () => {
   });
 
   it("opens on the requested tab when one is provided", () => {
-    openSettings("data");
+    openSettings("import");
     const s = useSettingsStore.getState();
     expect(s.open).toBe(true);
-    expect(s.activeTab).toBe("data");
+    expect(s.activeTab).toBe("import");
   });
 
   it("switches tab when called with a new tab while already open", () => {
-    openSettings("reading");
-    openSettings("help");
+    openSettings("import");
+    openSettings("export");
     const s = useSettingsStore.getState();
     expect(s.open).toBe(true);
-    expect(s.activeTab).toBe("help");
+    expect(s.activeTab).toBe("export");
   });
 
   it("closeSettings closes the dialog but preserves the last active tab", () => {
-    openSettings("help");
+    openSettings("export");
     closeSettings();
     const s = useSettingsStore.getState();
     expect(s.open).toBe(false);
-    expect(s.activeTab).toBe("help");
+    expect(s.activeTab).toBe("export");
   });
 });

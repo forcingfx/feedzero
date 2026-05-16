@@ -6,11 +6,13 @@ import {
   Loader2,
   MessageSquare,
   Sparkles,
+  User,
   Wand2,
 } from "lucide-react";
 import { useSyncStore } from "@/stores/sync-store.ts";
 import { useAppStore } from "@/stores/app-store.ts";
 import { requestSyncSetup } from "@/lib/request-sync-setup.ts";
+import { openSettings } from "@/lib/open-settings.ts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,6 +94,12 @@ export function SettingsMenu(props: SettingsMenuProps) {
     return (
       <>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => openSettings("account")}>
+              <User className="size-4" />
+              <span>Account</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           {showSync && (
             <SidebarMenuItem>
               <SidebarMenuButton onClick={() => requestSyncSetup()}>
@@ -172,6 +180,15 @@ export function SettingsMenu(props: SettingsMenuProps) {
           align={align}
           sideOffset={4}
         >
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              openSettings("account");
+            }}
+          >
+            <User className="size-4" />
+            <span>Account</span>
+          </DropdownMenuItem>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuItem

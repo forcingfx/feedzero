@@ -14,7 +14,10 @@
  */
 import { create } from "zustand";
 
-export type SettingsTab = "account" | "reading" | "data" | "help";
+// Phase A tabs: account (default), import, export.
+// Phase B will rename to: account, reading, data, help — and fold the
+// sync setup + upgrade content as sections inside the Account tab.
+export type SettingsTab = "account" | "import" | "export";
 
 interface SettingsState {
   open: boolean;

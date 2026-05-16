@@ -1,13 +1,16 @@
 /**
  * <SettingsDialog> — focused tab-wiring tests.
  *
- * Verifies the Account tab is reachable. Behavioral details of each tab
- * are tested in their own spec files (account-tab.test.tsx, etc.).
+ * Verifies the Account tab is reachable and that the dialog is driven by
+ * useSettingsStore (props-less). Behavioral details of each tab are tested
+ * in their own spec files (account-tab.test.tsx, etc.).
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { useLicenseStore } from "@/stores/license-store";
+import { useSettingsStore } from "@/stores/settings-store";
+import { openSettings, closeSettings } from "@/lib/open-settings";
 
 // Mock the heavyweight tab views — we're testing the dialog's switching,
 // not the views themselves.
@@ -21,27 +24,50 @@ vi.mock("@/components/settings/export-view", () => ({
 describe("<SettingsDialog>", () => {
   beforeEach(() => {
     useLicenseStore.setState({ tier: "free", verifying: false });
+    useSettingsStore.setState({ open: false, activeTab: "account" });
   });
 
-  it("renders an Account toggle alongside Import/Export", () => {
-    render(<SettingsDialog open onOpenChange={() => {}} />);
-    expect(screen.getByLabelText(/import feeds/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/export feeds/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/account/i)).toBeInTheDocument();
+  it("renders nothing when the store says closed", () => {
+    render(<SettingsDialog />);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("clicking the Account toggle shows the AccountTab", () => {
-    render(<SettingsDialog open onOpenChange={() => {}} />);
-    // Sanity: Import is the default view
-    expect(screen.getByTestId("import-view")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText(/account/i));
-
-    // AccountTab on free tier shows the Subscribe CTA
+  it("opens via openSettings() and lands on the Account tab by default", () => {
+    render(<SettingsDialog />);
+    act(() => openSettings());
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /subscribe to personal/i }),
     ).toBeInTheDocument();
-    // And Import is gone
-    expect(screen.queryByTestId("import-view")).toBeNull();
+  });
+
+  it("renders all three tab toggles (account / import / export)", () => {
+    act(() => openSettings());
+    render(<SettingsDialog />);
+    expect(screen.getByLabelText(/account/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/import feeds/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/export feeds/i)).toBeInTheDocument();
+  });
+
+  it("opens on the specified tab when openSettings('import') is called", () => {
+    render(<SettingsDialog />);
+    act(() => openSettings("import"));
+    expect(screen.getByTestId("import-view")).toBeInTheDocument();
+  });
+
+  it("clicking a toggle updates the store's activeTab", () => {
+    act(() => openSettings());
+    render(<SettingsDialog />);
+    fireEvent.click(screen.getByLabelText(/export feeds/i));
+    expect(useSettingsStore.getState().activeTab).toBe("export");
+    expect(screen.getByTestId("export-view")).toBeInTheDocument();
+  });
+
+  it("closeSettings() closes the dialog", () => {
+    act(() => openSettings());
+    render(<SettingsDialog />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    act(() => closeSettings());
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
