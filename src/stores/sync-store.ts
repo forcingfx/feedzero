@@ -20,6 +20,17 @@ import { ok, err } from "../utils/result.ts";
 
 export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 
+/**
+ * Why a grace-migration dialog is pending. The store sets this when a sync
+ * action fails in a way the user can recover from without losing reading
+ * data — currently only `license-required` (existing cloud-sync user opens
+ * the app after the paywall launches and the server returns 401 with
+ * `error: "license required"`). Future migration causes (e.g. unverified
+ * vault format, server-side revocation) would extend this union; the UI
+ * renders one `SyncMigrationDialog` keyed off the discriminant.
+ */
+export type PendingMigration = "license-required";
+
 const DEBOUNCE_MS = 5000;
 const MAX_JITTER_MS = 30000;
 
@@ -31,6 +42,8 @@ interface SyncStore {
   error: string | null;
   credentials: SyncCredentials | null;
   dialogOpen: boolean;
+  /** Non-null when sync hit a recoverable wall the user must decide how to handle. See PendingMigration. */
+  pendingMigration: PendingMigration | null;
 
   enableSync: (passphrase: string) => Promise<void>;
   restoreSync: (credentials: SyncCredentials) => void;
@@ -38,6 +51,17 @@ interface SyncStore {
   logout: () => Promise<void>;
   push: () => Promise<void>;
   pull: () => Promise<void>;
+  /**
+   * Switch an existing cloud-sync user to local-only WITHOUT touching the
+   * server vault. Used by the license-required migration flow — the server
+   * vault is unreachable (401), and our retention policy promises 90-day
+   * preservation, so the only safe action is local-side: drop vault keys
+   * (cloud key material), clear in-memory credentials, leave IndexedDB
+   * + DB keys intact so the user keeps reading offline.
+   */
+  migrateToLocalOnly: () => Promise<void>;
+  /** Close the migration dialog without taking any action. */
+  dismissPendingMigration: () => void;
   /**
    * Explicit "replace local with cloud" — bypasses pull's in-flight dedup
    * and the debounced push timer, then refreshes the in-memory feed and
@@ -86,12 +110,28 @@ async function deriveSyncCredentials(
   return ok({ vaultId: vaultIdResult.value, vaultKey: vaultKeyResult.value });
 }
 
+/**
+ * Detects the server's "license required" 401 in a pullVault error string.
+ * sync-handler.ts emits `{"ok":false,"error":"license required",...}` for
+ * authed endpoints when LAUNCH_PAID_TIER=1 and the request lacks a valid
+ * bearer; pullVault wraps that into `Sync pull failed (401): {...}`.
+ *
+ * Substring match (not regex) — the server payload is JSON-encoded and we
+ * only care about the human-readable error field. Future server changes
+ * to the error string need to coordinate with this matcher; see
+ * tests/stores/sync-store.test.ts for the contract.
+ */
+function isLicenseRequiredError(message: string): boolean {
+  return message.includes("license required");
+}
+
 export const useSyncStore = create<SyncStore>((set, get) => ({
   status: "local-only",
   lastSyncedAt: null,
   error: null,
   credentials: null,
   dialogOpen: false,
+  pendingMigration: null,
 
   enableSync: async (passphrase) => {
     // Derive vault keys and persist alongside existing DB keys
@@ -121,6 +161,26 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       lastSyncedAt: Date.now(),
       error: null,
     });
+  },
+
+  migrateToLocalOnly: async () => {
+    clearPendingTimers();
+    // Intentionally do NOT call deleteVault(credentials) — the server would
+    // 401 (no license) and our retention policy promises 90-day preservation
+    // so the user can recover by subscribing later. Local-side: drop vault
+    // keys, clear credentials, keep IndexedDB + DB keys so reading continues.
+    removeVaultKeys();
+    set({
+      status: "local-only",
+      lastSyncedAt: null,
+      error: null,
+      credentials: null,
+      pendingMigration: null,
+    });
+  },
+
+  dismissPendingMigration: () => {
+    set({ pendingMigration: null });
   },
 
   disableSync: async () => {
@@ -186,7 +246,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       set({ status: "syncing", error: null });
       const pullResult = await pullVault(credentials);
       if (!pullResult.ok) {
-        set({ status: "error", error: pullResult.error });
+        const pendingMigration: PendingMigration | null =
+          isLicenseRequiredError(pullResult.error) ? "license-required" : null;
+        set({ status: "error", error: pullResult.error, pendingMigration });
         return;
       }
 

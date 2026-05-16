@@ -145,18 +145,22 @@ function ErrorState() {
 }
 
 async function loadAll(): Promise<StatsData> {
+  // /api/stats-sync is the only required endpoint — vault count is meaningful
+  // local data that every deployment can resolve. The catalog endpoints are
+  // optional: self-hosters who don't wire the Upstash catalog adapter get
+  // 404s, and the page should still render rather than show a hard error.
   const [popular, count, sync] = await Promise.all([
-    fetchJson<{ ok: boolean; feeds?: CatalogFeedDTO[]; error?: string }>(
+    fetchJsonOptional<{ ok: boolean; feeds?: CatalogFeedDTO[]; error?: string }>(
       `/api/catalog?action=popular&limit=${TOP_FEED_LIMIT}`,
     ),
-    fetchJson<{ ok: boolean; count?: number; error?: string }>(`/api/catalog?action=count`),
+    fetchJsonOptional<{ ok: boolean; count?: number; error?: string }>(`/api/catalog?action=count`),
     fetchJson<{ ok: boolean; vaults?: number; error?: string }>(`/api/stats-sync`),
   ]);
-  if (!popular.ok || !count.ok || !sync.ok) throw new Error("stats endpoint failed");
+  if (!sync.ok) throw new Error("stats endpoint failed");
   return {
     vaults: sync.vaults ?? 0,
-    totalFeeds: count.count ?? 0,
-    topFeeds: popular.feeds ?? [],
+    totalFeeds: count?.count ?? 0,
+    topFeeds: popular?.feeds ?? [],
   };
 }
 
@@ -164,6 +168,18 @@ async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as T;
+}
+
+/** Returns null on any error — for endpoints whose absence should be a soft
+ * degradation, not a hard failure. */
+async function fetchJsonOptional<T>(url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 function hostFromUrl(url: string): string {

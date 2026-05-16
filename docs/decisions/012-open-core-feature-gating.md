@@ -30,6 +30,25 @@ A single repo with a small, well-tested gating layer:
 | **Self-hosted** | `VITE_SELF_HOSTED=1` | hidden | bypassed | free (operator's own server) |
 | **Dev / local** | neither | hidden | tier defaults to free; coming-soon features stay locked | free |
 
+### Why two flags (`VITE_PAID_TIER_VISIBLE` + `LAUNCH_PAID_TIER`), not one
+
+They live in different process boundaries and answer different questions:
+
+| Flag | Layer | What it controls | When you flip it |
+|---|---|---|---|
+| `VITE_PAID_TIER_VISIBLE` | **Build-time** (baked into JS bundle by Vite — `import.meta.env`) | Does the **UI** show Subscribe buttons, pricing widgets, license status chip? Pure cosmetic — what users *see*. | First. Existing users see pricing but everything keeps working. |
+| `LAUNCH_PAID_TIER` | **Runtime** (server-side `process.env`) | Does `/api/sync` reject requests without a valid bearer with HTTP 401 `license required`? Hard enforcement — what users *can do*. | Second, after soak. This is the moment "free for everyone" becomes "paid required". |
+
+The two-step exists so you can ship pricing visibility and watch real funnel metrics for a day before flipping enforcement. Collapsing into one flag would forfeit that soak window.
+
+**Post-launch invariant:** both should be `=1` together. If `LAUNCH_PAID_TIER=1` without `VITE_PAID_TIER_VISIBLE=1`, existing users hit 401s with no Subscribe affordance — `SyncMigrationDialog` (the graceful migration UX) still kicks in via `pendingMigration: "license-required"`, but the user never sees a Subscribe button in the chrome.
+
+### Graceful migration off gated features
+
+Any gated feature that can fail mid-session (i.e. has a server-side enforcement path) must surface a recoverable dialog, not a raw error. `cloud-sync` does this via `pendingMigration` + `SyncMigrationDialog`. Pure client-side features (`auto-organize`) degrade in-place — the UI swaps to an Upgrade CTA, the store action toasts and no-ops. Coming-soon features never enter an error path because their code isn't shipped.
+
+Extend `PendingMigration` (currently `"license-required"`) with new discriminants when adding future server-enforced features rather than spawning sibling dialogs.
+
 ### Defense-in-depth at the store boundary
 
 The UI gate (popover offering "Upgrade — $5/mo" instead of "Organize now") is the visible path. Stores also call `gateState` at the action level (`feed-store.applyAutoOrganize`) so that programmatic callers — a future keyboard shortcut, a script in the dev console, an extension — can't bypass the UI check. On a locked action, the store no-ops and toasts.
