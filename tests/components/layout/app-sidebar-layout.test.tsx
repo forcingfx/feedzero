@@ -160,6 +160,20 @@ describe("AppSidebar layout structure", () => {
       expect(screen.getByText(/^Synced$/)).toBeInTheDocument();
     });
 
+    it("renders the Settings label centered (single-line) when no chip is visible", () => {
+      // For local-only online users SyncBadge returns null. The footer
+      // trigger should collapse to a single, vertically-centered "Settings"
+      // line instead of leaving an empty second row that makes the label
+      // look top-aligned.
+      useSyncStore.setState({ status: "local-only" });
+      renderSidebar();
+      const settingsLabel = screen.getByText("Settings");
+      const container = settingsLabel.parentElement as HTMLElement;
+      // Single-line layout uses flex with items-center, not the two-row grid.
+      expect(container.className).toContain("items-center");
+      expect(container.className).not.toContain("grid");
+    });
+
     it("shows a Local pill inside the Settings dropdown when status is local-only", async () => {
       useSyncStore.setState({ status: "local-only" });
       useFeedStore.setState({
