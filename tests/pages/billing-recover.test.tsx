@@ -164,7 +164,12 @@ describe("<BillingRecover>", () => {
 
     expect(screen.queryByText(/didn't get an email/i)).toBeNull();
 
-    vi.advanceTimersByTime(60_000);
+    // Use the async variant so the timer callback's React state updates
+    // get flushed via microtask scheduling before waitFor polls. The sync
+    // `advanceTimersByTime` races the React update queue under load (full
+    // suite + multi-worker), causing intermittent CI failures even though
+    // the test passes in isolation.
+    await vi.advanceTimersByTimeAsync(60_000);
 
     await waitFor(() => {
       expect(screen.getByText(/didn't get an email/i)).toBeInTheDocument();
