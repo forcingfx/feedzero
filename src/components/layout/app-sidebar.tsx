@@ -32,6 +32,7 @@ import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
 import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
+import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
@@ -240,6 +241,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         </SidebarContent>
 
         <SidebarFooter>
+          <QuotaIndicator />
           <LocalStorageWarning />
           <SidebarMenu>
             <SidebarMenuItem>

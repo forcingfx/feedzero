@@ -13,6 +13,9 @@ import {
   selectCurrentUrl,
 } from "@/stores/import-store";
 import { useFeedStore } from "@/stores/feed-store";
+import { useLicenseStore } from "@/stores/license-store";
+import { isSelfHosted } from "@/core/features/self-hosted";
+import { checkFeedQuota, quotaErrorMessage } from "@/core/features/quotas";
 import { ImportProgress } from "./import-progress";
 import { ImportResults } from "./import-results";
 
@@ -98,6 +101,20 @@ export function ImportView({ onClose }: ImportViewProps) {
       const urls = await extractUrls(content);
       if (urls.length === 0) {
         setParseError("No valid feed URLs found");
+        return;
+      }
+
+      // Upfront quota check. The feed-store also gates per-URL, but doing
+      // it once here lets us refuse cleanly before kicking off a loop that
+      // would partially succeed and surface N cryptic per-URL failures.
+      const quota = checkFeedQuota({
+        currentCount: useFeedStore.getState().feeds.length,
+        delta: urls.length,
+        tier: useLicenseStore.getState().tier,
+        isSelfHosted: isSelfHosted(),
+      });
+      if (!quota.ok) {
+        setParseError(quotaErrorMessage(quota));
         return;
       }
 

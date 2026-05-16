@@ -1,0 +1,124 @@
+/**
+ * Quota refusal for OPML / URL-list import.
+ *
+ * The feed-store already gates addFeed per-URL — but for a 30-URL OPML on a
+ * free user at 0 feeds, that means the user gets 25 successes + 5 cryptic
+ * "limit exceeded" failures. ImportView pre-checks the total upfront and
+ * refuses with a clear error before kicking off the loop.
+ */
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { ImportView } from "@/components/settings/import-view";
+import { useFeedStore } from "@/stores/feed-store";
+import { useLicenseStore } from "@/stores/license-store";
+import { useImportStore } from "@/stores/import-store";
+
+vi.mock("@/core/features/self-hosted", () => ({
+  isSelfHosted: vi.fn(() => false),
+}));
+
+vi.mock("@/core/opml/url-list-parser", async () => {
+  const actual = await vi.importActual<typeof import("@/core/opml/url-list-parser")>(
+    "@/core/opml/url-list-parser",
+  );
+  return actual;
+});
+
+function seedFreeFeeds(count: number): void {
+  const feeds = Array.from({ length: count }, (_, i) => ({
+    id: `feed-${i}`,
+    url: `https://example.com/${i}.xml`,
+    title: `Feed ${i}`,
+    description: "",
+    lastUpdated: 0,
+  }));
+  useFeedStore.setState({
+    feeds: feeds as never,
+    selectedFeedId: null,
+    isLoading: false,
+    error: null,
+  });
+}
+
+describe("ImportView quota refusal", () => {
+  let addFeedMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    useLicenseStore.setState({ tier: "free", verifying: false });
+    seedFreeFeeds(20);
+    addFeedMock = vi.fn().mockResolvedValue({ ok: true });
+    useFeedStore.setState({ addFeed: addFeedMock } as never);
+    // import-store progresses to a "complete" view after a successful import;
+    // leaving that state would render the results panel instead of the form
+    // on the next test's render. Reset between tests.
+    useImportStore.getState().reset();
+  });
+
+  it("refuses upfront when URL list would push total past the free-tier cap, without calling addFeed", async () => {
+    const user = userEvent.setup();
+    render(<ImportView onClose={() => {}} />);
+
+    // Switch to text-input mode so we can paste a URL list synchronously.
+    await user.click(screen.getByLabelText(/paste text/i));
+
+    const ten = Array.from(
+      { length: 10 },
+      (_, i) => `https://example.com/import-${i}.xml`,
+    ).join("\n");
+    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    await user.click(textarea);
+    await user.paste(ten);
+
+    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+
+    // Tolerant of "exceed", "limit", "25"; what matters is that the user is
+    // told why and no addFeed call sneaks through.
+    expect(
+      await screen.findByText(/limit|exceed|25/i),
+    ).toBeInTheDocument();
+    expect(addFeedMock).not.toHaveBeenCalled();
+  });
+
+  it("imports normally when the count fits within the cap", async () => {
+    const user = userEvent.setup();
+    seedFreeFeeds(20);
+    useFeedStore.setState({ addFeed: addFeedMock } as never);
+    render(<ImportView onClose={() => {}} />);
+
+    await user.click(screen.getByLabelText(/paste text/i));
+    const four = Array.from(
+      { length: 4 },
+      (_, i) => `https://example.com/fits-${i}.xml`,
+    ).join("\n");
+    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    await user.click(textarea);
+    await user.paste(four);
+
+    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+
+    // 20 + 4 = 24, under the 25 cap — addFeed runs for each URL.
+    expect(addFeedMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("allows large imports for paid users (cap doesn't apply)", async () => {
+    const user = userEvent.setup();
+    useLicenseStore.setState({ tier: "personal", verifying: false });
+    seedFreeFeeds(20);
+    useFeedStore.setState({ addFeed: addFeedMock } as never);
+    render(<ImportView onClose={() => {}} />);
+
+    await user.click(screen.getByLabelText(/paste text/i));
+    const fifty = Array.from(
+      { length: 50 },
+      (_, i) => `https://example.com/paid-${i}.xml`,
+    ).join("\n");
+    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    await user.click(textarea);
+    await user.paste(fifty);
+
+    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+
+    expect(addFeedMock).toHaveBeenCalledTimes(50);
+  });
+});
