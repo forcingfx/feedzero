@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
-import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { useDroppable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import {
   SidebarMenu,
@@ -26,15 +28,29 @@ interface FolderItemProps {
   isSelected: boolean;
   /** Called when the user wants to view the folder's aggregated feed. */
   onSelect: () => void;
+  /** When true, the folder header shows a grip handle and is reorderable
+   *  via @dnd-kit/sortable. Used in custom sort mode. */
+  sortable?: boolean;
 }
 
-export function FolderItem({ folder, children, onDelete, isSelected, onSelect }: FolderItemProps) {
+export function FolderItem({ folder, children, onDelete, isSelected, onSelect, sortable = false }: FolderItemProps) {
   const [open, setOpen] = useState(true);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const renameFolder = useFeedStore((s) => s.renameFolder);
   const updateFolderColor = useFeedStore((s) => s.updateFolderColor);
-  const { setNodeRef, isOver } = useDroppable({ id: folder.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: folder.id });
+  const sortableHook = useSortable({ id: folder.id, disabled: !sortable });
+  const sortStyle: React.CSSProperties = sortable && sortableHook.transform
+    ? { transform: CSS.Transform.toString(sortableHook.transform), transition: sortableHook.transition }
+    : {};
+
+  /** Combine the droppable ref (feed→folder drop target) with the sortable
+   *  ref (folder reorder) into a single ref callback for the outer <li>. */
+  function setNodeRef(node: HTMLLIElement | null) {
+    setDropRef(node);
+    if (sortable) sortableHook.setNodeRef(node);
+  }
 
   function handleStartRename() {
     setRenameValue(folder.name);
@@ -59,6 +75,7 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect }:
   return (
     <li
       ref={setNodeRef}
+      style={{ opacity: sortable && sortableHook.isDragging ? 0.4 : 1, ...sortStyle }}
       className={isOver ? "bg-accent/50 rounded-md transition-colors" : "transition-colors"}
     >
       <Collapsible.Root className="group/folder" open={open} onOpenChange={setOpen}>
@@ -66,6 +83,17 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect }:
           data-sidebar="menu-item"
           className="group/menu-item relative"
         >
+          {sortable && (
+            <button
+              type="button"
+              {...sortableHook.listeners}
+              {...sortableHook.attributes}
+              aria-label={`Drag folder ${folder.name}`}
+              className="absolute -left-2 top-1.5 z-20 flex size-5 items-center justify-center cursor-grab opacity-0 group-hover/menu-item:opacity-100 transition-opacity"
+            >
+              <GripVertical className="size-3 text-muted-foreground" />
+            </button>
+          )}
           {isRenaming ? (
             <form className="flex items-center gap-2 px-2 py-1" onSubmit={handleSubmitRename}>
               <ChevronRight className="size-3.5" />

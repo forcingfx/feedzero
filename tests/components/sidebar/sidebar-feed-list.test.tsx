@@ -333,5 +333,66 @@ describe("SidebarFeedList", () => {
       expect(gammaIdx).toBeLessThan(alphaIdx);
       expect(alphaIdx).toBeLessThan(betaIdx);
     });
+
+    it("in custom mode renders folders in the stored custom order", () => {
+      useFeedStore.setState({
+        feeds: [],
+        folders: [
+          { id: "a", name: "Alpha", createdAt: 0 },
+          { id: "b", name: "Beta", createdAt: 0 },
+          { id: "c", name: "Gamma", createdAt: 0 },
+        ],
+        selectedFeedId: null,
+        feedSortMode: "custom",
+        feedCustomOrder: [],
+        folderCustomOrder: ["c", "a", "b"],
+      });
+
+      const { container } = renderList();
+
+      const headers = container.querySelectorAll("[data-sidebar='menu-button']");
+      const names = Array.from(headers).map((b) => b.textContent?.trim()).filter(Boolean);
+      const c = names.findIndex((t) => t === "Gamma");
+      const a = names.findIndex((t) => t === "Alpha");
+      const b = names.findIndex((t) => t === "Beta");
+      expect(c).toBeLessThan(a);
+      expect(a).toBeLessThan(b);
+    });
+
+    it("in custom mode each folder header gets a drag handle", () => {
+      useFeedStore.setState({
+        feeds: [],
+        folders: [
+          { id: "a", name: "Alpha", createdAt: 0 },
+          { id: "b", name: "Beta", createdAt: 0 },
+        ],
+        selectedFeedId: null,
+        feedSortMode: "custom",
+        feedCustomOrder: [],
+        folderCustomOrder: ["a", "b"],
+      });
+      renderList();
+      expect(
+        screen.getByRole("button", { name: /drag folder alpha/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /drag folder beta/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("non-custom modes do not show folder drag handles", () => {
+      useFeedStore.setState({
+        feeds: [],
+        folders: [{ id: "a", name: "Alpha", createdAt: 0 }],
+        selectedFeedId: null,
+        feedSortMode: "name",
+        feedCustomOrder: [],
+        folderCustomOrder: [],
+      });
+      renderList();
+      expect(
+        screen.queryByRole("button", { name: /drag folder alpha/i }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

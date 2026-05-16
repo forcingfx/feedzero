@@ -63,6 +63,7 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
   const folderCustomOrder = useFeedStore((s) => s.folderCustomOrder);
   const setFeedSortMode = useFeedStore((s) => s.setFeedSortMode);
   const reorderFeeds = useFeedStore((s) => s.reorderFeeds);
+  const reorderFolders = useFeedStore((s) => s.reorderFolders);
   const articlesByFeedId = useArticleStore((s) => s.articlesByFeedId);
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -122,13 +123,28 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
     if (!over) return;
     const draggedId = active.id as string;
     const overId = over.id as string;
+    const draggedIsFolder = folderIds.has(draggedId);
+    const overIsFolder = folderIds.has(overId);
 
-    // Dragging over a folder → move feed into folder
-    if (folderIds.has(overId)) {
+    // Custom mode: reorder folders when both sides of the drag are folders.
+    // Must be checked BEFORE the feed→folder branch below, otherwise dragging
+    // folder A over folder B would file folder A inside folder B.
+    if (feedSortMode === "custom" && draggedIsFolder && overIsFolder) {
+      const currentOrder = sortedFolders.map((f) => f.id);
+      const oldIdx = currentOrder.indexOf(draggedId);
+      const newIdx = currentOrder.indexOf(overId);
+      if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
+        reorderFolders(arrayMove(currentOrder, oldIdx, newIdx));
+      }
+      return;
+    }
+
+    // Feed dragged over a folder → move feed into folder
+    if (overIsFolder && !draggedIsFolder) {
       moveFeedToFolder(draggedId, overId);
       return;
     }
-    if (overId === "unfiled") {
+    if (overId === "unfiled" && !draggedIsFolder) {
       moveFeedToFolder(draggedId, null);
       return;
     }
@@ -150,6 +166,7 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
 
   const isCustomMode = feedSortMode === "custom";
   const sortableIds = isCustomMode ? sortedUnfiledFeeds.map((f) => f.id) : [];
+  const folderSortableIds = isCustomMode ? sortedFolders.map((f) => f.id) : [];
 
   return (
     <>
@@ -201,37 +218,40 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
           </UnfiledDropZone>
         </SortableContext>
 
-        {sortedFolders.map((folder) => {
-          const folderFeeds = feedsByFolder.get(folder.id) ?? [];
-          const sortedFolderFeeds = feedSortMode === "count"
-            ? [...folderFeeds].sort(
-                (a, b) =>
-                  selectUnreadCount({ articlesByFeedId }, b.id) -
-                  selectUnreadCount({ articlesByFeedId }, a.id),
-              )
-            : folderFeeds;
-          return (
-            <FolderItem
-              key={folder.id}
-              folder={folder}
-              isSelected={selectedFeedId === toFolderFeedId(folder.id)}
-              onSelect={() => onFeedSelect(toFolderFeedId(folder.id))}
-              onDelete={() => setFolderToDelete(folder)}
-            >
-              {sortedFolderFeeds.map((feed) => (
-                <FeedItem
-                  key={feed.id}
-                  feed={feed}
-                  isSelected={feed.id === selectedFeedId}
-                  inFolder
-                  onSelect={() => onFeedSelect(feed.id)}
-                  onRemove={() => setFeedToRemove(feed)}
-                  onReload={() => setFeedToReload(feed)}
-                />
-              ))}
-            </FolderItem>
-          );
-        })}
+        <SortableContext items={folderSortableIds} strategy={verticalListSortingStrategy}>
+          {sortedFolders.map((folder) => {
+            const folderFeeds = feedsByFolder.get(folder.id) ?? [];
+            const sortedFolderFeeds = feedSortMode === "count"
+              ? [...folderFeeds].sort(
+                  (a, b) =>
+                    selectUnreadCount({ articlesByFeedId }, b.id) -
+                    selectUnreadCount({ articlesByFeedId }, a.id),
+                )
+              : folderFeeds;
+            return (
+              <FolderItem
+                key={folder.id}
+                folder={folder}
+                sortable={isCustomMode}
+                isSelected={selectedFeedId === toFolderFeedId(folder.id)}
+                onSelect={() => onFeedSelect(toFolderFeedId(folder.id))}
+                onDelete={() => setFolderToDelete(folder)}
+              >
+                {sortedFolderFeeds.map((feed) => (
+                  <FeedItem
+                    key={feed.id}
+                    feed={feed}
+                    isSelected={feed.id === selectedFeedId}
+                    inFolder
+                    onSelect={() => onFeedSelect(feed.id)}
+                    onRemove={() => setFeedToRemove(feed)}
+                    onReload={() => setFeedToReload(feed)}
+                  />
+                ))}
+              </FolderItem>
+            );
+          })}
+        </SortableContext>
 
         <DragOverlay>
           {activeDragId ? (
