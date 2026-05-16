@@ -33,6 +33,7 @@ import { useIsOnline } from "@/hooks/use-online.ts";
 import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
+import { BrandMark } from "@/components/brand/brand-mark.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
@@ -210,7 +211,8 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         <SidebarHeader>
           <div className="flex flex-col gap-2 px-2 py-2">
             <div className="flex items-center justify-between">
-              <span className="text-lg font-semibold tracking-tight">
+              <span className="inline-flex items-center gap-2 text-lg font-semibold tracking-tight">
+                <BrandMark className="size-6" alt="" />
                 FeedZero
               </span>
               <div className="flex items-center gap-1">

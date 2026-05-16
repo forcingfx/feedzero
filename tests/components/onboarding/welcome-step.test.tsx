@@ -29,6 +29,13 @@ describe("WelcomeStep", () => {
     expect(screen.getByText("Welcome to FeedZero")).toBeInTheDocument();
   });
 
+  it("shows the FeedZero brand mark above the heading", () => {
+    renderInDialog(<WelcomeStep />);
+    // Radix renders the dialog through a portal so the icon lives on document.body.
+    const mark = document.body.querySelector("img[src='/icon-192.png']");
+    expect(mark).not.toBeNull();
+  });
+
   it("renders tagline about privacy", () => {
     renderInDialog(<WelcomeStep />);
     expect(screen.getByText(/your feeds, your privacy/i)).toBeInTheDocument();

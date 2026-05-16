@@ -5,9 +5,14 @@ import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { useFeatureGate } from "@/hooks/use-feature-gate";
 import { useLicenseStore } from "@/stores/license-store";
 import { isSelfHosted } from "@/core/features/self-hosted";
+import { isPaidTierActive } from "@/core/features/paid-tier-active";
 
 vi.mock("@/core/features/self-hosted", () => ({
   isSelfHosted: vi.fn(),
+}));
+
+vi.mock("@/core/features/paid-tier-active", () => ({
+  isPaidTierActive: vi.fn(),
 }));
 
 function LocationProbe() {
@@ -49,6 +54,9 @@ describe("useFeatureGate", () => {
   beforeEach(() => {
     useLicenseStore.setState({ tier: "free", verifying: false });
     vi.mocked(isSelfHosted).mockReturnValue(false);
+    // Default to "paid tier launched" so existing gate tests assert the
+    // tier-locked path. The dedicated paid-tier-inactive test below flips it.
+    vi.mocked(isPaidTierActive).mockReturnValue(true);
   });
 
   it("free user → tier-locked for auto-organize", () => {
@@ -78,6 +86,13 @@ describe("useFeatureGate", () => {
     renderWithRouter(<GateProbe feature="ai-signal" />);
     expect(screen.getByTestId("enabled")).toHaveTextContent("false");
     expect(screen.getByTestId("reason")).toHaveTextContent("not-built");
+  });
+
+  it("free user → paid-tier-inactive bypass when paid tier hasn't launched", () => {
+    vi.mocked(isPaidTierActive).mockReturnValue(false);
+    renderWithRouter(<GateProbe feature="auto-organize" />);
+    expect(screen.getByTestId("enabled")).toHaveTextContent("true");
+    expect(screen.getByTestId("reason")).toHaveTextContent("paid-tier-inactive");
   });
 
   it("promptUpgrade navigates to /?subscribe=personal-monthly", async () => {

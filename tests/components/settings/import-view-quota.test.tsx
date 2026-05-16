@@ -18,6 +18,13 @@ vi.mock("@/core/features/self-hosted", () => ({
   isSelfHosted: vi.fn(() => false),
 }));
 
+vi.mock("@/core/features/paid-tier-active", () => ({
+  // Existing tests model the post-launch contract (cap enforced).
+  // The pre-launch / inactive case is exercised in the dedicated test
+  // at the bottom of the file.
+  isPaidTierActive: vi.fn(() => true),
+}));
+
 vi.mock("@/core/opml/url-list-parser", async () => {
   const actual = await vi.importActual<typeof import("@/core/opml/url-list-parser")>(
     "@/core/opml/url-list-parser",
@@ -119,6 +126,32 @@ describe("ImportView quota refusal", () => {
 
     await user.click(screen.getByRole("button", { name: /import feeds/i }));
 
+    expect(addFeedMock).toHaveBeenCalledTimes(50);
+  });
+
+  it("allows large free-tier imports when the paid tier is inactive (pre-launch)", async () => {
+    const { isPaidTierActive } = await import("@/core/features/paid-tier-active");
+    vi.mocked(isPaidTierActive).mockReturnValue(false);
+
+    const user = userEvent.setup();
+    useLicenseStore.setState({ tier: "free", verifying: false });
+    seedFreeFeeds(20);
+    useFeedStore.setState({ addFeed: addFeedMock } as never);
+    render(<ImportView onClose={() => {}} />);
+
+    await user.click(screen.getByLabelText(/paste text/i));
+    const fifty = Array.from(
+      { length: 50 },
+      (_, i) => `https://example.com/prelaunch-${i}.xml`,
+    ).join("\n");
+    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    await user.click(textarea);
+    await user.paste(fifty);
+
+    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+
+    // 20 + 50 = 70, well over the 25 cap — but the paid tier hasn't launched,
+    // so there's no upgrade path to point users at. Allow the import.
     expect(addFeedMock).toHaveBeenCalledTimes(50);
   });
 });

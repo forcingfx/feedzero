@@ -1,4 +1,4 @@
-import { Rss, Plus, BookOpen, ShieldCheck } from "lucide-react";
+import { Plus, BookOpen, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useOnboardingStore } from "@/stores/onboarding-store";
+import { BrandMark } from "@/components/brand/brand-mark";
 
 const FEATURES = [
   {
@@ -33,9 +34,7 @@ export function WelcomeStep() {
   return (
     <>
       <div className="flex justify-center py-4">
-        <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
-          <Rss className="size-8 text-primary" />
-        </div>
+        <BrandMark className="size-16" />
       </div>
 
       <DialogHeader className="text-center sm:text-center">

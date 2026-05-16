@@ -4,10 +4,17 @@ import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 import { useLicenseStore } from "../../src/stores/license-store.ts";
 import { isSelfHosted } from "../../src/core/features/self-hosted.ts";
+import { isPaidTierActive } from "../../src/core/features/paid-tier-active.ts";
 import { toast } from "sonner";
 
 vi.mock("../../src/core/features/self-hosted.ts", () => ({
   isSelfHosted: vi.fn(() => false),
+}));
+
+vi.mock("../../src/core/features/paid-tier-active.ts", () => ({
+  // Default to "paid tier launched" so quota/gate tests in this file assert
+  // the enforcement path. The new pre-launch test below flips it false.
+  isPaidTierActive: vi.fn(() => true),
 }));
 
 vi.mock("sonner", () => ({
@@ -79,6 +86,7 @@ describe("feed-store", () => {
     // auto-organize gate. Free / locked variants set their own tier.
     useLicenseStore.setState({ tier: "personal", verifying: false });
     vi.mocked(isSelfHosted).mockReturnValue(false);
+    vi.mocked(isPaidTierActive).mockReturnValue(true);
   });
 
   it("starts empty", () => {
@@ -291,6 +299,25 @@ describe("feed-store", () => {
         await useFeedStore.getState().addFeed("https://new.com/feed");
 
         expect(useFeedStore.getState().error).toMatch(/Free limit of 25/);
+      });
+
+      it("does NOT block Free user with 100 feeds when the paid tier is inactive (pre-launch)", async () => {
+        useLicenseStore.setState({ tier: "free", verifying: false });
+        vi.mocked(isPaidTierActive).mockReturnValue(false);
+        seedFeeds(100);
+        const feed = mockFeed("new", "New Feed");
+        vi.mocked(addFeedFlow).mockResolvedValue({
+          ok: true,
+          value: { feed, articles: [] },
+        });
+        vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
+
+        const result = await useFeedStore
+          .getState()
+          .addFeed("https://new.com/feed");
+
+        expect(result.ok).toBe(true);
+        expect(addFeedFlow).toHaveBeenCalledOnce();
       });
     });
   });
@@ -748,6 +775,26 @@ describe("feed-store", () => {
       it("runs normally when tier is free but self-hosted is enabled", async () => {
         useLicenseStore.setState({ tier: "free" });
         vi.mocked(isSelfHosted).mockReturnValue(true);
+
+        const f1 = mockFeed("f1", "Hacker News");
+        useFeedStore.setState({ feeds: [f1], folders: [] });
+        vi.mocked(addFolder).mockResolvedValue({ ok: true, value: true });
+        vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [] });
+        vi.mocked(getFeed).mockResolvedValue({ ok: true, value: f1 });
+        vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+        vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1] });
+
+        await useFeedStore.getState().applyAutoOrganize([
+          { folderName: "Tech", feedIds: ["f1"] },
+        ]);
+
+        expect(addFolder).toHaveBeenCalledTimes(1);
+        expect(toast).not.toHaveBeenCalled();
+      });
+
+      it("runs normally for free user when the paid tier is inactive (pre-launch)", async () => {
+        useLicenseStore.setState({ tier: "free" });
+        vi.mocked(isPaidTierActive).mockReturnValue(false);
 
         const f1 = mockFeed("f1", "Hacker News");
         useFeedStore.setState({ feeds: [f1], folders: [] });

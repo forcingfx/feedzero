@@ -68,6 +68,21 @@ describe("StatsPage", () => {
     vi.restoreAllMocks();
   });
 
+  it("shows the FeedZero brand mark next to the page title", async () => {
+    globalThis.fetch = fetchMockResponses({
+      "action=popular": { ok: true, feeds: [] },
+      "action=count": { ok: true, count: 0 },
+      "stats-sync": { ok: true, vaults: 0 },
+    });
+    renderStats();
+    await waitFor(() => {
+      expect(screen.getByText(/FeedZero stats/i)).toBeInTheDocument();
+    });
+    expect(
+      document.body.querySelector("img[src='/icon-192.png']"),
+    ).not.toBeNull();
+  });
+
   it("renders headline numbers (vault count and feed count)", async () => {
     globalThis.fetch = fetchMockResponses({
       "action=popular": { ok: true, feeds: POPULAR_FEEDS },

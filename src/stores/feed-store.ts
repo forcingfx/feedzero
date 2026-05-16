@@ -20,6 +20,7 @@ import { useArticleStore } from "./article-store.ts";
 import { useLicenseStore } from "./license-store.ts";
 import { gateState } from "../core/features/feature-gates.ts";
 import { isSelfHosted } from "../core/features/self-hosted.ts";
+import { isPaidTierActive } from "../core/features/paid-tier-active.ts";
 import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
 import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
@@ -132,6 +133,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       currentCount: get().feeds.length,
       tier: useLicenseStore.getState().tier,
       isSelfHosted: isSelfHosted(),
+      paidTierActive: isPaidTierActive(),
     });
     if (!quota.ok) {
       const message = quotaErrorMessage(quota);
@@ -353,6 +355,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       "auto-organize",
       useLicenseStore.getState().tier,
       isSelfHosted(),
+      isPaidTierActive(),
     );
     if (!gate.enabled) {
       toast("Auto-organize is a Personal feature. Subscribe to unlock.");
