@@ -212,6 +212,89 @@ describe("sync-store", () => {
     });
   });
 
+  describe("license-required migration (existing cloud-sync user post-paywall)", () => {
+    it("sets pendingMigration='license-required' when pull returns a 401 license-required error", async () => {
+      mockPullVault.mockResolvedValue({
+        ok: false,
+        error: 'Sync pull failed (401): {"ok":false,"error":"license required","traceId":"req_be627fd1"}',
+      });
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        pendingMigration: null,
+      });
+
+      await useSyncStore.getState().pull();
+
+      expect(useSyncStore.getState().pendingMigration).toBe("license-required");
+      expect(useSyncStore.getState().status).toBe("error");
+    });
+
+    it("does NOT set pendingMigration for non-license pull failures (network errors etc.)", async () => {
+      mockPullVault.mockResolvedValue({
+        ok: false,
+        error: "Sync pull failed: fetch error",
+      });
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        pendingMigration: null,
+      });
+
+      await useSyncStore.getState().pull();
+
+      expect(useSyncStore.getState().pendingMigration).toBeNull();
+      expect(useSyncStore.getState().status).toBe("error");
+    });
+
+    it("migrateToLocalOnly clears credentials, sets status=local-only, and clears pendingMigration", async () => {
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        status: "error",
+        pendingMigration: "license-required",
+        error: "license required",
+      });
+
+      await useSyncStore.getState().migrateToLocalOnly();
+
+      const s = useSyncStore.getState();
+      expect(s.credentials).toBeNull();
+      expect(s.status).toBe("local-only");
+      expect(s.pendingMigration).toBeNull();
+      expect(s.error).toBeNull();
+    });
+
+    it("migrateToLocalOnly does NOT attempt to delete the server vault (policy: 90-day retention)", async () => {
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        pendingMigration: "license-required",
+      });
+
+      await useSyncStore.getState().migrateToLocalOnly();
+
+      // The server vault delete would 401 anyway (no license) — skipping it
+      // is the whole point. Privacy policy promises 90-day retention then
+      // auto-delete by our retention cron (separate ops surface).
+      expect(mockDeleteVault).not.toHaveBeenCalled();
+    });
+
+    it("dismissPendingMigration clears the flag without changing sync state (user dismissed dialog without choosing)", async () => {
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        status: "error",
+        pendingMigration: "license-required",
+        error: "license required",
+      });
+
+      useSyncStore.getState().dismissPendingMigration();
+
+      const s = useSyncStore.getState();
+      expect(s.pendingMigration).toBeNull();
+      // sync state untouched — user just closed the modal. The dialog can
+      // re-appear on the next pull attempt (which will still 401).
+      expect(s.credentials).toBe(mockCredentials);
+      expect(s.status).toBe("error");
+    });
+  });
+
   describe("forceResync", () => {
     it("returns err when no credentials are set", async () => {
       useSyncStore.setState({ credentials: null });
