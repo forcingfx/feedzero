@@ -15,6 +15,7 @@ import {
 import { useFeedStore } from "@/stores/feed-store";
 import { useLicenseStore } from "@/stores/license-store";
 import { isSelfHosted } from "@/core/features/self-hosted";
+import { isPaidTierActive } from "@/core/features/paid-tier-active";
 import { checkFeedQuota, quotaErrorMessage } from "@/core/features/quotas";
 import { ImportProgress } from "./import-progress";
 import { ImportResults } from "./import-results";
@@ -112,6 +113,7 @@ export function ImportView({ onClose }: ImportViewProps) {
         delta: urls.length,
         tier: useLicenseStore.getState().tier,
         isSelfHosted: isSelfHosted(),
+        paidTierActive: isPaidTierActive(),
       });
       if (!quota.ok) {
         setParseError(quotaErrorMessage(quota));

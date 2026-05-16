@@ -35,16 +35,25 @@ export interface FeedQuotaArgs {
   delta?: number;
   tier: Tier;
   isSelfHosted: boolean;
+  /**
+   * Whether the paid tier is active in this build (read from
+   * `VITE_PAID_TIER_VISIBLE` via `isPaidTierActive()`). When false, the
+   * paid tier is dormant — Subscribe surfaces are hidden, /api/sync is
+   * unauthenticated, and Free users get full functionality (no quota
+   * cap). The cap is only meaningful once the upgrade path exists.
+   */
+  paidTierActive: boolean;
 }
 
 /**
  * Decide whether adding `delta` (default 1) more feeds is allowed under the
- * current tier and self-hosted state.
+ * current tier, self-hosted state, and paid-tier launch state.
  *
  * Returns `ok: true` when:
+ *  - the paid tier is dormant (pre-launch — no upgrade path exists yet,
+ *    so the cap would only frustrate users),
  *  - the user is on a paid tier (personal or pro),
- *  - the user is self-hosted (the FREE_FEED_LIMIT cap doesn't apply to
- *    operators running their own server), or
+ *  - the user is self-hosted, or
  *  - the total after the add is at or below FREE_FEED_LIMIT.
  *
  * Returns a structured error otherwise so the UI can render an Upgrade prompt
@@ -52,6 +61,7 @@ export interface FeedQuotaArgs {
  */
 export function checkFeedQuota(args: FeedQuotaArgs): QuotaCheck {
   const delta = args.delta ?? 1;
+  if (!args.paidTierActive) return { ok: true };
   if (args.tier !== "free") return { ok: true };
   if (args.isSelfHosted) return { ok: true };
   if (args.currentCount + delta > FREE_FEED_LIMIT) {

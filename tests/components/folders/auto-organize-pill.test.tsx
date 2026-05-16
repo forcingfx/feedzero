@@ -12,6 +12,12 @@ vi.mock("@/core/features/self-hosted", () => ({
   isSelfHosted: vi.fn(() => false),
 }));
 
+vi.mock("@/core/features/paid-tier-active", () => ({
+  // Free-tier gating in this suite asserts the post-launch contract.
+  // The paid-tier-inactive bypass is exercised in feature-gates.test.ts.
+  isPaidTierActive: vi.fn(() => true),
+}));
+
 function LocationProbe() {
   const location = useLocation();
   return (

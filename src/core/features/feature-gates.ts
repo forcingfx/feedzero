@@ -57,6 +57,15 @@ export const FEATURE_MAP: Record<Feature, FeatureSpec> = {
 export type GateReason =
   | "ok"
   | "self-hosted-bypass"
+  /**
+   * The paid tier is dormant in this build (VITE_PAID_TIER_VISIBLE !== "1").
+   * No Subscribe path exists, so the gate relaxes for shipped features —
+   * everyone gets full functionality until the paid tier is launched.
+   * Distinct from `self-hosted-bypass` so telemetry/UI can distinguish
+   * "operator running their own server" from "vendor hasn't launched
+   * paid yet".
+   */
+  | "paid-tier-inactive"
   | "tier-locked"
   | "not-built";
 
@@ -69,21 +78,33 @@ export interface GateState {
 const TIER_ORDER: Record<Tier, number> = { free: 0, personal: 1, pro: 2 };
 
 /**
- * Evaluate the gate for a feature given the current user's tier and the
- * self-hosted flag. Pure — same inputs always yield the same output.
+ * Evaluate the gate for a feature given the current user's tier, the
+ * self-hosted flag, and whether the paid tier has been launched.
+ * Pure — same inputs always yield the same output.
  *
- * Precedence: `not-built` (status) > `self-hosted-bypass` > tier check.
- * `not-built` wins over self-hosted because flipping the flag should not
- * pretend a feature exists when its code hasn't shipped.
+ * Precedence:
+ *   `not-built` (status)
+ *   > `paid-tier-inactive` (entire monetization layer dormant)
+ *   > `self-hosted-bypass`
+ *   > tier check.
+ *
+ * `not-built` wins because flipping any flag should not pretend a
+ * feature exists when its code hasn't shipped. `paid-tier-inactive`
+ * outranks self-hosted because it's a build-wide signal that there
+ * is no upgrade path at all, so the gate is meaningless.
  */
 export function gateState(
   feature: Feature,
   currentTier: Tier,
   isSelfHosted: boolean,
+  paidTierActive: boolean,
 ): GateState {
   const spec = FEATURE_MAP[feature];
   if (spec.status === "coming-soon") {
     return { enabled: false, reason: "not-built", requiredTier: spec.requiredTier };
+  }
+  if (!paidTierActive) {
+    return { enabled: true, reason: "paid-tier-inactive", requiredTier: spec.requiredTier };
   }
   if (isSelfHosted) {
     return { enabled: true, reason: "self-hosted-bypass", requiredTier: spec.requiredTier };

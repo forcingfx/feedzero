@@ -12,6 +12,7 @@ describe("checkFeedQuota", () => {
         currentCount: 10,
         tier: "free",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
     });
@@ -21,6 +22,7 @@ describe("checkFeedQuota", () => {
         currentCount: FREE_FEED_LIMIT - 1,
         tier: "free",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
     });
@@ -30,6 +32,7 @@ describe("checkFeedQuota", () => {
         currentCount: FREE_FEED_LIMIT,
         tier: "free",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -47,6 +50,7 @@ describe("checkFeedQuota", () => {
         delta: 10,
         tier: "free",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -60,6 +64,7 @@ describe("checkFeedQuota", () => {
         delta: 10,
         tier: "free",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
     });
@@ -70,6 +75,7 @@ describe("checkFeedQuota", () => {
         delta: 100,
         tier: "free",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(false);
     });
@@ -81,6 +87,7 @@ describe("checkFeedQuota", () => {
         currentCount: 5000,
         tier: "personal",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
     });
@@ -91,6 +98,7 @@ describe("checkFeedQuota", () => {
         delta: 1000,
         tier: "personal",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
     });
@@ -102,8 +110,42 @@ describe("checkFeedQuota", () => {
         currentCount: 5000,
         tier: "pro",
         isSelfHosted: false,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
+    });
+  });
+
+  describe("paid-tier-inactive bypass (pre-launch / paid tier dormant)", () => {
+    it("allows free users to add feeds with no count limit when paid tier is inactive", () => {
+      const result = checkFeedQuota({
+        currentCount: 5000,
+        tier: "free",
+        isSelfHosted: false,
+        paidTierActive: false,
+      });
+      expect(result.ok).toBe(true);
+    });
+
+    it("allows free-tier bulk imports of any size when paid tier is inactive", () => {
+      const result = checkFeedQuota({
+        currentCount: 0,
+        delta: 10000,
+        tier: "free",
+        isSelfHosted: false,
+        paidTierActive: false,
+      });
+      expect(result.ok).toBe(true);
+    });
+
+    it("still enforces the cap when paid tier IS active and user is free + not self-hosted", () => {
+      const result = checkFeedQuota({
+        currentCount: FREE_FEED_LIMIT,
+        tier: "free",
+        isSelfHosted: false,
+        paidTierActive: true,
+      });
+      expect(result.ok).toBe(false);
     });
   });
 
@@ -113,6 +155,7 @@ describe("checkFeedQuota", () => {
         currentCount: 5000,
         tier: "free",
         isSelfHosted: true,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
     });
@@ -123,6 +166,7 @@ describe("checkFeedQuota", () => {
         delta: 10000,
         tier: "free",
         isSelfHosted: true,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
     });
@@ -132,6 +176,7 @@ describe("checkFeedQuota", () => {
         currentCount: 999,
         tier: "personal",
         isSelfHosted: true,
+        paidTierActive: true,
       });
       expect(result.ok).toBe(true);
     });

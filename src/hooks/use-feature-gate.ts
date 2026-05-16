@@ -16,6 +16,7 @@ import {
   type GateState,
 } from "@/core/features/feature-gates";
 import { isSelfHosted } from "@/core/features/self-hosted";
+import { isPaidTierActive } from "@/core/features/paid-tier-active";
 
 export interface UseFeatureGate extends GateState {
   /** Navigate to the Personal-monthly subscribe deeplink. */
@@ -24,7 +25,7 @@ export interface UseFeatureGate extends GateState {
 
 export function useFeatureGate(feature: Feature): UseFeatureGate {
   const tier = useLicenseStore((s) => s.tier);
-  const state = gateState(feature, tier, isSelfHosted());
+  const state = gateState(feature, tier, isSelfHosted(), isPaidTierActive());
   const navigate = useNavigate();
   const promptUpgrade = useCallback(() => {
     navigate("/?subscribe=personal-monthly");
