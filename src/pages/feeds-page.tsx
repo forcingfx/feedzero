@@ -7,7 +7,7 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useSharedSidebarSize } from "@/hooks/use-shared-sidebar-size.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
-import { ALL_FEEDS_ID, LOCAL_STORAGE, PANEL_LAYOUT_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, PANEL_LAYOUT_ID } from "@/utils/constants.ts";
 import { findNextArticle, findPrevArticle } from "@/lib/next-article.ts";
 import {
   ResizablePanelGroup,
@@ -112,28 +112,33 @@ export function FeedsPage() {
   // article matching the previous URL.
   const lastSyncedArticleIdRef = useRef<string | undefined>(undefined);
 
-  // Whenever no feedId is in the URL (and we're not explicitly on /explore),
-  // land on the All items article list — except for the user's very first
-  // visit, where we briefly detour through /explore so they immediately see
-  // the catalog. After the one-time redirect the INITIAL_EXPLORE_SHOWN flag
-  // is set and future no-feedId visits fall back to All items as before.
+  // Default destination for a bare /feeds URL (no feedId). The decision is
+  // driven by the actual feed count, not a persistent flag, so it is robust
+  // across browser sessions, reset flows, and the timing race between the
+  // first loadFeeds() and the release-feed auto-subscribe.
+  //
+  //   * 0 or 1 feeds  → /explore (still in starter mode; the one feed is
+  //                     typically just the auto-subscribed release feed,
+  //                     so we'd rather show the catalog than a one-feed
+  //                     All Items list)
+  //   * 2+ feeds      → /feeds/all (returning user — go to the aggregate)
+  //
+  // The `feedsLoaded` gate prevents a flash where the effect fires with
+  // feeds=[] before loadFeeds() has populated the store. Without it, a
+  // returning multi-feed user would land on /explore briefly and then get
+  // stuck there once isExplorePage flipped true.
+  const feedsLoaded = useFeedStore((s) => s.feedsLoaded);
+  const feedCount = feeds.length;
   useEffect(() => {
     if (isExplorePage || isStatsPage) return;
     if (feedId) return;
-    let firstLaunch = false;
-    try {
-      firstLaunch =
-        localStorage.getItem(LOCAL_STORAGE.INITIAL_EXPLORE_SHOWN) !== "true";
-    } catch { /* localStorage unavailable — treat as returning user */ }
-    if (firstLaunch) {
-      try {
-        localStorage.setItem(LOCAL_STORAGE.INITIAL_EXPLORE_SHOWN, "true");
-      } catch { /* ignore */ }
+    if (!feedsLoaded) return;
+    if (feedCount <= 1) {
       navigate("/explore", { replace: true });
       return;
     }
     navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
-  }, [isExplorePage, isStatsPage, feedId, navigate]);
+  }, [isExplorePage, isStatsPage, feedId, feedsLoaded, feedCount, navigate]);
 
   const isLoadingArticles = useArticleStore((s) => s.isLoading);
 

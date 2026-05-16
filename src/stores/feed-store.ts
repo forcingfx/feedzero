@@ -54,6 +54,10 @@ interface FeedStore {
   feedSortMode: FeedSortMode;
   feedCustomOrder: string[];
   folderCustomOrder: string[];
+  /** True once loadFeeds() has resolved at least once. Used by the
+   *  /feeds → /explore-vs-/feeds/all routing decision to avoid firing
+   *  with an empty store before the DB is read. */
+  feedsLoaded: boolean;
   loadFeeds: () => Promise<void>;
   addFeed: (url: string) => Promise<Result<void>>;
   removeFeed: (feedId: string) => Promise<void>;
@@ -108,6 +112,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   feedCustomOrder: readJsonArray(LOCAL_STORAGE.FEED_CUSTOM_ORDER),
   folderCustomOrder: readJsonArray(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER),
   folderOpenState: {},
+  feedsLoaded: false,
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
@@ -115,6 +120,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       feeds: feedsResult.ok ? sortFeeds(feedsResult.value) : [],
       folders: foldersResult.ok ? foldersResult.value.sort((a, b) => a.name.localeCompare(b.name)) : [],
       error: feedsResult.ok ? null : feedsResult.error,
+      feedsLoaded: true,
     });
   },
 
