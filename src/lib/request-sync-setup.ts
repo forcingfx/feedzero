@@ -1,37 +1,20 @@
 /**
- * Intent-layer gate for the "Enable cloud sync" affordance.
+ * "User intent: open the sync surface" — now a thin alias for
+ * `openSettings("account")`.
  *
- * Cloud sync is a paid feature. Free users in production paywall mode used
- * to be able to click the affordance, derive a passphrase, push a vault, and
- * only THEN hit a 401 from /api/sync — landing in SyncMigrationDialog with
- * no obvious way back. This helper checks the gate first: free users hit
- * the UpgradeDialog instead of starting a flow they can't complete.
+ * Phase A established the unified Settings dialog with an Account tab.
+ * Phase B extended that tab to adaptively render the upgrade comparison
+ * for free users and the cloud-sync controls for paid users. So the gate
+ * routing that used to live here (free → UpgradeDialog, paid →
+ * SyncSetupDialog) is now expressed by the Account tab itself.
  *
- * Single chokepoint so all three call sites (sidebar's LocalStorageWarning,
- * SyncStatusChip, settings menu) share the same gating logic. To add a new
- * "Enable cloud sync" entry point, call this — never call
- * `useSyncStore.getState().setDialogOpen(true)` directly.
+ * Kept as a named function (vs inlining `openSettings("account")` at each
+ * call site) so callers preserve the "this click is sync-adjacent" intent
+ * at their site — useful if we later want to scroll to / highlight the
+ * sync section when the dialog opens from a sync affordance.
  */
-
-import { useLicenseStore } from "@/stores/license-store";
-import { useSyncStore } from "@/stores/sync-store";
-import { gateState } from "@/core/features/feature-gates";
-import { isSelfHosted } from "@/core/features/self-hosted";
-import { isPaidTierActive } from "@/core/features/paid-tier-active";
+import { openSettings } from "@/lib/open-settings";
 
 export function requestSyncSetup(): void {
-  const tier = useLicenseStore.getState().tier;
-  const gate = gateState(
-    "cloud-sync",
-    tier,
-    isSelfHosted(),
-    isPaidTierActive(),
-  );
-  if (gate.enabled) {
-    useSyncStore.getState().setDialogOpen(true);
-    return;
-  }
-  // gate.reason === "tier-locked" (or "not-built", which can't happen
-  // because cloud-sync is shipped, but we route to upgrade either way).
-  useLicenseStore.getState().openUpgradeDialog();
+  openSettings("account");
 }

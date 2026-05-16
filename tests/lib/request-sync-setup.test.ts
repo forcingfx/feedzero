@@ -1,63 +1,41 @@
 /**
- * requestSyncSetup() — intent-layer gate for the "Enable cloud sync" affordance.
+ * requestSyncSetup() — now a thin alias for openSettings("account").
  *
- * The pre-PR behavior was: free users in production paywall mode could click
- * "Enable cloud sync", derive a passphrase, push a vault, and only then hit
- * a 401 from /api/sync — landing in SyncMigrationDialog with no clear path
- * back. This helper gates at the intent layer: a free user clicking the
- * affordance opens UpgradeDialog instead, never reaching the dead-end.
+ * Phase A established the unified Settings dialog with an Account tab.
+ * Phase B extended the Account tab to render the right content per tier
+ * (upgrade section for free users, sync controls for paid). So the gate
+ * logic that used to live in requestSyncSetup is now in the tab itself —
+ * one path, one place. requestSyncSetup remains as a named entry point
+ * for callers that want the "user clicked something sync-adjacent" intent
+ * documented at the call site, but it just opens Settings → Account.
+ *
+ * Kept as a separate helper (vs inlining openSettings calls) so future
+ * changes (e.g. "highlight the sync section when triggered from a sync
+ * affordance") have one place to live.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { requestSyncSetup } from "@/lib/request-sync-setup";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useLicenseStore } from "@/stores/license-store";
-import { useSyncStore } from "@/stores/sync-store";
-
-vi.mock("@/core/features/self-hosted", () => ({
-  isSelfHosted: vi.fn(() => false),
-}));
-vi.mock("@/core/features/paid-tier-active", () => ({
-  isPaidTierActive: vi.fn(() => true),
-}));
-
-import { isSelfHosted } from "@/core/features/self-hosted";
-import { isPaidTierActive } from "@/core/features/paid-tier-active";
 
 describe("requestSyncSetup", () => {
   beforeEach(() => {
-    useLicenseStore.setState({
-      tier: "free",
-      verifying: false,
-      upgradeDialogOpen: false,
-    });
-    useSyncStore.setState({ dialogOpen: false });
-    vi.mocked(isSelfHosted).mockReturnValue(false);
-    vi.mocked(isPaidTierActive).mockReturnValue(true);
+    useSettingsStore.setState({ open: false, activeTab: "account" });
+    useLicenseStore.setState({ tier: "free", verifying: false });
   });
 
-  it("opens UpgradeDialog and does NOT open SyncSetupDialog for free users when paid tier is active", () => {
+  it("opens Settings on the Account tab for free users (where the upgrade section lives)", () => {
     requestSyncSetup();
-    expect(useLicenseStore.getState().upgradeDialogOpen).toBe(true);
-    expect(useSyncStore.getState().dialogOpen).toBe(false);
+    const s = useSettingsStore.getState();
+    expect(s.open).toBe(true);
+    expect(s.activeTab).toBe("account");
   });
 
-  it("opens SyncSetupDialog directly for personal-tier users", () => {
+  it("opens Settings on the Account tab for paid users (where the sync section lives)", () => {
     useLicenseStore.setState({ tier: "personal" });
     requestSyncSetup();
-    expect(useSyncStore.getState().dialogOpen).toBe(true);
-    expect(useLicenseStore.getState().upgradeDialogOpen).toBe(false);
-  });
-
-  it("opens SyncSetupDialog directly for self-hosted (gate bypassed)", () => {
-    vi.mocked(isSelfHosted).mockReturnValue(true);
-    requestSyncSetup();
-    expect(useSyncStore.getState().dialogOpen).toBe(true);
-    expect(useLicenseStore.getState().upgradeDialogOpen).toBe(false);
-  });
-
-  it("opens SyncSetupDialog directly when paid tier is dormant (every feature free)", () => {
-    vi.mocked(isPaidTierActive).mockReturnValue(false);
-    requestSyncSetup();
-    expect(useSyncStore.getState().dialogOpen).toBe(true);
-    expect(useLicenseStore.getState().upgradeDialogOpen).toBe(false);
+    const s = useSettingsStore.getState();
+    expect(s.open).toBe(true);
+    expect(s.activeTab).toBe("account");
   });
 });

@@ -82,14 +82,18 @@ describe("SyncMigrationDialog", () => {
     expect(useSyncStore.getState().credentials).toBeNull();
   });
 
-  it("offers a Subscribe link pointing at the Personal monthly deeplink", () => {
+  it("offers a Subscribe action that routes through Settings → Account (per Phase B unification)", async () => {
+    const { useSettingsStore } = await import("@/stores/settings-store");
+    useSettingsStore.setState({ open: false, activeTab: "account" });
     useSyncStore.setState({ pendingMigration: "license-required" });
     renderDialog();
-    const subscribe = screen.getByRole("link", { name: /subscribe/i });
-    // Deeplink consumer parses ?subscribe=personal-monthly and routes to Stripe.
-    expect(subscribe.getAttribute("href")).toMatch(
-      /subscribe=personal-monthly/,
-    );
+    // Subscribe is now a button (not a link) — clicking it opens the
+    // unified Settings dialog on the Account tab where the customer sees
+    // the four-tier comparison and clicks Subscribe in the Personal card.
+    const subscribe = screen.getByRole("button", { name: /subscribe/i });
+    subscribe.click();
+    expect(useSettingsStore.getState().open).toBe(true);
+    expect(useSettingsStore.getState().activeTab).toBe("account");
   });
 
   it("offers a Self-host link pointing at the docs", () => {
