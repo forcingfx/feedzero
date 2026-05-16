@@ -34,6 +34,7 @@ import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
 import { LicenseStatusChip } from "@/components/billing/license-status-chip.tsx";
+import { requestSyncSetup } from "@/lib/request-sync-setup.ts";
 import { BrandMark } from "@/components/brand/brand-mark.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -125,7 +126,6 @@ const LOCAL_STORAGE_WARNING_KEY = "feedzero:local-warning-dismissed";
 function LocalStorageWarning() {
   const feeds = useFeedStore((s) => s.feeds);
   const syncStatus = useSyncStore((s) => s.status);
-  const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
   const [dismissed, setDismissed] = useState(() => {
     try {
       return localStorage.getItem(LOCAL_STORAGE_WARNING_KEY) === "true";
@@ -162,7 +162,7 @@ function LocalStorageWarning() {
         </button>
       </div>
       <button
-        onClick={() => setSyncDialogOpen(true)}
+        onClick={() => requestSyncSetup()}
         className="mt-1.5 underline hover:no-underline font-medium"
       >
         Enable cloud sync

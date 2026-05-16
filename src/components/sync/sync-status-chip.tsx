@@ -1,17 +1,19 @@
 import { Cloud, Loader2, CloudAlert } from "lucide-react";
 import { useSyncStore } from "@/stores/sync-store";
 import { Switch } from "@/components/ui/switch";
+import { requestSyncSetup } from "@/lib/request-sync-setup";
 
 export function SyncStatusChip() {
   const status = useSyncStore((s) => s.status);
-  const setDialogOpen = useSyncStore((s) => s.setDialogOpen);
 
   const isOn = status === "synced" || status === "syncing";
   const isError = status === "error";
   const isSyncing = status === "syncing";
 
   function handleToggle() {
-    setDialogOpen(true);
+    // Gated: free users hit UpgradeDialog instead of starting a flow they
+    // can't complete. See src/lib/request-sync-setup.ts.
+    requestSyncSetup();
   }
 
   return (

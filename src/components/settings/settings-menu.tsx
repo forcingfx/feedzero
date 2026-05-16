@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useSyncStore } from "@/stores/sync-store.ts";
 import { useAppStore } from "@/stores/app-store.ts";
+import { requestSyncSetup } from "@/lib/request-sync-setup.ts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +61,6 @@ export function SettingsMenu(props: SettingsMenuProps) {
   const { hasFeeds, onWhatsNew } = props;
 
   const syncStatus = useSyncStore((s) => s.status);
-  const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
   const setGroupArticleFloods = useAppStore((s) => s.setGroupArticleFloods);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -94,7 +94,7 @@ export function SettingsMenu(props: SettingsMenuProps) {
         <SidebarMenu>
           {showSync && (
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => setSyncDialogOpen(true)}>
+              <SidebarMenuButton onClick={() => requestSyncSetup()}>
                 {isSyncing ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
@@ -106,7 +106,7 @@ export function SettingsMenu(props: SettingsMenuProps) {
                   checked={isSyncOn}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSyncDialogOpen(true);
+                    requestSyncSetup();
                   }}
                 />
               </SidebarMenuButton>
@@ -178,7 +178,7 @@ export function SettingsMenu(props: SettingsMenuProps) {
                 disabled={!canSync && !isSyncOn}
                 onSelect={(e) => {
                   e.preventDefault();
-                  if (canSync || isSyncOn) setSyncDialogOpen(true);
+                  if (canSync || isSyncOn) requestSyncSetup();
                 }}
               >
                 <div className="flex items-center gap-2 flex-1">
@@ -201,7 +201,7 @@ export function SettingsMenu(props: SettingsMenuProps) {
                   disabled={!canSync && !isSyncOn}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (canSync || isSyncOn) setSyncDialogOpen(true);
+                    if (canSync || isSyncOn) requestSyncSetup();
                   }}
                 />
               </DropdownMenuItem>

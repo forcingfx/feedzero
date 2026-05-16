@@ -175,4 +175,21 @@ describe("useLicenseStore", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
+
+  describe("upgrade dialog state", () => {
+    it("upgradeDialogOpen defaults to false", () => {
+      expect(useLicenseStore.getState().upgradeDialogOpen).toBe(false);
+    });
+
+    it("openUpgradeDialog sets upgradeDialogOpen=true", () => {
+      useLicenseStore.getState().openUpgradeDialog();
+      expect(useLicenseStore.getState().upgradeDialogOpen).toBe(true);
+    });
+
+    it("closeUpgradeDialog sets upgradeDialogOpen=false", () => {
+      useLicenseStore.setState({ upgradeDialogOpen: true });
+      useLicenseStore.getState().closeUpgradeDialog();
+      expect(useLicenseStore.getState().upgradeDialogOpen).toBe(false);
+    });
+  });
 });

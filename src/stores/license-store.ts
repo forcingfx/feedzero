@@ -33,9 +33,21 @@ import type { Tier } from "@/core/features/feature-gates";
 interface LicenseState {
   tier: Tier;
   verifying: boolean;
+  /**
+   * Visibility of the in-app upgrade dialog. Opened when a free user
+   * attempts a paid feature (e.g. clicks "Enable cloud sync"); the dialog
+   * shows tier comparison + Subscribe CTAs that route to Stripe Checkout.
+   *
+   * Owned by license-store rather than a standalone store because tier and
+   * upgrade-intent are the same domain: the dialog only ever appears when
+   * tier is locked, and dismisses naturally when tier changes.
+   */
+  upgradeDialogOpen: boolean;
   refresh: () => Promise<void>;
   /** Direct setter used by tests and explicit overrides. */
   setTier: (tier: Tier) => void;
+  openUpgradeDialog: () => void;
+  closeUpgradeDialog: () => void;
 }
 
 const TOKEN_PREFIX = "fz_";
@@ -53,8 +65,11 @@ function decodeTierFromToken(token: string): Tier {
 export const useLicenseStore = create<LicenseState>((set) => ({
   tier: "free",
   verifying: false,
+  upgradeDialogOpen: false,
 
   setTier: (tier) => set({ tier }),
+  openUpgradeDialog: () => set({ upgradeDialogOpen: true }),
+  closeUpgradeDialog: () => set({ upgradeDialogOpen: false }),
 
   refresh: async () => {
     const token = getLicenseToken();
