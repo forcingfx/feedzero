@@ -21,11 +21,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type Phase = "idle" | "submitting" | "sent" | "error";
 
+const TROUBLESHOOT_DELAY_MS = 60_000;
+const SUPPORT_EMAIL = "support@feedzero.app";
+
 export function BillingRecover() {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState(() => searchParams.get("email") ?? "");
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   // If the query param changes after mount (e.g. navigation from Account tab),
   // keep the input in sync. Without this the prefill only works on first mount.
@@ -34,6 +38,19 @@ export function BillingRecover() {
     if (fromQuery && fromQuery !== email) setEmail(fromQuery);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // After the "check your email" confirmation appears, surface
+  // troubleshooting + support after a delay. Customers who hit a real
+  // problem (wrong email, Stripe email config off) need a path forward
+  // beyond the spinning hope-it-works message.
+  useEffect(() => {
+    if (phase !== "sent") {
+      setShowTroubleshoot(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowTroubleshoot(true), TROUBLESHOOT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,13 +96,43 @@ export function BillingRecover() {
       </header>
 
       {phase === "sent" ? (
-        <Alert>
-          <AlertDescription>
-            Check your email. If a subscription exists for{" "}
-            <strong>{email}</strong>, Stripe will send you a sign-in link in
-            the next few minutes. Open it on this device to continue.
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert>
+            <AlertDescription>
+              Check your email. If a subscription exists for{" "}
+              <strong>{email}</strong>, Stripe will send you a sign-in link in
+              the next few minutes. Open it on this device to continue.
+            </AlertDescription>
+          </Alert>
+          {showTroubleshoot && (
+            <div className="rounded-md border border-border bg-card p-4 text-sm space-y-2">
+              <p className="font-medium">Didn&apos;t get an email?</p>
+              <ul className="list-disc pl-5 text-muted-foreground space-y-1 text-xs">
+                <li>
+                  Check your spam / promotions folder. Stripe&apos;s sign-in
+                  link sometimes lands there.
+                </li>
+                <li>
+                  Double-check the email you used at checkout — try a typo
+                  or a secondary inbox.
+                </li>
+                <li>
+                  Still stuck?{" "}
+                  <a
+                    href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Can't recover my FeedZero license")}&body=${encodeURIComponent(
+                      `Email I used at checkout: ${email}\n\n(Anything else helpful here.)`,
+                    )}`}
+                    className="underline"
+                  >
+                    Contact support
+                  </a>{" "}
+                  with the email you used at checkout — we can usually
+                  recover access manually.
+                </li>
+              </ul>
+            </div>
+          )}
+        </>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">

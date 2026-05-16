@@ -26,6 +26,7 @@ import { base64UrlDecodeToString } from "@/core/license/crypto";
 import type { LicensePayload } from "@/core/license/format";
 import { AccountUpgradeSection } from "./account-upgrade-section";
 import { AccountSyncSection } from "./account-sync-section";
+import { AccountSafetyControls } from "./account-safety-controls";
 
 const TOKEN_PREFIX = "fz_";
 
@@ -230,6 +231,13 @@ function PaidView({ tier, onSignOut }: PaidViewProps) {
       </div>
 
       <AccountSyncSection />
+
+      {token && payload && (
+        <AccountSafetyControls
+          token={token}
+          customerId={payload.customerId}
+        />
+      )}
 
       <div className="rounded-lg border border-border bg-card p-4">
         <p className="text-xs text-muted-foreground mb-2">

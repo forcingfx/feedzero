@@ -147,4 +147,32 @@ describe("<BillingRecover>", () => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
   });
+
+  it("after submission, reveals troubleshooting + support link after a short delay", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    globalThis.fetch = mockFetch({ status: 200, body: { ok: true } });
+    renderAt("/billing/recover");
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /recover/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/check your (email|inbox)/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/didn't get an email/i)).toBeNull();
+
+    vi.advanceTimersByTime(60_000);
+
+    await waitFor(() => {
+      expect(screen.getByText(/didn't get an email/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("link", { name: /contact support|email us/i }),
+    ).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
 });

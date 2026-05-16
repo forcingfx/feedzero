@@ -7,9 +7,7 @@ import { useSyncStore } from "@/stores/sync-store.ts";
 import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
-import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
-import { UpgradeDialog } from "@/components/billing/upgrade-dialog.tsx";
 import { SettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -171,9 +169,7 @@ export function App() {
         </AppInit>
         <Toaster position="bottom-center" />
       </BrowserRouter>
-      <SyncSetupDialog />
       <SyncMigrationDialog />
-      <UpgradeDialog />
       <SettingsDialog />
       <SpeedInsights />
     </>
