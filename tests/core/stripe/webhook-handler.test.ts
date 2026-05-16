@@ -8,7 +8,9 @@ import {
   subscriptionCreatedEvent,
   subscriptionDeletedEvent,
   subscriptionUpdatedEvent,
+  subscriptionUpdatedEventDahlia,
   invoicePaidEvent,
+  invoicePaidEventDahlia,
   customEvent,
   type StripeFixture,
 } from "@/core/stripe/test-fixtures";
@@ -221,6 +223,180 @@ describe("handleStripeWebhook", () => {
       customerId: CUSTOMER_ID,
       subscriptionId: SUBSCRIPTION_ID,
       expirySec,
+    });
+  });
+
+  describe("API version drift — Stripe 2026-04-22 dahlia payload shapes", () => {
+    it("reads current_period_end from items.data[0] when top-level is missing (dahlia subscription.updated)", async () => {
+      const expirySec = nowSec() + 30 * 24 * 60 * 60;
+      const fixture = subscriptionUpdatedEventDahlia({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        status: "active",
+        cancel_at_period_end: false,
+        current_period_end: expirySec,
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer),
+      );
+      expect(res.status).toBe(200);
+      expect(issuer.recordRenewal).toHaveBeenCalledWith({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        expirySec,
+      });
+    });
+
+    it("still reads top-level current_period_end (legacy subscription.updated, regression check)", async () => {
+      const expirySec = nowSec() + 30 * 24 * 60 * 60;
+      const fixture = subscriptionUpdatedEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        status: "active",
+        cancel_at_period_end: false,
+        current_period_end: expirySec,
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer),
+      );
+      expect(res.status).toBe(200);
+      expect(issuer.recordRenewal).toHaveBeenCalledWith({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        expirySec,
+      });
+    });
+
+    it("reads subscription from parent.subscription_details (dahlia invoice.paid)", async () => {
+      const expirySec = nowSec() + 30 * 24 * 60 * 60;
+      const fixture = invoicePaidEventDahlia({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        current_period_end: expirySec,
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer),
+      );
+      expect(res.status).toBe(200);
+      expect(issuer.recordRenewal).toHaveBeenCalledWith({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        expirySec,
+      });
+    });
+
+    it("still reads top-level subscription on invoice.paid (legacy regression check)", async () => {
+      const expirySec = nowSec() + 30 * 24 * 60 * 60;
+      const fixture = invoicePaidEvent({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        current_period_end: expirySec,
+      });
+      const res = await handleStripeWebhook(
+        postFixture(fixture, nowSec()),
+        makeConfig(issuer),
+      );
+      expect(res.status).toBe(200);
+      expect(issuer.recordRenewal).toHaveBeenCalledWith({
+        customerId: CUSTOMER_ID,
+        subscriptionId: SUBSCRIPTION_ID,
+        expirySec,
+      });
+    });
+  });
+
+  describe("acceptedWithIssue — silent 200 paths are surfaced via logError", () => {
+    it("logs a structured AcceptedWithIssue line when extractTier returns null (Missing tier metadata on price)", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        // Build a subscription.created fixture with no tier on the price
+        // metadata — this is the exact failure mode that bit production
+        // on 2026-05-15. The handler returns 200 (Stripe stops retrying)
+        // but should also emit a structured log so the operator sees it.
+        const event = {
+          id: "evt_no_tier_meta",
+          type: "customer.subscription.created",
+          data: {
+            object: {
+              id: SUBSCRIPTION_ID,
+              customer: CUSTOMER_ID,
+              items: { data: [{ price: { metadata: {} } }] },
+            },
+          },
+        };
+        const sigTs = nowSec();
+        const body = JSON.stringify(event);
+        const { createHmac } = await import("node:crypto");
+        const sig = createHmac("sha256", SECRET)
+          .update(`${sigTs}.${body}`)
+          .digest("hex");
+        const req = new Request(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Stripe-Signature": `t=${sigTs},v1=${sig}`,
+          },
+          body,
+        });
+        const res = await handleStripeWebhook(req, makeConfig(issuer));
+        expect(res.status).toBe(200);
+        const respBody = await res.json();
+        expect(respBody).toEqual({
+          ok: true,
+          issue: "Missing tier metadata on price",
+        });
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
+        expect(logged.route).toBe("/api/stripe/webhook");
+        expect(logged.status).toBe(200);
+        expect(logged.errClass).toBe("AcceptedWithIssue");
+        expect(logged.errMsg).toBe("Missing tier metadata on price");
+        expect(logged.traceId).toMatch(/^req_[0-9a-f]+$/);
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("does NOT log on the plain {ok:true} success path (no false positives)", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const fixture = subscriptionCreatedEvent({
+          customerId: CUSTOMER_ID,
+          subscriptionId: SUBSCRIPTION_ID,
+          tier: "personal",
+        });
+        await handleStripeWebhook(
+          postFixture(fixture, nowSec()),
+          makeConfig(issuer),
+        );
+        expect(consoleError).not.toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("does NOT log on the {ok:true, ignored: <type>} unknown-event-type path", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const fixture = customEvent("charge.refunded");
+        await handleStripeWebhook(
+          postFixture(fixture, nowSec()),
+          makeConfig(issuer),
+        );
+        expect(consoleError).not.toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+      }
     });
   });
 

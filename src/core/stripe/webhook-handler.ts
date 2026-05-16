@@ -321,13 +321,38 @@ async function handleSubscriptionUpdated(
     );
   }
 
-  const expirySec = obj.current_period_end;
-  if (typeof expirySec !== "number") {
+  const expirySec = extractSubscriptionCurrentPeriodEnd(obj);
+  if (expirySec === null) {
     return acceptedWithIssue("Missing current_period_end");
   }
   return outcomeFromIssuerResult(
     await issuer.recordRenewal({ customerId, subscriptionId, expirySec }),
   );
+}
+
+/**
+ * Read `current_period_end` from a Subscription object, tolerant of API version drift.
+ *
+ * Legacy (pre-2026 dahlia): `subscription.current_period_end` at top level.
+ * Dahlia+ (2026-04-22 onward): moved to `subscription.items.data[0].current_period_end`
+ * — Stripe split billing periods per subscription item to support items that bill
+ * on different cadences.
+ *
+ * We try the dahlia path first (where dahlia-and-newer events arrive) and fall
+ * back to top-level for older API versions. Returning `null` triggers an
+ * acceptedWithIssue 200 in the caller; the wrapper logs the miss so the API
+ * version drift becomes visible in production logs.
+ */
+function extractSubscriptionCurrentPeriodEnd(
+  obj: Record<string, unknown>,
+): number | null {
+  const items = obj.items as
+    | { data?: Array<{ current_period_end?: unknown }> }
+    | undefined;
+  const itemEnd = items?.data?.[0]?.current_period_end;
+  if (typeof itemEnd === "number") return itemEnd;
+  const topLevel = obj.current_period_end;
+  return typeof topLevel === "number" ? topLevel : null;
 }
 
 function isCancellationUpdate(obj: Record<string, unknown>): boolean {
@@ -341,7 +366,7 @@ async function handleInvoicePaid(
   issuer: LicenseIssuer,
 ): Promise<DispatchOutcome> {
   const customerId = getString(obj, "customer");
-  const subscriptionId = getString(obj, "subscription");
+  const subscriptionId = extractInvoiceSubscription(obj);
   if (!customerId || !subscriptionId) {
     return {
       status: 200,
@@ -358,8 +383,32 @@ async function handleInvoicePaid(
 }
 
 /**
- * Invoice events carry the renewal period end inside
- * `lines.data[0].period.end` rather than at the top level.
+ * Read the related subscription id from an Invoice object, tolerant of API version drift.
+ *
+ * Legacy: `invoice.subscription` at top level.
+ * Dahlia+ (2026-04-22 onward): moved to
+ * `invoice.parent.subscription_details.subscription` — Stripe re-shaped invoices
+ * to express their relationship to a subscription (or other parent) via a typed
+ * `parent` discriminator.
+ *
+ * Returning `null` falls through to the "invoice.paid without subscription"
+ * acceptedWithIssue 200, which the wrapper logs.
+ */
+function extractInvoiceSubscription(
+  obj: Record<string, unknown>,
+): string | null {
+  const parent = obj.parent as
+    | { subscription_details?: { subscription?: unknown } }
+    | undefined;
+  const newPath = parent?.subscription_details?.subscription;
+  if (typeof newPath === "string") return newPath;
+  return getString(obj, "subscription");
+}
+
+/**
+ * Read the renewal period end from an Invoice's line items. Legacy and dahlia
+ * both expose this at `lines.data[0].period.end` (the field itself didn't move
+ * in dahlia), but kept as a small helper for symmetry and forward-readability.
  */
 function extractInvoicePeriodEnd(
   obj: Record<string, unknown>,
@@ -441,6 +490,28 @@ export async function handleStripeWebhook(
         ? (outcome.body as { error: string }).error
         : "dispatch failed";
     return serverError(errMsg, "DispatchFailed", outcome.status, traceId, method);
+  }
+  // 200-with-issue paths return success to Stripe (so it stops retrying) but
+  // represent silent operational gaps — most often missing metadata or an
+  // API-version drift in the event payload shape. Surface them in runtime
+  // logs so they don't go unnoticed. We deliberately do not change status —
+  // returning 5xx would cause Stripe to retry indefinitely on an issue that
+  // is operator-side, not transient.
+  if (
+    outcome.status === 200 &&
+    typeof outcome.body === "object" &&
+    outcome.body !== null &&
+    "issue" in outcome.body &&
+    typeof (outcome.body as { issue: unknown }).issue === "string"
+  ) {
+    logError({
+      route: ROUTE,
+      method,
+      status: 200,
+      traceId,
+      errClass: "AcceptedWithIssue",
+      errMsg: (outcome.body as { issue: string }).issue,
+    });
   }
   return jsonResponse(outcome.body, outcome.status);
 }

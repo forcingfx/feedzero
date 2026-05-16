@@ -121,6 +121,41 @@ export function subscriptionUpdatedEvent(
   };
 }
 
+/**
+ * Dahlia-shaped subscription.updated event. The 2026-04-22 API version moved
+ * `current_period_end` from the top-level subscription onto each subscription
+ * item (`items.data[i].current_period_end`) to support items billing on
+ * different cadences. Real live events from dahlia-pinned endpoints arrive
+ * in this shape.
+ */
+export function subscriptionUpdatedEventDahlia(
+  args: SubscriptionUpdatedArgs,
+): StripeFixture {
+  const event = {
+    id: `evt_${args.subscriptionId}_updated_dahlia`,
+    type: "customer.subscription.updated",
+    data: {
+      object: {
+        id: args.subscriptionId,
+        customer: args.customerId,
+        status: args.status,
+        cancel_at_period_end: args.cancel_at_period_end,
+        // NOTE: no top-level current_period_end — that's the whole point of
+        // this fixture. It lives on the item instead.
+        items: {
+          data: [
+            { current_period_end: args.current_period_end },
+          ],
+        },
+      },
+    },
+  };
+  return {
+    event,
+    signature: (secret, ts) => buildSignature(event, secret, ts),
+  };
+}
+
 interface InvoicePaidArgs {
   customerId: string;
   subscriptionId: string;
@@ -135,6 +170,44 @@ export function invoicePaidEvent(args: InvoicePaidArgs): StripeFixture {
       object: {
         customer: args.customerId,
         subscription: args.subscriptionId,
+        lines: {
+          data: [
+            {
+              period: { end: args.current_period_end },
+            },
+          ],
+        },
+      },
+    },
+  };
+  return {
+    event,
+    signature: (secret, ts) => buildSignature(event, secret, ts),
+  };
+}
+
+/**
+ * Dahlia-shaped invoice.paid event. The 2026-04-22 API version moved the
+ * top-level `subscription` field onto a discriminated `parent` object:
+ * `parent.subscription_details.subscription`. Real live events from
+ * dahlia-pinned endpoints arrive in this shape (this exact bug bit us
+ * on 2026-05-15 — operator paid $5, webhook returned 200 with
+ * `ignored: "invoice.paid without subscription"`).
+ */
+export function invoicePaidEventDahlia(args: InvoicePaidArgs): StripeFixture {
+  const event = {
+    id: `evt_${args.subscriptionId}_invoice_paid_dahlia`,
+    type: "invoice.paid",
+    data: {
+      object: {
+        customer: args.customerId,
+        // NOTE: no top-level `subscription` field in dahlia — moved to parent.
+        parent: {
+          type: "subscription_details",
+          subscription_details: {
+            subscription: args.subscriptionId,
+          },
+        },
         lines: {
           data: [
             {
