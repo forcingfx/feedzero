@@ -123,6 +123,27 @@ describe("StatsPage", () => {
     });
   });
 
+  it("degrades gracefully when /api/catalog is missing (self-hosted mode without catalog backend)", async () => {
+    // Self-hosters who haven't wired Upstash catalog storage get 404s on
+    // /api/catalog/*. The page should still render the local stats it CAN
+    // resolve (vault count) instead of bricking the whole route.
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.includes("/api/stats-sync")) {
+        return new Response(JSON.stringify({ ok: true, vaults: 7 }), { status: 200 });
+      }
+      // /api/catalog/* — not configured in this deployment
+      return new Response(JSON.stringify({ ok: false, error: "not configured" }), { status: 404 });
+    });
+    renderStats();
+    await waitFor(() => {
+      // Vault count still renders
+      expect(screen.getByText(/7/)).toBeInTheDocument();
+    });
+    // No "Couldn't load stats" hard error
+    expect(screen.queryByTestId("stats-error")).toBeNull();
+  });
+
   it("renders a loading state initially", async () => {
     let resolvePopular: (value: Response) => void;
     globalThis.fetch = vi.fn(async (input) => {

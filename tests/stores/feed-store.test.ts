@@ -204,6 +204,95 @@ describe("feed-store", () => {
 
       expect(result).toEqual({ ok: true, value: undefined });
     });
+
+    describe("Free quota gate (hard cutover at 25 feeds)", () => {
+      function seedFeeds(n: number) {
+        const feeds = Array.from({ length: n }, (_, i) =>
+          mockFeed(`f${i}`, `Feed ${i}`),
+        );
+        useFeedStore.setState({ feeds });
+      }
+
+      it("blocks addFeed on hosted Free when already at 25 feeds", async () => {
+        useLicenseStore.setState({ tier: "free", verifying: false });
+        seedFeeds(25);
+
+        const result = await useFeedStore
+          .getState()
+          .addFeed("https://new.com/feed");
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toMatch(/Free limit of 25/);
+        }
+        expect(addFeedFlow).not.toHaveBeenCalled();
+      });
+
+      it("allows addFeed on hosted Free at 24 feeds (boundary)", async () => {
+        useLicenseStore.setState({ tier: "free", verifying: false });
+        seedFeeds(24);
+        const feed = mockFeed("new", "New Feed");
+        vi.mocked(addFeedFlow).mockResolvedValue({
+          ok: true,
+          value: { feed, articles: [] },
+        });
+        vi.mocked(getFeeds).mockResolvedValue({
+          ok: true,
+          value: [...useFeedStore.getState().feeds, feed],
+        });
+
+        const result = await useFeedStore
+          .getState()
+          .addFeed("https://new.com/feed");
+
+        expect(result.ok).toBe(true);
+        expect(addFeedFlow).toHaveBeenCalledOnce();
+      });
+
+      it("does NOT block Personal user with 100 feeds", async () => {
+        useLicenseStore.setState({ tier: "personal", verifying: false });
+        seedFeeds(100);
+        const feed = mockFeed("new", "New Feed");
+        vi.mocked(addFeedFlow).mockResolvedValue({
+          ok: true,
+          value: { feed, articles: [] },
+        });
+        vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
+
+        const result = await useFeedStore
+          .getState()
+          .addFeed("https://new.com/feed");
+
+        expect(result.ok).toBe(true);
+      });
+
+      it("does NOT block self-hosted Free user with 100 feeds", async () => {
+        useLicenseStore.setState({ tier: "free", verifying: false });
+        vi.mocked(isSelfHosted).mockReturnValue(true);
+        seedFeeds(100);
+        const feed = mockFeed("new", "New Feed");
+        vi.mocked(addFeedFlow).mockResolvedValue({
+          ok: true,
+          value: { feed, articles: [] },
+        });
+        vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
+
+        const result = await useFeedStore
+          .getState()
+          .addFeed("https://new.com/feed");
+
+        expect(result.ok).toBe(true);
+      });
+
+      it("sets store.error so a Settings indicator can render the quota warning", async () => {
+        useLicenseStore.setState({ tier: "free", verifying: false });
+        seedFeeds(25);
+
+        await useFeedStore.getState().addFeed("https://new.com/feed");
+
+        expect(useFeedStore.getState().error).toMatch(/Free limit of 25/);
+      });
+    });
   });
 
   describe("removeFeed", () => {
