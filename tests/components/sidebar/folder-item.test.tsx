@@ -136,7 +136,19 @@ describe("FolderItem", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("chevron trigger uses hover:bg-white/20 on colored folders to avoid light square on dark background", () => {
+  it("chevron uses a color-only hover affordance, not a background box", () => {
+    // The folder name and the chevron sit next to each other; a filled
+    // hover rectangle on the chevron used to blur into the name's hover
+    // background. The chevron now uses color-only transitions so the two
+    // affordances read as distinct.
+    renderFolder();
+    const toggle = screen.getByRole("button", { name: /toggle folder/i });
+    expect(toggle.className).not.toContain("hover:bg-sidebar-accent");
+    expect(toggle.className).not.toContain("hover:bg-white/20");
+    expect(toggle.className).toContain("hover:text-foreground");
+  });
+
+  it("chevron uses a brighter color hover on colored folders (no fill)", () => {
     const coloredFolder = { ...mockFolder, color: "#7c3aed" };
     render(
       <SidebarProvider>
@@ -146,8 +158,8 @@ describe("FolderItem", () => {
       </SidebarProvider>
     );
     const toggle = screen.getByRole("button", { name: /toggle folder/i });
-    expect(toggle.className).toContain("hover:bg-white/20");
-    expect(toggle.className).not.toContain("hover:bg-sidebar-accent");
+    expect(toggle.className).not.toContain("hover:bg-white/20");
+    expect(toggle.className).toContain("hover:text-white");
   });
 
   it("marks the folder header active when isSelected is true", () => {

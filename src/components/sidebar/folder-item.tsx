@@ -136,10 +136,11 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect, s
                   type="button"
                   aria-label="Toggle folder"
                   className={cn(
-                    "absolute left-1 top-1 size-6 flex items-center justify-center rounded-sm z-10",
-                    folder.color ? "hover:bg-white/20" : "hover:bg-sidebar-accent",
+                    "absolute left-1 top-1 size-6 flex items-center justify-center z-10 transition-colors",
+                    folder.color
+                      ? "text-white/70 hover:text-white"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
-                  style={folder.color ? { color: "#ffffff" } : undefined}
                 >
                   <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
                 </button>
