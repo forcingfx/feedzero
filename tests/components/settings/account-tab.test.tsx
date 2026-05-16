@@ -55,8 +55,9 @@ describe("<AccountTab>", () => {
   describe("free tier (no subscription)", () => {
     it("shows 'Free' tier label and a subscribe CTA", () => {
       render(<AccountTab />);
-      // Exact-match the chip (avoids matching body copy "You're on the Free tier")
-      expect(screen.getByText("Free")).toBeInTheDocument();
+      // "Free" appears as both the tier chip and a tier-comparison heading
+      // in the inline upgrade section. The chip is sufficient signal here.
+      expect(screen.getAllByText("Free").length).toBeGreaterThan(0);
       const subscribeLink = screen.getByRole("link", {
         name: /subscribe to personal/i,
       });
@@ -153,6 +154,27 @@ describe("<AccountTab>", () => {
       // Token gone from storage; tier reset.
       expect(localStorage.getItem(LICENSE_TOKEN_STORAGE_KEY)).toBeNull();
       expect(useLicenseStore.getState().tier).toBe("free");
+    });
+  });
+
+  describe("Phase B: inline upgrade + sync sections", () => {
+    it("free tier renders the full upgrade tier comparison inline (not just a Subscribe button)", () => {
+      useLicenseStore.setState({ tier: "free", verifying: false });
+      render(<AccountTab />);
+      // All four tiers from AccountUpgradeSection
+      expect(screen.getByRole("heading", { name: /^Personal$/i })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /^Pro$/i })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /Self-host/i })).toBeInTheDocument();
+    });
+
+    it("paid tier renders the inline cloud sync section", () => {
+      setLicenseToken(makeToken("personal"));
+      useLicenseStore.setState({ tier: "personal", verifying: false });
+      render(<AccountTab />);
+      // AccountSyncSection's "Cloud sync" heading
+      expect(screen.getByRole("heading", { name: /cloud sync/i })).toBeInTheDocument();
+      // For local-only sync status (default), Enable sync button is present
+      expect(screen.getByRole("button", { name: /enable sync/i })).toBeInTheDocument();
     });
   });
 });
