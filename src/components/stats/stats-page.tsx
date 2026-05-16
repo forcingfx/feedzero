@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { BarChart3 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
+import { BrandMark } from "@/components/brand/brand-mark.tsx";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 
 const TOP_FEED_LIMIT = 100;
@@ -44,7 +44,7 @@ export function StatsPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 md:py-10">
       <header className="mb-6 flex items-center gap-2">
-        <BarChart3 className="size-5 text-primary" />
+        <BrandMark className="size-6" alt="" />
         <h1 className="text-xl font-semibold">FeedZero stats</h1>
       </header>
       <p className="mb-6 text-sm text-muted-foreground">

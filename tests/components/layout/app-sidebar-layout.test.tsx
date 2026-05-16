@@ -46,6 +46,14 @@ describe("AppSidebar layout structure", () => {
     expect(rail).not.toBeNull();
   });
 
+  it("shows the FeedZero brand mark in the sidebar header", () => {
+    const { container } = renderSidebar();
+    const header = container.querySelector("[data-sidebar='header']");
+    expect(header).not.toBeNull();
+    const mark = header!.querySelector("img[src='/icon-192.png']");
+    expect(mark).not.toBeNull();
+  });
+
   it("SidebarHeader hides refresh when no feeds exist", () => {
     const { container } = renderSidebar();
     const header = container.querySelector("[data-sidebar='header']");
