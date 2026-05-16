@@ -66,12 +66,10 @@ function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) 
       </span>
     );
   }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-      <span className="rounded-full size-1.5 bg-amber-500" />
-      Local
-    </span>
-  );
+  // Local-only (and any unknown status): suppress the chip on the Settings
+  // button. The amber "Local" indicator now lives inside the Settings
+  // dropdown on the Cloud sync row — see SettingsMenu.
+  return null;
 }
 
 function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhatsNew: () => void }) {

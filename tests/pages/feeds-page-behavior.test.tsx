@@ -9,23 +9,6 @@ import * as db from "@/core/storage/db.ts";
 import { ALL_FEEDS_ID, toFolderFeedId, LOCAL_STORAGE } from "@/utils/constants.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
-// happy-dom in this test file does not provide localStorage; install a tiny
-// in-memory shim so the feeds-page redirect (which reads/writes the
-// INITIAL_EXPLORE_SHOWN flag) works under test.
-const localStorageMock = (() => {
-  let store: Record<string, string> = {};
-  return {
-    getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-    removeItem: vi.fn((key: string) => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
-  };
-})();
-Object.defineProperty(globalThis, "localStorage", {
-  value: localStorageMock,
-  writable: true,
-});
-
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
