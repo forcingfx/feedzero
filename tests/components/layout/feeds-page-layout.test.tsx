@@ -346,19 +346,29 @@ describe("FeedsPage layout — desktop", () => {
     spy.mockRestore();
   });
 
-  it("sidebar CSS variable is at most 14rem so three panels fit at 1024px", () => {
-    // At 1024px: sidebar (≤14rem = 224px) + article list (≥180px) + reader (≥200px)
-    // = 224 + 180 + 200 = 604px — well within 1024px. If the sidebar grows beyond
-    // 14rem, the remaining space gets too tight at common laptop widths.
+  it("sidebar CSS variable is at most 18rem so three panels still fit at 1024px", () => {
+    // At 1024px: sidebar (≤18rem = 288px) + article list (≥180px) + reader (≥200px)
+    // = 288 + 180 + 200 = 668px — still fits within 1024px with 356px of slack.
+    // Widened from 14rem → 18rem to give feed titles more breathing room
+    // without crowding the reader at common laptop widths. Going beyond 18rem
+    // would leave the reader too narrow for comfortable reading.
     const { container } = renderPage();
     const wrapper = container.querySelector("[data-slot='sidebar-wrapper']");
     expect(wrapper).not.toBeNull();
     const style = (wrapper as HTMLElement).getAttribute("style") ?? "";
-    // Extract the --sidebar-width value from the inline style
     const match = style.match(/--sidebar-width:\s*([^;]+)/);
     expect(match).not.toBeNull();
     const remValue = parseFloat(match![1]);
-    expect(remValue).toBeLessThanOrEqual(14);
+    expect(remValue).toBeLessThanOrEqual(18);
+  });
+
+  it("sidebar default width is 18rem (the new user-facing default after PR A widening)", () => {
+    // Pin the default so a regression downgrades it visibly. The previous
+    // default of 14rem made feed titles wrap aggressively at common counts.
+    const { container } = renderPage();
+    const wrapper = container.querySelector("[data-slot='sidebar-wrapper']");
+    const style = (wrapper as HTMLElement).getAttribute("style") ?? "";
+    expect(style).toMatch(/--sidebar-width:\s*18rem/);
   });
 });
 
