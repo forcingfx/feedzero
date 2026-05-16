@@ -95,10 +95,17 @@ describe("useFeatureGate", () => {
     expect(screen.getByTestId("reason")).toHaveTextContent("paid-tier-inactive");
   });
 
-  it("promptUpgrade navigates to /?subscribe=personal-monthly", async () => {
+  it("promptUpgrade opens the unified Settings dialog on the Account tab", async () => {
+    // Was: navigate("/?subscribe=personal-monthly") (straight to Stripe).
+    // Now: openUpgrade() → Settings → Account. The Plan card's Subscribe
+    // CTAs are the only remaining in-app path to Stripe Checkout.
+    const { useSettingsStore } = await import("@/stores/settings-store.ts");
+    useSettingsStore.setState({ open: false, activeTab: "help" });
     const user = userEvent.setup();
     renderWithRouter(<GateProbe feature="auto-organize" />);
     await user.click(screen.getByRole("button", { name: /upgrade/i }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/?subscribe=personal-monthly");
+    const s = useSettingsStore.getState();
+    expect(s.open).toBe(true);
+    expect(s.activeTab).toBe("account");
   });
 });
