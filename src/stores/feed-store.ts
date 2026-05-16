@@ -20,6 +20,7 @@ import { useArticleStore } from "./article-store.ts";
 import { useLicenseStore } from "./license-store.ts";
 import { gateState } from "../core/features/feature-gates.ts";
 import { isSelfHosted } from "../core/features/self-hosted.ts";
+import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
 import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
 import { toast } from "sonner";
@@ -112,6 +113,20 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   addFeed: async (url) => {
+    // Free hosted users are capped at 25 feed subscriptions (ADR 013).
+    // Personal/Pro and self-hosted bypass. Check BEFORE touching the
+    // ingestion pipeline so we don't half-add a feed then fail late.
+    const quota = checkFeedQuota({
+      currentCount: get().feeds.length,
+      tier: useLicenseStore.getState().tier,
+      isSelfHosted: isSelfHosted(),
+    });
+    if (!quota.ok) {
+      const message = quotaErrorMessage(quota);
+      set({ error: message });
+      return { ok: false, error: message } as const;
+    }
+
     set({ isLoading: true, error: null });
     const result = await addFeedFlow(url);
     if (!result.ok) {
