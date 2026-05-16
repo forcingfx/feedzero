@@ -49,10 +49,29 @@ function formatRenewal(expirySec: number): string {
   });
 }
 
-// Preserve the fz_ prefix and the dot separator so the format hint is
-// legible while the secret part is opaque. Width matches a typical token
-// so the layout doesn't jump on reveal/hide.
-const MASKED_TOKEN = "fz_••••••••••••••.••••••••••••";
+/**
+ * Mask the token to the SAME character width as the real token, preserving
+ * the `fz_` prefix and the `.` separator. Same width = no layout jitter
+ * when the user toggles reveal/hide.
+ *
+ * Format: `fz_<payload>.<sig>` → `fz_••••.••••` with dot-counts derived
+ * from the actual payload and sig lengths.
+ */
+function maskToken(token: string): string {
+  const PREFIX = "fz_";
+  if (!token.startsWith(PREFIX)) {
+    // Fallback for malformed tokens — match overall width, opaque.
+    return "•".repeat(Math.max(token.length, 8));
+  }
+  const body = token.slice(PREFIX.length);
+  const dotIdx = body.indexOf(".");
+  if (dotIdx < 0) {
+    return PREFIX + "•".repeat(body.length);
+  }
+  const payloadLen = dotIdx;
+  const sigLen = body.length - dotIdx - 1;
+  return `${PREFIX}${"•".repeat(payloadLen)}.${"•".repeat(sigLen)}`;
+}
 
 export function AccountTab() {
   const tier = useLicenseStore((s) => s.tier);
@@ -169,7 +188,7 @@ function PaidView({ tier, onSignOut }: PaidViewProps) {
             </label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs font-mono bg-muted px-2 py-1.5 rounded overflow-x-auto whitespace-nowrap">
-                {revealed ? token : MASKED_TOKEN}
+                {revealed ? token : maskToken(token)}
               </code>
               <Button
                 type="button"

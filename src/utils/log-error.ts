@@ -59,4 +59,26 @@ export function logError(fields: ErrorLogFields): void {
   }
   safe.ts = new Date().toISOString();
   console.error(JSON.stringify(safe));
+
+  // Operator alert for silent webhook failures. When the Stripe webhook
+  // returns 200 with errClass="AcceptedWithIssue", the customer never
+  // hears about it but the license never issues. We can't have those
+  // hide in the log noise. Best-effort POST to the operator's webhook
+  // (Slack, Discord, etc.) so the next paying customer's incident
+  // becomes a notification.
+  //
+  // Fire-and-forget. Failure to alert MUST NOT crash the request handler
+  // that called us.
+  if (fields.errClass === "AcceptedWithIssue") {
+    const url = process.env.OPERATOR_ALERT_URL;
+    if (url) {
+      void fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(safe),
+      }).catch(() => {
+        // swallow — alert failures don't propagate
+      });
+    }
+  }
 }
