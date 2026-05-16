@@ -34,7 +34,8 @@ interface FolderItemProps {
 }
 
 export function FolderItem({ folder, children, onDelete, isSelected, onSelect, sortable = false }: FolderItemProps) {
-  const [open, setOpen] = useState(true);
+  const open = useFeedStore((s) => s.folderOpenState[folder.id] ?? true);
+  const setFolderOpen = useFeedStore((s) => s.setFolderOpen);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const renameFolder = useFeedStore((s) => s.renameFolder);
@@ -78,7 +79,11 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect, s
       style={{ opacity: sortable && sortableHook.isDragging ? 0.4 : 1, ...sortStyle }}
       className={isOver ? "bg-accent/50 rounded-md transition-colors" : "transition-colors"}
     >
-      <Collapsible.Root className="group/folder" open={open} onOpenChange={setOpen}>
+      <Collapsible.Root
+        className="group/folder"
+        open={open}
+        onOpenChange={(v) => setFolderOpen(folder.id, v)}
+      >
         <div
           data-sidebar="menu-item"
           className="group/menu-item relative"
@@ -109,15 +114,18 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect, s
           ) : (
             <>
               {/*
-                The SidebarMenuButton does both: navigate to the folder's
-                aggregated feed AND toggle collapse. The absolutely-positioned
-                Collapsible.Trigger (chevron) also toggles collapse but does
-                NOT navigate — useful for keyboard/pointer users who want
-                collapse-only. Button padding (pl-7) leaves room for the chevron.
+                Click the folder name → navigate to the folder's aggregated
+                feed only. Click the absolutely-positioned chevron (the
+                Collapsible.Trigger below) → toggle collapse only. The two
+                affordances are intentionally distinct: clicking the name
+                used to also toggle, which surprised users who expected
+                "click name = open that feed" without losing their place
+                in the folder tree. Button padding (pl-7) leaves room for
+                the chevron.
               */}
               <SidebarMenuButton
                 isActive={isSelected}
-                onClick={() => { onSelect(); setOpen(o => !o); }}
+                onClick={onSelect}
                 className="font-semibold pl-7"
                 style={colorStyle}
               >

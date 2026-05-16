@@ -95,7 +95,10 @@ function renderFolderWithFeed(folderProps: Partial<React.ComponentProps<typeof F
 
 describe("FolderItem", () => {
   beforeEach(() => {
-    useFeedStore.setState({ folders: [mockFolder] });
+    // Reset folder open-state so a prior test's chevron click doesn't leak
+    // a "closed" state into the next test's render (folder open-state moved
+    // from per-component useState into feed-store).
+    useFeedStore.setState({ folders: [mockFolder], folderOpenState: {} });
   });
 
   it("renders the folder name", () => {
@@ -108,7 +111,7 @@ describe("FolderItem", () => {
     expect(screen.getByTestId("child-content")).toBeInTheDocument();
   });
 
-  it("calls onSelect when folder title is clicked AND also collapses the folder", async () => {
+  it("calls onSelect when folder title is clicked and does NOT collapse the folder", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     renderFolder({ onSelect });
@@ -116,8 +119,8 @@ describe("FolderItem", () => {
     await user.click(screen.getByText("Tech News"));
 
     expect(onSelect).toHaveBeenCalledTimes(1);
-    // Clicking the title also collapses — title is both a navigate AND toggle target.
-    expect(screen.queryByTestId("child-content")).not.toBeInTheDocument();
+    // Clicking the title only navigates; the chevron is the toggle affordance.
+    expect(screen.getByTestId("child-content")).toBeInTheDocument();
   });
 
   it("collapses children when the chevron toggle is clicked, without calling onSelect", async () => {
