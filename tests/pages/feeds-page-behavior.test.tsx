@@ -67,11 +67,13 @@ function makeArticle(id: string, feedId = "feed-1"): Article {
 }
 
 let currentUrl = "";
+let currentSearch = "";
 
 /** Captures the current URL on each render. */
 function LocationCapture() {
   const loc = useLocation();
   currentUrl = loc.pathname;
+  currentSearch = loc.search;
   return null;
 }
 
@@ -206,6 +208,22 @@ describe("FeedsPage behavior — desktop", () => {
 
     // Observable: folder feed is selected in store state
     expect(useFeedStore.getState().selectedFeedId).toBe(folderFeedId);
+  });
+
+  it("preserves the query string when auto-redirecting to /explore (deeplink survives)", async () => {
+    // Production bug: landing on /feeds?subscribe=personal-monthly with 0 or 1
+    // feeds triggered an auto-redirect to /explore that dropped the search
+    // string. SubscribeDeeplink then ran at /explore with no ?subscribe= and
+    // no Stripe Checkout fired. Search must survive both this redirect and
+    // the catchall in app.tsx (covered by NavigateWithSearch tests).
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+
+    renderPage("/feeds?subscribe=personal-monthly");
+
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe("/explore");
+    });
+    expect(currentSearch).toBe("?subscribe=personal-monthly");
   });
 
   it("auto-navigates to /explore when only one feed exists (starter state)", async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router";
+import { BrowserRouter, Routes, Route } from "react-router";
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -9,6 +9,7 @@ import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
+import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { BillingSuccess } from "@/pages/billing-success.tsx";
@@ -159,7 +160,7 @@ export function App() {
             <Route path="/stats" element={<FeedsPage />} />
             <Route path="/billing/success" element={<BillingSuccess />} />
             <Route path="/billing/cancelled" element={<BillingCancelled />} />
-            <Route path="*" element={<Navigate to="/feeds" replace />} />
+            <Route path="*" element={<NavigateWithSearch to="/feeds" />} />
           </Routes>
         </AppInit>
         <Toaster position="bottom-center" />

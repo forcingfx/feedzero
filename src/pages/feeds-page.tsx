@@ -56,7 +56,7 @@ function SidebarKeyboardToggle() {
 export function FeedsPage() {
   const { feedId, articleId } = useParams();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const isExplorePage = pathname === "/explore";
   const isStatsPage = pathname === "/stats";
   const isDesktop = useIsDesktop();
@@ -134,11 +134,11 @@ export function FeedsPage() {
     if (feedId) return;
     if (!feedsLoaded) return;
     if (feedCount <= 1) {
-      navigate("/explore", { replace: true });
+      navigate({ pathname: "/explore", search }, { replace: true });
       return;
     }
-    navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
-  }, [isExplorePage, isStatsPage, feedId, feedsLoaded, feedCount, navigate]);
+    navigate({ pathname: `/feeds/${ALL_FEEDS_ID}`, search }, { replace: true });
+  }, [isExplorePage, isStatsPage, feedId, feedsLoaded, feedCount, navigate, search]);
 
   const isLoadingArticles = useArticleStore((s) => s.isLoading);
 
