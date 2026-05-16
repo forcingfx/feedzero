@@ -88,7 +88,6 @@ describe("App sync-aware init", () => {
       lastSyncedAt: null,
       error: null,
       credentials: null,
-      dialogOpen: false,
     });
     useFeedStore.setState({
       feeds: [],

@@ -87,7 +87,6 @@ describe("OnboardingModal", () => {
       lastSyncedAt: null,
       error: null,
       credentials: null,
-      dialogOpen: false,
     });
   });
 

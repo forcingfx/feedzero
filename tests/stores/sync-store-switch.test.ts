@@ -85,7 +85,6 @@ describe("sync-store switchToExistingCloud", () => {
       lastSyncedAt: null,
       error: null,
       credentials: null,
-      dialogOpen: false,
     });
     vi.clearAllMocks();
   });

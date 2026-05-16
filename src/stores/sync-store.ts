@@ -41,7 +41,6 @@ interface SyncStore {
   lastSyncedAt: number | null;
   error: string | null;
   credentials: SyncCredentials | null;
-  dialogOpen: boolean;
   /** Non-null when sync hit a recoverable wall the user must decide how to handle. See PendingMigration. */
   pendingMigration: PendingMigration | null;
 
@@ -70,7 +69,6 @@ interface SyncStore {
    */
   forceResync: () => Promise<Result<{ feedCount: number }>>;
   scheduleSyncPush: () => void;
-  setDialogOpen: (open: boolean) => void;
   switchToExistingCloud: (
     passphrase: string,
     mode: SwitchMode,
@@ -130,7 +128,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   lastSyncedAt: null,
   error: null,
   credentials: null,
-  dialogOpen: false,
   pendingMigration: null,
 
   enableSync: async (passphrase) => {
@@ -316,8 +313,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       }, jitter);
     }, DEBOUNCE_MS);
   },
-
-  setDialogOpen: (open) => set({ dialogOpen: open }),
 
   switchToExistingCloud: async (passphrase, mode) => {
     set({ status: "syncing", error: null });

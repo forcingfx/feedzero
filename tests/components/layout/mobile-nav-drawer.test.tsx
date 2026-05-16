@@ -146,22 +146,25 @@ describe("MobileNavDrawer", () => {
     expect(safeAreaPadded!.className).toContain("safe-area-inset-bottom");
   });
 
-  it("settings items are inlined directly in the drawer (no Settings dropdown)", async () => {
+  it("renders a single Settings entry that opens the unified Settings dialog", async () => {
+    // The drawer footer no longer inlines individual settings items. The
+    // dropdown→dialog refactor moved everything into the unified Settings
+    // dialog (account / reading / help / import / export). A centered dialog
+    // isn't anchored to the drawer bottom so iOS Safari chrome no longer
+    // occludes it — one tap, one dialog.
+    const { useSettingsStore } = await import("@/stores/settings-store.ts");
+    useSettingsStore.setState({ open: false, activeTab: "account" });
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
     renderDrawer();
     await user.click(screen.getByRole("button", { name: "Open feed list" }));
 
-    // All settings items are reachable WITHOUT opening a sub-menu —
-    // a dropdown anchored to the drawer bottom gets covered by iOS browser
-    // chrome, so we surface every item as a direct row in the footer.
-    expect(await screen.findByText("Cloud sync")).toBeInTheDocument();
-    expect(screen.getByText("Auto-organize feeds")).toBeInTheDocument();
-    expect(screen.getByText("Keyboard shortcuts")).toBeInTheDocument();
-    expect(screen.getByText("Send feedback")).toBeInTheDocument();
-    expect(screen.getByText(/What.*new/)).toBeInTheDocument();
-    // No "Settings" button — the items themselves are the surface.
-    expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
+    const settingsBtn = await screen.findByRole("button", { name: "Settings" });
+    await user.click(settingsBtn);
+
+    const s = useSettingsStore.getState();
+    expect(s.open).toBe(true);
+    expect(s.activeTab).toBe("account");
   });
 
   it("drawer body content has horizontal padding so feed/settings rows don't run edge-to-edge", async () => {

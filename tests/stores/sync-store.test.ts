@@ -73,7 +73,6 @@ describe("sync-store", () => {
       lastSyncedAt: null,
       error: null,
       credentials: null,
-      dialogOpen: false,
     });
     useAppStore.setState({
       isDbReady: false,

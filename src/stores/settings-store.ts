@@ -14,10 +14,17 @@
  */
 import { create } from "zustand";
 
-// Phase A tabs: account (default), import, export.
-// Phase B will rename to: account, reading, data, help — and fold the
-// sync setup + upgrade content as sections inside the Account tab.
-export type SettingsTab = "account" | "import" | "export";
+// Unified Settings dialog tabs. Account is default — it's the central hub
+// for tier / billing / sync / upgrade. Reading + Help fold what used to
+// live in the sidebar dropdown menu (Group floods toggle, Auto-organize
+// launcher, Keyboard shortcuts, Send feedback, What's new). Import and
+// Export are the data-portability flows.
+export type SettingsTab =
+  | "account"
+  | "reading"
+  | "help"
+  | "import"
+  | "export";
 
 interface SettingsState {
   open: boolean;
