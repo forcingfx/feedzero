@@ -188,6 +188,27 @@ describe("FeedItem", () => {
     expect(badge!.className).toContain("max-md:hidden");
   });
 
+  it("dropdown shows a 'Prefer full text' toggle that calls setFeedPreferFullText", async () => {
+    const setFeedPreferFullText = vi.fn().mockResolvedValue(undefined);
+    useFeedStore.setState({ setFeedPreferFullText });
+    const user = userEvent.setup();
+    renderFeedItem();
+    await user.click(screen.getByRole("button", { name: /more/i }));
+    const item = await screen.findByRole("menuitem", { name: /prefer full text/i });
+    await user.click(item);
+    expect(setFeedPreferFullText).toHaveBeenCalledWith("f1", true);
+  });
+
+  it("Prefer full text menu item shows a check when the feed already opts in", async () => {
+    const user = userEvent.setup();
+    renderFeedItem({ feed: { ...mockFeed, preferFullText: true } });
+    await user.click(screen.getByRole("button", { name: /more/i }));
+    const item = await screen.findByRole("menuitem", { name: /prefer full text/i });
+    // The Check icon is opacity-100 when on, opacity-0 when off.
+    const icon = item.querySelector("svg");
+    expect(icon?.getAttribute("class") ?? "").toContain("opacity-100");
+  });
+
   it("action dots do not appear on click-focus, only on hover or keyboard focus-visible", () => {
     // Bug: clicking a feed puts the button into :focus state (click focus).
     // The shadcn SidebarMenuAction's showOnHover variant used

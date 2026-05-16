@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { MoreHorizontal, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/utils.ts";
 import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
@@ -36,6 +37,7 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
   const [renameValue, setRenameValue] = useState("");
   const unreadCount = useArticleStore((s) => selectUnreadCount(s, feed.id));
   const renameFeed = useFeedStore((s) => s.renameFeed);
+  const setFeedPreferFullText = useFeedStore((s) => s.setFeedPreferFullText);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
   const folders = useFeedStore((s) => s.folders);
@@ -102,6 +104,17 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
         <DropdownMenuContent side="right" align="start">
           <DropdownMenuItem onClick={handleStartRename}>
             <Pencil className="size-4" /> Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setFeedPreferFullText(feed.id, !feed.preferFullText)}
+          >
+            <Check
+              className={cn(
+                "size-4",
+                feed.preferFullText ? "opacity-100" : "opacity-0",
+              )}
+            />
+            Prefer full text
           </DropdownMenuItem>
           {folders.length > 0 && (
             <>

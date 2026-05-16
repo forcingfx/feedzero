@@ -64,10 +64,20 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   // new article. With useEffect the user briefly sees article B at the
   // previous (article A) scroll offset before the position snaps back to 0.
   // See GitLab #8.
+  //
+  // When the feed has preferFullText=true, immediately switch to extracted
+  // view so the user doesn't see the teaser flash before the cached or
+  // newly-fetched full text takes over.
   useLayoutEffect(() => {
     resetForArticle();
     if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
-  }, [article?.id, resetForArticle]);
+    if (article?.link) {
+      const feed = useFeedStore.getState().feeds.find((f) => f.id === article.feedId);
+      if (feed?.preferFullText) {
+        switchToExtracted(article.link);
+      }
+    }
+  }, [article?.id, article?.link, article?.feedId, resetForArticle, switchToExtracted]);
 
   // Auto-extract teaser articles in background
   useEffect(() => {

@@ -6,6 +6,8 @@ export interface Feed {
   siteUrl: string;
   /** Folder this feed belongs to. Null/undefined = unfiled (top level). */
   folderId?: string;
+  /** When true, the reader opens articles from this feed in "Full text" view by default. */
+  preferFullText?: boolean;
   createdAt: number;
   updatedAt: number;
 }

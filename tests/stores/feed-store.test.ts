@@ -237,6 +237,34 @@ describe("feed-store", () => {
     });
   });
 
+  describe("setFeedPreferFullText", () => {
+    it("persists the new flag via updateFeed and reloads feeds", async () => {
+      const feed = mockFeed("f1", "Example");
+      useFeedStore.setState({ feeds: [feed] });
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: true,
+        value: [{ ...feed, preferFullText: true }],
+      });
+
+      await useFeedStore.getState().setFeedPreferFullText("f1", true);
+
+      expect(updateFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "f1", preferFullText: true }),
+      );
+      expect(useFeedStore.getState().feeds[0].preferFullText).toBe(true);
+    });
+
+    it("no-ops when the feed cannot be found", async () => {
+      vi.mocked(getFeed).mockResolvedValue({ ok: false, error: "not found" });
+
+      await useFeedStore.getState().setFeedPreferFullText("missing", true);
+
+      expect(updateFeed).not.toHaveBeenCalled();
+    });
+  });
+
   describe("selectFeed", () => {
     it("sets selectedFeedId", () => {
       useFeedStore.getState().selectFeed("abc");

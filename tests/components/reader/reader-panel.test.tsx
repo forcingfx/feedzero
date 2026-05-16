@@ -612,4 +612,58 @@ describe("ReaderPanel", () => {
       expect(screen.getByTestId("next-pill").className).toContain("flex-1");
     });
   });
+
+  describe("Prefer full text per feed", () => {
+    it("opens articles in extracted view when the feed has preferFullText=true", () => {
+      const feed = {
+        id: "f1",
+        url: "https://example.com/feed",
+        title: "Example",
+        description: "",
+        siteUrl: "https://example.com",
+        preferFullText: true,
+        createdAt: 0,
+        updatedAt: 0,
+      };
+      useFeedStore.setState({ feeds: [feed], selectedFeedId: "f1" });
+      const article = mockArticle({ link: "https://example.com/post-a" });
+      // Pre-seed cached extraction so switchToExtracted doesn't fire a fetch.
+      useExtractionStore.setState({
+        cache: { [article.link]: "<p>full text from cache</p>" },
+        statusMap: { [article.link]: "available" },
+        viewMode: "feed",
+      });
+      useArticleStore.setState({
+        selectedArticle: article,
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+    });
+
+    it("leaves viewMode as 'feed' when the feed does not opt in", () => {
+      const feed = {
+        id: "f1",
+        url: "https://example.com/feed",
+        title: "Example",
+        description: "",
+        siteUrl: "https://example.com",
+        createdAt: 0,
+        updatedAt: 0,
+      };
+      useFeedStore.setState({ feeds: [feed], selectedFeedId: "f1" });
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(useExtractionStore.getState().viewMode).toBe("feed");
+    });
+  });
 });
