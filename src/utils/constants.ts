@@ -70,6 +70,9 @@ export const LOCAL_STORAGE = {
   FOLDER_CUSTOM_ORDER: "feedzero:folder-custom-order",
   AUTO_ORGANIZE_DISMISSED_COUNT: "feedzero:auto-organize-dismissed-count",
   GROUP_ARTICLE_FLOODS: "feedzero:group-article-floods",
+  /** Set the first time a no-feedId visit redirects to /explore. Once
+   *  set, subsequent visits fall back to the All items list. */
+  INITIAL_EXPLORE_SHOWN: "feedzero:initial-explore-shown",
 } as const;
 
 /**

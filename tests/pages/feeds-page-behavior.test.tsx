@@ -6,8 +6,25 @@ import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, clearArticleCache } from "@/stores/article-store.ts";
 import * as db from "@/core/storage/db.ts";
-import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, toFolderFeedId, LOCAL_STORAGE } from "@/utils/constants.ts";
 import type { Article, Feed } from "@/types/index.ts";
+
+// happy-dom in this test file does not provide localStorage; install a tiny
+// in-memory shim so the feeds-page redirect (which reads/writes the
+// INITIAL_EXPLORE_SHOWN flag) works under test.
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+  };
+})();
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStorageMock,
+  writable: true,
+});
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -147,6 +164,10 @@ function resetStores() {
   });
   clearArticleCache();
   vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [] });
+  // Default to "returning user" — Explore-on-first-launch is a one-time
+  // detour, so the rest of the test suite should not trip it. The two
+  // first-launch tests below clear the flag explicitly.
+  localStorage.setItem(LOCAL_STORAGE.INITIAL_EXPLORE_SHOWN, "true");
 }
 
 describe("FeedsPage behavior — desktop", () => {
@@ -290,6 +311,33 @@ describe("FeedsPage behavior — desktop", () => {
 
     // Observable: URL stays the same
     expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
+  });
+
+  describe("first-launch lands on /explore", () => {
+    it("redirects /feeds to /explore on first ever launch and persists the seen flag", async () => {
+      localStorage.removeItem(LOCAL_STORAGE.INITIAL_EXPLORE_SHOWN);
+      useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+
+      renderPage("/feeds");
+
+      await vi.waitFor(() => {
+        expect(currentUrl).toBe("/explore");
+      });
+      expect(localStorage.getItem(LOCAL_STORAGE.INITIAL_EXPLORE_SHOWN)).toBe(
+        "true",
+      );
+    });
+
+    it("falls back to All items on subsequent visits after the flag is set", async () => {
+      // resetStores() has already set the flag — this models a returning user.
+      useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+
+      renderPage("/feeds");
+
+      await vi.waitFor(() => {
+        expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
+      });
+    });
   });
 });
 

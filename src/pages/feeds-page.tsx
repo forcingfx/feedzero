@@ -7,7 +7,7 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useSharedSidebarSize } from "@/hooks/use-shared-sidebar-size.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
-import { ALL_FEEDS_ID, PANEL_LAYOUT_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, LOCAL_STORAGE, PANEL_LAYOUT_ID } from "@/utils/constants.ts";
 import { findNextArticle, findPrevArticle } from "@/lib/next-article.ts";
 import {
   ResizablePanelGroup,
@@ -100,15 +100,26 @@ export function FeedsPage() {
   const lastSyncedArticleIdRef = useRef<string | undefined>(undefined);
 
   // Whenever no feedId is in the URL (and we're not explicitly on /explore),
-  // land on the All items article list. Even with zero feeds the list is the
-  // expected home — the auto-subscribe to the release notes feed populates
-  // it shortly, and Explore is reachable via the sidebar. Defaulting to
-  // Explore would otherwise make the app feel like a directory, not a reader.
+  // land on the All items article list — except for the user's very first
+  // visit, where we briefly detour through /explore so they immediately see
+  // the catalog. After the one-time redirect the INITIAL_EXPLORE_SHOWN flag
+  // is set and future no-feedId visits fall back to All items as before.
   useEffect(() => {
     if (isExplorePage || isStatsPage) return;
-    if (!feedId) {
-      navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
+    if (feedId) return;
+    let firstLaunch = false;
+    try {
+      firstLaunch =
+        localStorage.getItem(LOCAL_STORAGE.INITIAL_EXPLORE_SHOWN) !== "true";
+    } catch { /* localStorage unavailable — treat as returning user */ }
+    if (firstLaunch) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE.INITIAL_EXPLORE_SHOWN, "true");
+      } catch { /* ignore */ }
+      navigate("/explore", { replace: true });
+      return;
     }
+    navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
   }, [isExplorePage, isStatsPage, feedId, navigate]);
 
   const isLoadingArticles = useArticleStore((s) => s.isLoading);
