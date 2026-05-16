@@ -89,8 +89,17 @@ export const useLicenseStore = create<LicenseState>((set) => ({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.ok) {
-        // Server rejected the token — clear it so we don't keep sending an
-        // invalid Bearer on every sync request.
+        // 5xx = transient (Vercel hiccup, Upstash blip). DO NOT clear the
+        // token — a paying customer would see their tier silently flip to
+        // Free and panic. Keep the locally-decoded tier; the next refresh
+        // (page load, cross-tab event) will retry.
+        // 4xx = the server explicitly rejected this token (revoked,
+        // expired, forged). Clear so we don't keep sending an invalid
+        // Bearer on every sync request.
+        if (res.status >= 500) {
+          set({ verifying: false });
+          return;
+        }
         clearLicenseToken();
         set({ tier: "free", verifying: false });
         return;

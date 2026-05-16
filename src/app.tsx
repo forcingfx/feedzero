@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
 import { UpgradeDialog } from "@/components/billing/upgrade-dialog.tsx";
+import { SettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
@@ -173,6 +174,7 @@ export function App() {
       <SyncSetupDialog />
       <SyncMigrationDialog />
       <UpgradeDialog />
+      <SettingsDialog />
       <SpeedInsights />
     </>
   );

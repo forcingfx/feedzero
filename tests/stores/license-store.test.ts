@@ -113,6 +113,23 @@ describe("useLicenseStore", () => {
       expect(localStorage.getItem(LICENSE_TOKEN_STORAGE_KEY)).toBe(personalToken);
     });
 
+    it("keeps the locally-decoded tier when the server returns 5xx (transient failure)", async () => {
+      setLicenseToken(personalToken);
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ ok: false, error: "bad gateway" }), {
+          status: 502,
+        }),
+      );
+
+      await useLicenseStore.getState().refresh();
+      // 5xx = transient (Vercel hiccup, Upstash blip). DO NOT silently
+      // downgrade a paying customer to Free on a transient blip — they'd
+      // see their tier disappear and panic. Only clear on 4xx (server
+      // says explicitly: this token is no good).
+      expect(useLicenseStore.getState().tier).toBe("personal");
+      expect(localStorage.getItem(LICENSE_TOKEN_STORAGE_KEY)).toBe(personalToken);
+    });
+
     it("falls back to free when the token payload is unparseable", async () => {
       // Well-formed-shape token but the payload base64 decodes to gibberish.
       setLicenseToken("fz_bm90LXZhbGlk.c2ln");

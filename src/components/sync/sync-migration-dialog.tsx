@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useSyncStore } from "@/stores/sync-store";
+import { openSettings } from "@/lib/open-settings";
 
 const SELF_HOST_GUIDE_URL = "https://www.feedzero.app/docs/self-hosting";
 
@@ -68,10 +69,14 @@ export function SyncMigrationDialog() {
         </div>
 
         <DialogFooter className="flex-col gap-2 sm:flex-col sm:items-stretch">
-          <Button asChild className="w-full">
-            <a href="/?subscribe=personal-monthly">
-              Subscribe to Personal — $5/mo
-            </a>
+          <Button
+            className="w-full"
+            onClick={() => {
+              dismissPendingMigration();
+              openSettings("account");
+            }}
+          >
+            Subscribe to Personal — $5/mo
           </Button>
           <Button
             variant="outline"

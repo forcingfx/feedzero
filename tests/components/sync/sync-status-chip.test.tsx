@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SyncStatusChip } from "@/components/sync/sync-status-chip";
 import { useSyncStore } from "@/stores/sync-store";
+import { useSettingsStore } from "@/stores/settings-store";
+import { useLicenseStore } from "@/stores/license-store";
 
 describe("SyncStatusChip", () => {
   beforeEach(() => {
@@ -10,6 +12,8 @@ describe("SyncStatusChip", () => {
       status: "local-only",
       dialogOpen: false,
     });
+    useSettingsStore.setState({ open: false, activeTab: "account" });
+    useLicenseStore.setState({ tier: "free", verifying: false });
   });
 
   it("shows 'Cloud sync' label", () => {
@@ -30,15 +34,13 @@ describe("SyncStatusChip", () => {
     expect(toggle).toBeChecked();
   });
 
-  it("opens dialog when clicked", async () => {
+  it("opens Settings on the Account tab when clicked (Phase B unification)", async () => {
     const user = userEvent.setup();
-    const setDialogOpen = vi.fn();
-    useSyncStore.setState({ setDialogOpen });
-
     render(<SyncStatusChip />);
     await user.click(screen.getByText("Cloud sync"));
-
-    expect(setDialogOpen).toHaveBeenCalledWith(true);
+    const s = useSettingsStore.getState();
+    expect(s.open).toBe(true);
+    expect(s.activeTab).toBe("account");
   });
 
   it("shows spinner animation for syncing status", () => {

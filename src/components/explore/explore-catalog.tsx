@@ -19,7 +19,7 @@ import {
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { FeedPreviewSheet } from "@/components/explore/feed-preview-sheet.tsx";
-import { SettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { openSettings } from "@/lib/open-settings.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
@@ -603,7 +603,6 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddingFeed, setIsAddingFeed] = useState(false);
-  const [importExportOpen, setImportExportOpen] = useState(false);
   const [selectedRowId, setSelectedFeedUrl] = useState<string | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -769,7 +768,7 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setImportExportOpen(true)}
+          onClick={() => openSettings("import")}
         >
           <FileUp className="mr-2 size-4" />
           Import / Export
@@ -883,10 +882,6 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
         )}
       </div>
 
-      <SettingsDialog
-        open={importExportOpen}
-        onOpenChange={setImportExportOpen}
-      />
     </div>
   );
 }

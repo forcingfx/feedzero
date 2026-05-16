@@ -24,6 +24,8 @@ import {
 import { decodeLicensePayload } from "@/core/license/format";
 import { base64UrlDecodeToString } from "@/core/license/crypto";
 import type { LicensePayload } from "@/core/license/format";
+import { AccountUpgradeSection } from "./account-upgrade-section";
+import { AccountSyncSection } from "./account-sync-section";
 
 const TOKEN_PREFIX = "fz_";
 
@@ -65,22 +67,15 @@ export function AccountTab() {
 function FreeView() {
   return (
     <div className="space-y-4 py-2">
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-slate-50 text-slate-600 border-slate-200">
-            Free
-          </span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          You&apos;re on the Free tier. Upgrade to Personal for end-to-end
-          encrypted cloud sync, auto-organize folders, and unlimited feeds.
-        </p>
-        <Button asChild className="w-full sm:w-auto">
-          <a href="/?subscribe=personal-monthly">
-            Subscribe to Personal — $5/mo
-          </a>
-        </Button>
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-slate-50 text-slate-600 border-slate-200">
+          Free
+        </span>
+        <span className="text-sm text-muted-foreground">
+          You&apos;re on the Free tier.
+        </span>
       </div>
+      <AccountUpgradeSection />
     </div>
   );
 }
@@ -233,6 +228,8 @@ function PaidView({ tier, onSignOut }: PaidViewProps) {
           </Alert>
         )}
       </div>
+
+      <AccountSyncSection />
 
       <div className="rounded-lg border border-border bg-card p-4">
         <p className="text-xs text-muted-foreground mb-2">
