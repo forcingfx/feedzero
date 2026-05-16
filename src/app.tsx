@@ -167,10 +167,13 @@ export function App() {
             <Route path="*" element={<NavigateWithSearch to="/feeds" />} />
           </Routes>
         </AppInit>
+        {/* Top-level dialogs mounted inside the Router so hooks like
+            useNavigate and useWhatsNew (which Settings → Help calls)
+            have router context. */}
+        <SyncMigrationDialog />
+        <SettingsDialog />
         <Toaster position="bottom-center" />
       </BrowserRouter>
-      <SyncMigrationDialog />
-      <SettingsDialog />
       <SpeedInsights />
     </>
   );

@@ -10,7 +10,6 @@ describe("SyncStatusChip", () => {
   beforeEach(() => {
     useSyncStore.setState({
       status: "local-only",
-      dialogOpen: false,
     });
     useSettingsStore.setState({ open: false, activeTab: "account" });
     useLicenseStore.setState({ tier: "free", verifying: false });

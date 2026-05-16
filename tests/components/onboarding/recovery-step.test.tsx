@@ -71,7 +71,6 @@ describe("RecoveryStep", () => {
       lastSyncedAt: null,
       error: null,
       credentials: null,
-      dialogOpen: false,
     });
   });
 

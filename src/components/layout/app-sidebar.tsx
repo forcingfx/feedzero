@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
 import {
-  ChevronsUpDown,
   RefreshCw,
   Settings,
   X,
@@ -27,14 +25,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { useSyncStore } from "@/stores/sync-store.ts";
-import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
-import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
 import { LicenseStatusChip } from "@/components/billing/license-status-chip.tsx";
 import { requestSyncSetup } from "@/lib/request-sync-setup.ts";
+import { openSettings } from "@/lib/open-settings.ts";
 import { BrandMark } from "@/components/brand/brand-mark.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -70,54 +67,46 @@ function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) 
     );
   }
   // Local-only (and any unknown status): suppress the chip on the Settings
-  // button. The amber "Local" indicator now lives inside the Settings
-  // dropdown on the Cloud sync row — see SettingsMenu.
+  // button. The "Cloud sync" launcher lives inside Settings → Account.
   return null;
 }
 
-function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhatsNew: () => void }) {
+function SidebarFooterMenu() {
   const syncStatus = useSyncStore((s) => s.status);
   const isOnline = useIsOnline();
-  // SyncBadge returns null when the user is local-only AND online (that
-  // indicator now lives inside the Settings dropdown instead). In that
-  // case there's no chip on the second line, so render a single-line,
-  // vertically-centered label instead of an empty two-row grid that
-  // makes "Settings" look top-aligned.
+  // SyncBadge returns null when the user is local-only AND online —
+  // collapse to a single-line label in that case so "Settings" looks
+  // vertically centered instead of top-anchored in an empty two-row grid.
   const hasChip = !isOnline || syncStatus !== "local-only";
 
   return (
-    <SettingsMenu
-      hasFeeds={hasFeeds}
-      onWhatsNew={onWhatsNew}
-      side="top"
-      align="end"
-      contentClassName="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-      trigger={
-        <SidebarMenuButton
-          size="lg"
-          className="group/settings py-3 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-        >
-          <div className="flex items-center justify-center size-8 rounded-lg bg-muted text-muted-foreground">
-            <Settings className="size-4" />
-          </div>
-          {hasChip ? (
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">Settings</span>
-              <span className="flex items-center gap-1.5 mt-0.5">
-                <SyncBadge status={syncStatus} isOnline={isOnline} />
-                <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
-              </span>
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center text-left">
-              <span className="flex-1 truncate text-base font-semibold">Settings</span>
-              <Kbd className="h-5 text-[10px] px-1.5 mr-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
-            </div>
-          )}
-          <ChevronsUpDown className="ml-auto size-4" />
-        </SidebarMenuButton>
-      }
-    />
+    <SidebarMenuButton
+      size="lg"
+      onClick={() => openSettings()}
+      className="group/settings py-3"
+    >
+      <div className="flex items-center justify-center size-8 rounded-lg bg-muted text-muted-foreground">
+        <Settings className="size-4" />
+      </div>
+      {hasChip ? (
+        <div className="grid flex-1 text-left text-sm leading-tight">
+          <span className="truncate font-semibold">Settings</span>
+          <span className="flex items-center gap-1.5 mt-0.5">
+            <SyncBadge status={syncStatus} isOnline={isOnline} />
+            <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">
+              {settingsShortcutLabel}
+            </Kbd>
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-1 items-center text-left">
+          <span className="flex-1 truncate text-base font-semibold">Settings</span>
+          <Kbd className="h-5 text-[10px] px-1.5 mr-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">
+            {settingsShortcutLabel}
+          </Kbd>
+        </div>
+      )}
+    </SidebarMenuButton>
   );
 }
 
@@ -175,35 +164,12 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
-  const addFeed = useFeedStore((s) => s.addFeed);
 
   const { isMobile, setOpenMobile } = useSidebar();
-  const navigate = useNavigate();
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
     if (onFeedSelect) onFeedSelect(feedId);
-  }
-
-  async function handleWhatsNew() {
-    const existing = feeds.find((f) => f.url === CHANGELOG_FEED_URL);
-    if (existing) {
-      handleSelect(existing.id);
-      navigate(`/feeds/${existing.id}`);
-      return;
-    }
-    // Subscribe to the external release feed. addFeed goes through the feed
-    // service, which fetches via the proxy (or directly — CORS is open).
-    try {
-      await addFeed(CHANGELOG_FEED_URL);
-      const added = useFeedStore.getState().feeds.find(
-        (f) => f.url === CHANGELOG_FEED_URL,
-      );
-      if (added) {
-        handleSelect(added.id);
-        navigate(`/feeds/${added.id}`);
-      }
-    } catch { /* noop */ }
   }
 
   return (
@@ -262,7 +228,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
           <LocalStorageWarning />
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarFooterMenu hasFeeds={feeds.length > 0} onWhatsNew={handleWhatsNew} />
+              <SidebarFooterMenu />
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

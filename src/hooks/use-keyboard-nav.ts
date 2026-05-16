@@ -3,6 +3,7 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { toFolderFeedId } from "@/utils/constants.ts";
+import { openSettings } from "@/lib/open-settings.ts";
 
 /**
  * Keyboard navigation hook for feed reader shortcuts.
@@ -13,10 +14,14 @@ import { toFolderFeedId } from "@/utils/constants.ts";
  */
 export function useKeyboardNav() {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Cmd/Ctrl+, opens settings (works even in inputs)
+    // Cmd/Ctrl+, opens settings (works even in inputs).
+    // Drives the store directly — the previous event-indirection lived
+    // because the SettingsMenu dropdown listened for it; the unified
+    // SettingsDialog reads state from useSettingsStore, so no listener
+    // is needed.
     if (e.key === "," && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      document.dispatchEvent(new CustomEvent("feedzero:open-settings"));
+      openSettings();
       return;
     }
 

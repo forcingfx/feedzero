@@ -131,30 +131,18 @@ describe("AppSidebar layout structure", () => {
     expect(footer!.textContent).not.toContain("Free");
   });
 
-  it("settings dropdown contains an Auto-organize menu item", async () => {
-    // Need at least one feed so the settings menu shows the relevant section.
-    useFeedStore.setState({
-      feeds: [
-        {
-          id: "f1",
-          url: "https://example.com/x.xml",
-          title: "Example",
-          description: "",
-          siteUrl: "https://example.com",
-          createdAt: 0,
-          updatedAt: 0,
-        },
-      ],
-    });
+  it("clicking the sidebar Settings button opens the unified Settings dialog", async () => {
+    const { useSettingsStore } = await import("@/stores/settings-store.ts");
+    useSettingsStore.setState({ open: false, activeTab: "account" });
     const { default: userEvent } = await import("@testing-library/user-event");
     const user = userEvent.setup();
 
     renderSidebar();
 
     await user.click(screen.getByRole("button", { name: /settings/i }));
-    expect(
-      await screen.findByText(/Auto-organize/i),
-    ).toBeInTheDocument();
+    const s = useSettingsStore.getState();
+    expect(s.open).toBe(true);
+    expect(s.activeTab).toBe("account");
   });
 
   it("renders Explore entry inside Feeds group", () => {
@@ -208,27 +196,14 @@ describe("AppSidebar layout structure", () => {
       expect(container.className).not.toContain("grid");
     });
 
-    it("shows a Local pill inside the Settings dropdown when status is local-only", async () => {
+    it("does NOT render a Local chip on the Settings button when local-only + online", () => {
+      // The old dropdown surfaced a Local pill inline on the Cloud sync row.
+      // After the dropdown→button refactor, the chip is suppressed for
+      // local-only + online users — the amber "Cloud sync" launcher lives
+      // inside Settings → Account instead. The button just says "Settings".
       useSyncStore.setState({ status: "local-only" });
-      useFeedStore.setState({
-        feeds: [
-          {
-            id: "feed-1",
-            url: "https://example.com/rss",
-            title: "Example Feed",
-            description: "",
-            siteUrl: "https://example.com",
-            createdAt: 0,
-            updatedAt: 0,
-          },
-        ],
-      });
-      const { default: userEvent } = await import("@testing-library/user-event");
-      const user = userEvent.setup();
       renderSidebar();
-      await user.click(screen.getByRole("button", { name: /settings/i }));
-      // Local pill inside the open dropdown.
-      expect(await screen.findByText(/^Local$/)).toBeInTheDocument();
+      expect(screen.queryByText(/^Local$/)).toBeNull();
     });
   });
 });

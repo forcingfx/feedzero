@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { useLicenseStore } from "@/stores/license-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -28,12 +29,20 @@ describe("<SettingsDialog>", () => {
   });
 
   it("renders nothing when the store says closed", () => {
-    render(<SettingsDialog />);
+    render(
+      <MemoryRouter>
+        <SettingsDialog />
+      </MemoryRouter>,
+    );
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("opens via openSettings() and lands on the Account tab by default", () => {
-    render(<SettingsDialog />);
+    render(
+      <MemoryRouter>
+        <SettingsDialog />
+      </MemoryRouter>,
+    );
     act(() => openSettings());
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(
@@ -41,23 +50,37 @@ describe("<SettingsDialog>", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders all three tab toggles (account / import / export)", () => {
+  it("renders all five tab toggles (account / reading / help / import / export)", () => {
     act(() => openSettings());
-    render(<SettingsDialog />);
+    render(
+      <MemoryRouter>
+        <SettingsDialog />
+      </MemoryRouter>,
+    );
     expect(screen.getByLabelText(/account/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^reading$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^help$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/import feeds/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/export feeds/i)).toBeInTheDocument();
   });
 
   it("opens on the specified tab when openSettings('import') is called", () => {
-    render(<SettingsDialog />);
+    render(
+      <MemoryRouter>
+        <SettingsDialog />
+      </MemoryRouter>,
+    );
     act(() => openSettings("import"));
     expect(screen.getByTestId("import-view")).toBeInTheDocument();
   });
 
   it("clicking a toggle updates the store's activeTab", () => {
     act(() => openSettings());
-    render(<SettingsDialog />);
+    render(
+      <MemoryRouter>
+        <SettingsDialog />
+      </MemoryRouter>,
+    );
     fireEvent.click(screen.getByLabelText(/export feeds/i));
     expect(useSettingsStore.getState().activeTab).toBe("export");
     expect(screen.getByTestId("export-view")).toBeInTheDocument();
@@ -65,7 +88,11 @@ describe("<SettingsDialog>", () => {
 
   it("closeSettings() closes the dialog", () => {
     act(() => openSettings());
-    render(<SettingsDialog />);
+    render(
+      <MemoryRouter>
+        <SettingsDialog />
+      </MemoryRouter>,
+    );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     act(() => closeSettings());
     expect(screen.queryByRole("dialog")).toBeNull();

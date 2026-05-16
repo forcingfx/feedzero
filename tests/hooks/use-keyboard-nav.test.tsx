@@ -614,4 +614,23 @@ describe("useKeyboardNav", () => {
       expect(event.defaultPrevented).toBe(true);
     });
   });
+
+  describe("open settings (Cmd/Ctrl + ,)", () => {
+    it("opens the unified Settings dialog directly (no event indirection)", async () => {
+      const { useSettingsStore } = await import("@/stores/settings-store.ts");
+      useSettingsStore.setState({ open: false, activeTab: "account" });
+      renderHook(() => useKeyboardNav());
+
+      const event = new KeyboardEvent("keydown", {
+        key: ",",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      document.dispatchEvent(event);
+
+      expect(useSettingsStore.getState().open).toBe(true);
+      expect(event.defaultPrevented).toBe(true);
+    });
+  });
 });

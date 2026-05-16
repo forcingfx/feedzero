@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
-import { ChevronUp, Layers } from "lucide-react";
+import { ChevronUp, Layers, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID, CHANGELOG_FEED_URL } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
-import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
+import { openSettings } from "@/lib/open-settings.ts";
 
 interface MobileNavDrawerProps {
   onFeedSelect: (feedId: string) => void;
@@ -16,8 +15,6 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
-  const addFeed = useFeedStore((s) => s.addFeed);
-  const navigate = useNavigate();
 
   useEffect(() => {
     function handleToggle() {
@@ -32,22 +29,9 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     setOpen(false);
   }
 
-  async function handleWhatsNew() {
+  function handleSettings() {
     setOpen(false);
-    const existing = feeds.find((f) => f.url === CHANGELOG_FEED_URL);
-    if (existing) {
-      onFeedSelect(existing.id);
-      navigate(`/feeds/${existing.id}`);
-      return;
-    }
-    try {
-      await addFeed(CHANGELOG_FEED_URL);
-      const added = useFeedStore.getState().feeds.find((f) => f.url === CHANGELOG_FEED_URL);
-      if (added) {
-        onFeedSelect(added.id);
-        navigate(`/feeds/${added.id}`);
-      }
-    } catch { /* noop */ }
+    openSettings();
   }
 
   const activeFeed = feeds.find((f) => f.id === selectedFeedId);
@@ -58,7 +42,6 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
 
   return (
     <Drawer.Root open={open} onOpenChange={setOpen} snapPoints={[0.85]}>
-      {/* In-flow handle — always visible, 60px, part of the flex column */}
       <Drawer.Trigger asChild>
         <div
           data-testid="drawer-handle-strip"
@@ -86,27 +69,13 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
         >
           <div className="mx-auto w-10 h-1 rounded-full bg-muted-foreground/30 mt-3 mb-1 shrink-0" />
 
-          {/*
-            SidebarProvider's default wrapper is `flex min-h-svh w-full` (row, viewport-tall).
-            Inside a height-bounded drawer that lays out content vertically, we override to
-            `block min-h-0` so children stack vertically and the inner overflow-y-auto can
-            do its job without competing with min-h-svh.
-          */}
           <SidebarProvider defaultOpen={false} className="block min-h-0">
             <div
               data-testid="drawer-scroll"
-              // Padding-bottom = home-indicator inset + iOS toolbar slack + breathing room.
-              // - `env(safe-area-inset-bottom)`: iPhone home-indicator strip (~34px on
-              //   modern iPhones in PWA / no-toolbar contexts).
-              // - `calc(100vh - 100dvh)`: iOS Safari's dynamic bottom toolbar
-              //   (~70-80px on iPhones). Zero when the toolbar is collapsed. The
-              //   prior fix omitted this — leaving the last drawer row occluded
-              //   when the toolbar was up. See `tests/components/layout/mobile-nav-drawer.test.tsx`
-              //   for the regression guard.
-              // - `2rem`: visual breathing room so the last row isn't pressed against
-              //   the very edge.
-              // Vaul positions the outer Drawer.Content itself; the only place we
-              // can reliably enforce safe-area is here on the inner scroll.
+              // pb-[calc(env(safe-area-inset-bottom) + (100vh - 100dvh) + 2rem)]:
+              //   home-indicator inset + iOS Safari toolbar slack + breathing room.
+              //   Vaul positions the outer Drawer.Content; this inner scroll is the
+              //   only place we can reliably enforce the safe-area floor.
               className="overflow-y-auto overflow-x-hidden pb-[calc(env(safe-area-inset-bottom)_+_(100vh_-_100dvh)_+_2rem)]"
               style={{ height: "calc(85dvh - 1.25rem)" }}
             >
@@ -118,16 +87,21 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
               </div>
 
               {/*
-                Settings as direct rows (variant="list"). A dropdown anchored to
-                the drawer bottom gets covered by iOS Safari browser chrome —
-                listing every option in-flow keeps them all reachable with one tap.
+                Single Settings entry. Tapping it closes the drawer and opens
+                the unified Settings dialog (account / reading / help / import
+                / export). The dialog is screen-centered — unlike a dropdown
+                anchored to the drawer bottom, it isn't occluded by iOS Safari
+                chrome, so we no longer need every Settings item inlined here.
               */}
               <div data-testid="drawer-section" className="border-t mt-2 px-3 py-1">
-                <SettingsMenu
-                  variant="list"
-                  hasFeeds={feeds.length > 0}
-                  onWhatsNew={handleWhatsNew}
-                />
+                <button
+                  type="button"
+                  onClick={handleSettings}
+                  className="flex items-center gap-3 w-full px-2 py-3 text-left text-sm font-medium rounded-md hover:bg-accent"
+                >
+                  <Settings className="size-4 shrink-0 text-muted-foreground" />
+                  Settings
+                </button>
               </div>
             </div>
           </SidebarProvider>
