@@ -67,6 +67,109 @@ describe("logError", () => {
     expect(raw).not.toContain("should-not-appear-in-logs-ever");
   });
 
+  describe("operator alerting for silent webhook failures", () => {
+    let originalFetch: typeof fetch;
+    let originalAlertUrl: string | undefined;
+
+    beforeEach(() => {
+      originalFetch = globalThis.fetch;
+      originalAlertUrl = process.env.OPERATOR_ALERT_URL;
+    });
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+      if (originalAlertUrl === undefined) {
+        delete process.env.OPERATOR_ALERT_URL;
+      } else {
+        process.env.OPERATOR_ALERT_URL = originalAlertUrl;
+      }
+    });
+
+    it("POSTs to OPERATOR_ALERT_URL when errClass is AcceptedWithIssue", async () => {
+      process.env.OPERATOR_ALERT_URL = "https://hooks.example.com/operator";
+      const fetchMock = vi.fn().mockResolvedValue(new Response("ok"));
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      logError({
+        route: "/api/stripe/webhook",
+        method: "POST",
+        status: 200,
+        traceId: "req_alert",
+        errClass: "AcceptedWithIssue",
+        errMsg: "Missing tier metadata on price",
+      });
+
+      // Alert is fire-and-forget; flush microtasks
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://hooks.example.com/operator");
+      expect(init.method).toBe("POST");
+      const body = JSON.parse(init.body as string);
+      expect(body.errClass).toBe("AcceptedWithIssue");
+      expect(body.errMsg).toBe("Missing tier metadata on price");
+      expect(body.traceId).toBe("req_alert");
+    });
+
+    it("does NOT POST when errClass is something else (only silent-failure paths alert)", async () => {
+      process.env.OPERATOR_ALERT_URL = "https://hooks.example.com/operator";
+      const fetchMock = vi.fn();
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      logError({
+        route: "/api/sync",
+        method: "PUT",
+        status: 500,
+        traceId: "req_normal_err",
+        errClass: "StorageError",
+        errMsg: "disk full",
+      });
+
+      await new Promise((r) => setTimeout(r, 0));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("is a silent no-op when OPERATOR_ALERT_URL is unset", async () => {
+      delete process.env.OPERATOR_ALERT_URL;
+      const fetchMock = vi.fn();
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      logError({
+        route: "/api/stripe/webhook",
+        method: "POST",
+        status: 200,
+        traceId: "req_x",
+        errClass: "AcceptedWithIssue",
+        errMsg: "Missing line item period.end",
+      });
+
+      await new Promise((r) => setTimeout(r, 0));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("swallows alert-channel failures (don't crash the original handler)", async () => {
+      process.env.OPERATOR_ALERT_URL = "https://hooks.example.com/operator";
+      const fetchMock = vi.fn().mockRejectedValue(new Error("hook down"));
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      expect(() =>
+        logError({
+          route: "/api/stripe/webhook",
+          method: "POST",
+          status: 200,
+          traceId: "req_alert_fail",
+          errClass: "AcceptedWithIssue",
+          errMsg: "boom",
+        }),
+      ).not.toThrow();
+
+      await new Promise((r) => setTimeout(r, 10));
+      // Alert was attempted but it failing didn't propagate
+      expect(fetchMock).toHaveBeenCalled();
+    });
+  });
+
   it("does NOT emit other PII-like fields (customerId, email, ip, token)", () => {
     logError({
       route: "/api/stripe/webhook",

@@ -157,6 +157,22 @@ describe("<AccountTab>", () => {
     });
   });
 
+  describe("masked-token width matches actual token (no layout jitter on reveal)", () => {
+    it("mask preserves fz_ prefix and the dot, with mask width matching token width", () => {
+      const token = makeToken("personal");
+      setLicenseToken(token);
+      useLicenseStore.setState({ tier: "personal", verifying: false });
+      render(<AccountTab />);
+
+      const codeEl = document.querySelector("code");
+      expect(codeEl).not.toBeNull();
+      const maskedText = codeEl!.textContent ?? "";
+      expect(maskedText.startsWith("fz_")).toBe(true);
+      expect(maskedText).toContain(".");
+      expect(maskedText.length).toBe(token.length);
+    });
+  });
+
   describe("Phase B: inline upgrade + sync sections", () => {
     it("free tier renders the full upgrade tier comparison inline (not just a Subscribe button)", () => {
       useLicenseStore.setState({ tier: "free", verifying: false });
