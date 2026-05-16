@@ -13,6 +13,7 @@ import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { BillingSuccess } from "@/pages/billing-success.tsx";
 import { BillingCancelled } from "@/pages/billing-cancelled.tsx";
 import { SubscribeDeeplink } from "@/components/billing/subscribe-deeplink.tsx";
+import { useLicenseStore } from "@/stores/license-store.ts";
 import { Button } from "@/components/ui/button.tsx";
 
 function AppInit({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,9 @@ function AppInit({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     checkOnboardingStatus();
+    // Resolve the user's license tier once at startup so gated UI (Sidebar
+    // status chip, feature gates) doesn't flash "Free" for paid users.
+    void useLicenseStore.getState().refresh();
   }, []);
 
   // Returning users: restore from stored keys

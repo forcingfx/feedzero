@@ -17,8 +17,12 @@ import {
 } from "../core/feeds/feed-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
+import { useLicenseStore } from "./license-store.ts";
+import { gateState } from "../core/features/feature-gates.ts";
+import { isSelfHosted } from "../core/features/self-hosted.ts";
 import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
+import { toast } from "sonner";
 import type { Feed, Folder, FeedSortMode } from "../types/index.ts";
 import type { Result } from "../utils/result.ts";
 
@@ -292,6 +296,20 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
    * sidebar with unused folders. One sync push at the end keeps writes cheap.
    */
   applyAutoOrganize: async (plan) => {
+    // Defense-in-depth: even when the UI thinks the user is paid, gate the
+    // store action so programmatic callers (future shortcuts, scripts) cannot
+    // bypass the honor-system check. UI handles its own messaging — the toast
+    // here is for the edge case where state diverges.
+    const gate = gateState(
+      "auto-organize",
+      useLicenseStore.getState().tier,
+      isSelfHosted(),
+    );
+    if (!gate.enabled) {
+      toast("Auto-organize is a Personal feature. Subscribe to unlock.");
+      return;
+    }
+
     const nonEmpty = plan.filter((p) => p.feedIds.length > 0);
     if (nonEmpty.length === 0) return;
 
