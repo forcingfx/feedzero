@@ -26,7 +26,7 @@ import { base64UrlDecodeToString } from "@/core/license/crypto";
 import type { LicensePayload } from "@/core/license/format";
 import { AccountUpgradeSection } from "./account-upgrade-section";
 import { AccountSyncSection } from "./account-sync-section";
-import { AccountSafetyControls } from "./account-safety-controls";
+import { AccountLicenseRecovery } from "./account-license-recovery";
 
 const TOKEN_PREFIX = "fz_";
 
@@ -252,7 +252,7 @@ function PaidView({ tier, onSignOut }: PaidViewProps) {
       <AccountSyncSection />
 
       {token && payload && (
-        <AccountSafetyControls
+        <AccountLicenseRecovery
           token={token}
           customerId={payload.customerId}
         />
