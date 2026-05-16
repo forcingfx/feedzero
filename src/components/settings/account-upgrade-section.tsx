@@ -8,12 +8,24 @@
  */
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { openLogin } from "@/lib/open-login";
 
 export function AccountUpgradeSection() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
         Cloud sync, auto-organize, and more — for the price of a coffee.
+      </p>
+
+      <p className="text-xs text-muted-foreground">
+        Already have a FeedZero account?{" "}
+        <button
+          type="button"
+          onClick={openLogin}
+          className="text-primary underline hover:no-underline"
+        >
+          Log in
+        </button>
       </p>
 
       <TierCard
