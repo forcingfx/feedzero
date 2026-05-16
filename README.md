@@ -98,11 +98,24 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 FeedZero can run entirely on your own infrastructure:
 
 ```bash
-npm run build:all
+VITE_SELF_HOSTED=1 npm run build:all
 npm run serve
 ```
 
 This starts a standalone Hono server with all API endpoints. Point your reverse proxy at it.
+
+### `VITE_SELF_HOSTED=1`
+
+The hosted build at my.feedzero.app gates some features behind the Personal tier (currently auto-organize; later: filters, mute keywords). Setting `VITE_SELF_HOSTED=1` at build time bypasses every tier gate — every shipped feature is available to self-hosters at no charge. Features marked "coming soon" stay unavailable until the code lands; the flag doesn't conjure them into existence.
+
+Persist the flag in a `.env.production` file at the repo root if you build via CI:
+
+```
+# .env.production
+VITE_SELF_HOSTED=1
+```
+
+See [docs/decisions/012-open-core-feature-gating.md](docs/decisions/012-open-core-feature-gating.md) for the design and the honor-system tradeoff.
 
 For Vercel deployment, `git push` to a connected repository. The `api/` directory contains serverless function wrappers.
 
