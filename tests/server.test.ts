@@ -9,6 +9,8 @@ import { SUPPORTED_METHODS as STRIPE_SUPPORTED_METHODS } from "../src/core/strip
 import { SUPPORTED_METHODS as LICENSE_VERIFY_SUPPORTED_METHODS } from "../src/core/license/verify-handler";
 import { SUPPORTED_METHODS as LICENSE_ISSUE_SUPPORTED_METHODS } from "../src/core/license/issue-handler";
 import { SUPPORTED_METHODS as LICENSE_RETRIEVE_SUPPORTED_METHODS } from "../src/core/license/retrieve-handler";
+import { SUPPORTED_METHODS as LICENSE_RECOVER_SUPPORTED_METHODS } from "../src/core/license/recover-handler";
+import { SUPPORTED_METHODS as LICENSE_ISSUE_FROM_RECOVERY_SUPPORTED_METHODS } from "../src/core/license/issue-from-recovery-handler";
 import { SUPPORTED_METHODS as PORTAL_SUPPORTED_METHODS } from "../src/core/stripe/portal-handler";
 import { SUPPORTED_METHODS as CHECKOUT_SUPPORTED_METHODS } from "../src/core/stripe/checkout-handler";
 import * as vercelSyncExports from "../api/sync";
@@ -1049,6 +1051,86 @@ describe("server", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.url).toMatch(/billing\.stripe\.com/);
+    });
+
+    it("Hono server accepts POST /api/license/recover (cross-device recovery entry)", async () => {
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey: { secret: "this-is-a-test-signing-secret-32-bytes!" },
+        storage: new MemoryLicenseStorage(),
+        // Customer lookup returns no match → handler returns 200 with
+        // enumeration-protected response (no portalUrl). Proves the route
+        // is wired even without a portal.create injection.
+        customers: { list: async () => ({ data: [] }) },
+      });
+      const res = await app.request("/api/license/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "unknown@example.com" }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(body.portalUrl).toBeUndefined();
+    });
+
+    it("Vercel api/license/[action].ts exports POST for the recover action", () => {
+      for (const method of LICENSE_RECOVER_SUPPORTED_METHODS) {
+        expect(
+          vercelLicenseDynamicExports,
+          `api/license/[action].ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+      }
+    });
+
+    it("Vercel POST dispatcher routes /api/license/recover (not 404)", async () => {
+      // Stronger than the export-presence check above: actually invoke the
+      // dispatcher with a /api/license/recover URL and assert it doesn't
+      // return 404. Catches regressions where the action arm gets removed
+      // from the dispatcher but POST is still exported.
+      const post = (vercelLicenseDynamicExports as { POST: (req: Request) => Promise<Response> }).POST;
+      const req = new Request("https://test.local/api/license/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "anyone@example.com" }),
+      });
+      const res = await post(req);
+      // The handler may 502 (no real Stripe key in tests) or 200 (with the
+      // memory storage stub); what matters is the action was recognized.
+      expect(res.status).not.toBe(404);
+    });
+
+    it("Hono server accepts POST /api/license/issue-from-recovery", async () => {
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey: { secret: "this-is-a-test-signing-secret-32-bytes!" },
+        storage: new MemoryLicenseStorage(),
+      });
+      // Missing recoveryToken → 400 from handler (not 404 from missing route)
+      const res = await app.request("/api/license/issue-from-recovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("Vercel api/license/[action].ts exports POST for issue-from-recovery", () => {
+      for (const method of LICENSE_ISSUE_FROM_RECOVERY_SUPPORTED_METHODS) {
+        expect(
+          vercelLicenseDynamicExports,
+          `api/license/[action].ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+      }
+    });
+
+    it("Vercel POST dispatcher routes /api/license/issue-from-recovery (not 404)", async () => {
+      const post = (vercelLicenseDynamicExports as { POST: (req: Request) => Promise<Response> }).POST;
+      const req = new Request("https://test.local/api/license/issue-from-recovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const res = await post(req);
+      expect(res.status).not.toBe(404);
     });
 
     it("Hono server returns 404 for the OLD /api/billing/portal URL (route removed)", async () => {

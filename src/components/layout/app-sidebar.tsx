@@ -33,6 +33,7 @@ import { useIsOnline } from "@/hooks/use-online.ts";
 import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
+import { LicenseStatusChip } from "@/components/billing/license-status-chip.tsx";
 import { BrandMark } from "@/components/brand/brand-mark.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -254,6 +255,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         </SidebarContent>
 
         <SidebarFooter>
+          <div className="flex items-center justify-end px-3 pb-1">
+            <LicenseStatusChip />
+          </div>
           <QuotaIndicator />
           <LocalStorageWarning />
           <SidebarMenu>

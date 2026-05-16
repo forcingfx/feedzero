@@ -1,6 +1,8 @@
 import { handleLicenseVerifyRequest } from "../../src/core/license/verify-handler";
 import { handleLicenseIssueRequest } from "../../src/core/license/issue-handler";
 import { handleLicenseRetrieveRequest } from "../../src/core/license/retrieve-handler";
+import { handleLicenseRecoverRequest } from "../../src/core/license/recover-handler";
+import { handleIssueFromRecoveryRequest } from "../../src/core/license/issue-from-recovery-handler";
 import { handlePortalRequest } from "../../src/core/stripe/portal-handler";
 import { LicenseIssuerImpl } from "../../src/core/license/issuer";
 import { resolveLicenseStorage } from "../../src/core/license/resolve-storage";
@@ -94,6 +96,50 @@ export async function POST(req: Request): Promise<Response> {
       },
       signingKey: { secret: signingSecret },
       storage,
+    });
+  }
+
+  if (action === "recover") {
+    return handleLicenseRecoverRequest(req, {
+      customers: {
+        list: async (params) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const list = await stripe.customers.list({
+            email: params.email,
+            limit: params.limit ?? 1,
+          });
+          return {
+            data: list.data.map((c) => ({ id: c.id, email: c.email ?? null })),
+          };
+        },
+      },
+      portal: {
+        create: async (params) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.billingPortal.sessions.create(params);
+          return { url: session.url };
+        },
+      },
+      signingKey: { secret: signingSecret },
+      returnUrlBase: `${new URL(req.url).origin}/billing/issued`,
+    });
+  }
+
+  if (action === "issue-from-recovery") {
+    const storage = await storagePromise;
+    return handleIssueFromRecoveryRequest(req, {
+      signingKey: { secret: signingSecret },
+      storage,
+      subscriptions: {
+        retrieve: async (subscriptionId) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const sub = await stripe.subscriptions.retrieve(subscriptionId);
+          return { status: sub.status };
+        },
+      },
     });
   }
 

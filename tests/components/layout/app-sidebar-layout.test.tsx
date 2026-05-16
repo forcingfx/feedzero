@@ -105,6 +105,32 @@ describe("AppSidebar layout structure", () => {
     expect(footer!.textContent).toContain("Settings");
   });
 
+  it("SidebarFooter renders the license-status chip (free by default)", async () => {
+    // Reset license-store to the free baseline so we don't read a paid tier
+    // leaked from another test file in the same vitest module worker.
+    const { useLicenseStore } = await import("@/stores/license-store.ts");
+    useLicenseStore.setState({ tier: "free", verifying: false });
+
+    const { container } = renderSidebar();
+    const footer = container.querySelector("[data-sidebar='footer']");
+    expect(footer).not.toBeNull();
+    // The chip uses aria-live="polite" — find it by the label text.
+    expect(footer!.textContent).toContain("Free");
+  });
+
+  it("SidebarFooter license chip reflects a personal-tier customer", async () => {
+    const { useLicenseStore } = await import("@/stores/license-store.ts");
+    useLicenseStore.setState({ tier: "personal", verifying: false });
+
+    const { container } = renderSidebar();
+    const footer = container.querySelector("[data-sidebar='footer']");
+    expect(footer).not.toBeNull();
+    expect(footer!.textContent).toContain("Personal");
+    // Free label should not be present when tier is Personal — guards against
+    // dual-mount regressions.
+    expect(footer!.textContent).not.toContain("Free");
+  });
+
   it("settings dropdown contains an Auto-organize menu item", async () => {
     // Need at least one feed so the settings menu shows the relevant section.
     useFeedStore.setState({

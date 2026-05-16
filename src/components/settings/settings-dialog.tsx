@@ -8,8 +8,9 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ImportView } from "./import-view";
 import { ExportView } from "./export-view";
+import { AccountTab } from "./account-tab";
 
-type SettingsView = "import" | "export";
+type SettingsView = "import" | "export" | "account";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -45,10 +46,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <ToggleGroupItem value="export" aria-label="Export feeds">
             Export
           </ToggleGroupItem>
+          <ToggleGroupItem value="account" aria-label="Account">
+            Account
+          </ToggleGroupItem>
         </ToggleGroup>
 
         {view === "import" && <ImportView onClose={() => onOpenChange(false)} />}
         {view === "export" && <ExportView />}
+        {view === "account" && <AccountTab />}
       </DialogContent>
     </Dialog>
   );

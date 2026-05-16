@@ -277,6 +277,61 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
+      server.middlewares.use("/api/license/recover", async (req, res) => {
+        const { handleLicenseRecoverRequest } = await import(
+          "./src/core/license/recover-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const origin = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host ?? "localhost:3000"}`;
+        const webRes = await handleLicenseRecoverRequest(webReq, {
+          customers: {
+            list: async (params) => {
+              const { default: Stripe } = await import("stripe");
+              const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+              const list = await stripe.customers.list({
+                email: params.email,
+                limit: params.limit ?? 1,
+              });
+              return {
+                data: list.data.map((c) => ({ id: c.id, email: c.email ?? null })),
+              };
+            },
+          },
+          portal: {
+            create: async (params) => {
+              const { default: Stripe } = await import("stripe");
+              const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+              const session = await stripe.billingPortal.sessions.create(params);
+              return { url: session.url };
+            },
+          },
+          signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+          returnUrlBase: `${origin}/billing/issued`,
+        });
+        await sendWebResponse(webRes, res);
+      });
+
+      server.middlewares.use("/api/license/issue-from-recovery", async (req, res) => {
+        const { licenseStorage } = await ensureLicenseDeps();
+        const { handleIssueFromRecoveryRequest } = await import(
+          "./src/core/license/issue-from-recovery-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handleIssueFromRecoveryRequest(webReq, {
+          signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
+          storage: licenseStorage,
+          subscriptions: {
+            retrieve: async (subscriptionId) => {
+              const { default: Stripe } = await import("stripe");
+              const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+              const sub = await stripe.subscriptions.retrieve(subscriptionId);
+              return { status: sub.status };
+            },
+          },
+        });
+        await sendWebResponse(webRes, res);
+      });
+
       server.middlewares.use("/api/checkout/create-session", async (req, res) => {
         const [
           { handleCreateCheckoutSession },

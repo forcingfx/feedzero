@@ -1,0 +1,128 @@
+/**
+ * /billing/recover — public entry point for cross-device license recovery.
+ *
+ * The customer is on Device B (or has lost local storage). They enter their
+ * email; we look up the Stripe customer and create a portal session whose
+ * return_url carries a signed recovery token. Stripe sends the magic-link
+ * email — the customer clicks it, lands in the portal authenticated, and
+ * the portal's "Return to merchant" sends them to /billing/issued where
+ * their license is reissued.
+ *
+ * Enumeration protection: unknown emails get the same "check your email"
+ * confirmation as known ones. The Stripe magic-link gate is the real
+ * auth boundary; we just don't help an attacker probe for paying customers.
+ */
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+type Phase = "idle" | "submitting" | "sent" | "error";
+
+export function BillingRecover() {
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState(() => searchParams.get("email") ?? "");
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  // If the query param changes after mount (e.g. navigation from Account tab),
+  // keep the input in sync. Without this the prefill only works on first mount.
+  useEffect(() => {
+    const fromQuery = searchParams.get("email");
+    if (fromQuery && fromQuery !== email) setEmail(fromQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setPhase("submitting");
+    setError(null);
+    try {
+      const res = await fetch("/api/license/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) {
+        setError(body.error ?? `Recovery failed (${res.status})`);
+        setPhase("error");
+        return;
+      }
+      // Two legitimate 200 outcomes:
+      //  (a) portalUrl present → known customer → redirect immediately
+      //  (b) no portalUrl → unknown email → show confirmation anyway
+      //      (enumeration protection — attacker can't distinguish)
+      if (typeof body.portalUrl === "string" && body.portalUrl.length > 0) {
+        window.location.href = body.portalUrl;
+        return;
+      }
+      setPhase("sent");
+    } catch (err) {
+      setError((err as Error).message);
+      setPhase("error");
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-md p-8 space-y-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">Recover your license</h1>
+        <p className="text-sm text-muted-foreground">
+          Enter the email you used to subscribe. We&apos;ll send you a sign-in
+          link via Stripe — open it on this device to restore your license
+          and activate sync.
+        </p>
+      </header>
+
+      {phase === "sent" ? (
+        <Alert>
+          <AlertDescription>
+            Check your email. If a subscription exists for{" "}
+            <strong>{email}</strong>, Stripe will send you a sign-in link in
+            the next few minutes. Open it on this device to continue.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="recover-email">Email</Label>
+            <Input
+              id="recover-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={phase === "submitting" || !email.trim()}
+            className="w-full"
+          >
+            {phase === "submitting" ? "Looking up…" : "Recover license"}
+          </Button>
+        </form>
+      )}
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        Subscribed on a different device but never paid here?{" "}
+        <a href="/?subscribe=personal-monthly" className="underline">
+          Start a new subscription
+        </a>
+        .
+      </p>
+    </div>
+  );
+}

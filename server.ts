@@ -18,6 +18,8 @@ import {
   type PortalClient,
   type PortalSessionRetriever,
 } from "./src/core/stripe/portal-handler";
+import { handleLicenseRecoverRequest } from "./src/core/license/recover-handler";
+import { handleIssueFromRecoveryRequest } from "./src/core/license/issue-from-recovery-handler";
 import { handleCreateCheckoutSession } from "./src/core/stripe/checkout-handler";
 import { resolveAllowedPrices } from "./src/core/stripe/allowed-prices";
 import type { SeenEventStore } from "./src/core/stripe/seen-event-store";
@@ -68,6 +70,17 @@ export interface LicenseDeps {
   portal?: PortalClient;
   /** Optional override for the portal handler's session retriever. */
   portalSessions?: PortalSessionRetriever;
+  /**
+   * Optional Stripe customers.list client for /api/license/recover. Tests
+   * pass a fake; production lazy-constructs via the Stripe SDK.
+   */
+  customers?: import("./src/core/license/recover-handler").CustomersClient;
+  /**
+   * Optional Stripe subscriptions.retrieve client for
+   * /api/license/issue-from-recovery. Tests pass a fake; production
+   * lazy-constructs via the Stripe SDK.
+   */
+  subscriptions?: import("./src/core/license/issue-from-recovery-handler").SubscriptionsClient;
 }
 
 function buildLicenseDeps(): LicenseDeps {
@@ -282,6 +295,52 @@ export function createApp(
       signingKey: license.signingKey,
       storage: license.storage,
       nowSec: license.nowSec,
+    }),
+  );
+
+  app.post("/api/license/recover", (c) =>
+    handleLicenseRecoverRequest(c.req.raw, {
+      customers: license.customers ?? {
+        list: async (params) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const list = await stripe.customers.list({
+            email: params.email,
+            limit: params.limit ?? 1,
+          });
+          return {
+            data: list.data.map((cust) => ({
+              id: cust.id,
+              email: cust.email ?? null,
+            })),
+          };
+        },
+      },
+      portal: license.portal ?? {
+        create: async (params) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const session = await stripe.billingPortal.sessions.create(params);
+          return { url: session.url };
+        },
+      },
+      signingKey: license.signingKey,
+      returnUrlBase: `${new URL(c.req.url).origin}/billing/issued`,
+    }),
+  );
+
+  app.post("/api/license/issue-from-recovery", (c) =>
+    handleIssueFromRecoveryRequest(c.req.raw, {
+      signingKey: license.signingKey,
+      storage: license.storage,
+      subscriptions: license.subscriptions ?? {
+        retrieve: async (subscriptionId) => {
+          const { default: Stripe } = await import("stripe");
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+          const sub = await stripe.subscriptions.retrieve(subscriptionId);
+          return { status: sub.status };
+        },
+      },
     }),
   );
 
