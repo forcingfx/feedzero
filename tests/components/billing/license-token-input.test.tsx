@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LicenseTokenInput } from "@/components/billing/license-token-input";
 
@@ -89,6 +89,73 @@ describe("LicenseTokenInput", () => {
     render(<LicenseTokenInput paidTierVisible={true} />);
     await userEvent.click(screen.getByRole("button", { name: /clear/i }));
     expect(localStorageMock.getItem("feedzero:license-token")).toBeNull();
+  });
+
+  describe("auto-fill via `value` prop", () => {
+    it("when value prop is provided, the input shows that value", () => {
+      render(
+        <LicenseTokenInput paidTierVisible={true} value="fz_provided.token" />,
+      );
+      const input = screen.getByPlaceholderText(/fz_/i) as HTMLInputElement;
+      expect(input.value).toBe("fz_provided.token");
+    });
+
+    it("when value prop transitions to a well-formed token, auto-fires verify; re-render with the same value does NOT re-fire", async () => {
+      const { rerender } = render(
+        <LicenseTokenInput paidTierVisible={true} value="" />,
+      );
+      const fetchMock = (globalThis.fetch as unknown) as ReturnType<typeof vi.fn>;
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      function verifyCallCount(): number {
+        return fetchMock.mock.calls.filter((c) =>
+          c[0].toString().includes("/api/license/verify"),
+        ).length;
+      }
+
+      rerender(
+        <LicenseTokenInput
+          paidTierVisible={true}
+          value="fz_autofilled.token"
+        />,
+      );
+
+      // We expect at least one verify (the component's own) and possibly a
+      // follow-on from useLicenseStore.refresh() on success. Either way it
+      // happens — not zero. The "exactly once per token change" invariant is
+      // checked below by comparing counts across rerenders.
+      await waitFor(() => {
+        expect(verifyCallCount()).toBeGreaterThan(0);
+      });
+      const countAfterFirst = verifyCallCount();
+
+      rerender(
+        <LicenseTokenInput
+          paidTierVisible={true}
+          value="fz_autofilled.token"
+        />,
+      );
+      await new Promise((r) => setTimeout(r, 30));
+      // A second rerender with the same token must NOT trigger another verify.
+      // The store's own refresh() may still fire from the initial Save, so we
+      // lock the count against drift rather than expecting a literal number.
+      expect(verifyCallCount()).toBe(countAfterFirst);
+    });
+
+    it("does NOT auto-verify when value prop is a malformed token (shape-check guards us)", async () => {
+      const { rerender } = render(
+        <LicenseTokenInput paidTierVisible={true} value="" />,
+      );
+      rerender(
+        <LicenseTokenInput paidTierVisible={true} value="not-a-token" />,
+      );
+      await new Promise((r) => setTimeout(r, 20));
+      const fetchMock = (globalThis.fetch as unknown) as ReturnType<typeof vi.fn>;
+      const verifyCalls = fetchMock.mock.calls.filter((c) =>
+        c[0].toString().includes("/api/license/verify"),
+      );
+      expect(verifyCalls).toHaveLength(0);
+    });
   });
 
   it("when /api/license/verify returns 401 revoked, surfaces the error AND removes the token", async () => {

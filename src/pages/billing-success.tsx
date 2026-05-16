@@ -9,38 +9,58 @@
  * license token asynchronously. If the customer lands here before the
  * webhook has finished, there is nothing yet to display. We close that gap
  * by polling `/api/license/retrieve?sessionId=...` every 3s for up to 30s,
- * auto-filling the LicenseTokenInput once the token arrives.
+ * piping the resulting token into LicenseTokenInput which auto-verifies it
+ * server-side.
  *
- * UX contract:
- *  - Confirmation heading so the customer knows the payment landed.
- *  - LicenseTokenInput inline so they can verify/paste their token. With
- *    polling wired, the typical flow is "wait a few seconds → token
- *    appears" — manual paste is the fallback for any edge case.
- *  - "Manage subscription" button opens the Stripe Customer Portal so
- *    customers can self-serve cancel, update payment method, view invoices.
- *  - Stripe session ID echoed in plain text for support debugging.
- *  - A clear way back to the reader.
+ * UX states the user can see:
+ *  - polling  — spinner + "Retrieving your license…". The default visible
+ *    state while we wait on the webhook → Upstash → re-sign chain.
+ *  - success  — checkmark alert + populated, auto-verified input.
+ *  - timeout  — destructive alert that exposes the session id as a support
+ *    diagnostic, and invites the user to paste a token they may already have.
+ *
+ * The session id is intentionally NOT rendered as page chrome on the happy
+ * path. It only appears inside the timeout alert, where it serves a purpose.
  */
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { LicenseTokenInput } from "@/components/billing/license-token-input";
 import {
   getLicenseToken,
   setLicenseToken,
 } from "@/core/license/license-token-store";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_DURATION_MS = 30_000;
 
+type Phase = "polling" | "success" | "timeout";
+
 export function BillingSuccess() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
-  const [autoFilledToken, setAutoFilledToken] = useState<string | null>(null);
+  const [autoFilledToken, setAutoFilledToken] = useState<string | null>(() =>
+    getLicenseToken(),
+  );
+  const [phase, setPhase] = useState<Phase>(() => {
+    if (getLicenseToken()) return "success";
+    if (sessionId) return "polling";
+    return "success";
+  });
   const [portalBusy, setPortalBusy] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
 
-  useTokenAutoFill(sessionId, setAutoFilledToken);
+  useTokenAutoFill(
+    sessionId,
+    (token) => {
+      setAutoFilledToken(token);
+      setPhase("success");
+    },
+    () => setPhase("timeout"),
+  );
 
   async function onManageSubscription() {
     if (!sessionId) return;
@@ -69,53 +89,83 @@ export function BillingSuccess() {
   }
 
   return (
-    <div className="mx-auto max-w-xl p-8 space-y-6">
+    <div className="mx-auto max-w-xl space-y-6 p-8">
       <h1 className="text-2xl font-semibold">
         Thanks for subscribing to FeedZero
       </h1>
 
-      <p>
-        Your payment has been processed. Your license token is shown below —
-        save it somewhere safe; you'll need it to activate sync on every
-        device you use.
+      <p className="text-muted-foreground">
+        Your payment was processed. We&apos;ve activated sync on this device —
+        nothing else to do.
       </p>
 
-      {autoFilledToken && (
-        <p role="status" aria-live="polite" className="text-sm">
-          We retrieved your token automatically. Click <strong>Save</strong>{" "}
-          below to activate sync.
-        </p>
+      {phase === "polling" && (
+        <Alert>
+          <Loader2 className="animate-spin" />
+          <AlertDescription role="status" aria-live="polite">
+            Retrieving your license… this normally takes a few seconds.
+          </AlertDescription>
+        </Alert>
       )}
 
-      <LicenseTokenInput paidTierVisible={true} />
+      {phase === "success" && autoFilledToken && (
+        <Alert>
+          <CheckCircle2 />
+          <AlertDescription role="status" aria-live="polite">
+            Your subscription is active. We&apos;ve saved your license to this
+            browser.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {phase === "timeout" && sessionId && (
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertDescription role="alert" aria-live="polite">
+            We couldn&apos;t retrieve your license automatically. If you have
+            your token, paste it below. Otherwise email{" "}
+            <a
+              href="mailto:support@feedzero.app"
+              className="underline underline-offset-2"
+            >
+              support@feedzero.app
+            </a>{" "}
+            and quote session <code>{sessionId}</code>.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <LicenseTokenInput
+        paidTierVisible={true}
+        value={autoFilledToken ?? undefined}
+      />
 
       {sessionId && (
         <div className="space-y-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={onManageSubscription}
             disabled={portalBusy}
             aria-busy={portalBusy}
           >
             {portalBusy ? "Opening…" : "Manage subscription"}
-          </button>
+          </Button>
           {portalError && (
-            <div role="alert" aria-live="polite">
-              {portalError}
-            </div>
+            <Alert variant="destructive">
+              <AlertDescription role="alert" aria-live="polite">
+                {portalError}
+              </AlertDescription>
+            </Alert>
           )}
         </div>
       )}
 
-      {sessionId && (
-        <p className="text-sm text-muted-foreground">
-          Stripe session: <code>{sessionId}</code>
-        </p>
-      )}
-
-      <p>
-        <a href="/feeds">Back to FeedZero</a>
-      </p>
+      <div>
+        <Button asChild>
+          <a href="/feeds">Continue to FeedZero</a>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -127,11 +177,13 @@ export function BillingSuccess() {
  *
  * The polling deliberately fires the FIRST request synchronously on mount —
  * if the webhook is already done, we want the token to appear instantly, not
- * after a 3-second wait.
+ * after a 3-second wait. On deadline exhaustion, `onTimeout` lets the parent
+ * switch to the timeout-state UI rather than silently giving up.
  */
 function useTokenAutoFill(
   sessionId: string | null,
   onFilled: (token: string) => void,
+  onTimeout: () => void,
 ): void {
   const stopped = useRef(false);
 
@@ -142,6 +194,14 @@ function useTokenAutoFill(
 
     const deadline = Date.now() + POLL_MAX_DURATION_MS;
     let timer: ReturnType<typeof setTimeout> | null = null;
+
+    function scheduleNextOrTimeout(): void {
+      if (Date.now() + POLL_INTERVAL_MS < deadline) {
+        timer = setTimeout(attempt, POLL_INTERVAL_MS);
+      } else {
+        onTimeout();
+      }
+    }
 
     async function attempt(): Promise<void> {
       if (stopped.current) return;
@@ -159,15 +219,9 @@ function useTokenAutoFill(
             return;
           }
         }
-        // 202 pending OR 4xx (still worth one retry — webhook may catch up).
-        if (Date.now() + POLL_INTERVAL_MS < deadline) {
-          timer = setTimeout(attempt, POLL_INTERVAL_MS);
-        }
+        scheduleNextOrTimeout();
       } catch {
-        // Network blip — try again until the deadline.
-        if (Date.now() + POLL_INTERVAL_MS < deadline) {
-          timer = setTimeout(attempt, POLL_INTERVAL_MS);
-        }
+        scheduleNextOrTimeout();
       }
     }
 
@@ -177,5 +231,5 @@ function useTokenAutoFill(
       stopped.current = true;
       if (timer) clearTimeout(timer);
     };
-  }, [sessionId, onFilled]);
+  }, [sessionId, onFilled, onTimeout]);
 }

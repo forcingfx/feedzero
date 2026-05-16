@@ -1,28 +1,43 @@
 /**
- * License token input — paste-from-email landing pad.
+ * License token input — paste / auto-fill landing for the license token.
  *
- * After Stripe Checkout, the customer receives an email with their
- * `fz_<...>.<...>` license token. They paste it here. We:
- *  1. Shape-validate (refuse obviously-wrong inputs locally — fast feedback)
- *  2. Persist to localStorage
- *  3. Call /api/license/verify to confirm the server accepts it
- *  4. If server rejects (revoked, expired, forged): unset the storage so we
- *     don't keep sending an invalid Bearer header on every sync request.
+ * Two flows feed this component:
+ *  - Post-checkout: /billing/success passes `value={autoFilledToken}` once the
+ *    Stripe webhook has issued the license and /api/license/retrieve returns
+ *    it. The component populates the input from the prop and auto-fires
+ *    verification — no Save click required.
+ *  - Manual paste: a user with a token they exported elsewhere drops it into
+ *    the input and clicks Save. We shape-validate locally then call
+ *    /api/license/verify to confirm the server accepts it.
+ *
+ * If the server rejects (revoked, expired, forged) we unset the stored token
+ * so we don't keep sending an invalid Bearer header on every sync request.
  *
  * Hidden by default — only renders when `paidTierVisible=true` (driven by
  * `import.meta.env.VITE_PAID_TIER_VISIBLE` at the call site).
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   setLicenseToken,
   clearLicenseToken,
   getLicenseToken,
 } from "@/core/license/license-token-store";
 import { useLicenseStore } from "@/stores/license-store";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export interface LicenseTokenInputProps {
   paidTierVisible: boolean;
+  /**
+   * Optional caller-supplied token. When this transitions from empty to a
+   * well-formed value, the component mirrors it into the input and auto-runs
+   * the same verify path as a manual Save. Used by /billing/success after the
+   * webhook hands us a freshly minted token.
+   */
+  value?: string;
 }
 
 interface VerifiedLicense {
@@ -30,33 +45,44 @@ interface VerifiedLicense {
   customerId: string;
 }
 
-export function LicenseTokenInput({ paidTierVisible }: LicenseTokenInputProps) {
-  const [token, setToken] = useState(() => getLicenseToken() ?? "");
+function isWellFormed(token: string): boolean {
+  const trimmed = token.trim();
+  return trimmed.startsWith("fz_") && trimmed.split(".").length === 2;
+}
+
+export function LicenseTokenInput({
+  paidTierVisible,
+  value,
+}: LicenseTokenInputProps) {
+  const [token, setToken] = useState(() => value ?? getLicenseToken() ?? "");
   const [verified, setVerified] = useState<VerifiedLicense | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const autoVerifiedFor = useRef<string | null>(null);
 
-  if (!paidTierVisible) return null;
+  // Mirror the caller-supplied token into local state. Guarded so we don't
+  // clobber user input on every parent re-render — only meaningful changes
+  // (non-empty + different from what we already have) overwrite. `token` is
+  // deliberately excluded from deps: this effect responds to *external*
+  // changes, not to typing in the field.
+  useEffect(() => {
+    if (value && value !== token) {
+      setToken(value);
+    }
+  }, [value]);
 
-  async function onSave() {
+  async function runVerify(candidate: string): Promise<void> {
     setBusy(true);
     setError(null);
     setVerified(null);
 
-    // Local shape-check first — fast feedback before network round-trip.
-    const trimmed = token.trim();
-    if (
-      !trimmed.startsWith("fz_") ||
-      trimmed.split(".").length !== 2
-    ) {
-      setError(
-        'Invalid license token. Expected format: fz_<...>.<...>',
-      );
+    const trimmed = candidate.trim();
+    if (!isWellFormed(trimmed)) {
+      setError("Invalid license token. Expected format: fz_<...>.<...>");
       setBusy(false);
       return;
     }
 
-    // Persist optimistically — verify next.
     setLicenseToken(trimmed);
 
     try {
@@ -67,7 +93,6 @@ export function LicenseTokenInput({ paidTierVisible }: LicenseTokenInputProps) {
       });
       const body = await res.json();
       if (!res.ok || !body.ok) {
-        // Server rejected — un-persist so we don't send a bad Bearer forever.
         clearLicenseToken();
         setError(body.error ?? `License verification failed (${res.status})`);
         return;
@@ -76,8 +101,6 @@ export function LicenseTokenInput({ paidTierVisible }: LicenseTokenInputProps) {
         tier: body.license.tier,
         customerId: body.license.customerId,
       });
-      // Wake the centralized license store so the sidebar chip and any
-      // gated UI update without a page reload.
       void useLicenseStore.getState().refresh();
     } catch (e) {
       clearLicenseToken();
@@ -87,41 +110,66 @@ export function LicenseTokenInput({ paidTierVisible }: LicenseTokenInputProps) {
     }
   }
 
+  // Auto-verify when `value` arrives from the parent (post-checkout flow).
+  // Guarded by `autoVerifiedFor` so re-renders of the parent don't re-fire.
+  useEffect(() => {
+    if (!value || !isWellFormed(value)) return;
+    if (autoVerifiedFor.current === value) return;
+    autoVerifiedFor.current = value;
+    void runVerify(value);
+  }, [value]);
+
+  if (!paidTierVisible) return null;
+
+  async function onSave() {
+    await runVerify(token);
+  }
+
   function onClear() {
     clearLicenseToken();
     setToken("");
     setVerified(null);
     setError(null);
+    autoVerifiedFor.current = null;
     void useLicenseStore.getState().refresh();
   }
 
   return (
-    <div>
-      <label htmlFor="license-token-input">License token</label>
-      <input
-        id="license-token-input"
-        type="text"
-        value={token}
-        onChange={(e) => setToken(e.target.value)}
-        placeholder="fz_..."
-        autoComplete="off"
-        spellCheck={false}
-      />
-      <button type="button" onClick={onSave} disabled={busy}>
-        Save
-      </button>
-      <button type="button" onClick={onClear} disabled={busy}>
-        Clear
-      </button>
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="license-token-input">License token</Label>
+        <Input
+          id="license-token-input"
+          type="text"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="fz_..."
+          autoComplete="off"
+          spellCheck={false}
+          aria-invalid={error !== null}
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" onClick={onClear} disabled={busy}>
+          Clear
+        </Button>
+        <Button type="button" onClick={onSave} disabled={busy}>
+          {busy ? "Saving…" : "Save"}
+        </Button>
+      </div>
       {verified && (
-        <div role="status" aria-live="polite">
-          Active: {verified.tier} (customer {verified.customerId})
-        </div>
+        <Alert>
+          <AlertDescription role="status" aria-live="polite">
+            Active: {verified.tier} (customer {verified.customerId})
+          </AlertDescription>
+        </Alert>
       )}
       {error && (
-        <div role="alert" aria-live="polite">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription role="alert" aria-live="polite">
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );
