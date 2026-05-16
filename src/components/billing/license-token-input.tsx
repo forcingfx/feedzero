@@ -19,6 +19,7 @@ import {
   clearLicenseToken,
   getLicenseToken,
 } from "@/core/license/license-token-store";
+import { useLicenseStore } from "@/stores/license-store";
 
 export interface LicenseTokenInputProps {
   paidTierVisible: boolean;
@@ -75,6 +76,9 @@ export function LicenseTokenInput({ paidTierVisible }: LicenseTokenInputProps) {
         tier: body.license.tier,
         customerId: body.license.customerId,
       });
+      // Wake the centralized license store so the sidebar chip and any
+      // gated UI update without a page reload.
+      void useLicenseStore.getState().refresh();
     } catch (e) {
       clearLicenseToken();
       setError((e as Error).message);
@@ -88,6 +92,7 @@ export function LicenseTokenInput({ paidTierVisible }: LicenseTokenInputProps) {
     setToken("");
     setVerified(null);
     setError(null);
+    void useLicenseStore.getState().refresh();
   }
 
   return (

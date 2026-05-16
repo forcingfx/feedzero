@@ -1,105 +1,38 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { LicenseStatusChip } from "@/components/billing/license-status-chip";
-
-const localStorageMock = (() => {
-  let store: Record<string, string> = {};
-  return {
-    getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => {
-      store[key] = value;
-    }),
-    removeItem: vi.fn((key: string) => {
-      delete store[key];
-    }),
-    clear: vi.fn(() => {
-      store = {};
-    }),
-  };
-})();
-Object.defineProperty(globalThis, "localStorage", {
-  value: localStorageMock,
-  writable: true,
-});
+import { useLicenseStore } from "@/stores/license-store";
 
 beforeEach(() => {
-  localStorageMock.clear();
-});
-afterEach(() => {
-  vi.restoreAllMocks();
+  useLicenseStore.setState({ tier: "free", verifying: false });
 });
 
 describe("LicenseStatusChip", () => {
-  it("renders 'Free' when no license token is stored", async () => {
+  it("renders 'Free' when the license store is at the free tier", () => {
     render(<LicenseStatusChip />);
-    expect(await screen.findByText(/free/i)).toBeInTheDocument();
+    expect(screen.getByText(/free/i)).toBeInTheDocument();
   });
 
-  it("does NOT call /api/license/verify when no token is stored", async () => {
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("{}"),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
+  it("renders 'Personal' when the store reports personal", () => {
+    useLicenseStore.setState({ tier: "personal" });
     render(<LicenseStatusChip />);
-    await new Promise((r) => setTimeout(r, 30));
-
-    const verifyCalls = fetchMock.mock.calls.filter((c) =>
-      c[0].toString().includes("/api/license/verify"),
-    );
-    expect(verifyCalls).toHaveLength(0);
+    expect(screen.getByText(/personal/i)).toBeInTheDocument();
   });
 
-  it("calls /api/license/verify and renders the verified tier when a token is stored", async () => {
-    localStorage.setItem("feedzero:license-token", "fz_payload.signature");
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            license: {
-              tier: "personal",
-              customerId: "cus_test",
-              keyId: "abc",
-              issuedAtSec: 1,
-              expirySec: 2,
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
+  it("renders 'Pro' when the store reports pro", () => {
+    useLicenseStore.setState({ tier: "pro" });
     render(<LicenseStatusChip />);
-
-    expect(await screen.findByText(/personal/i)).toBeInTheDocument();
+    expect(screen.getByText(/^pro$/i)).toBeInTheDocument();
   });
 
-  it("falls back to 'Free' when the server rejects the token (e.g. revoked)", async () => {
-    localStorage.setItem("feedzero:license-token", "fz_payload.signature");
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(
-          JSON.stringify({ ok: false, error: "license revoked", traceId: "req_x" }),
-          { status: 401, headers: { "Content-Type": "application/json" } },
-        ),
-    );
-    vi.stubGlobal("fetch", fetchMock);
+  it("uses tier-specific color classes (emerald for personal, indigo for pro)", () => {
+    useLicenseStore.setState({ tier: "personal" });
+    const { unmount } = render(<LicenseStatusChip />);
+    expect(screen.getByText(/personal/i).className).toMatch(/emerald/);
+    unmount();
 
+    useLicenseStore.setState({ tier: "pro" });
     render(<LicenseStatusChip />);
-    expect(await screen.findByText(/free/i)).toBeInTheDocument();
-  });
-
-  it("falls back to 'Free' on network error (defensive — don't pretend paid when offline)", async () => {
-    localStorage.setItem("feedzero:license-token", "fz_payload.signature");
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) => {
-        throw new Error("network down");
-      },
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<LicenseStatusChip />);
-    expect(await screen.findByText(/free/i)).toBeInTheDocument();
+    expect(screen.getByText(/^pro$/i).className).toMatch(/indigo/);
   });
 });
