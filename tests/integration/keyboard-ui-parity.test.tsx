@@ -255,24 +255,31 @@ describe("keyboard-UI behavior parity", () => {
   });
 
   describe("U/I keys vs Feed button click", () => {
-    it("both result in feed button being clicked (DOM delegation)", () => {
-      // Set up DOM with feed buttons
-      document.body.innerHTML = `
-        <button data-sidebar="menu-button" data-active="true">Feed 1</button>
-        <button data-sidebar="menu-button" data-active="false">Feed 2</button>
-      `;
+    it("U dispatches feedzero:navigate-feed for the next feed in the logical list", () => {
+      // U / I now traverse feed-store state instead of DOM buttons so they
+      // can reach feeds hidden inside collapsed folders. The contract is a
+      // feedzero:navigate-feed event that FeedsPage turns into a URL push —
+      // same single source of truth as clicking a feed in the sidebar.
+      useFeedStore.setState({
+        feeds: [
+          { id: "f1", url: "x", title: "Feed 1", description: "", siteUrl: "", createdAt: 0, updatedAt: 0 },
+          { id: "f2", url: "y", title: "Feed 2", description: "", siteUrl: "", createdAt: 0, updatedAt: 0 },
+        ],
+        selectedFeedId: "f1",
+      });
 
-      const feed2Button = document.querySelectorAll(
-        '[data-sidebar="menu-button"]',
-      )[1] as HTMLElement;
-      const clickSpy = vi.fn();
-      feed2Button.addEventListener("click", clickSpy);
+      const eventHandler = vi.fn();
+      document.addEventListener("feedzero:navigate-feed", eventHandler);
 
-      // Keyboard path - U should click next feed
       renderHook(() => useKeyboardNav());
       pressKey("u");
 
-      expect(clickSpy).toHaveBeenCalled();
+      expect(eventHandler).toHaveBeenCalledTimes(1);
+      const detail = (eventHandler.mock.calls[0][0] as CustomEvent<{ feedId: string }>)
+        .detail;
+      expect(detail.feedId).toBe("f2");
+
+      document.removeEventListener("feedzero:navigate-feed", eventHandler);
     });
   });
 
