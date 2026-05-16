@@ -6,11 +6,13 @@ coverage/
 test-results/
 playwright-report/
 # Personal Claude Code config + permissions, not for the public repo.
-# Skills and hooks ARE tracked because they describe shared workflows
-# (e.g. /new-release) and contributor automation (RGR pre-edit hook).
+# Skills, hooks, and commands ARE tracked because they describe shared
+# workflows (e.g. /new-release, /research-competitors) and contributor
+# automation (RGR pre-edit hook).
 .claude/*
 !.claude/skills/
 !.claude/hooks/
+!.claude/commands/
 
 .vercel
 .env*.local
