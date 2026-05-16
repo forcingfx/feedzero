@@ -57,8 +57,8 @@ export function SetupWizard({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="relative rounded-md border bg-muted p-4">
-              <p className="text-center font-mono text-lg tracking-wide select-all">
+            <div className="relative rounded-md border bg-muted p-4 overflow-x-auto">
+              <p className="text-center font-mono text-lg tracking-wide select-all break-all">
                 {passphrase}
               </p>
               <Button
