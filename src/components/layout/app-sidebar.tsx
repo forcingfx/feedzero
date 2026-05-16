@@ -29,7 +29,6 @@ import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
-import { LicenseStatusChip } from "@/components/billing/license-status-chip.tsx";
 import { requestSyncSetup } from "@/lib/request-sync-setup.ts";
 import { openSettings } from "@/lib/open-settings.ts";
 import { BrandMark } from "@/components/brand/brand-mark.tsx";
@@ -221,9 +220,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         </SidebarContent>
 
         <SidebarFooter>
-          <div className="flex items-center justify-end px-3 pb-1">
-            <LicenseStatusChip />
-          </div>
           <QuotaIndicator />
           <LocalStorageWarning />
           <SidebarMenu>
