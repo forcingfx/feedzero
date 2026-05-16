@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Wand2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store";
+import { useFeatureGate } from "@/hooks/use-feature-gate";
 import { LOCAL_STORAGE } from "@/utils/constants";
 import { AutoOrganizeDialog } from "./auto-organize-dialog";
 import { Button } from "@/components/ui/button";
@@ -15,11 +16,17 @@ const REAPPEAR_GAP = 5;
 
 /**
  * Wand icon trigger that appears inline with "New folder" when there are
- * enough unfiled feeds to organize. Clicking opens a popover with a brief
- * description and actions: "Organize now" (launches the dialog) and "Dismiss".
+ * enough unfiled feeds to organize. Clicking opens a popover.
+ *
+ * Behavior splits on tier:
+ *  - Personal / self-hosted: "Organize now" launches the dialog.
+ *  - Free hosted user: the same wand opens an "Upgrade to Personal"
+ *    popover and the primary CTA routes to the Stripe Checkout deeplink.
+ *    The feature is discoverable but locked — see ADR 012.
  */
 export function AutoOrganizePill() {
   const feeds = useFeedStore((s) => s.feeds);
+  const gate = useFeatureGate("auto-organize");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
@@ -64,6 +71,8 @@ export function AutoOrganizePill() {
 
   if (!visible) return null;
 
+  const showUpgrade = !gate.enabled && gate.reason === "tier-locked";
+
   return (
     <>
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
@@ -83,23 +92,41 @@ export function AutoOrganizePill() {
           className="w-64 p-3 space-y-3"
         >
           <div>
-            <p className="font-medium text-sm">Auto-organize feeds</p>
+            <p className="font-medium text-sm">
+              {showUpgrade
+                ? "Auto-organize is a Personal feature"
+                : "Auto-organize feeds"}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
               Group your {unfiledCount} unfiled feeds into folders automatically.
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              data-testid="auto-organize-open-dialog"
-              size="sm"
-              className="flex-1"
-              onClick={() => {
-                setPopoverOpen(false);
-                setDialogOpen(true);
-              }}
-            >
-              Organize now
-            </Button>
+            {showUpgrade ? (
+              <Button
+                data-testid="auto-organize-upgrade-cta"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  setPopoverOpen(false);
+                  gate.promptUpgrade();
+                }}
+              >
+                Upgrade — $5/mo
+              </Button>
+            ) : (
+              <Button
+                data-testid="auto-organize-open-dialog"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  setPopoverOpen(false);
+                  setDialogOpen(true);
+                }}
+              >
+                Organize now
+              </Button>
+            )}
             <Button
               data-testid="auto-organize-dismiss"
               variant="ghost"

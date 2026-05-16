@@ -2,6 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useFeedStore, selectFeedsById } from "../../src/stores/feed-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
+import { useLicenseStore } from "../../src/stores/license-store.ts";
+import { isSelfHosted } from "../../src/core/features/self-hosted.ts";
+import { toast } from "sonner";
+
+vi.mock("../../src/core/features/self-hosted.ts", () => ({
+  isSelfHosted: vi.fn(() => false),
+}));
+
+vi.mock("sonner", () => ({
+  toast: vi.fn(),
+}));
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -64,6 +75,10 @@ describe("feed-store", () => {
       error: null,
     });
     vi.clearAllMocks();
+    // Default to Personal tier so existing tests don't trip the
+    // auto-organize gate. Free / locked variants set their own tier.
+    useLicenseStore.setState({ tier: "personal", verifying: false });
+    vi.mocked(isSelfHosted).mockReturnValue(false);
   });
 
   it("starts empty", () => {
@@ -594,6 +609,44 @@ describe("feed-store", () => {
 
       expect(addFolder).not.toHaveBeenCalled();
       expect(updateFeed).not.toHaveBeenCalled();
+    });
+
+    describe("feature gating", () => {
+      it("no-ops and toasts when tier is free and not self-hosted", async () => {
+        useLicenseStore.setState({ tier: "free" });
+        const f1 = mockFeed("f1", "Hacker News");
+        useFeedStore.setState({ feeds: [f1], folders: [] });
+
+        await useFeedStore.getState().applyAutoOrganize([
+          { folderName: "Tech", feedIds: ["f1"] },
+        ]);
+
+        expect(addFolder).not.toHaveBeenCalled();
+        expect(updateFeed).not.toHaveBeenCalled();
+        expect(toast).toHaveBeenCalledWith(
+          expect.stringMatching(/personal feature/i),
+        );
+      });
+
+      it("runs normally when tier is free but self-hosted is enabled", async () => {
+        useLicenseStore.setState({ tier: "free" });
+        vi.mocked(isSelfHosted).mockReturnValue(true);
+
+        const f1 = mockFeed("f1", "Hacker News");
+        useFeedStore.setState({ feeds: [f1], folders: [] });
+        vi.mocked(addFolder).mockResolvedValue({ ok: true, value: true });
+        vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [] });
+        vi.mocked(getFeed).mockResolvedValue({ ok: true, value: f1 });
+        vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+        vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1] });
+
+        await useFeedStore.getState().applyAutoOrganize([
+          { folderName: "Tech", feedIds: ["f1"] },
+        ]);
+
+        expect(addFolder).toHaveBeenCalledTimes(1);
+        expect(toast).not.toHaveBeenCalled();
+      });
     });
   });
 
