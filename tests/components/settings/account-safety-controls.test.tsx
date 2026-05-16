@@ -52,6 +52,17 @@ describe("<AccountSafetyControls>", () => {
     expect(decodeURIComponent(href)).toContain(CUSTOMER_ID);
   });
 
+  it("button row uses flex-wrap so long labels don't overflow the dialog (no horizontal scroll)", () => {
+    const { container } = render(
+      <AccountSafetyControls token={TOKEN} customerId={CUSTOMER_ID} />,
+    );
+    // Three buttons with verbose labels ("Email this license to me",
+    // "Download recovery sheet", "Contact support") exceed sm:max-w-lg
+    // when forced inline. Use flex-wrap so they stack gracefully instead.
+    const row = container.querySelector("div.flex.flex-wrap");
+    expect(row).not.toBeNull();
+  });
+
   it("uses the operator support email in mailto links", () => {
     render(<AccountSafetyControls token={TOKEN} customerId={CUSTOMER_ID} />);
     const supportLink = screen.getByRole("link", { name: /contact support/i });

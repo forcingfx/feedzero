@@ -108,7 +108,7 @@ export function AccountSafetyControls({
           offline.
         </p>
       </div>
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline" size="sm">
           <a href={buildEmailMyselfHref(token)}>
             <Mail className="mr-2 size-4" />
