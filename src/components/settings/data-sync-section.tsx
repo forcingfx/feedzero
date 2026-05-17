@@ -1,11 +1,10 @@
 /**
- * Inline cloud-sync controls for the Account tab.
+ * Inline cloud-sync controls for the Data tab.
  *
- * Replaces the SyncSetupDialog modal for the in-Settings flow. Renders the
- * status view + buttons inline (no Dialog wrapper). SetupWizard,
- * ExistingCloudFlow, and confirmation prompts stay as nested dialogs
- * triggered by the inline buttons — Radix Dialog stacks cleanly on top of
- * the parent Settings dialog via portals.
+ * Renders the status view + buttons inline (no Dialog wrapper).
+ * SetupWizard, ExistingCloudFlow, and confirmation prompts stay as
+ * nested dialogs triggered by the inline buttons — Radix Dialog stacks
+ * cleanly on top of the parent stage page via portals.
  */
 import { useState } from "react";
 import {
@@ -40,7 +39,7 @@ import { ExistingCloudFlow } from "@/components/sync/existing-cloud-flow";
 type Confirmation = "none" | "delete" | "disable" | "logout" | "restore";
 type SubFlow = "none" | "setup" | "existing";
 
-export function AccountSyncSection() {
+export function DataSyncSection() {
   const status = useSyncStore((s) => s.status);
   const syncError = useSyncStore((s) => s.error);
   const enableSync = useSyncStore((s) => s.enableSync);

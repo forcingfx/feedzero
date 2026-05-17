@@ -75,7 +75,7 @@ export function SyncMigrationDialog() {
             className="w-full"
             onClick={() => {
               dismissPendingMigration();
-              goToSettings(navigate, "account");
+              goToSettings(navigate, "subscription");
             }}
           >
             Subscribe to Personal — $5/mo

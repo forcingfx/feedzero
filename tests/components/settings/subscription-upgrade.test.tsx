@@ -1,16 +1,15 @@
 /**
- * <AccountUpgradeSection> — inline tier-comparison for the Account tab.
- *
- * Replaces the UpgradeDialog modal for the in-Settings flow. Same four
- * tier cards (Free / Personal / Pro / Self-host); same CTAs.
+ * <SubscriptionUpgrade> — inline tier comparison shown to free users
+ * inside the Subscription tab. Four tier cards (Free / Personal / Pro /
+ * Self-host); same CTAs.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AccountUpgradeSection } from "@/components/settings/account-upgrade-section";
+import { SubscriptionUpgrade } from "@/components/settings/subscription-upgrade";
 
-describe("<AccountUpgradeSection>", () => {
+describe("<SubscriptionUpgrade>", () => {
   it("renders all four tiers", () => {
-    render(<AccountUpgradeSection />);
+    render(<SubscriptionUpgrade />);
     expect(screen.getByText(/^Free$/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Personal$/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Pro$/i })).toBeInTheDocument();
@@ -18,19 +17,19 @@ describe("<AccountUpgradeSection>", () => {
   });
 
   it("Personal Subscribe CTA links to the personal-monthly deeplink", () => {
-    render(<AccountUpgradeSection />);
+    render(<SubscriptionUpgrade />);
     const cta = screen.getByRole("link", { name: /subscribe.*personal/i });
     expect(cta.getAttribute("href")).toMatch(/\?subscribe=personal-monthly/);
   });
 
   it("Pro tier shows Coming Soon with no subscribe link", () => {
-    render(<AccountUpgradeSection />);
+    render(<SubscriptionUpgrade />);
     expect(screen.getByText(/coming 2026/i)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /pro/i })).toBeNull();
   });
 
   it("Self-host links to the docs page", () => {
-    render(<AccountUpgradeSection />);
+    render(<SubscriptionUpgrade />);
     const link = screen.getByRole("link", { name: /self-host/i });
     expect(link.getAttribute("href")).toMatch(/self-host/);
   });
@@ -43,7 +42,7 @@ describe("<AccountUpgradeSection>", () => {
     useLoginStore.setState({ open: false });
     const { default: userEvent } = await import("@testing-library/user-event");
     const user = userEvent.setup();
-    render(<AccountUpgradeSection />);
+    render(<SubscriptionUpgrade />);
     const loginBtn = screen.getByRole("button", { name: /log in/i });
     await user.click(loginBtn);
     expect(useLoginStore.getState().open).toBe(true);

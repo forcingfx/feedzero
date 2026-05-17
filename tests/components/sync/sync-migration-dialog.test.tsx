@@ -97,17 +97,17 @@ describe("SyncMigrationDialog", () => {
     expect(useSyncStore.getState().credentials).toBeNull();
   });
 
-  it("offers a Subscribe action that routes to /settings?tab=account (per Phase B unification)", async () => {
+  it("offers a Subscribe action that routes to /settings?tab=subscription", async () => {
     useSyncStore.setState({ pendingMigration: "license-required" });
     renderDialog();
     // Subscribe is now a button (not a link) — clicking it navigates to
-    // the Settings stage page on the Account tab where the customer sees
-    // the four-tier comparison and clicks Subscribe in the Personal card.
+    // the Settings stage page on the Subscription tab where the customer
+    // sees the four-tier comparison and clicks Subscribe in Personal.
     const user = userEvent.setup();
     const subscribe = screen.getByRole("button", { name: /subscribe/i });
     await user.click(subscribe);
     expect(screen.getByTestId("probe-path")).toHaveTextContent(
-      "/settings?tab=account",
+      "/settings?tab=subscription",
     );
   });
 

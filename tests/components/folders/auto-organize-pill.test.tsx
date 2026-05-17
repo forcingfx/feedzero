@@ -225,10 +225,10 @@ describe("AutoOrganizePill (wand trigger + popover)", () => {
       expect(screen.queryByTestId("auto-organize-open-dialog")).toBeNull();
     });
 
-    it("clicking the Upgrade CTA navigates to Settings → Account (via goToUpgrade chokepoint)", async () => {
+    it("clicking the Upgrade CTA navigates to Settings → Subscription (via goToUpgrade chokepoint)", async () => {
       // Was: route to /?subscribe=personal-monthly (straight to Stripe).
-      // Now: navigate to /settings?tab=account so the user sees the Plan
-      // card with full tier comparison before committing.
+      // Now: navigate to /settings?tab=subscription so the user sees the
+      // Plan card with full tier comparison before committing.
       const user = userEvent.setup();
       setFeeds(12, 0);
       renderWithRouter(<AutoOrganizePill />);
@@ -236,7 +236,7 @@ describe("AutoOrganizePill (wand trigger + popover)", () => {
       await user.click(screen.getByTestId("auto-organize-upgrade-cta"));
 
       expect(screen.getByTestId("probe-path")).toHaveTextContent(
-        "/settings?tab=account",
+        "/settings?tab=subscription",
       );
     });
   });

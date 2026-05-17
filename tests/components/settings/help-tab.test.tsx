@@ -10,11 +10,17 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { HelpTab } from "@/components/settings/help-tab";
+import { HelpTab } from "@/components/settings/tabs/help-tab";
 
 vi.mock("@/components/feedback/feedback-dialog", () => ({
   FeedbackDialog: ({ open }: { open: boolean }) =>
     open ? <div data-testid="feedback-dialog-open" /> : null,
+}));
+vi.mock("@/core/license/license-token-store", () => ({
+  getLicenseToken: () => null,
+  clearLicenseToken: () => undefined,
+  setLicenseToken: () => undefined,
+  LICENSE_TOKEN_STORAGE_KEY: "feedzero:license-token",
 }));
 
 describe("<HelpTab>", () => {

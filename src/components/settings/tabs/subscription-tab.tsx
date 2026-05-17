@@ -1,33 +1,32 @@
 /**
- * Account tab — in-product license + billing surface.
+ * Subscription tab — tier badge, license-token reveal, billing portal.
  *
- * Closes four customer-facing UX gaps:
- *   1. See current tier and renewal date (was: invisible after first session)
- *   2. See and copy the license token (was: only visible on /billing/success)
- *   3. Open Stripe Customer Portal to manage billing / cancel (was: only on
- *      /billing/success which the user couldn't reach again)
- *   4. Link to /billing/recover so a paying user can activate on another
- *      device (was: no entry point in the app)
+ * Free users see <SubscriptionUpgrade> (the tier comparison cards).
+ * Paid users see:
+ *   - tier card with renewal date
+ *   - truncated license key with reveal+copy
+ *   - "Manage subscription" → Stripe Customer Portal via openPortal()
+ *   - inline "Need another device? See Recovery →" cross-link
  *
- * For free users this tab pivots to a Subscribe CTA — the rest of the
- * controls don't apply when there's no subscription to manage.
+ * The "Add another device" action that used to live here moved to the
+ * Recovery tab — pasting a token is a recovery surface, not a billing
+ * one. PR C will add a "Deactivate FeedZero Personal on this device"
+ * button to this tab.
  */
 import { useState } from "react";
 import { Sparkles, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLicenseStore } from "@/stores/license-store";
-import {
-  getLicenseToken,
-  clearLicenseToken,
-} from "@/core/license/license-token-store";
+import { getLicenseToken } from "@/core/license/license-token-store";
 import { decodeLicensePayload } from "@/core/license/format";
 import { base64UrlDecodeToString } from "@/core/license/crypto";
 import type { LicensePayload } from "@/core/license/format";
-import { AccountUpgradeSection } from "./account-upgrade-section";
-import { AccountSyncSection } from "./account-sync-section";
-import { AccountLicenseRecovery } from "./account-license-recovery";
+import { SubscriptionUpgrade } from "@/components/settings/subscription-upgrade";
 import { openPortal } from "@/lib/open-portal";
+import { maskToken } from "@/lib/format-license";
+import { goToSettings } from "@/lib/go-to-settings";
 
 const TOKEN_PREFIX = "fz_";
 
@@ -50,39 +49,14 @@ function formatRenewal(expirySec: number): string {
   });
 }
 
-/**
- * Mask the token to the SAME character width as the real token, preserving
- * the `fz_` prefix and the `.` separator. Same width = no layout jitter
- * when the user toggles reveal/hide.
- *
- * Format: `fz_<payload>.<sig>` → `fz_••••.••••` with dot-counts derived
- * from the actual payload and sig lengths.
- */
-function maskToken(token: string): string {
-  const PREFIX = "fz_";
-  if (!token.startsWith(PREFIX)) {
-    // Fallback for malformed tokens — match overall width, opaque.
-    return "•".repeat(Math.max(token.length, 8));
-  }
-  const body = token.slice(PREFIX.length);
-  const dotIdx = body.indexOf(".");
-  if (dotIdx < 0) {
-    return PREFIX + "•".repeat(body.length);
-  }
-  const payloadLen = dotIdx;
-  const sigLen = body.length - dotIdx - 1;
-  return `${PREFIX}${"•".repeat(payloadLen)}.${"•".repeat(sigLen)}`;
-}
-
-export function AccountTab() {
+export function SubscriptionTab() {
   const tier = useLicenseStore((s) => s.tier);
-  const refresh = useLicenseStore((s) => s.refresh);
 
   if (tier === "free") {
     return <FreeView />;
   }
 
-  return <PaidView tier={tier} onSignOut={() => void refresh()} />;
+  return <PaidView tier={tier} />;
 }
 
 function FreeView() {
@@ -96,17 +70,17 @@ function FreeView() {
           You&apos;re on the Free tier.
         </span>
       </div>
-      <AccountUpgradeSection />
+      <SubscriptionUpgrade />
     </div>
   );
 }
 
 interface PaidViewProps {
   tier: "personal" | "pro";
-  onSignOut: () => void;
 }
 
-function PaidView({ tier, onSignOut }: PaidViewProps) {
+function PaidView({ tier }: PaidViewProps) {
+  const navigate = useNavigate();
   const token = getLicenseToken();
   const payload = decodePayload(token);
 
@@ -135,11 +109,6 @@ function PaidView({ tier, onSignOut }: PaidViewProps) {
       setPortalError(result.error ?? `Portal failed`);
     }
     setPortalBusy(false);
-  }
-
-  function onSignOutClick() {
-    clearLicenseToken();
-    onSignOut();
   }
 
   const tierLabel = tier === "personal" ? "Personal" : "Pro";
@@ -205,10 +174,6 @@ function PaidView({ tier, onSignOut }: PaidViewProps) {
                 )}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Use this token to activate FeedZero on other devices, or use the
-              Add another device link below.
-            </p>
           </div>
         )}
 
@@ -221,38 +186,24 @@ function PaidView({ tier, onSignOut }: PaidViewProps) {
           >
             {portalBusy ? "Opening Stripe…" : "Manage subscription"}
           </Button>
-          <Button asChild variant="outline">
-            <a href="/billing/recover" target="_blank" rel="noreferrer noopener">
-              Add another device →
-            </a>
-          </Button>
         </div>
+
+        <p className="text-xs text-muted-foreground">
+          Need to activate on another device?{" "}
+          <button
+            type="button"
+            onClick={() => goToSettings(navigate, "recovery")}
+            className="underline hover:no-underline"
+          >
+            See Recovery →
+          </button>
+        </p>
 
         {portalError && (
           <Alert variant="destructive">
             <AlertDescription>{portalError}</AlertDescription>
           </Alert>
         )}
-      </div>
-
-      <AccountSyncSection />
-
-      {token && payload && (
-        <AccountLicenseRecovery
-          token={token}
-          customerId={payload.customerId}
-        />
-      )}
-
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-xs text-muted-foreground mb-2">
-          Signing out removes your license token from this browser only. Your
-          subscription stays active and reading data on this device is
-          preserved.
-        </p>
-        <Button type="button" variant="ghost" size="sm" onClick={onSignOutClick}>
-          Sign out of this device
-        </Button>
       </div>
     </div>
   );

@@ -6,15 +6,19 @@
  * `?tab=` param so the user can deep-link and the browser back button
  * walks tab history.
  *
- * Tabs match the prior dialog set (account / reading / help / import /
- * export). PR B will rename them along the new taxonomy.
+ * Tabs answer one question each:
+ *   - Subscription : what plan am I on and how do I pay for it?
+ *   - Recovery     : how do I get back in if I lose this device?
+ *   - Data         : where does my data live, and how do I move it?
+ *   - Reading      : how should articles be presented?
+ *   - Help         : keyboard shortcuts, support, what's new.
  */
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ImportView } from "./import-view";
-import { ExportView } from "./export-view";
-import { AccountTab } from "./account-tab";
-import { ReadingTab } from "./reading-tab";
-import { HelpTab } from "./help-tab";
+import { SubscriptionTab } from "./tabs/subscription-tab";
+import { RecoveryTab } from "./tabs/recovery-tab";
+import { DataTab } from "./tabs/data-tab";
+import { ReadingTab } from "./tabs/reading-tab";
+import { HelpTab } from "./tabs/help-tab";
 import { useWhatsNew } from "@/hooks/use-whats-new";
 import type { SettingsTab } from "@/lib/go-to-settings";
 
@@ -34,8 +38,14 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
         onValueChange={(v) => v && onTabChange(v as SettingsTab)}
         className="justify-start flex-wrap"
       >
-        <ToggleGroupItem value="account" aria-label="Account">
-          Account
+        <ToggleGroupItem value="subscription" aria-label="Subscription">
+          Subscription
+        </ToggleGroupItem>
+        <ToggleGroupItem value="recovery" aria-label="Recovery">
+          Recovery
+        </ToggleGroupItem>
+        <ToggleGroupItem value="data" aria-label="Data">
+          Data
         </ToggleGroupItem>
         <ToggleGroupItem value="reading" aria-label="Reading">
           Reading
@@ -43,19 +53,13 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
         <ToggleGroupItem value="help" aria-label="Help">
           Help
         </ToggleGroupItem>
-        <ToggleGroupItem value="import" aria-label="Import feeds">
-          Import
-        </ToggleGroupItem>
-        <ToggleGroupItem value="export" aria-label="Export feeds">
-          Export
-        </ToggleGroupItem>
       </ToggleGroup>
 
-      {activeTab === "account" && <AccountTab />}
+      {activeTab === "subscription" && <SubscriptionTab />}
+      {activeTab === "recovery" && <RecoveryTab />}
+      {activeTab === "data" && <DataTab />}
       {activeTab === "reading" && <ReadingTab />}
       {activeTab === "help" && <HelpTab onWhatsNew={() => void whatsNew()} />}
-      {activeTab === "import" && <ImportView onClose={() => onTabChange("account")} />}
-      {activeTab === "export" && <ExportView />}
     </div>
   );
 }

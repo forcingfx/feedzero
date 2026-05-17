@@ -96,15 +96,15 @@ describe("useFeatureGate", () => {
     expect(screen.getByTestId("reason")).toHaveTextContent("paid-tier-inactive");
   });
 
-  it("promptUpgrade navigates to /settings?tab=account", async () => {
+  it("promptUpgrade navigates to /settings?tab=subscription", async () => {
     // Was: navigate("/?subscribe=personal-monthly") (straight to Stripe).
-    // Now: goToUpgrade(navigate) → /settings?tab=account. The Plan card's
-    // Subscribe CTAs are the only remaining in-app path to Stripe Checkout.
+    // Now: goToUpgrade(navigate) → /settings?tab=subscription. The Plan
+    // card's Subscribe CTAs are the only remaining in-app path to Stripe.
     const user = userEvent.setup();
     renderWithRouter(<GateProbe feature="auto-organize" />);
     await user.click(screen.getByRole("button", { name: /upgrade/i }));
     expect(screen.getByTestId("location")).toHaveTextContent(
-      "/settings?tab=account",
+      "/settings?tab=subscription",
     );
   });
 });

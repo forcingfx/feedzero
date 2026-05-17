@@ -1,5 +1,5 @@
 /**
- * <AccountSyncSection> — inline cloud sync controls for the Account tab.
+ * <DataSyncSection> — inline cloud sync controls for the Account tab.
  *
  * Replaces the SyncSetupDialog modal for the in-Settings flow. Renders the
  * status view inline (no Dialog wrapper); SetupWizard, ExistingCloudFlow,
@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AccountSyncSection } from "@/components/settings/account-sync-section";
+import { DataSyncSection } from "@/components/settings/data-sync-section";
 import { useSyncStore } from "@/stores/sync-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { useLicenseStore } from "@/stores/license-store";
@@ -20,7 +20,7 @@ vi.mock("@/core/crypto/passphrase-generator", () => ({
   generatePassphrase: vi.fn().mockResolvedValue("alpha bravo charlie delta"),
 }));
 
-describe("<AccountSyncSection>", () => {
+describe("<DataSyncSection>", () => {
   beforeEach(() => {
     useSyncStore.setState({
       status: "local-only",
@@ -31,7 +31,7 @@ describe("<AccountSyncSection>", () => {
   });
 
   it("renders Enable sync and Use existing cloud account buttons when local-only", () => {
-    render(<AccountSyncSection />);
+    render(<DataSyncSection />);
     expect(
       screen.getByRole("button", { name: /enable sync/i }),
     ).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe("<AccountSyncSection>", () => {
 
   it("renders Switch to local / Restore / Log out when synced", () => {
     useSyncStore.setState({ status: "synced" });
-    render(<AccountSyncSection />);
+    render(<DataSyncSection />);
     expect(
       screen.getByRole("button", { name: /switch to local/i }),
     ).toBeInTheDocument();
@@ -56,7 +56,7 @@ describe("<AccountSyncSection>", () => {
 
   it("shows a destructive Delete all data button when the user is on the Free tier", () => {
     useLicenseStore.setState({ tier: "free", verifying: false });
-    render(<AccountSyncSection />);
+    render(<DataSyncSection />);
     expect(
       screen.getByRole("button", { name: /delete all data/i }),
     ).toBeInTheDocument();
@@ -68,7 +68,7 @@ describe("<AccountSyncSection>", () => {
     // it on). Force them through the portal first so cancellation and data
     // deletion are sequenced safely.
     useLicenseStore.setState({ tier: "personal", verifying: false });
-    render(<AccountSyncSection />);
+    render(<DataSyncSection />);
     expect(
       screen.queryByRole("button", { name: /delete all data/i }),
     ).toBeNull();
@@ -83,7 +83,7 @@ describe("<AccountSyncSection>", () => {
 
   it("paid-tier Pro user also sees the Manage subscription gate (not just personal)", () => {
     useLicenseStore.setState({ tier: "pro", verifying: false });
-    render(<AccountSyncSection />);
+    render(<DataSyncSection />);
     expect(
       screen.queryByRole("button", { name: /delete all data/i }),
     ).toBeNull();
@@ -94,13 +94,13 @@ describe("<AccountSyncSection>", () => {
 
   it("shows status text reflecting current sync state", () => {
     useSyncStore.setState({ status: "synced" });
-    render(<AccountSyncSection />);
+    render(<DataSyncSection />);
     expect(screen.getByText(/encrypted and synced/i)).toBeInTheDocument();
   });
 
   it("shows the sync error message when status is error", () => {
     useSyncStore.setState({ status: "error", error: "fake network blip" });
-    render(<AccountSyncSection />);
+    render(<DataSyncSection />);
     expect(screen.getByText(/fake network blip/i)).toBeInTheDocument();
   });
 });

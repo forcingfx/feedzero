@@ -13,11 +13,11 @@ import { SettingsTabs } from "@/components/settings/settings-tabs";
 import type { SettingsTab } from "@/lib/go-to-settings";
 
 const VALID_TABS: readonly SettingsTab[] = [
-  "account",
+  "subscription",
+  "recovery",
+  "data",
   "reading",
   "help",
-  "import",
-  "export",
 ];
 
 function isSettingsTab(value: string | null): value is SettingsTab {
@@ -27,7 +27,7 @@ function isSettingsTab(value: string | null): value is SettingsTab {
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get("tab");
-  const activeTab: SettingsTab = isSettingsTab(raw) ? raw : "account";
+  const activeTab: SettingsTab = isSettingsTab(raw) ? raw : "subscription";
 
   function handleTabChange(tab: SettingsTab) {
     const next = new URLSearchParams(searchParams);

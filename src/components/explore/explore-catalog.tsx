@@ -770,7 +770,7 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => goToSettings(navigate, "import")}
+          onClick={() => goToSettings(navigate, "data")}
         >
           <FileUp className="mr-2 size-4" />
           Import / Export

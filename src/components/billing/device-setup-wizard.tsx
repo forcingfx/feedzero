@@ -4,8 +4,7 @@
  *
  * Two stages:
  *   1. License entry — paste an `fz_…` token (or recover via email link).
- *      POST /api/license/verify validates server-side; on success we
- *      apply the token and advance.
+ *      Delegated to <LicenseTokenPasteForm>; on success we advance.
  *   2. Optional sync restoration — if the user also uses cloud sync,
  *      they enter their passphrase to decrypt their vault. Skip is
  *      always available (license is already applied).
@@ -18,11 +17,10 @@
  *   makes the two-step nature explicit without making the user navigate
  *   between disjoint screens.
  *
- * Mounted at the app level (alongside <SettingsDialog>); opened via
- * `openLogin()` from anywhere.
+ * Mounted at the app level; opened via `openLogin()` from anywhere.
  */
 import { useState } from "react";
-import { Loader2, KeyRound, CloudDownload } from "lucide-react";
+import { Loader2, CloudDownload } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,68 +33,26 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  setLicenseToken,
-  clearLicenseToken,
-} from "@/core/license/license-token-store";
-import { useLicenseStore } from "@/stores/license-store";
 import { useSyncStore } from "@/stores/sync-store";
 import { useLoginStore } from "@/stores/login-store";
 import { closeLogin } from "@/lib/open-login";
+import { LicenseTokenPasteForm } from "@/components/settings/license-token-paste-form";
 
 type Stage = "license" | "sync-prompt" | "syncing" | "done";
-
-function isWellFormedToken(token: string): boolean {
-  const trimmed = token.trim();
-  return trimmed.startsWith("fz_") && trimmed.split(".").length === 2;
-}
 
 export function DeviceSetupWizard() {
   const open = useLoginStore((s) => s.open);
   const [stage, setStage] = useState<Stage>("license");
-  const [token, setToken] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   function resetAndClose() {
     setStage("license");
-    setToken("");
     setPassphrase("");
     setError(null);
     setBusy(false);
     closeLogin();
-  }
-
-  async function handleVerifyLicense() {
-    setError(null);
-    const trimmed = token.trim();
-    if (!isWellFormedToken(trimmed)) {
-      setError("Invalid license token. Expected format: fz_<...>.<...>");
-      return;
-    }
-    setBusy(true);
-    setLicenseToken(trimmed);
-    try {
-      const res = await fetch("/api/license/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: trimmed }),
-      });
-      const body = await res.json();
-      if (!res.ok || !body.ok) {
-        clearLicenseToken();
-        setError(body.error ?? `License verification failed (${res.status})`);
-        return;
-      }
-      void useLicenseStore.getState().refresh();
-      setStage("sync-prompt");
-    } catch (e) {
-      clearLicenseToken();
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
   }
 
   async function handleRestoreSync() {
@@ -132,46 +88,14 @@ export function DeviceSetupWizard() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-2">
-              <Label htmlFor="login-token">License token</Label>
-              <Input
-                id="login-token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="fz_…"
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <p className="text-xs text-muted-foreground">
-                Don't have it handy?{" "}
-                <a
-                  href="/billing/recover"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="underline"
-                >
-                  Recover by email →
-                </a>
-              </p>
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            <LicenseTokenPasteForm
+              inputId="login-token"
+              onSuccess={() => setStage("sync-prompt")}
+            />
 
             <DialogFooter>
               <Button variant="ghost" onClick={resetAndClose}>
                 Cancel
-              </Button>
-              <Button onClick={handleVerifyLicense} disabled={busy}>
-                {busy ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                ) : (
-                  <KeyRound className="mr-2 size-4" />
-                )}
-                Continue
               </Button>
             </DialogFooter>
           </>

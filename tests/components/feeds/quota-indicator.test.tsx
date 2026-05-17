@@ -81,11 +81,11 @@ describe("QuotaIndicator", () => {
     expect(screen.getByText(/25/)).toBeInTheDocument();
   });
 
-  it("offers an Upgrade button when at or above the limit that navigates to Settings → Account", async () => {
+  it("offers an Upgrade button when at or above the limit that navigates to Settings → Subscription", async () => {
     // The Upgrade entry was an <a href="/?subscribe=…"> that jumped straight
     // to Stripe Checkout, bypassing the Plan card. Every in-app upgrade
     // affordance now funnels through goToUpgrade(navigate) → /settings?tab=
-    // account so the user sees the tier comparison before commitment.
+    // subscription so the user sees the tier comparison before commitment.
     const { default: userEvent } = await import("@testing-library/user-event");
     const user = userEvent.setup();
     seedFeeds(25);
@@ -93,7 +93,7 @@ describe("QuotaIndicator", () => {
     const upgrade = screen.getByRole("button", { name: /upgrade/i });
     await user.click(upgrade);
     expect(screen.getByTestId("location")).toHaveTextContent(
-      "/settings?tab=account",
+      "/settings?tab=subscription",
     );
   });
 

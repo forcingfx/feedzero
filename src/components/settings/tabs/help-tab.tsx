@@ -13,6 +13,8 @@ import { Keyboard, MessageSquare, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
+import { ContactSupport } from "@/components/settings/contact-support";
+import { getLicenseToken } from "@/core/license/license-token-store";
 
 const isMac =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -65,6 +67,7 @@ interface HelpTabProps {
 
 export function HelpTab({ onWhatsNew }: HelpTabProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const token = getLicenseToken();
 
   return (
     <div className="space-y-4 py-2">
@@ -119,6 +122,11 @@ export function HelpTab({ onWhatsNew }: HelpTabProps) {
           What&apos;s new
         </Button>
       </div>
+
+      <ContactSupport
+        token={token}
+        diagnosticContext={{ Source: "settings-help" }}
+      />
 
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>

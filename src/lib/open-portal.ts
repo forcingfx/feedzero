@@ -2,8 +2,8 @@
  * Shared helper for opening the Stripe Customer Portal session.
  *
  * Two callers need this:
- *   - AccountTab "Manage subscription" button
- *   - AccountSyncSection's Danger Zone gate for paid users (PR H)
+ *   - SubscriptionTab "Manage subscription" button
+ *   - DataSyncSection's Danger Zone gate for paid users
  *
  * Returns `{ ok: true }` on redirect-initiated success, or an error string.
  * The actual redirect happens here via `window.location.href` — callers

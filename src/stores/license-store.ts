@@ -1,7 +1,7 @@
 /**
  * License tier — single source of truth for the React tree.
  *
- * Other components (AccountTab tier badge, useFeatureGate) subscribe here
+ * Other components (SubscriptionTab tier badge, useFeatureGate) subscribe here
  * instead of each performing their own /api/license/verify round trip.
  *
  * Refresh runs in two phases so the UI feels instant:

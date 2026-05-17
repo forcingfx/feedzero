@@ -27,17 +27,17 @@ describe("goToSettings", () => {
   });
 
   it("encodes the tab as a query param", () => {
-    goToSettings(navigate, "import");
-    expect(navigate).toHaveBeenCalledWith("/settings?tab=import");
+    goToSettings(navigate, "data");
+    expect(navigate).toHaveBeenCalledWith("/settings?tab=data");
   });
 
-  it("goToUpgrade lands on the account tab", () => {
+  it("goToUpgrade lands on the subscription tab", () => {
     goToUpgrade(navigate);
-    expect(navigate).toHaveBeenCalledWith("/settings?tab=account");
+    expect(navigate).toHaveBeenCalledWith("/settings?tab=subscription");
   });
 
-  it("goToSyncSetup lands on the account tab", () => {
+  it("goToSyncSetup lands on the data tab", () => {
     goToSyncSetup(navigate);
-    expect(navigate).toHaveBeenCalledWith("/settings?tab=account");
+    expect(navigate).toHaveBeenCalledWith("/settings?tab=data");
   });
 });

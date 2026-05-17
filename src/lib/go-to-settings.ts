@@ -12,11 +12,11 @@
 import type { NavigateFunction } from "react-router";
 
 export type SettingsTab =
-  | "account"
+  | "subscription"
+  | "recovery"
+  | "data"
   | "reading"
-  | "help"
-  | "import"
-  | "export";
+  | "help";
 
 export function goToSettings(
   navigate: NavigateFunction,
@@ -25,10 +25,12 @@ export function goToSettings(
   navigate(tab ? `/settings?tab=${tab}` : "/settings");
 }
 
+/** Send the user to the in-app upgrade affordance. */
 export function goToUpgrade(navigate: NavigateFunction): void {
-  goToSettings(navigate, "account");
+  goToSettings(navigate, "subscription");
 }
 
+/** Send the user to the sync-management section. */
 export function goToSyncSetup(navigate: NavigateFunction): void {
-  goToSettings(navigate, "account");
+  goToSettings(navigate, "data");
 }
