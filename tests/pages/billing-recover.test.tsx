@@ -194,6 +194,29 @@ describe("<BillingRecover>", () => {
     ).toBeInTheDocument();
   });
 
+  // Recovery is a two-hop flow (email link → Stripe portal → return to app)
+  // and users were dropping out at step 2 — they'd sign in to Stripe, see
+  // their billing details, and close the tab without clicking the return
+  // link. A visual numbered guide above the form sets the expectation
+  // upfront so the "Return to FeedZero" hand-off isn't a surprise.
+  it("renders a numbered two-step visual guide before submission", () => {
+    renderAt("/billing/recover");
+    // Numeric step indicators visible to sighted users
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    // Each step has a heading
+    expect(
+      screen.getByRole("heading", { name: /sign in via stripe/i, level: 2 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /activate.*license/i, level: 2 }),
+    ).toBeInTheDocument();
+    // The guide is a semantic ordered list so screen readers announce
+    // "step 1 of 2"
+    expect(screen.getByRole("list")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
   it("post-submit confirmation repeats the 'Return to FeedZero' instruction", async () => {
     globalThis.fetch = mockFetch({ status: 200, body: { ok: true } });
     renderAt("/billing/recover");
