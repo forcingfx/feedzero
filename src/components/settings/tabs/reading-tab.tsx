@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
-import { ThemeToggle } from "./theme-toggle";
+import { ThemeToggle } from "../theme-toggle";
 
 export function ReadingTab() {
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
