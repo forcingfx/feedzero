@@ -50,5 +50,11 @@ export function isFlagEnabled(
   name: FlagName,
   env: Record<string, string | undefined> = process.env,
 ): boolean {
+  // Self-host master switch: SELF_HOSTED=1 suppresses every paid-tier
+  // flag, regardless of how those flags are individually set. Server-side
+  // mirror of `isPaidTierActive`'s client-side rule. Kill switches and
+  // operational flags (MAINTENANCE_MODE, KILL_*) are unaffected — a
+  // self-hoster still needs to drain traffic during an upgrade. See ADR 014.
+  if (env.SELF_HOSTED === "1" && name === "LAUNCH_PAID_TIER") return false;
   return env[name] === "1";
 }

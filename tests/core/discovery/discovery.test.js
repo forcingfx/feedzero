@@ -157,4 +157,34 @@ describe("discoverFeed", () => {
     const result = await discoverFeed("https://example.com");
     expect(isErr(result)).toBe(true);
   });
+
+  it("propagates a 429 status as a rate-limit-specific error message", async () => {
+    // Self-host symptom from feedback #97: 14 feeds fail with "No RSS feed
+    // could be found" when the real cause is upstream rate-limiting. The
+    // discovery layer must surface the HTTP status so the user sees the
+    // actual problem, not a misleading "no feed exists" diagnosis.
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Map([["retry-after", "60"]]),
+      text: () => Promise.resolve(""),
+    });
+
+    const result = await discoverFeed("https://example.com");
+    expect(isErr(result)).toBe(true);
+    if (!result.ok) expect(result.error).toMatch(/rate.?limit|429/i);
+  });
+
+  it("propagates a 403 status as a block-specific error message", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      headers: new Map(),
+      text: () => Promise.resolve(""),
+    });
+
+    const result = await discoverFeed("https://example.com");
+    expect(isErr(result)).toBe(true);
+    if (!result.ok) expect(result.error).toMatch(/block|forbidden|403/i);
+  });
 });

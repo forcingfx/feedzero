@@ -94,6 +94,44 @@
     --sync-error-bg: oklch(0.95 0.03 25);
 }
 
+/* FeedZero dark theme — same hue family, inverted lightness.
+   Activated by next-themes setting `class="dark"` on <html>. */
+.dark {
+    --background: oklch(0.16 0.014 285);
+    --foreground: oklch(0.96 0.005 80);
+    --card: oklch(0.20 0.014 285);
+    --card-foreground: oklch(0.96 0.005 80);
+    --popover: oklch(0.20 0.014 285);
+    --popover-foreground: oklch(0.96 0.005 80);
+    --primary: oklch(0.96 0.005 80);
+    --primary-foreground: oklch(0.18 0.024 285);
+    --secondary: oklch(0.26 0.012 285);
+    --secondary-foreground: oklch(0.96 0.005 80);
+    --muted: oklch(0.26 0.012 285);
+    --muted-foreground: oklch(0.68 0.018 285);
+    --accent: oklch(0.32 0.020 270);
+    --accent-foreground: oklch(0.96 0.005 80);
+    --destructive: oklch(0.62 0.235 27);
+    --border: oklch(0.30 0.010 285);
+    --input: oklch(0.30 0.010 285);
+    --ring: oklch(0.65 0.15 270);
+    --sidebar: oklch(0.18 0.012 285);
+    --sidebar-foreground: oklch(0.96 0.005 80);
+    --sidebar-primary: oklch(0.96 0.005 80);
+    --sidebar-primary-foreground: oklch(0.18 0.024 285);
+    --sidebar-accent: oklch(0.32 0.020 270);
+    --sidebar-accent-foreground: oklch(0.96 0.005 80);
+    --sidebar-border: oklch(0.30 0.010 285);
+    --sidebar-ring: oklch(0.65 0.15 270);
+
+    --sync-local: oklch(0.78 0.15 85);
+    --sync-local-bg: oklch(0.30 0.06 85);
+    --sync-synced: oklch(0.70 0.18 145);
+    --sync-synced-bg: oklch(0.28 0.05 145);
+    --sync-error: oklch(0.72 0.22 25);
+    --sync-error-bg: oklch(0.30 0.06 25);
+}
+
 @layer base {
     * {
         @apply border-border outline-ring/50;

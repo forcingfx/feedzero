@@ -62,11 +62,18 @@ export function WelcomeStep() {
         sync is experimental.
       </div>
 
-      <DialogFooter className="sm:justify-center">
+      <DialogFooter className="sm:justify-center sm:flex-col sm:gap-2">
         <Button size="lg" onClick={() => setStep("storage-choice")} autoFocus>
           Get Started
           <Kbd className="ml-2">Enter</Kbd>
         </Button>
+        <button
+          type="button"
+          onClick={() => setStep("recovery")}
+          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+        >
+          Already have a FeedZero passphrase? Restore from cloud
+        </button>
       </DialogFooter>
     </>
   );

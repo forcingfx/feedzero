@@ -24,4 +24,13 @@ describe("isPaidTierActive", () => {
     vi.stubEnv("VITE_PAID_TIER_VISIBLE", "0");
     expect(isPaidTierActive()).toBe(false);
   });
+
+  it("returns false when VITE_SELF_HOSTED=1 even if VITE_PAID_TIER_VISIBLE=1 (master switch)", () => {
+    // Self-hosters never have an upgrade path. The single-switch invariant
+    // says VITE_SELF_HOSTED=1 hides every paid-tier surface, regardless of
+    // any other flag. Locks the master-switch contract from ADR 014.
+    vi.stubEnv("VITE_SELF_HOSTED", "1");
+    vi.stubEnv("VITE_PAID_TIER_VISIBLE", "1");
+    expect(isPaidTierActive()).toBe(false);
+  });
 });

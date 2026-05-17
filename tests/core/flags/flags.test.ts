@@ -42,6 +42,31 @@ describe("isFlagEnabled", () => {
     );
   });
 
+  describe("SELF_HOSTED master switch", () => {
+    it("forces LAUNCH_PAID_TIER off even when LAUNCH_PAID_TIER=1", () => {
+      // Single-switch invariant for self-hosters: SELF_HOSTED=1 disables
+      // every paid-tier surface, server-side included. Mirrors the
+      // client-side rule in isPaidTierActive. See ADR 014.
+      expect(
+        isFlagEnabled("LAUNCH_PAID_TIER", {
+          SELF_HOSTED: "1",
+          LAUNCH_PAID_TIER: "1",
+        }),
+      ).toBe(false);
+    });
+
+    it("does not affect unrelated flags (kill switches still work in self-host)", () => {
+      // A self-hoster firing MAINTENANCE_MODE during an upgrade should still
+      // see the maintenance gate. SELF_HOSTED only suppresses paid-tier flags.
+      expect(
+        isFlagEnabled("MAINTENANCE_MODE", {
+          SELF_HOSTED: "1",
+          MAINTENANCE_MODE: "1",
+        }),
+      ).toBe(true);
+    });
+  });
+
   it("treats every defined FlagName independently", () => {
     const names: FlagName[] = [
       "MAINTENANCE_MODE",

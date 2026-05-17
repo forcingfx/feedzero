@@ -221,6 +221,29 @@ describe("sync-service", () => {
       expect(isErr(result)).toBe(true);
     });
 
+    it("returns a human-readable message on 404, not the raw server payload", async () => {
+      // A new device entering a passphrase that has no cloud vault hits this
+      // path. The raw "Sync pull failed (404): Vault not found" string leaks
+      // the implementation. Users need to see: "No vault exists yet for this
+      // passphrase — either typo, or this is your first device." Locks the
+      // friendly-error contract.
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 404,
+          text: () => Promise.resolve("Vault not found"),
+        }),
+      );
+
+      const result = await pullVault("test-passphrase");
+      expect(isErr(result)).toBe(true);
+      if (!result.ok) {
+        expect(result.error).not.toMatch(/^Sync pull failed/);
+        expect(result.error).toMatch(/no vault|no cloud|passphrase/i);
+      }
+    });
+
     it("returns err on network failure", async () => {
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Offline")));
 

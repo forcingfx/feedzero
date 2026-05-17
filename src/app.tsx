@@ -19,6 +19,10 @@ import { BillingIssued } from "@/pages/billing-issued.tsx";
 import { SubscribeDeeplink } from "@/components/billing/subscribe-deeplink.tsx";
 import { useLicenseStore } from "@/stores/license-store.ts";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  checkSecureContext,
+  type SecureContextProblemKind,
+} from "@/core/security/secure-context.ts";
 
 function AppInit({ children }: { children: React.ReactNode }) {
   const isDbReady = useAppStore((s) => s.isDbReady);
@@ -33,6 +37,11 @@ function AppInit({ children }: { children: React.ReactNode }) {
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const preloadArticles = useArticleStore((s) => s.preloadAll);
   const [isResetting, setIsResetting] = useState(false);
+  const [securityProblem, setSecurityProblem] = useState<{
+    kind: SecureContextProblemKind;
+    message: string;
+    origin?: string;
+  } | null>(null);
 
   useEffect(() => {
     checkOnboardingStatus();
@@ -51,11 +60,13 @@ function AppInit({ children }: { children: React.ReactNode }) {
   // New users: auto-initialize with local-only mode (no onboarding modal)
   useEffect(() => {
     if (hasCompletedOnboarding === false && !isDbReady) {
-      if (!globalThis.crypto?.subtle) {
-        useAppStore.getState().setError(
-          "Your browser does not support the Web crypto API required for encryption. " +
-          "This can happen in iOS Lockdown Mode or very old browsers.",
-        );
+      const check = checkSecureContext({
+        isSecureContext: globalThis.isSecureContext ?? false,
+        crypto: globalThis.crypto as Pick<Crypto, "subtle"> | undefined,
+        origin: typeof window !== "undefined" ? window.location.origin : undefined,
+      });
+      if (!check.ok) {
+        setSecurityProblem({ kind: check.kind, message: check.error, origin: check.origin });
         return;
       }
       generatePassphrase()
@@ -103,9 +114,57 @@ function AppInit({ children }: { children: React.ReactNode }) {
 
   const handleReset = async () => {
     setIsResetting(true);
-    await resetApp();
+    // resetApp() can hang in an insecure context — IndexedDB ops may sit
+    // forever without throwing. Race against a 5s ceiling so the user
+    // isn't trapped on a frozen button. The hard fallback wipes
+    // localStorage on its own so re-onboarding can start fresh.
+    const RESET_TIMEOUT_MS = 5000;
+    const timed = new Promise<void>((resolve) =>
+      setTimeout(() => {
+        try { localStorage.clear(); } catch { /* noop */ }
+        resolve();
+      }, RESET_TIMEOUT_MS),
+    );
+    await Promise.race([resetApp(), timed]);
     setIsResetting(false);
   };
+
+  if (securityProblem) {
+    return (
+      <div className="p-6 max-w-xl mx-auto space-y-4">
+        <h1 className="text-lg font-semibold">FeedZero can't start here</h1>
+        <p className="text-sm text-muted-foreground whitespace-pre-line">
+          {securityProblem.message}
+        </p>
+        {securityProblem.origin ? (
+          <p className="text-sm">
+            <span className="text-muted-foreground">You're loading from:</span>{" "}
+            <code className="text-foreground">{securityProblem.origin}</code>
+          </p>
+        ) : null}
+        {securityProblem.kind === "insecure-context" ? (
+          <div className="text-sm space-y-2">
+            <p>Common fixes for self-hosters:</p>
+            <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+              <li>Put Caddy or nginx in front of <code>:3000</code> with a TLS cert.</li>
+              <li>Or open the app via <code>http://localhost:3000</code> from the host itself.</li>
+              <li>Or trust a self-signed cert for the LAN address.</li>
+            </ul>
+            <p className="pt-2">
+              <a
+                className="underline"
+                href="https://feedzero.app/docs/self-hosting"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                Self-hosting guide →
+              </a>
+            </p>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   if (error) {
     return (

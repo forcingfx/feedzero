@@ -2,6 +2,7 @@ import { validateProxyUrl } from "./validate-url.ts";
 import type { FeedCache } from "./feed-cache.ts";
 import type { CatalogStorageAdapter } from "../catalog/catalog-types.ts";
 import { cleanFeedContent } from "../cleaner/cleaner.ts";
+import { pickUserAgent } from "./pick-user-agent.ts";
 
 /**
  * HTTP methods the proxy handler accepts.
@@ -107,7 +108,7 @@ export async function handleProxyRequest(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
     const response = await fetch(url, {
-      headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
+      headers: { "User-Agent": pickUserAgent(process.env) },
       signal: controller.signal,
     });
     clearTimeout(timeout);
