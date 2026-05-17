@@ -320,17 +320,17 @@ describe("FeedsPage layout — desktop", () => {
     expect(useArticleStore.getState().selectedArticle?.id).toBe("a15");
   });
 
-  it("explore layout's sidebar starts at the user's stored width (preserved by single stable layout id)", async () => {
+  it("explore layout's sidebar starts at the user's stored width in pixels (preserved by single stable layout id)", async () => {
     // PR F: with one stable layout id across routes, the sidebar width is
     // naturally preserved by react-resizable-panels' per-id persistence.
-    // The useSharedSidebarSize hook still reads the localStorage migration
-    // value as the initial defaultSize, and is now called with the stable
-    // id regardless of route.
+    // PR J: the hook now stores pixels (not percentages) so the width
+    // survives viewport changes between drag and reload. The defaultSize
+    // returned by the hook is a px-suffixed string.
     const hookModule = await import("@/hooks/use-shared-sidebar-size.ts");
     const spy = vi.spyOn(hookModule, "useSharedSidebarSize");
 
-    const SIDEBAR_KEY = hookModule.SIDEBAR_SIZE_STORAGE_KEY;
-    window.localStorage.setItem(SIDEBAR_KEY, "27");
+    const SIDEBAR_KEY = hookModule.SIDEBAR_WIDTH_STORAGE_KEY;
+    window.localStorage.setItem(SIDEBAR_KEY, "240");
 
     renderPage("/explore");
 
@@ -340,7 +340,7 @@ describe("FeedsPage layout — desktop", () => {
 
     const lastResult = spy.mock.results.at(-1)?.value;
     expect(lastResult).toBeDefined();
-    expect(lastResult.defaultSize).toBe("27%");
+    expect(lastResult.defaultSize).toBe("240px");
 
     window.localStorage.removeItem(SIDEBAR_KEY);
     spy.mockRestore();

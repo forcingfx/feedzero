@@ -364,7 +364,7 @@ export function FeedsPage() {
       <ResizablePanelGroup id={layoutId} direction="horizontal" className="h-svh">
         <ResizablePanel
           id="sidebar"
-          defaultSize={sidebarSize.defaultSize ?? "17%"}
+          defaultSize={sidebarSize.defaultSize ?? "256px"}
           minSize="150px"
           maxSize="280px"
           className="overflow-hidden"
