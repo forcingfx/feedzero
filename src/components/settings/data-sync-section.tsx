@@ -199,10 +199,10 @@ export function DataSyncSection() {
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-lg border border-border bg-card min-h-[140px]">
+      <div className="relative overflow-hidden rounded-lg border border-border bg-card min-h-[160px]">
         <div
           className={`p-4 space-y-3 ${
-            gated ? "pointer-events-none select-none blur-sm opacity-40" : ""
+            gated ? "pointer-events-none select-none opacity-60" : ""
           }`}
           aria-hidden={gated || undefined}
         >
@@ -310,12 +310,29 @@ interface GateOverlayProps {
  * nested card frame, which is what caused the prior layout to overflow on
  * mobile when the parent card was shorter than the overlay's own content.
  */
+/**
+ * Frosted-glass surface classes shared by both gate variants.
+ *
+ * - `bg-card/40` — light tint so the toggle behind reads through.
+ * - `backdrop-blur-lg` — strong frosted blur on whatever sits behind.
+ *   Falls back gracefully on browsers without `backdrop-filter` (Safari
+ *   ≥9, Chrome ≥76, Firefox ≥103); the tint alone still dims the toggle.
+ * - `ring-1 ring-inset ring-foreground/10` — subtle inset edge that
+ *   defines the glass surface against the card border.
+ * - `supports-[backdrop-filter]:bg-card/30` — lighter tint when blur is
+ *   actually doing the visual work, heavier tint when it isn't.
+ */
+const GLASS_CLASSES =
+  "absolute inset-0 flex items-center justify-center px-4 " +
+  "bg-card/40 supports-[backdrop-filter]:bg-card/30 " +
+  "backdrop-blur-lg ring-1 ring-inset ring-foreground/10";
+
 function GateOverlay({ variant, onUpgrade }: GateOverlayProps) {
   if (variant === "self-host") {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm px-4">
+      <div className={GLASS_CLASSES}>
         <div className="text-center space-y-2 max-w-xs">
-          <Lock className="mx-auto size-5 text-muted-foreground" />
+          <Lock className="mx-auto size-5 text-foreground/70" />
           <p className="text-sm font-medium">Sync server not configured</p>
           <Button asChild size="sm" variant="outline">
             <a href={SELF_HOST_DOCS_URL} target="_blank" rel="noreferrer noopener">
@@ -329,9 +346,9 @@ function GateOverlay({ variant, onUpgrade }: GateOverlayProps) {
   }
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm px-4">
+    <div className={GLASS_CLASSES}>
       <div className="text-center space-y-2 max-w-xs">
-        <Lock className="mx-auto size-5 text-muted-foreground" />
+        <Lock className="mx-auto size-5 text-foreground/70" />
         <p className="text-sm font-medium">Cloud sync requires a subscription</p>
         <Button size="sm" onClick={onUpgrade}>
           Upgrade plan
