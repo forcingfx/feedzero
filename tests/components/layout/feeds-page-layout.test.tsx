@@ -232,21 +232,21 @@ describe("FeedsPage layout — desktop", () => {
     }
   });
 
-  it("uses the 3-panel layout id on the feeds route so widths persist independently of the explore layout", () => {
-    // The Group must carry a stable id matching the layout shape; switching
-    // to /explore (which drops the reader) must use a different id so widths
-    // for each layout are remembered separately.
-    const { container } = renderPage("/feeds/f1");
-    const group = container.querySelector("[data-slot='resizable-panel-group']");
-    expect(group).not.toBeNull();
-    expect(group!.getAttribute("id")).toBe("feedzero:layout:feeds");
-  });
-
-  it("uses the single-content layout id on the explore route", () => {
-    const { container } = renderPage("/explore");
-    const group = container.querySelector("[data-slot='resizable-panel-group']");
-    expect(group).not.toBeNull();
-    expect(group!.getAttribute("id")).toBe("feedzero:layout:single");
+  it("uses a STABLE layout id across all routes so the sidebar width survives navigation", () => {
+    // PR F: the prior model used distinct ids per layout shape
+    // (feedzero:layout:feeds for /feeds, feedzero:layout:single for /explore).
+    // That meant react-resizable-panels stored panel sizes separately per
+    // route group — so clicking Explore reset the sidebar to the single
+    // layout's defaults, visibly changing the sidebar width on every
+    // navigation. The sidebar width must be route-independent.
+    const { container: c1 } = renderPage("/feeds/f1");
+    const g1 = c1.querySelector("[data-slot='resizable-panel-group']");
+    const id1 = g1!.getAttribute("id");
+    const { container: c2 } = renderPage("/explore");
+    const g2 = c2.querySelector("[data-slot='resizable-panel-group']");
+    const id2 = g2!.getAttribute("id");
+    expect(id1).toBe(id2);
+    expect(id1).toBe("feedzero:layout:main");
   });
 
   it("explore layout exposes stable ids for sidebar and explore panels", () => {
@@ -320,13 +320,12 @@ describe("FeedsPage layout — desktop", () => {
     expect(useArticleStore.getState().selectedArticle?.id).toBe("a15");
   });
 
-  it("explore layout's sidebar starts at the user's stored width (preserved across layout transitions)", async () => {
-    // The sidebar width must be respected when entering the Explore tab.
-    // Distinct group ids per layout shape mean the library's per-group
-    // persistence does not share the sidebar size between the 3-panel feeds
-    // layout and the 2-panel explore/stats layout. The page reads the shared
-    // sidebar width from localStorage and applies it as the panel's
-    // defaultSize so /explore opens at the user's preferred width.
+  it("explore layout's sidebar starts at the user's stored width (preserved by single stable layout id)", async () => {
+    // PR F: with one stable layout id across routes, the sidebar width is
+    // naturally preserved by react-resizable-panels' per-id persistence.
+    // The useSharedSidebarSize hook still reads the localStorage migration
+    // value as the initial defaultSize, and is now called with the stable
+    // id regardless of route.
     const hookModule = await import("@/hooks/use-shared-sidebar-size.ts");
     const spy = vi.spyOn(hookModule, "useSharedSidebarSize");
 
@@ -335,14 +334,10 @@ describe("FeedsPage layout — desktop", () => {
 
     renderPage("/explore");
 
-    // The hook must be called with the active layout id so the persisted
-    // sidebar width re-applies after the layout transitions to /explore.
     expect(spy).toHaveBeenCalled();
     const lastCallLayoutKey = spy.mock.calls.at(-1)?.[0];
-    expect(lastCallLayoutKey).toBe("feedzero:layout:single");
+    expect(lastCallLayoutKey).toBe("feedzero:layout:main");
 
-    // The hook returned a defaultSize derived from localStorage; that value
-    // must be the one the page hands to the sidebar panel.
     const lastResult = spy.mock.results.at(-1)?.value;
     expect(lastResult).toBeDefined();
     expect(lastResult.defaultSize).toBe("27%");
