@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { ChevronUp, Layers, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
-import { openSettings } from "@/lib/open-settings.ts";
+import { goToSettings } from "@/lib/go-to-settings.ts";
 
 interface MobileNavDrawerProps {
   onFeedSelect: (feedId: string) => void;
@@ -13,6 +14,7 @@ interface MobileNavDrawerProps {
 
 export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
 
@@ -31,7 +33,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
 
   function handleSettings() {
     setOpen(false);
-    openSettings();
+    goToSettings(navigate);
   }
 
   const activeFeed = feeds.find((f) => f.id === selectedFeedId);

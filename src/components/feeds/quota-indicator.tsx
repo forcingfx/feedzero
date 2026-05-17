@@ -11,16 +11,18 @@
  * so it stays in sync with adds/removes without prop drilling.
  */
 
+import { useNavigate } from "react-router";
 import { useFeedStore } from "@/stores/feed-store";
 import { useLicenseStore } from "@/stores/license-store";
 import { isSelfHosted } from "@/core/features/self-hosted";
 import { FREE_FEED_LIMIT } from "@/core/features/quotas";
-import { openUpgrade } from "@/lib/open-upgrade";
+import { goToUpgrade } from "@/lib/go-to-settings";
 import { cn } from "@/lib/utils";
 
 export function QuotaIndicator() {
   const tier = useLicenseStore((s) => s.tier);
   const count = useFeedStore((s) => s.feeds.length);
+  const navigate = useNavigate();
 
   if (tier !== "free") return null;
   if (isSelfHosted()) return null;
@@ -40,7 +42,7 @@ export function QuotaIndicator() {
       {atOrOverLimit && (
         <button
           type="button"
-          onClick={openUpgrade}
+          onClick={() => goToUpgrade(navigate)}
           className="text-primary font-medium hover:underline"
         >
           Upgrade

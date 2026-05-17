@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
+
+function LocationProbe() {
+  const { pathname, search } = useLocation();
+  return <div data-testid="probe-path">{pathname + search}</div>;
+}
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -34,8 +39,18 @@ const makeFeed = (id: string, title: string) => ({
 
 function renderDrawer(props: Partial<{ onFeedSelect: (id: string) => void }> = {}) {
   return render(
-    <MemoryRouter>
-      <MobileNavDrawer onFeedSelect={props.onFeedSelect ?? vi.fn()} />
+    <MemoryRouter initialEntries={["/feeds"]}>
+      <Routes>
+        <Route
+          path="*"
+          element={
+            <>
+              <MobileNavDrawer onFeedSelect={props.onFeedSelect ?? vi.fn()} />
+              <LocationProbe />
+            </>
+          }
+        />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -146,14 +161,10 @@ describe("MobileNavDrawer", () => {
     expect(safeAreaPadded!.className).toContain("safe-area-inset-bottom");
   });
 
-  it("renders a single Settings entry that opens the unified Settings dialog", async () => {
-    // The drawer footer no longer inlines individual settings items. The
-    // dropdown→dialog refactor moved everything into the unified Settings
-    // dialog (account / reading / help / import / export). A centered dialog
-    // isn't anchored to the drawer bottom so iOS Safari chrome no longer
-    // occludes it — one tap, one dialog.
-    const { useSettingsStore } = await import("@/stores/settings-store.ts");
-    useSettingsStore.setState({ open: false, activeTab: "account" });
+  it("renders a single Settings entry that navigates to /settings", async () => {
+    // The drawer footer no longer inlines individual settings items. Tapping
+    // Settings now navigates to the stage page at /settings — one tap, one
+    // destination — rather than opening a centered modal.
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
     renderDrawer();
@@ -162,9 +173,7 @@ describe("MobileNavDrawer", () => {
     const settingsBtn = await screen.findByRole("button", { name: "Settings" });
     await user.click(settingsBtn);
 
-    const s = useSettingsStore.getState();
-    expect(s.open).toBe(true);
-    expect(s.activeTab).toBe("account");
+    expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings");
   });
 
   it("drawer body content has horizontal padding so feed/settings rows don't run edge-to-edge", async () => {

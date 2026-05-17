@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog";
 import { useSyncStore } from "@/stores/sync-store";
+
+function LocationProbe() {
+  const { pathname, search } = useLocation();
+  return <div data-testid="probe-path">{pathname + search}</div>;
+}
 
 // Minimal sync-service mocks — the dialog itself does not call sync-service,
 // but the store imports it, and importing the store at module-load triggers
@@ -31,8 +36,18 @@ vi.mock("@/core/sync/vault-crypto", () => ({
 
 function renderDialog() {
   return render(
-    <MemoryRouter>
-      <SyncMigrationDialog />
+    <MemoryRouter initialEntries={["/feeds"]}>
+      <Routes>
+        <Route
+          path="*"
+          element={
+            <>
+              <SyncMigrationDialog />
+              <LocationProbe />
+            </>
+          }
+        />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -82,18 +97,18 @@ describe("SyncMigrationDialog", () => {
     expect(useSyncStore.getState().credentials).toBeNull();
   });
 
-  it("offers a Subscribe action that routes through Settings → Account (per Phase B unification)", async () => {
-    const { useSettingsStore } = await import("@/stores/settings-store");
-    useSettingsStore.setState({ open: false, activeTab: "account" });
+  it("offers a Subscribe action that routes to /settings?tab=account (per Phase B unification)", async () => {
     useSyncStore.setState({ pendingMigration: "license-required" });
     renderDialog();
-    // Subscribe is now a button (not a link) — clicking it opens the
-    // unified Settings dialog on the Account tab where the customer sees
+    // Subscribe is now a button (not a link) — clicking it navigates to
+    // the Settings stage page on the Account tab where the customer sees
     // the four-tier comparison and clicks Subscribe in the Personal card.
+    const user = userEvent.setup();
     const subscribe = screen.getByRole("button", { name: /subscribe/i });
-    subscribe.click();
-    expect(useSettingsStore.getState().open).toBe(true);
-    expect(useSettingsStore.getState().activeTab).toBe("account");
+    await user.click(subscribe);
+    expect(screen.getByTestId("probe-path")).toHaveTextContent(
+      "/settings?tab=account",
+    );
   });
 
   it("offers a Self-host link pointing at the docs", () => {

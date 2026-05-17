@@ -28,9 +28,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useSyncStore } from "@/stores/sync-store";
-import { openSettings } from "@/lib/open-settings";
+import { goToSettings } from "@/lib/go-to-settings";
 
 const SELF_HOST_GUIDE_URL = "https://www.feedzero.app/docs/self-hosting";
 
@@ -40,6 +41,7 @@ export function SyncMigrationDialog() {
   const dismissPendingMigration = useSyncStore(
     (s) => s.dismissPendingMigration,
   );
+  const navigate = useNavigate();
 
   const open = pendingMigration === "license-required";
 
@@ -73,7 +75,7 @@ export function SyncMigrationDialog() {
             className="w-full"
             onClick={() => {
               dismissPendingMigration();
-              openSettings("account");
+              goToSettings(navigate, "account");
             }}
           >
             Subscribe to Personal — $5/mo

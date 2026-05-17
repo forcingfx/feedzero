@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { ExploreCatalog } from "@/components/explore/explore-catalog.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { feedCatalog } from "@/lib/feed-catalog.ts";
+
+function renderCatalog(props: React.ComponentProps<typeof ExploreCatalog> = {}) {
+  return render(
+    <MemoryRouter>
+      <ExploreCatalog {...props} />
+    </MemoryRouter>,
+  );
+}
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -37,7 +46,7 @@ describe("ExploreCatalog", () => {
   });
 
   it("renders all category names", () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     for (const category of feedCatalog) {
       expect(screen.getByText(category.name)).toBeInTheDocument();
@@ -45,7 +54,7 @@ describe("ExploreCatalog", () => {
   });
 
   it("renders all feed names within categories", () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     for (const category of feedCatalog) {
       for (const feed of category.feeds) {
@@ -55,14 +64,14 @@ describe("ExploreCatalog", () => {
   });
 
   it("renders feed descriptions", () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const firstFeed = feedCatalog[0].feeds[0];
     expect(screen.getByText(firstFeed.description)).toBeInTheDocument();
   });
 
   it("shows add button for unsubscribed feeds", () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const addButtons = screen.getAllByRole("button", { name: /^add$/i });
     const totalFeeds = feedCatalog.reduce((sum, c) => sum + c.feeds.length, 0);
@@ -85,7 +94,7 @@ describe("ExploreCatalog", () => {
       ],
     });
 
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     // One fewer add button since one feed is subscribed
     const addButtons = screen.getAllByRole("button", { name: /^add$/i });
@@ -98,7 +107,7 @@ describe("ExploreCatalog", () => {
   });
 
   it("shows 'Add all' button for each category", () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const addAllButtons = screen.getAllByRole("button", { name: /add all/i });
     expect(addAllButtons.length).toBe(feedCatalog.length);
@@ -117,7 +126,7 @@ describe("ExploreCatalog", () => {
     }));
     useFeedStore.setState({ feeds: subscribedFeeds });
 
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const addAllButtons = screen.getAllByRole("button", { name: /add all|all added/i });
     // First category's button should indicate all added
@@ -127,7 +136,7 @@ describe("ExploreCatalog", () => {
 
   it("shows hint when input looks like a URL", async () => {
     const user = userEvent.setup();
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
     await user.type(input, "example.com/feed");
@@ -139,7 +148,7 @@ describe("ExploreCatalog", () => {
 
   it("does not show hint for regular search text", async () => {
     const user = userEvent.setup();
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
     await user.type(input, "technology");
@@ -154,7 +163,7 @@ describe("ExploreCatalog", () => {
     const addFeed = vi.fn().mockResolvedValue({ ok: true, value: undefined });
     useFeedStore.setState({ addFeed });
 
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
     await user.type(input, "https://example.com/feed{Enter}");
@@ -173,7 +182,7 @@ describe("ExploreCatalog", () => {
     useFeedStore.setState({ addFeed });
     const onFeedAdded = vi.fn();
 
-    render(<ExploreCatalog onFeedAdded={onFeedAdded} />);
+    renderCatalog({ onFeedAdded });
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
     await user.type(input, "https://example.com/feed{Enter}");
@@ -185,7 +194,7 @@ describe("ExploreCatalog", () => {
   });
 
   it("renders Import / Export OPML button", () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     expect(
       screen.getByRole("button", { name: /import.*export/i }),
@@ -193,7 +202,7 @@ describe("ExploreCatalog", () => {
   });
 
   it("feed rows have role option with aria-selected", () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const options = screen.getAllByRole("option");
     const totalFeeds = feedCatalog.reduce((sum, c) => sum + c.feeds.length, 0);
@@ -206,14 +215,14 @@ describe("ExploreCatalog", () => {
   });
 
   it("wraps feed list in a listbox", () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     expect(screen.getByRole("listbox", { name: /feeds/i })).toBeInTheDocument();
   });
 
   it("shows search hints when search is focused", async () => {
     const user = userEvent.setup();
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
     await user.click(input);
@@ -223,7 +232,7 @@ describe("ExploreCatalog", () => {
   });
 
   it("focuses search input on feedzero:focus-explore-search event", async () => {
-    render(<ExploreCatalog />);
+    renderCatalog();
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
     input.blur();

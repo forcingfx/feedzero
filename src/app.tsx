@@ -8,7 +8,6 @@ import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
-import { SettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -161,6 +160,7 @@ export function App() {
             />
             <Route path="/explore" element={<FeedsPage />} />
             <Route path="/stats" element={<FeedsPage />} />
+            <Route path="/settings" element={<FeedsPage />} />
             <Route path="/billing/success" element={<BillingSuccess />} />
             <Route path="/billing/cancelled" element={<BillingCancelled />} />
             <Route path="/billing/recover" element={<BillingRecover />} />
@@ -172,7 +172,6 @@ export function App() {
             useNavigate and useWhatsNew (which Settings → Help calls)
             have router context. */}
         <SyncMigrationDialog />
-        <SettingsDialog />
         <DeviceSetupWizard />
         <Toaster position="bottom-center" />
       </BrowserRouter>

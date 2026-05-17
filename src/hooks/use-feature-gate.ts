@@ -2,11 +2,12 @@
  * React-side consumer of `gateState` from src/core/features/feature-gates.
  *
  * Components call `useFeatureGate("auto-organize")` and get back an
- * enriched GateState with a `promptUpgrade()` action that routes to the
- * Personal-monthly checkout deeplink. Tier comes from `useLicenseStore`
- * so all gated components stay in sync.
+ * enriched GateState with a `promptUpgrade()` action that navigates to
+ * the Settings page on the upgrade-affordance tab. Tier comes from
+ * `useLicenseStore` so all gated components stay in sync.
  */
 
+import { useNavigate } from "react-router";
 import { useLicenseStore } from "@/stores/license-store";
 import {
   gateState,
@@ -15,15 +16,16 @@ import {
 } from "@/core/features/feature-gates";
 import { isSelfHosted } from "@/core/features/self-hosted";
 import { isPaidTierActive } from "@/core/features/paid-tier-active";
-import { openUpgrade } from "@/lib/open-upgrade";
+import { goToUpgrade } from "@/lib/go-to-settings";
 
 export interface UseFeatureGate extends GateState {
-  /** Open the unified Settings dialog on the Account tab. */
+  /** Navigate to the Settings page's upgrade affordance. */
   promptUpgrade: () => void;
 }
 
 export function useFeatureGate(feature: Feature): UseFeatureGate {
   const tier = useLicenseStore((s) => s.tier);
+  const navigate = useNavigate();
   const state = gateState(feature, tier, isSelfHosted(), isPaidTierActive());
-  return { ...state, promptUpgrade: openUpgrade };
+  return { ...state, promptUpgrade: () => goToUpgrade(navigate) };
 }
