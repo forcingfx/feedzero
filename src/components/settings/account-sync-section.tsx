@@ -31,6 +31,8 @@ import { generatePassphrase } from "@/core/crypto/passphrase-generator";
 import { useSyncStore } from "@/stores/sync-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { useAppStore } from "@/stores/app-store";
+import { useLicenseStore } from "@/stores/license-store";
+import { openPortal } from "@/lib/open-portal";
 import { toast } from "sonner";
 import { SetupWizard } from "@/components/sync/setup-wizard";
 import { ExistingCloudFlow } from "@/components/sync/existing-cloud-flow";
@@ -65,6 +67,65 @@ export function AccountSyncSection() {
     setPending(false);
     setConfirmation("none");
     toast("Sync disabled. Server data deleted.");
+  }
+
+  function DangerZone() {
+    const tier = useLicenseStore((s) => s.tier);
+    const [portalBusy, setPortalBusy] = useState(false);
+    const [portalError, setPortalError] = useState<string | null>(null);
+
+    async function onManageSubscription() {
+      setPortalBusy(true);
+      setPortalError(null);
+      const result = await openPortal();
+      if (!result.ok) {
+        setPortalError(result.error ?? "Couldn't open Stripe portal");
+      }
+      setPortalBusy(false);
+    }
+
+    if (tier !== "free") {
+      // Paid users can't delete data without first canceling the
+      // subscription — otherwise Stripe keeps billing them for an account
+      // they no longer have anywhere to use. Route them to the Customer
+      // Portal first.
+      return (
+        <div className="border-t pt-3 space-y-2">
+          <p className="text-xs font-medium text-destructive">Danger zone</p>
+          <p className="text-xs text-muted-foreground">
+            You have an active subscription. Cancel it in the Stripe
+            Customer Portal before deleting your data — otherwise the
+            subscription stays active with nothing to use it on.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-start"
+            onClick={onManageSubscription}
+            disabled={portalBusy}
+          >
+            {portalBusy ? "Opening Stripe…" : "Manage subscription"}
+          </Button>
+          {portalError && (
+            <p className="text-xs text-destructive">{portalError}</p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="border-t pt-3">
+        <p className="text-xs font-medium text-destructive mb-2">Danger zone</p>
+        <Button
+          variant="outline"
+          className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={() => setConfirmation("delete")}
+        >
+          <Trash2 className="mr-2 size-4" />
+          Delete all data
+        </Button>
+      </div>
+    );
   }
 
   async function handleDeleteAll() {
@@ -165,17 +226,8 @@ export function AccountSyncSection() {
         </div>
       )}
 
-      <div className="border-t pt-3">
-        <p className="text-xs font-medium text-destructive mb-2">Danger zone</p>
-        <Button
-          variant="outline"
-          className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={() => setConfirmation("delete")}
-        >
-          <Trash2 className="mr-2 size-4" />
-          Delete all data
-        </Button>
-      </div>
+      <DangerZone />
+
 
       {subFlow === "setup" && (
         <SetupWizard

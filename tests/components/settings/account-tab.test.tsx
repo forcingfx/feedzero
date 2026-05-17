@@ -132,11 +132,17 @@ describe("<AccountTab>", () => {
       });
     });
 
-    it("shows a Manage subscription button (opens Stripe Customer Portal)", () => {
+    it("shows at least one Manage subscription button (opens Stripe Customer Portal)", () => {
+      // Two intentional surfaces for paid users post-PR-H: the primary CTA
+      // in PaidView's header, AND the Danger Zone gate inside
+      // AccountSyncSection (which replaces "Delete all data" with a
+      // "cancel subscription first" message). Both route to the same
+      // /api/license/portal endpoint via openPortal().
       render(<AccountTab />);
-      expect(
-        screen.getByRole("button", { name: /manage subscription/i }),
-      ).toBeInTheDocument();
+      const buttons = screen.getAllByRole("button", {
+        name: /manage subscription/i,
+      });
+      expect(buttons.length).toBeGreaterThanOrEqual(1);
     });
 
     it("shows an Add-another-device link pointing at /billing/recover", () => {
