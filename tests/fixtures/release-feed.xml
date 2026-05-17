@@ -3,15 +3,48 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-05-15T12:00:00Z</updated>
+  <updated>2026-05-17T12:00:00Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
   <entry>
+    <id>feedzero:release:0.9.0</id>
+    <title>v0.9.0: Settings unification, log in for existing license holders, OPML folders</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-05-17T12:00:00Z</published>
+    <updated>2026-05-17T12:00:00Z</updated>
+    <summary>The sidebar's settings dropdown collapsed into a single button opening a unified five-tab dialog. License holders can now log in to a fresh device via a two-step wizard. OPML import and export preserve folder organization.</summary>
+    <content type="html"><![CDATA[<p>The sidebar's settings dropdown collapsed into a single button opening a unified five-tab dialog. License holders can now log in to a fresh device via a two-step wizard. OPML import and export preserve folder organization.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added a Log in wizard for license holders on a fresh device. Settings → Account → Already have a FeedZero account opens a two-step ceremony: paste the license token, then optionally enter the sync passphrase to decrypt cloud data. The wizard surfaces alongside the Subscribe call to action so paying users do not accidentally re-purchase.</li>
+  <li>Added five Settings tabs (Account, Reading, Help, Import, Export) reachable from a single Settings button in the sidebar that replaces the previous dropdown menu. <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>,</kbd> opens the same dialog.</li>
+  <li>Added OPML folder preservation. Importing an OPML from Feedly, NetNewsWire, or Inoreader now recreates the parent outline groups as folders and assigns each feed accordingly. Export round-trips the same structure.</li>
+  <li>Added a Reading tab inside Settings that exposes the article-flood grouping toggle and the Auto-organize launcher.</li>
+  <li>Added a Help tab inside Settings with inline keyboard shortcuts, a Send feedback button, and a What's new link.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Consolidated every in-app upgrade button into a single chokepoint. Clicking Upgrade anywhere (sidebar feed-limit notice, Auto-organize gate, feature gates) opens Settings → Account on the Plan card. Stripe Checkout is reachable only from the Plan card's Subscribe buttons, so users always see the tier comparison before committing.</li>
+  <li>Removed the floating tier pill (Free, Personal, Pro) from the sidebar. It was not clickable and gave a false signal that something there was actionable. The current tier remains visible inside Settings → Account.</li>
+  <li>Replaced the layered safety controls in Settings → Account with a smaller If-you-lose-access card that shows the support email, an Email-my-license-to-me button, and an Open-recovery-page link. The downloadable plain-text recovery sheet was dropped as redundant with the email-self action.</li>
+  <li>Widened the desktop sidebar default from 14rem to 18rem so feed titles have room to breathe.</li>
+  <li>Raised the desktop and mobile breakpoint from 768px to 1024px. The three-panel reading layout is fundamentally a laptop-and-up layout; below 1024px the mobile snap-scroll layout activates cleanly.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed the sidebar visibly changing width every time the user navigated between the feeds list, Explore, and Stats. The cause was per-route resizable-panel-group identifiers, which the library persists separately. A single stable identifier across all routes preserves the user-dragged width regardless of navigation.</li>
+  <li>Fixed the canvas going blank when the browser window was resized between roughly 530 and 767 pixels wide. The desktop layout's panel minimum sizes summed to ~530 pixels but the mobile fallback only kicked in below 768 pixels; the gap left panels clipped by overflow:hidden. Raising the breakpoint to 1024 pixels eliminates the dead zone.</li>
+  <li>Fixed the sync passphrase reveal overflowing the dialog when the passphrase wrapped long. The container now wraps and scrolls if needed.</li>
+  <li>Fixed paid users being able to click Delete all data and orphan their Stripe subscription. The Danger Zone now shows Cancel subscription first with a Manage subscription button for paid users; free users see the existing destructive flow.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
+  <entry>
     <id>feedzero:release:0.8.2</id>
-    <title>v0.8.2 — Article flood grouping, cloud restore, and sync race fix</title>
+    <title>v0.8.2: Article flood grouping, cloud restore, and sync race fix</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-05-15T12:00:00Z</published>
     <updated>2026-05-15T12:00:00Z</updated>
@@ -32,7 +65,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.8.1</id>
-    <title>v0.8.1 — Server reliability, observability, and rate limiting</title>
+    <title>v0.8.1: Server reliability, observability, and rate limiting</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-05-14T13:00:00Z</published>
     <updated>2026-05-14T13:00:00Z</updated>
@@ -62,7 +95,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.8.0</id>
-    <title>v0.8.0 — First-launch reliability fix</title>
+    <title>v0.8.0: First-launch reliability fix</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-05-09T12:00:00Z</published>
     <updated>2026-05-09T12:00:00Z</updated>
@@ -76,7 +109,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.7.0</id>
-    <title>v0.7.0 — Mobile bottom drawer, pill navigation, and the stats page</title>
+    <title>v0.7.0: Mobile bottom drawer, pill navigation, and the stats page</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-05-03T12:00:00Z</published>
     <updated>2026-05-03T12:00:00Z</updated>
@@ -108,7 +141,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.6.0</id>
-    <title>v0.6.0 — Resizable panels, navigation pills, and auto-organize</title>
+    <title>v0.6.0: Resizable panels, navigation pills, and auto-organize</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-05-01T12:00:00Z</published>
     <updated>2026-05-01T12:00:00Z</updated>
@@ -140,7 +173,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.5.0</id>
-    <title>v0.5.0 — Feed folders and mobile navigation</title>
+    <title>v0.5.0: Feed folders and mobile navigation</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-04-19T12:00:00Z</published>
     <updated>2026-04-19T12:00:00Z</updated>
@@ -175,7 +208,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.4.0</id>
-    <title>v0.4.0 — Release notes feed</title>
+    <title>v0.4.0: Release notes feed</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-04-06T18:00:00Z</published>
     <updated>2026-04-06T18:00:00Z</updated>
@@ -200,7 +233,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.3.1</id>
-    <title>v0.3.1 — More vertical space</title>
+    <title>v0.3.1: More vertical space</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-04-06T12:00:00Z</published>
     <updated>2026-04-06T12:00:00Z</updated>
@@ -223,7 +256,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.3.0</id>
-    <title>v0.3.0 — Tracker and link-param stripping</title>
+    <title>v0.3.0: Tracker and link-param stripping</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-04-06T06:00:00Z</published>
     <updated>2026-04-06T06:00:00Z</updated>
@@ -243,7 +276,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.2.2</id>
-    <title>v0.2.2 — Bug fixes</title>
+    <title>v0.2.2: Bug fixes</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-03-29T00:00:00Z</published>
     <updated>2026-03-29T00:00:00Z</updated>
@@ -259,7 +292,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.2.1</id>
-    <title>v0.2.1 — Visual polish</title>
+    <title>v0.2.1: Visual polish</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-03-28T00:00:00Z</published>
     <updated>2026-03-28T00:00:00Z</updated>
@@ -277,7 +310,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.2.0</id>
-    <title>v0.2.0 — Explore, keyboard nav, sync, and OPML</title>
+    <title>v0.2.0: Explore, keyboard nav, sync, and OPML</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-03-28T00:00:00Z</published>
     <updated>2026-03-28T00:00:00Z</updated>
@@ -288,7 +321,7 @@
   <li>Added an Explore tab with around 1,000 feeds organized by topic and country. The search box accepts a URL, which is added directly as a feed.</li>
   <li>Added vim-style keyboard navigation: <code>j</code>/<code>k</code> for next/previous article, <code>Enter</code> to add a feed, <code>Space</code> to scroll, <code>h</code> for full text view, <code>o</code> to open the original.</li>
   <li>Added unread dots and a &quot;mark all read&quot; action.</li>
-  <li>Added optional end-to-end encrypted cloud sync. The encryption key is derived from a four-word passphrase generated from the EFF wordlist. Lost passphrase means lost data — by design.</li>
+  <li>Added optional end-to-end encrypted cloud sync. The encryption key is derived from a four-word passphrase generated from the EFF wordlist. Lost passphrase means lost data, by design.</li>
   <li>Added OPML import and export.</li>
 </ul>
 <h3>Changed</h3>
@@ -299,7 +332,7 @@
   </entry>
   <entry>
     <id>feedzero:release:0.1.0</id>
-    <title>v0.1.0 — First release</title>
+    <title>v0.1.0: First release</title>
     <link rel="alternate" href="https://feedzero.app/#releases" />
     <published>2026-01-31T00:00:00Z</published>
     <updated>2026-01-31T00:00:00Z</updated>
