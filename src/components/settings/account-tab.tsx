@@ -27,6 +27,7 @@ import type { LicensePayload } from "@/core/license/format";
 import { AccountUpgradeSection } from "./account-upgrade-section";
 import { AccountSyncSection } from "./account-sync-section";
 import { AccountLicenseRecovery } from "./account-license-recovery";
+import { openPortal } from "@/lib/open-portal";
 
 const TOKEN_PREFIX = "fz_";
 
@@ -129,26 +130,11 @@ function PaidView({ tier, onSignOut }: PaidViewProps) {
     if (!token) return;
     setPortalBusy(true);
     setPortalError(null);
-    try {
-      const res = await fetch("/api/license/portal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ returnUrl: window.location.href }),
-      });
-      const body = await res.json();
-      if (!res.ok || !body.ok) {
-        setPortalError(body.error ?? `Portal failed (${res.status})`);
-        return;
-      }
-      window.location.href = body.url;
-    } catch (e) {
-      setPortalError((e as Error).message);
-    } finally {
-      setPortalBusy(false);
+    const result = await openPortal();
+    if (!result.ok) {
+      setPortalError(result.error ?? `Portal failed`);
     }
+    setPortalBusy(false);
   }
 
   function onSignOutClick() {

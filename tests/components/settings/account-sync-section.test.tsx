@@ -14,6 +14,7 @@ import { render, screen } from "@testing-library/react";
 import { AccountSyncSection } from "@/components/settings/account-sync-section";
 import { useSyncStore } from "@/stores/sync-store";
 import { useFeedStore } from "@/stores/feed-store";
+import { useLicenseStore } from "@/stores/license-store";
 
 vi.mock("@/core/crypto/passphrase-generator", () => ({
   generatePassphrase: vi.fn().mockResolvedValue("alpha bravo charlie delta"),
@@ -53,10 +54,41 @@ describe("<AccountSyncSection>", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a destructive Delete all data button (danger zone) regardless of status", () => {
+  it("shows a destructive Delete all data button when the user is on the Free tier", () => {
+    useLicenseStore.setState({ tier: "free", verifying: false });
     render(<AccountSyncSection />);
     expect(
       screen.getByRole("button", { name: /delete all data/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("HIDES Delete all data and shows a Manage subscription CTA when the user has an active paid subscription", () => {
+    // Why: a paid user clicking Delete would wipe local data but leave the
+    // Stripe subscription orphaned (still billing them with no app to use
+    // it on). Force them through the portal first so cancellation and data
+    // deletion are sequenced safely.
+    useLicenseStore.setState({ tier: "personal", verifying: false });
+    render(<AccountSyncSection />);
+    expect(
+      screen.queryByRole("button", { name: /delete all data/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /manage subscription/i }),
+    ).toBeInTheDocument();
+    // Explanatory copy must mention canceling the subscription first
+    expect(
+      screen.getByText(/cancel.*subscription/i),
+    ).toBeInTheDocument();
+  });
+
+  it("paid-tier Pro user also sees the Manage subscription gate (not just personal)", () => {
+    useLicenseStore.setState({ tier: "pro", verifying: false });
+    render(<AccountSyncSection />);
+    expect(
+      screen.queryByRole("button", { name: /delete all data/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /manage subscription/i }),
     ).toBeInTheDocument();
   });
 
