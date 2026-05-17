@@ -88,7 +88,7 @@ Full-text extraction (user-initiated): click "Extracted" → `/api/page` → `ex
 - **src/components/onboarding/** — `onboarding-modal.tsx` + step components under `steps/`.
 - **src/components/explore/**, **feedback/**, **settings/** — feature UIs.
 - **src/components/sync/** — `sync-setup-dialog.tsx` (enable/disable, data mgmt, vault deletion), `sync-status-chip.tsx` (amber local / green synced / red error).
-- **src/pages/feeds-page.tsx** — Desktop: 3-panel CSS grid. Mobile: single panel + back nav. Syncs URL params → Zustand.
+- **src/pages/feeds-page.tsx** — Desktop: two-tier `ResizablePanelGroup`. Outer = `[sidebar | stage]`, constant on every route — the only place sidebar width lives. The `stage` panel is a slot whose *content* varies per route: `<ExploreCatalog>` on `/explore` / empty feeds, `<StatsPage>` on `/stats`, or an inner `ResizablePanelGroup` `[article-list | reader]` on the default route. New feature areas mount inside the stage; they MUST NOT add siblings to the sidebar (that's what made the sidebar visibly resize on every navigation — see ADR 013). Mobile: single panel + back nav. Syncs URL params → Zustand.
 - **src/lib/content-modes.ts** — Pure view-mode logic for reader-panel.
 - **src/lib/decode-entities.ts** — HTML entity decoding for plain-text display.
 
@@ -112,7 +112,7 @@ URL is the source of truth for navigation state. `FeedsPage` syncs URL params �
 Single CSS entry: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero runtime cost).
 
 - `@theme` — Design tokens (`--color-*`, `--font-*`).
-- `@layer base` — Resets, layout grid (`250px 300px 1fr`), base button/input styles.
+- `@layer base` — Resets, base button/input styles. (The desktop layout is a two-tier `ResizablePanelGroup` in `feeds-page.tsx`, not a CSS grid — see ADR 013.)
 - Use Tailwind utilities in JSX with `cn()` from `src/lib/utils.ts`.
 - **Spacing** — Use Tailwind v4's default numeric scale (`p-4`, `gap-2`). Do **not** define `--spacing-xs/sm/md/lg/xl` in `@theme` — these collide with `max-w-*` utilities (`max-w-lg` resolves to `--spacing-lg` instead of `--container-lg`). [Tailwind v4 gotcha](https://github.com/tailwindlabs/tailwindcss/discussions/17777).
 

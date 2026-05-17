@@ -65,6 +65,7 @@ function renderPage(route = "/feeds") {
           element={<FeedsPage />}
         />
         <Route path="/explore" element={<FeedsPage />} />
+        <Route path="/stats" element={<FeedsPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -98,13 +99,22 @@ describe("FeedsPage layout — desktop", () => {
     });
   });
 
-  it("shows only 2 panels (sidebar + explore) when there are no feeds", () => {
-    // When no feeds exist, the layout shows sidebar + explore, not sidebar +
-    // article list + reader. The panel group is still present for resizability.
+  it("shows only 2 top-level panels (sidebar + stage) when there are no feeds", () => {
+    // When no feeds exist, the empty-state Explore renders *inside* the stage
+    // panel. The outer panel group always exposes exactly two children:
+    // sidebar and stage. Whatever the route shows lives inside the stage.
     useFeedStore.setState({ feeds: [] });
     const { container } = renderPage();
-    const panels = container.querySelectorAll("[data-panel]");
-    expect(panels).toHaveLength(2);
+    const outerGroup = container.querySelector(
+      "[data-slot='resizable-panel-group']",
+    );
+    expect(outerGroup).not.toBeNull();
+    const topLevelPanels = outerGroup!.querySelectorAll(
+      ":scope > [data-panel]",
+    );
+    expect(topLevelPanels).toHaveLength(2);
+    const ids = Array.from(topLevelPanels).map((p) => p.getAttribute("id"));
+    expect(ids).toEqual(["sidebar", "stage"]);
   });
 
   it("shows panels when feeds exist", () => {
@@ -152,13 +162,14 @@ describe("FeedsPage layout — desktop", () => {
 
   it("each ResizablePanel has overflow-hidden via className", () => {
     const { container } = renderPage();
-    // The library renders data-panel on the outer div with inline overflow:hidden.
-    // Our className prop goes to an inner child div. We assert the inner div
-    // (data-slot="resizable-panel") carries overflow-hidden.
+    // Two-tier model: outer group has [sidebar, stage] (2 panels). On the
+    // default route, the stage contains an inner group with [article-list,
+    // reader] (2 more panels). All four ResizablePanels carry overflow-hidden
+    // so neither layer accidentally introduces a scrollbar at the panel edge.
     const panelSlots = container.querySelectorAll(
       "[data-slot='resizable-panel']",
     );
-    expect(panelSlots).toHaveLength(3);
+    expect(panelSlots).toHaveLength(4);
     for (const slot of panelSlots) {
       // The className is on the inner div (child of data-panel)
       const inner = slot.querySelector("div");
@@ -167,20 +178,23 @@ describe("FeedsPage layout — desktop", () => {
     }
   });
 
-  it("each panel has its own scrollable region", () => {
-    // Both panels use native overflow-y-auto scroll containers.
-    // ArticleList needs a native scroller for the virtualizer to measure.
-    // The reader panel also uses native overflow to avoid Radix ScrollArea's
-    // display:table wrapper, which prevents text from wrapping at panel width.
+  it("each leaf panel has its own scrollable region", () => {
+    // Sidebar, article-list, and reader are the *leaf* panels that hold
+    // scrollable content. The `stage` panel is a relay — its scrollable
+    // children live inside the inner group (or inside a single feature
+    // component on /explore /stats). We assert the three leaves carry
+    // scrollers; double-counting `stage` would falsely require it to scroll.
     const { container } = renderPage();
-    const panels = container.querySelectorAll("[data-panel]");
-    for (const panel of panels) {
-      const scrollArea = panel.querySelector(
+    const leafIds = ["sidebar", "article-list", "reader"];
+    for (const id of leafIds) {
+      const panel = container.querySelector(`[data-panel][id="${id}"]`);
+      expect(panel, `leaf panel ${id} not found`).not.toBeNull();
+      const scrollArea = panel!.querySelector(
         "[data-radix-scroll-area-viewport]",
       );
       const nativeScroller =
-        panel.querySelector(".overflow-y-auto") ??
-        panel.querySelector(".overflow-auto");
+        panel!.querySelector(".overflow-y-auto") ??
+        panel!.querySelector(".overflow-auto");
       expect(scrollArea ?? nativeScroller).not.toBeNull();
     }
   });
@@ -189,12 +203,17 @@ describe("FeedsPage layout — desktop", () => {
     // Radix ScrollArea wraps content in display:table which prevents text from
     // wrapping to the panel width — text clips at the panel edge instead.
     // The reader panel must use a plain overflow-y-auto div.
+    // The reader now lives in the inner group inside `stage`; find it by id
+    // rather than by index, since the outer group also contains panels.
     const { container } = renderPage();
-    const panels = container.querySelectorAll("[data-panel]");
-    const readerPanel = panels[2]; // sidebar=0, article-list=1, reader=2
-    expect(readerPanel.querySelector("[data-radix-scroll-area-viewport]")).toBeNull();
-    const nativeScroller = readerPanel.querySelector(".overflow-y-auto") ??
-      readerPanel.querySelector(".overflow-auto");
+    const readerPanel = container.querySelector('[data-panel][id="reader"]');
+    expect(readerPanel).not.toBeNull();
+    expect(
+      readerPanel!.querySelector("[data-radix-scroll-area-viewport]"),
+    ).toBeNull();
+    const nativeScroller =
+      readerPanel!.querySelector(".overflow-y-auto") ??
+      readerPanel!.querySelector(".overflow-auto");
     expect(nativeScroller).not.toBeNull();
   });
 
@@ -204,12 +223,13 @@ describe("FeedsPage layout — desktop", () => {
     expect(handle).not.toBeNull();
   });
 
-  it("renders 3 ResizablePanels on desktop (sidebar + article list + reader)", () => {
-    // All three columns must be independently resizable. Two handles required:
-    // sidebar|article-list and article-list|reader.
+  it("renders 2 outer + 2 inner ResizablePanels on the default desktop route", () => {
+    // Two-tier model. Outer group: [sidebar | stage]. Stage on the default
+    // route holds an inner group: [article-list | reader]. Total 4 panels,
+    // 2 handles (one per group). Each tier is independently resizable.
     const { container } = renderPage();
     const panels = container.querySelectorAll("[data-panel]");
-    expect(panels).toHaveLength(3);
+    expect(panels).toHaveLength(4);
     const handles = container.querySelectorAll("[data-slot='resizable-handle']");
     expect(handles).toHaveLength(2);
   });
@@ -217,19 +237,63 @@ describe("FeedsPage layout — desktop", () => {
   it("each ResizablePanel has a stable id so the layout library can persist sizes across re-renders", () => {
     // Without stable ids, react-resizable-panels falls back to useId() and
     // generates fresh keys on every mount/route change — which breaks
-    // persistence and causes a visible re-balance when the panel count
-    // changes (e.g. switching to /explore drops the reader panel).
+    // persistence and re-balances proportions on remount.
     const { container } = renderPage();
     const panels = container.querySelectorAll("[data-panel]");
-    expect(panels).toHaveLength(3);
+    expect(panels).toHaveLength(4);
     const ids = Array.from(panels).map((p) => p.getAttribute("id"));
     expect(ids).toEqual(
-      expect.arrayContaining(["sidebar", "article-list", "reader"]),
+      expect.arrayContaining(["sidebar", "stage", "article-list", "reader"]),
     );
     // No id should be auto-generated (react useId values start with ":r")
     for (const id of ids) {
       expect(id).not.toMatch(/^:/);
     }
+  });
+
+  it("STRUCTURAL INVARIANT: top-level panels are [sidebar, stage] on every desktop route", () => {
+    // The sidebar's neighbors must never change across routes. This is the
+    // structural counterpart of the user-facing rule "the sidebar size only
+    // changes when you drag the handle or resize the window."
+    //
+    // react-resizable-panels recomputes layout when a group's child set
+    // changes — even when individual panel ids stay stable. The fix is not
+    // to remember harder, but to never present a different child set in the
+    // first place. The stage is a constant slot whose *content* swaps.
+    for (const route of ["/feeds/f1", "/explore", "/stats"]) {
+      const { container, unmount } = renderPage(route);
+      const outerGroup = container.querySelector(
+        "[data-slot='resizable-panel-group']",
+      );
+      expect(outerGroup, `outer group missing on ${route}`).not.toBeNull();
+      const topLevelPanels = outerGroup!.querySelectorAll(
+        ":scope > [data-panel]",
+      );
+      const ids = Array.from(topLevelPanels).map((p) => p.getAttribute("id"));
+      expect(ids, `top-level ids on ${route}`).toEqual(["sidebar", "stage"]);
+      unmount();
+    }
+  });
+
+  it("inner group exists ONLY on the default route (article list + reader)", () => {
+    // Explore and Stats render a single feature inside the stage with no
+    // inner ResizablePanelGroup. The default route adds a second group for
+    // the list/reader split. This keeps the topology of the *outer* group
+    // constant while letting list/reader stay independently resizable.
+    const { container: cDefault } = renderPage("/feeds/f1");
+    expect(
+      cDefault.querySelectorAll("[data-slot='resizable-panel-group']"),
+    ).toHaveLength(2);
+
+    const { container: cExplore } = renderPage("/explore");
+    expect(
+      cExplore.querySelectorAll("[data-slot='resizable-panel-group']"),
+    ).toHaveLength(1);
+
+    const { container: cStats } = renderPage("/stats");
+    expect(
+      cStats.querySelectorAll("[data-slot='resizable-panel-group']"),
+    ).toHaveLength(1);
   });
 
   it("uses a STABLE layout id across all routes so the sidebar width survives navigation", () => {
@@ -249,12 +313,18 @@ describe("FeedsPage layout — desktop", () => {
     expect(id1).toBe("feedzero:layout:main");
   });
 
-  it("explore layout exposes stable ids for sidebar and explore panels", () => {
+  it("explore route renders [sidebar, stage] at the top level with explore inside the stage", () => {
+    // Explore is a feature area mounted *inside* the stage panel, not a
+    // sibling of sidebar. Total panel count is 2 (no inner group).
     const { container } = renderPage("/explore");
     const panels = container.querySelectorAll("[data-panel]");
     expect(panels).toHaveLength(2);
     const ids = Array.from(panels).map((p) => p.getAttribute("id"));
-    expect(ids).toEqual(expect.arrayContaining(["sidebar", "explore"]));
+    expect(ids).toEqual(["sidebar", "stage"]);
+    const stage = container.querySelector('[data-panel][id="stage"]');
+    expect(stage).not.toBeNull();
+    // ExploreCatalog content lives inside the stage.
+    expect(stage!.textContent ?? "").not.toBe("");
   });
 
   it("does not clobber selectedArticle to the previous URL article when articles mutates faster than React Router (PR #34 follow-up)", async () => {

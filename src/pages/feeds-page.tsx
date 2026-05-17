@@ -343,20 +343,72 @@ export function FeedsPage() {
     );
   }
 
-  // Desktop: all three columns in one ResizablePanelGroup so sidebar, article
-  // list, and reader are all independently user-resizable.
-  // AppSidebar uses collapsible="none" so it renders inline (not fixed-position)
-  // and participates naturally in the panel layout.
+  // Desktop: two-tier ResizablePanelGroup model.
+  //
+  //   OUTER group (id = MAIN): [sidebar | stage] — constant on every route.
+  //   STAGE content swaps:
+  //     /stats                  → <StatsPage>
+  //     /explore (or no feeds)  → <ExploreCatalog>
+  //     default                 → INNER group (id = STAGE_INNER) holding
+  //                                [article-list | reader]
+  //
+  // The outer group's child set never changes, so react-resizable-panels
+  // can't recompute layout when the route changes — that's what made the
+  // sidebar visibly resize on every navigation. The sidebar's neighbour
+  // (the stage) is always the same panel; its inner content is none of
+  // the library's business.
+  //
+  // AppSidebar uses collapsible="none" so it renders inline (not
+  // fixed-position) and participates naturally in the panel layout.
   const exploreOrEmpty = isExplorePage || feeds.length === 0;
   const showStats = isStatsPage;
-  // Single stable layout id across all routes — PR F. With the same group
-  // id everywhere, react-resizable-panels preserves the sidebar's user-
-  // dragged width naturally as routes change (the per-route ids of the
-  // prior model made the sidebar visibly resize on every navigation).
-  // Each child panel still has its own stable `id` so the library tracks
-  // their sizes independently.
   const layoutId = PANEL_LAYOUT_ID.MAIN;
   const sidebarSize = useSharedSidebarSize(layoutId);
+
+  let stageContent;
+  if (showStats) {
+    stageContent = (
+      <ScrollArea className="h-full">
+        <Suspense><StatsPage /></Suspense>
+      </ScrollArea>
+    );
+  } else if (exploreOrEmpty) {
+    stageContent = (
+      <ScrollArea className="h-full">
+        <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
+      </ScrollArea>
+    );
+  } else {
+    stageContent = (
+      <ResizablePanelGroup
+        id={PANEL_LAYOUT_ID.STAGE_INNER}
+        direction="horizontal"
+        className="h-full"
+      >
+        <ResizablePanel
+          id="article-list"
+          defaultSize="40%"
+          minSize="180px"
+          className="overflow-hidden"
+        >
+          <ArticleList onArticleSelect={handleArticleSelect} />
+        </ResizablePanel>
+        <ResizableHandle />
+        <ResizablePanel
+          id="reader"
+          defaultSize="60%"
+          minSize="200px"
+          className="overflow-hidden"
+        >
+          <ReaderPanel
+            nextArticle={nextArticle}
+            prevArticle={prevArticle}
+            onNavigate={handleArticleSelect}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    );
+  }
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
@@ -378,43 +430,9 @@ export function FeedsPage() {
           />
         </ResizablePanel>
         <ResizableHandle />
-        {showStats ? (
-          <ResizablePanel id="stats" className="overflow-hidden">
-            <ScrollArea className="h-full">
-              <Suspense><StatsPage /></Suspense>
-            </ScrollArea>
-          </ResizablePanel>
-        ) : exploreOrEmpty ? (
-          <ResizablePanel id="explore" className="overflow-hidden">
-            <ScrollArea className="h-full">
-              <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
-            </ScrollArea>
-          </ResizablePanel>
-        ) : (
-          <>
-            <ResizablePanel
-              id="article-list"
-              defaultSize="33%"
-              minSize="180px"
-              className="overflow-hidden"
-            >
-              <ArticleList onArticleSelect={handleArticleSelect} />
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel
-              id="reader"
-              defaultSize="50%"
-              minSize="200px"
-              className="overflow-hidden"
-            >
-              <ReaderPanel
-                nextArticle={nextArticle}
-                prevArticle={prevArticle}
-                onNavigate={handleArticleSelect}
-              />
-            </ResizablePanel>
-          </>
-        )}
+        <ResizablePanel id="stage" className="overflow-hidden">
+          {stageContent}
+        </ResizablePanel>
       </ResizablePanelGroup>
     </SidebarProvider>
   );

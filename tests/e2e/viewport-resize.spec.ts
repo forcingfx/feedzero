@@ -54,8 +54,12 @@ test.describe("Viewport resize", () => {
       { timeout: 10000 },
     );
 
-    // Desktop layout: resizable panel group should be present
-    const panels = page.locator('[data-slot="resizable-panel-group"]');
+    // Desktop layout: outer resizable panel group should be present.
+    // .first() because the default route also renders an inner group
+    // (article-list + reader) nested inside the stage panel.
+    const panels = page
+      .locator('[data-slot="resizable-panel-group"]')
+      .first();
     await expect(panels).toBeVisible({ timeout: 5000 });
 
     // Persistent sidebar should be visible (no trigger needed to open it)

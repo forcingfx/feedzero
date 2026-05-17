@@ -171,7 +171,7 @@ Every monetization handler (sync, license/verify, license/issue, stripe/webhook,
 Tailwind CSS v4 via `@tailwindcss/vite` (build-time only, zero runtime cost). Single CSS entry point: `src/index.css`.
 
 - **`@theme`** — Design tokens (colors, spacing, fonts, radius)
-- **`@layer base`** — Global resets, 3-panel grid layout, button/input base styles
+- **`@layer base`** — Global resets, button/input base styles (the desktop layout itself is a two-tier `ResizablePanelGroup` in `feeds-page.tsx`, not a CSS grid — see ADR 013)
 - **Tailwind utilities** — Used in JSX `className` props via `cn()` helper (clsx + tailwind-merge)
 
 See [ADR 004](decisions/004-tailwind-css.md) for Tailwind rationale.
