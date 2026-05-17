@@ -77,4 +77,23 @@ describe("WelcomeStep", () => {
     const button = screen.getByRole("button", { name: /get started/i });
     expect(button).toHaveFocus();
   });
+
+  it("surfaces a restore-from-cloud affordance for users who already have a passphrase", async () => {
+    // Closes the cross-device UX gap from feedback #98: a returning user on
+    // a new device shouldn't have to discover the recovery flow through
+    // Settings → Existing cloud account. The welcome step exposes it.
+    renderInDialog(<WelcomeStep />);
+    expect(
+      screen.getByRole("button", { name: /restore from cloud|already have/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("jumps to the recovery step when the restore affordance is clicked", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<WelcomeStep />);
+    await user.click(
+      screen.getByRole("button", { name: /restore from cloud|already have/i }),
+    );
+    expect(useOnboardingStore.getState().step).toBe("recovery");
+  });
 });

@@ -10,12 +10,13 @@
  * own surface. Reading tab is the launcher.
  */
 import { useState } from "react";
-import { Layers, Wand2 } from "lucide-react";
+import { Layers, Wand2, Palette } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
+import { ThemeToggle } from "./theme-toggle";
 
 export function ReadingTab() {
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
@@ -25,6 +26,17 @@ export function ReadingTab() {
 
   return (
     <div className="space-y-4 py-2">
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Palette className="size-4 text-muted-foreground" />
+          <p className="text-sm font-medium">Theme</p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Light, dark, or follow your system.
+        </p>
+        <ThemeToggle />
+      </div>
+
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">

@@ -528,23 +528,26 @@ describe("refreshAllFeeds", () => {
     expect(result.value.results.length).toBe(0);
   });
 
-  it("should refresh multiple feeds concurrently using Promise.allSettled", async () => {
-    // Add 3 feeds
-    for (let i = 1; i <= 3; i++) {
+  it("refreshes cross-host feeds in parallel but serializes same-host feeds", async () => {
+    // Three feeds on THREE DIFFERENT hosts — the per-host serialization
+    // added for feedback #97 (avoid bursting one upstream and tripping
+    // rate limits) shouldn't slow down unrelated upstreams. They must
+    // still all fire before any resolves.
+    const hosts = ["a.example.com", "b.example.com", "c.example.com"];
+    for (let i = 0; i < 3; i++) {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         text: () =>
           Promise.resolve(
-            ATOM_XML.replace("Example Feed", `Feed ${i}`).replace(
+            ATOM_XML.replace("Example Feed", `Feed ${i + 1}`).replace(
               "tag:example.com,2024:1",
-              `tag:example.com,2024:${i}`,
+              `tag:example.com,2024:${i + 1}`,
             ),
           ),
       });
-      await addFeedFlow(`https://example.com/feed${i}.xml`);
+      await addFeedFlow(`https://${hosts[i]}/feed.xml`);
     }
 
-    // Track the order: all fetches should start before any completes
     const callOrder = [];
     globalThis.fetch = vi.fn().mockImplementation(() => {
       callOrder.push("start");
@@ -561,13 +564,53 @@ describe("refreshAllFeeds", () => {
     expect(isOk(result)).toBe(true);
     expect(result.value.results.length).toBe(3);
 
-    // With Promise.allSettled, all 3 fetches are initiated before
-    // microtask resolution — all starts come before resolves
     const firstResolveIndex = callOrder.indexOf("resolve");
     const startCount = callOrder
       .slice(0, firstResolveIndex)
       .filter((e) => e === "start").length;
     expect(startCount).toBe(3);
+  });
+
+  it("serializes refreshes of same-host feeds (per-host politeness)", async () => {
+    // Three feeds on ONE host — must NOT all fire concurrently. The
+    // group-by-host packing splits them across batches; only one start
+    // happens before the first resolve. Lock the politeness contract
+    // so a future refactor can't silently regress to all-concurrent.
+    for (let i = 1; i <= 3; i++) {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            ATOM_XML.replace("Example Feed", `Feed ${i}`).replace(
+              "tag:example.com,2024:1",
+              `tag:example.com,2024:${i}`,
+            ),
+          ),
+      });
+      await addFeedFlow(`https://feeds.feedburner.com/feed${i}`);
+    }
+
+    const callOrder = [];
+    globalThis.fetch = vi.fn().mockImplementation(() => {
+      callOrder.push("start");
+      return Promise.resolve({
+        ok: true,
+        text: () => {
+          callOrder.push("resolve");
+          return Promise.resolve(ATOM_XML);
+        },
+      });
+    });
+
+    const result = await refreshAllFeeds();
+    expect(isOk(result)).toBe(true);
+    expect(result.value.results.length).toBe(3);
+
+    const firstResolveIndex = callOrder.indexOf("resolve");
+    const startCount = callOrder
+      .slice(0, firstResolveIndex)
+      .filter((e) => e === "start").length;
+    expect(startCount).toBe(1);
   });
 
   it("records per-feed errors when refresh fails for that feed", async () => {

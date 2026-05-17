@@ -15,6 +15,7 @@ import {
 } from "../storage/db.ts";
 import type { Feed, Article } from "../../types/index.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
+import { groupByHostForRefresh } from "./group-by-host.ts";
 
 interface AddFeedResult {
   feed: Feed;
@@ -287,8 +288,13 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
 }
 
 /**
- * Refresh all feeds concurrently with a concurrency limit.
- * Each feed refresh is independent, so they can safely run in parallel.
+ * Refresh all feeds with per-host serialization.
+ *
+ * Cross-host requests run in parallel up to REFRESH_CONCURRENCY. Same-host
+ * requests are serialized via `groupByHostForRefresh` so a bulk refresh
+ * against many feeds on one upstream (feeds.feedburner.com, Substack
+ * domains, etc.) doesn't burst-fire and trip per-IP rate limits — the
+ * self-host symptom from feedback #97.
  */
 /** Max concurrent feed refreshes to avoid network/CPU spikes. */
 const REFRESH_CONCURRENCY = 5;
@@ -300,9 +306,11 @@ export async function refreshAllFeeds(): Promise<Result<RefreshAllResult>> {
   const feeds = feedsResult.value;
   const results: RefreshAllResult["results"] = [];
 
-  // Process feeds in batches to limit concurrency
-  for (let i = 0; i < feeds.length; i += REFRESH_CONCURRENCY) {
-    const batch = feeds.slice(i, i + REFRESH_CONCURRENCY);
+  // Pack into batches where each batch has at most REFRESH_CONCURRENCY
+  // feeds AND no two feeds share a host. Same-host duplicates fall into
+  // later batches and refresh sequentially.
+  const batches = groupByHostForRefresh(feeds, REFRESH_CONCURRENCY);
+  for (const batch of batches) {
     const settled = await Promise.allSettled(
       batch.map((feed) =>
         refreshFeed(feed).then((result) => ({ feed, result })),
