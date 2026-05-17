@@ -15,6 +15,7 @@ import {
   destroyLocal,
   rekeyFromPassphrase,
 } from "../core/storage/key-manager.ts";
+import { clearLicenseToken } from "../core/license/license-token-store.ts";
 import type { Result } from "../utils/result.ts";
 import { ok, err } from "../utils/result.ts";
 
@@ -46,19 +47,36 @@ interface SyncStore {
 
   enableSync: (passphrase: string) => Promise<void>;
   restoreSync: (credentials: SyncCredentials) => void;
+  /**
+   * Disable sync on this device. Drops in-memory credentials, removes
+   * the persisted vault keys, and flips status back to `local-only`.
+   * PURELY LOCAL — does NOT touch the server. Idempotent.
+   *
+   * To also delete the server-side vault, call `deleteCloudVault()`
+   * BEFORE `disableSync()` (it reads credentials that disableSync
+   * clears) — see ADR forthcoming.
+   */
   disableSync: () => Promise<void>;
+  /**
+   * Delete the encrypted vault on the server. Single network call;
+   * does NOT mutate local state. Returns `err("no-credentials")` when
+   * the store has no credentials to derive the vault id from.
+   *
+   * Ordering invariant: must run before `disableSync()` — once
+   * credentials are cleared, the vault id can't be re-derived.
+   */
+  deleteCloudVault: () => Promise<Result<void>>;
+  /**
+   * Sign out of FeedZero Personal on this device. Clears the local
+   * license token and disables sync locally. KEEPS the server vault
+   * intact (the user can reactivate later and pull it back) and KEEPS
+   * local IndexedDB feeds + articles (the user keeps reading on the
+   * free tier on this device).
+   */
+  deactivateLocal: () => Promise<void>;
   logout: () => Promise<void>;
   push: () => Promise<void>;
   pull: () => Promise<void>;
-  /**
-   * Switch an existing cloud-sync user to local-only WITHOUT touching the
-   * server vault. Used by the license-required migration flow — the server
-   * vault is unreachable (401), and our retention policy promises 90-day
-   * preservation, so the only safe action is local-side: drop vault keys
-   * (cloud key material), clear in-memory credentials, leave IndexedDB
-   * + DB keys intact so the user keeps reading offline.
-   */
-  migrateToLocalOnly: () => Promise<void>;
   /** Close the migration dialog without taking any action. */
   dismissPendingMigration: () => void;
   /**
@@ -160,12 +178,16 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     });
   },
 
-  migrateToLocalOnly: async () => {
+  dismissPendingMigration: () => {
+    set({ pendingMigration: null });
+  },
+
+  disableSync: async () => {
     clearPendingTimers();
-    // Intentionally do NOT call deleteVault(credentials) — the server would
-    // 401 (no license) and our retention policy promises 90-day preservation
-    // so the user can recover by subscribing later. Local-side: drop vault
-    // keys, clear credentials, keep IndexedDB + DB keys so reading continues.
+    // Purely local: drop vault keys + clear in-memory credentials.
+    // Idempotent — calling twice yields the same final state.
+    // To also delete the server vault, call deleteCloudVault() FIRST
+    // (it needs the credentials this method clears).
     removeVaultKeys();
     set({
       status: "local-only",
@@ -176,36 +198,25 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     });
   },
 
-  dismissPendingMigration: () => {
-    set({ pendingMigration: null });
+  deleteCloudVault: async () => {
+    const { credentials } = get();
+    if (!credentials) return err("no-credentials");
+    const result = await deleteVault(credentials);
+    if (!result.ok) return err(result.error);
+    return ok(undefined);
   },
 
-  disableSync: async () => {
-    clearPendingTimers();
-    const { credentials } = get();
-
-    if (credentials) {
-      const deleteResult = await deleteVault(credentials);
-      if (!deleteResult.ok) {
-        const retry = await deleteVault(credentials);
-        if (!retry.ok) {
-          set({
-            status: "error",
-            error: `Could not delete server data: ${retry.error}. Your cloud vault may still exist. Try again.`,
-          });
-          return;
-        }
-      }
-    }
-
-    // Vault confirmed deleted — strip vault keys, keep DB keys
-    removeVaultKeys();
-    set({
-      status: "local-only",
-      lastSyncedAt: null,
-      error: null,
-      credentials: null,
-    });
+  deactivateLocal: async () => {
+    // Clear the license token first so any sync errors after this
+    // point don't leave the user "paid + sync broken". The store's
+    // license-store cross-tab listener picks up the token removal and
+    // flips tier → free.
+    clearLicenseToken();
+    await get().disableSync();
+    // Nudge license-store to re-resolve tier in this tab (the storage
+    // event from clearLicenseToken only fires in OTHER tabs).
+    const { useLicenseStore } = await import("./license-store.ts");
+    void useLicenseStore.getState().refresh();
   },
 
   logout: async () => {

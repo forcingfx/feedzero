@@ -10,11 +10,14 @@
 import { DataSyncSection } from "@/components/settings/data-sync-section";
 import { ImportView } from "@/components/settings/import-view";
 import { ExportView } from "@/components/settings/export-view";
+import { LostPassphrasePanel } from "@/components/settings/tabs/lost-passphrase-panel";
 
 export function DataTab() {
   return (
     <div className="space-y-4 py-2">
       <DataSyncSection />
+
+      <LostPassphrasePanel />
 
       <div className="grid gap-4 md:grid-cols-2">
         <ImportExportCard title="Import">

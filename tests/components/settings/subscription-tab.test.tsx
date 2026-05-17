@@ -95,7 +95,11 @@ describe("<SubscriptionTab>", () => {
 
     it("shows the Personal tier label", () => {
       renderTab();
-      expect(screen.getByText(/personal/i)).toBeInTheDocument();
+      // Several DOM nodes mention "Personal" (tier chip, Deactivate copy,
+      // info chip). The tier chip is the canonical one; assert via the
+      // chip's exact text.
+      const chips = screen.getAllByText("Personal");
+      expect(chips.length).toBeGreaterThan(0);
     });
 
     it("shows a renewal date decoded from the token", () => {

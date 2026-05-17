@@ -14,11 +14,20 @@
  * button to this tab.
  */
 import { useState } from "react";
-import { Sparkles, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { Sparkles, Eye, EyeOff, Copy, Check, LogOut, Info } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useLicenseStore } from "@/stores/license-store";
+import { useSyncStore } from "@/stores/sync-store";
 import { getLicenseToken } from "@/core/license/license-token-store";
 import { decodeLicensePayload } from "@/core/license/format";
 import { base64UrlDecodeToString } from "@/core/license/crypto";
@@ -83,11 +92,15 @@ function PaidView({ tier }: PaidViewProps) {
   const navigate = useNavigate();
   const token = getLicenseToken();
   const payload = decodePayload(token);
+  const syncStatus = useSyncStore((s) => s.status);
+  const deactivateLocal = useSyncStore((s) => s.deactivateLocal);
 
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [portalBusy, setPortalBusy] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deactivatePending, setDeactivatePending] = useState(false);
 
   async function onCopy() {
     if (!token) return;
@@ -109,6 +122,13 @@ function PaidView({ tier }: PaidViewProps) {
       setPortalError(result.error ?? `Portal failed`);
     }
     setPortalBusy(false);
+  }
+
+  async function onConfirmDeactivate() {
+    setDeactivatePending(true);
+    await deactivateLocal();
+    setDeactivatePending(false);
+    setDeactivateOpen(false);
   }
 
   const tierLabel = tier === "personal" ? "Personal" : "Pro";
@@ -204,7 +224,97 @@ function PaidView({ tier }: PaidViewProps) {
             <AlertDescription>{portalError}</AlertDescription>
           </Alert>
         )}
+
+        {syncStatus === "synced" && (
+          <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+            <Info className="size-3.5 shrink-0 mt-0.5" />
+            <span>
+              Sync stays on while your subscription is active. To disable
+              sync without canceling, use{" "}
+              <button
+                type="button"
+                onClick={() => goToSettings(navigate, "data")}
+                className="underline hover:no-underline"
+              >
+                Data → Switch to local only
+              </button>
+              .
+            </span>
+          </div>
+        )}
       </div>
+
+      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+        <h3 className="text-sm font-semibold">Deactivate on this device</h3>
+        <p className="text-xs text-muted-foreground">
+          Removes the license token from this browser only. Your
+          subscription stays active, your cloud vault is preserved, and
+          your local feeds + articles are untouched — but paid features
+          (sync, auto-organize, unlimited feeds) lock to the free tier
+          on this device until you reactivate.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setDeactivateOpen(true)}
+        >
+          <LogOut className="mr-2 size-4" />
+          Deactivate FeedZero {tierLabel} on this device
+        </Button>
+      </div>
+
+      <DeactivateConfirm
+        open={deactivateOpen}
+        onOpenChange={setDeactivateOpen}
+        pending={deactivatePending}
+        onConfirm={onConfirmDeactivate}
+        tierLabel={tierLabel}
+      />
     </div>
+  );
+}
+
+interface DeactivateConfirmProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  pending: boolean;
+  onConfirm: () => void;
+  tierLabel: string;
+}
+
+function DeactivateConfirm({
+  open,
+  onOpenChange,
+  pending,
+  onConfirm,
+  tierLabel,
+}: DeactivateConfirmProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Deactivate {tierLabel} on this device?</DialogTitle>
+          <DialogDescription>
+            We&apos;ll clear the license token from this browser and switch
+            sync off locally. Your subscription stays active and your
+            encrypted cloud vault stays intact — you can reactivate any
+            time with the token (Recovery tab) or by signing in again.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex-col gap-2 sm:flex-col">
+          <Button onClick={onConfirm} disabled={pending} aria-busy={pending}>
+            {pending ? "Deactivating…" : "Deactivate on this device"}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={pending}
+          >
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

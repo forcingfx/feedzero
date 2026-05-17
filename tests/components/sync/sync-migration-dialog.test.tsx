@@ -83,7 +83,7 @@ describe("SyncMigrationDialog", () => {
     expect(screen.getByText(/90 days/i)).toBeInTheDocument();
   });
 
-  it("'Keep reading locally' calls migrateToLocalOnly and clears pendingMigration", async () => {
+  it("'Keep reading locally' disables sync locally and clears pendingMigration", async () => {
     const user = userEvent.setup();
     useSyncStore.setState({ pendingMigration: "license-required" });
     renderDialog();
