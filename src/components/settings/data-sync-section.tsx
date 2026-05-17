@@ -27,12 +27,11 @@ import {
   Cloud,
   Trash2,
   AlertTriangle,
-  LogOut,
-  DownloadCloud,
   Loader2,
   Lock,
   ExternalLink,
   Info,
+  DownloadCloud,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import {
@@ -58,7 +57,7 @@ import { SetupWizard } from "@/components/sync/setup-wizard";
 import { ExistingCloudFlow } from "@/components/sync/existing-cloud-flow";
 import { LostPassphrasePanel } from "@/components/settings/tabs/lost-passphrase-panel";
 
-type Confirmation = "none" | "delete" | "disable" | "restore" | "logout";
+type Confirmation = "none" | "delete" | "disable";
 type SubFlow = "none" | "setup" | "existing" | "choose";
 
 const SELF_HOST_DOCS_URL = "https://www.feedzero.app/docs/self-hosting";
@@ -86,8 +85,6 @@ export function DataSyncSection() {
   const enableSync = useSyncStore((s) => s.enableSync);
   const disableSync = useSyncStore((s) => s.disableSync);
   const deleteCloudVault = useSyncStore((s) => s.deleteCloudVault);
-  const logout = useSyncStore((s) => s.logout);
-  const forceResync = useSyncStore((s) => s.forceResync);
   const switchToExistingCloud = useSyncStore((s) => s.switchToExistingCloud);
   const resetApp = useAppStore((s) => s.resetApp);
   const localFeedCount = useFeedStore((s) => s.feeds.length);
@@ -180,25 +177,6 @@ export function DataSyncSection() {
     setConfirmation("none");
   }
 
-  async function handleLogout() {
-    setPending(true);
-    await logout();
-    setPending(false);
-    setConfirmation("none");
-  }
-
-  async function handleRestore() {
-    setPending(true);
-    const result = await forceResync();
-    setPending(false);
-    if (result.ok) {
-      toast(`Restored ${result.value.feedCount} feeds from cloud.`);
-    } else {
-      toast.error(`Restore failed: ${result.error}`);
-    }
-    setConfirmation("none");
-  }
-
   const statusDescription = (() => {
     if (gated) {
       return selfHosted
@@ -221,11 +199,11 @@ export function DataSyncSection() {
 
   return (
     <div className="space-y-4">
-      <div className="relative rounded-lg border border-border bg-card p-4 space-y-3">
+      <div className="relative overflow-hidden rounded-lg border border-border bg-card min-h-[140px]">
         <div
-          className={
-            gated ? "pointer-events-none select-none blur-sm opacity-60" : ""
-          }
+          className={`p-4 space-y-3 ${
+            gated ? "pointer-events-none select-none blur-sm opacity-40" : ""
+          }`}
           aria-hidden={gated || undefined}
         >
           <div className="flex items-start justify-between gap-3">
@@ -246,16 +224,7 @@ export function DataSyncSection() {
             />
           </div>
 
-          {isOn && (
-            <>
-              <LostPassphrasePanel />
-              <AdvancedActions
-                onRestore={() => setConfirmation("restore")}
-                onLogout={() => setConfirmation("logout")}
-                disabled={isSyncing}
-              />
-            </>
-          )}
+          {isOn && !gated && <LostPassphrasePanel />}
         </div>
 
         {gated && (
@@ -323,33 +292,6 @@ export function DataSyncSection() {
         onKeepVault={handleDisableKeepVault}
         onDeleteVault={handleDisableDeleteVault}
       />
-
-      <Confirm
-        open={confirmation === "restore"}
-        onOpenChange={(o) => !o && setConfirmation("none")}
-        icon={<DownloadCloud className="size-6 text-blue-600" />}
-        iconBg="bg-blue-100"
-        title="Restore from cloud?"
-        description="This will replace your local feeds and articles with what's stored in the cloud. Use this if a device shows the wrong feed list after sync."
-        confirmLabel="Restore"
-        loadingLabel="Restoring…"
-        confirmIcon={<DownloadCloud className="mr-2 size-4" />}
-        isLoading={pending}
-        onConfirm={handleRestore}
-      />
-
-      <Confirm
-        open={confirmation === "logout"}
-        onOpenChange={(o) => !o && setConfirmation("none")}
-        icon={<LogOut className="size-6 text-muted-foreground" />}
-        iconBg="bg-muted"
-        title="Log out of this device?"
-        description="This will clear all local data from this browser. Your encrypted cloud backup is preserved — you will need your secret key to access your feeds again."
-        confirmLabel="Log out"
-        loadingLabel="Logging out…"
-        isLoading={pending}
-        onConfirm={handleLogout}
-      />
     </div>
   );
 }
@@ -359,17 +301,22 @@ interface GateOverlayProps {
   onUpgrade: () => void;
 }
 
+/**
+ * Locked-state overlay for the Cloud sync card. Renders inside the parent's
+ * `overflow-hidden` container with `absolute inset-0` so the blurred glass
+ * is exactly the size of the card it covers — never overflows above (into
+ * the tab strip) or below (into the Danger zone). Content is centred and
+ * intentionally compact: lock icon + one-line message + one button. No
+ * nested card frame, which is what caused the prior layout to overflow on
+ * mobile when the parent card was shorter than the overlay's own content.
+ */
 function GateOverlay({ variant, onUpgrade }: GateOverlayProps) {
   if (variant === "self-host") {
     return (
-      <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/70 backdrop-blur-sm">
-        <div className="mx-4 max-w-sm rounded-md border border-border bg-card p-4 text-center shadow-sm space-y-2">
+      <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm px-4">
+        <div className="text-center space-y-2 max-w-xs">
           <Lock className="mx-auto size-5 text-muted-foreground" />
           <p className="text-sm font-medium">Sync server not configured</p>
-          <p className="text-xs text-muted-foreground">
-            Set <code className="font-mono">SYNC_STORAGE</code> on your
-            FeedZero server before enabling cloud sync.
-          </p>
           <Button asChild size="sm" variant="outline">
             <a href={SELF_HOST_DOCS_URL} target="_blank" rel="noreferrer noopener">
               <ExternalLink className="mr-2 size-3.5" />
@@ -382,65 +329,14 @@ function GateOverlay({ variant, onUpgrade }: GateOverlayProps) {
   }
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/70 backdrop-blur-sm">
-      <div className="mx-4 max-w-sm rounded-md border border-border bg-card p-4 text-center shadow-sm space-y-2">
+    <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm px-4">
+      <div className="text-center space-y-2 max-w-xs">
         <Lock className="mx-auto size-5 text-muted-foreground" />
         <p className="text-sm font-medium">Cloud sync requires a subscription</p>
-        <p className="text-xs text-muted-foreground">
-          End-to-end encrypted sync is a Personal feature. Upgrade to enable
-          it across every device.
-        </p>
         <Button size="sm" onClick={onUpgrade}>
           Upgrade plan
         </Button>
       </div>
-    </div>
-  );
-}
-
-interface AdvancedActionsProps {
-  onRestore: () => void;
-  onLogout: () => void;
-  disabled: boolean;
-}
-
-function AdvancedActions({ onRestore, onLogout, disabled }: AdvancedActionsProps) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="border-t pt-3 mt-3 space-y-2">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="text-xs font-medium text-muted-foreground hover:text-foreground"
-        aria-expanded={open}
-      >
-        {open ? "Hide advanced actions ▾" : "Advanced actions ▸"}
-      </button>
-      {open && (
-        <div className="space-y-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full justify-start"
-            onClick={onRestore}
-            disabled={disabled}
-          >
-            <DownloadCloud className="mr-2 size-4" />
-            Restore from cloud
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full justify-start"
-            onClick={onLogout}
-            disabled={disabled}
-          >
-            <LogOut className="mr-2 size-4" />
-            Log out of this device
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -607,72 +503,6 @@ function DeleteAllDataConfirm({
             className="w-full"
             onClick={() => onOpenChange(false)}
             disabled={pending}
-          >
-            Cancel
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-interface ConfirmProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  loadingLabel: string;
-  isLoading: boolean;
-  onConfirm: () => void;
-  variant?: "default" | "destructive";
-  confirmIcon?: React.ReactNode;
-}
-
-function Confirm(props: ConfirmProps) {
-  return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <div className="flex justify-center py-2">
-            <div
-              className={`flex size-12 items-center justify-center rounded-full ${props.iconBg}`}
-            >
-              {props.icon}
-            </div>
-          </div>
-          <DialogTitle className="text-center">{props.title}</DialogTitle>
-          <DialogDescription className="text-center">
-            {props.description}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex-col gap-2 sm:flex-col">
-          <Button
-            variant={props.variant ?? "default"}
-            className="w-full"
-            onClick={props.onConfirm}
-            disabled={props.isLoading}
-            aria-busy={props.isLoading}
-          >
-            {props.isLoading ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                {props.loadingLabel}
-              </>
-            ) : (
-              <>
-                {props.confirmIcon}
-                {props.confirmLabel}
-              </>
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full"
-            onClick={() => props.onOpenChange(false)}
-            disabled={props.isLoading}
           >
             Cancel
           </Button>

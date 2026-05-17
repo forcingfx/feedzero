@@ -94,18 +94,37 @@ export function ExistingCloudFlow({
             <DialogHeader>
               <DialogTitle>Connect existing cloud store</DialogTitle>
               <DialogDescription>
-                Enter your passphrase. We&apos;ll merge the cloud store with
-                your local feeds — your local data takes precedence on
-                conflicts.
-                {localFeedCount > 0 && (
-                  <>
-                    {" "}
-                    You currently have {localFeedCount} local feed
-                    {localFeedCount !== 1 ? "s" : ""}.
-                  </>
-                )}
+                Enter the passphrase you set on another device. We&apos;ll
+                combine that cloud store with what you already have here.
               </DialogDescription>
             </DialogHeader>
+
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground space-y-1.5">
+              <p className="font-medium text-foreground">
+                What &ldquo;combine&rdquo; means
+              </p>
+              <ul className="space-y-1 pl-4 list-disc">
+                <li>
+                  Feeds only on cloud are added to this device.
+                </li>
+                <li>
+                  Feeds only on this device are pushed to the cloud on the
+                  next sync.
+                </li>
+                <li>
+                  When the same feed exists in both, the one on{" "}
+                  <strong>this device</strong> wins (its title, folder, and
+                  read state are kept). Same rule for articles, matched by
+                  GUID.
+                </li>
+              </ul>
+              {localFeedCount > 0 && (
+                <p className="pt-1">
+                  You currently have {localFeedCount} local feed
+                  {localFeedCount !== 1 ? "s" : ""}.
+                </p>
+              )}
+            </div>
 
             <form
               onSubmit={(e) => {
@@ -153,7 +172,7 @@ export function ExistingCloudFlow({
         {step === "syncing" && (
           <>
             <DialogHeader>
-              <DialogTitle>Merging feeds</DialogTitle>
+              <DialogTitle>Combining feeds</DialogTitle>
               <DialogDescription>
                 Combining cloud and local feeds…
               </DialogDescription>
