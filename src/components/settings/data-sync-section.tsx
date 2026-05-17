@@ -199,7 +199,11 @@ export function DataSyncSection() {
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-lg border border-border bg-card min-h-[160px]">
+      <div
+        className={`relative overflow-hidden rounded-lg border border-border bg-card ${
+          gated ? "min-h-[160px]" : ""
+        }`}
+      >
         <div
           className={`p-4 space-y-3 ${
             gated ? "pointer-events-none select-none opacity-60" : ""
@@ -305,22 +309,23 @@ interface GateOverlayProps {
  * Locked-state overlay for the Cloud sync card. Renders inside the parent's
  * `overflow-hidden` container with `absolute inset-0` so the blurred glass
  * is exactly the size of the card it covers — never overflows above (into
- * the tab strip) or below (into the Danger zone). Content is centred and
- * intentionally compact: lock icon + one-line message + one button. No
- * nested card frame, which is what caused the prior layout to overflow on
- * mobile when the parent card was shorter than the overlay's own content.
- */
-/**
- * Frosted-glass surface classes shared by both gate variants.
+ * the tab strip) or below (into the Danger zone).
  *
+ * Frosted-glass surface (`GLASS_CLASSES`):
  * - `bg-card/40` — light tint so the toggle behind reads through.
  * - `backdrop-blur-lg` — strong frosted blur on whatever sits behind.
- *   Falls back gracefully on browsers without `backdrop-filter` (Safari
- *   ≥9, Chrome ≥76, Firefox ≥103); the tint alone still dims the toggle.
+ *   Falls back gracefully on browsers without `backdrop-filter`
+ *   (Safari ≥9, Chrome ≥76, Firefox ≥103); the tint alone still dims
+ *   the toggle.
  * - `ring-1 ring-inset ring-foreground/10` — subtle inset edge that
  *   defines the glass surface against the card border.
  * - `supports-[backdrop-filter]:bg-card/30` — lighter tint when blur is
  *   actually doing the visual work, heavier tint when it isn't.
+ *
+ * Content is centred and intentionally compact: lock icon + one-line
+ * message + one button. No nested card frame, which is what caused the
+ * prior layout to overflow on mobile when the parent card was shorter
+ * than the overlay's own content.
  */
 const GLASS_CLASSES =
   "absolute inset-0 flex items-center justify-center px-4 " +
