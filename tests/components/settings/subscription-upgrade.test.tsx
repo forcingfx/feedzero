@@ -16,10 +16,21 @@ describe("<SubscriptionUpgrade>", () => {
     expect(screen.getByRole("heading", { name: /Self-host/i })).toBeInTheDocument();
   });
 
-  it("Personal Subscribe CTA links to the personal-monthly deeplink", () => {
+  it("Personal CTA links to the personal-monthly deeplink and surfaces the 30-day free trial", () => {
+    // Stripe-managed trial: the checkout handler injects
+    // subscription_data.trial_period_days=30. The CTA copy must match so a
+    // user reading the card understands why no charge appears immediately.
     render(<SubscriptionUpgrade />);
-    const cta = screen.getByRole("link", { name: /subscribe.*personal/i });
+    const cta = screen.getByRole("link", { name: /30-day free trial/i });
     expect(cta.getAttribute("href")).toMatch(/\?subscribe=personal-monthly/);
+  });
+
+  it("calls out '30 days free' in the Personal card blurb so the trial is visible above the fold", () => {
+    render(<SubscriptionUpgrade />);
+    // Multiple matches expected (blurb + secondary yearly CTA). Both surfaces
+    // intentionally repeat the trial framing — make sure at least the blurb
+    // line is present.
+    expect(screen.getAllByText(/30 days free/i).length).toBeGreaterThan(0);
   });
 
   it("Pro tier shows Coming Soon with no subscribe link", () => {

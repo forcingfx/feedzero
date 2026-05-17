@@ -161,6 +161,28 @@ describe("checkout handler — success path", () => {
     );
   });
 
+  it("injects subscription_data.trial_period_days=30 so every Personal subscription opens with a 30-day free trial", async () => {
+    // The 30-day trial is server-controlled (constant in the handler, not an
+    // env var or client field) so attackers can't extend it and operators
+    // don't risk staging vs live drift. Sunset by removing the field; setting
+    // it to 0 is invalid per Stripe.
+    const create = vi.fn(async () => ({ url: "https://x", id: "y" }));
+    await handleCreateCheckoutSession(
+      postBody({
+        priceId: "price_personal_monthly_test",
+        successUrl: "https://feedzero.app/s",
+        cancelUrl: "https://feedzero.app/c",
+      }),
+      { client: { create }, allowedPrices: ALLOWED_PRICES },
+    );
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription_data: { trial_period_days: 30 },
+      }),
+      expect.anything(),
+    );
+  });
+
   it("passes consent_collection.terms_of_service='required' so EU customers explicitly accept Terms (which embed the Art. 16(m) withdrawal-right waiver)", async () => {
     // Stripe docs (https://docs.stripe.com/api/checkout/sessions/create):
     //   "If set to `required`, it requires customers to check a terms of

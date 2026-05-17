@@ -76,6 +76,7 @@ License records: (none) — customer has no licenses in storage.
 |---|---|
 | Active record exists, recent expiry | Just reissue (Step 3). You don't need the original token's text — reissuing mints a brand-new token signed with the same key. |
 | Active record exists, expiry far in the future, customer just needs the token text | Same: reissue. The CLI prints a fresh token. The old one remains valid until expiry but it's not exposed by the CLI. |
+| Active record, expiry ≈ 30 days out, Stripe shows `status=trialing` | Customer is in their 30-day free trial. The license is pinned to the trial-end date (not the issuer's 31-day default) — see [ADR 015](../decisions/015-stripe-side-trial.md). Reissue if they need the token text; the trial clock is owned by Stripe and unaffected. Auto-renewal happens on day 31 via `invoice.paid` → `recordRenewal`. |
 | No records, but Stripe shows an active subscription | The webhook likely failed. Reissue still works — the issuer mints from the customer + subscription state. |
 | Stripe customer not found | Customer used a different email. Go to [Procedure 2](#procedure-2--multiple-lookups). |
 | Subscription is cancelled in Stripe | Go to [Procedure 3](#procedure-3--cancelled-subscription). |

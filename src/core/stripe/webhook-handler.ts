@@ -26,6 +26,13 @@ export interface LicenseIssuer {
     customerId: string;
     tier: "personal" | "pro";
     subscriptionId: string;
+    /**
+     * Optional override. Trial-aware `customer.subscription.created` events
+     * arrive with `current_period_end` already set to the trial-end date;
+     * we pass it through here so the issued license expires when the trial
+     * does instead of falling back to the issuer's 31-day default.
+     */
+    expirySec?: number;
   }): Promise<Result<void>>;
   revoke(args: {
     customerId: string;
@@ -278,8 +285,18 @@ async function handleSubscriptionCreated(
     // the issue for our own observability.
     return acceptedWithIssue("Missing tier metadata on price");
   }
+  // When the subscription is trialing (or just newly created) Stripe sets
+  // current_period_end to the trial-end / first-billing date. Pin the
+  // license expiry to it so the trial license expires when Stripe says it
+  // should, not at the issuer's 31-day default.
+  const expirySec = extractSubscriptionCurrentPeriodEnd(obj);
   return outcomeFromIssuerResult(
-    await issuer.issue({ customerId, subscriptionId, tier }),
+    await issuer.issue({
+      customerId,
+      subscriptionId,
+      tier,
+      ...(expirySec !== null ? { expirySec } : {}),
+    }),
   );
 }
 

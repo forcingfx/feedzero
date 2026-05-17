@@ -37,6 +37,13 @@ interface SubscriptionCreatedArgs {
   customerId: string;
   subscriptionId: string;
   tier: "personal" | "pro";
+  /**
+   * Trial-aware subscriptions expose the trial-end date here (Stripe sets it
+   * when `subscription_data.trial_period_days` is on the Checkout Session).
+   * Omit to model a legacy non-trial subscription where the webhook had to
+   * fall back to the issuer's 31-day default.
+   */
+  current_period_end?: number;
 }
 
 export function subscriptionCreatedEvent(
@@ -49,9 +56,46 @@ export function subscriptionCreatedEvent(
       object: {
         id: args.subscriptionId,
         customer: args.customerId,
+        ...(args.current_period_end !== undefined
+          ? { current_period_end: args.current_period_end }
+          : {}),
         items: {
           data: [
             {
+              price: {
+                metadata: { tier: args.tier },
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+  return {
+    event,
+    signature: (secret, ts) => buildSignature(event, secret, ts),
+  };
+}
+
+/**
+ * Dahlia-shaped subscription.created event — `current_period_end` rides on
+ * `items.data[0]` instead of the top level. See subscriptionUpdatedEventDahlia
+ * for the same shape change on update events.
+ */
+export function subscriptionCreatedEventDahlia(
+  args: SubscriptionCreatedArgs & { current_period_end: number },
+): StripeFixture {
+  const event = {
+    id: `evt_${args.subscriptionId}_created_dahlia`,
+    type: "customer.subscription.created",
+    data: {
+      object: {
+        id: args.subscriptionId,
+        customer: args.customerId,
+        items: {
+          data: [
+            {
+              current_period_end: args.current_period_end,
               price: {
                 metadata: { tier: args.tier },
               },

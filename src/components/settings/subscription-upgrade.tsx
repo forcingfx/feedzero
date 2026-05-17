@@ -45,7 +45,7 @@ export function SubscriptionUpgrade() {
         name="Personal"
         price="$5/mo"
         priceSub="or $50/yr — save 17%"
-        blurb="Sync across every device. Unlimited feeds."
+        blurb="Sync across every device. Unlimited feeds. 30 days free, cancel anytime."
         featured
         features={[
           "Everything in Free",
@@ -53,9 +53,9 @@ export function SubscriptionUpgrade() {
           "Auto-organize folders",
           "Unlimited feeds",
         ]}
-        cta="Subscribe to Personal — $5/mo"
+        cta="Start 30-day free trial — then $5/mo"
         ctaHref="/?subscribe=personal-monthly"
-        secondaryCta="or $50/yr — save 17%"
+        secondaryCta="or 30 days free, then $50/yr — save 17%"
         secondaryCtaHref="/?subscribe=personal-yearly"
       />
 
