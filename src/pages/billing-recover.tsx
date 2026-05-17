@@ -86,15 +86,27 @@ export function BillingRecover() {
 
   return (
     <div className="mx-auto max-w-md p-8 space-y-6">
-      <header className="space-y-2">
+      <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Recover your license</h1>
         <p className="text-sm text-muted-foreground">
-          Enter the email you used to subscribe. We&apos;ll send you a sign-in
-          link via Stripe — open it on this device, then click{" "}
-          <strong>&ldquo;Return to FeedZero&rdquo;</strong> at the top of the
-          Stripe page to finish activating your license here.
+          Two quick steps to reactivate on this device.
         </p>
       </header>
+
+      {phase === "sent" ? null : (
+        <ol className="space-y-3">
+          <RecoveryStep number={1} title="Sign in via Stripe">
+            Enter the email you used to subscribe. We&apos;ll send you a
+            sign-in link to the Stripe customer portal — open it on this
+            device.
+          </RecoveryStep>
+          <RecoveryStep number={2} title="Activate your license">
+            At the top of the Stripe page, click{" "}
+            <strong>&ldquo;Return to FeedZero&rdquo;</strong>. That hand-off
+            finishes activating your license here.
+          </RecoveryStep>
+        </ol>
+      )}
 
       {phase === "sent" ? (
         <>
@@ -188,5 +200,28 @@ export function BillingRecover() {
         .
       </p>
     </div>
+  );
+}
+
+interface RecoveryStepProps {
+  number: number;
+  title: string;
+  children: React.ReactNode;
+}
+
+function RecoveryStep({ number, title, children }: RecoveryStepProps) {
+  return (
+    <li className="flex items-start gap-3">
+      <span
+        aria-hidden="true"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+      >
+        {number}
+      </span>
+      <div className="space-y-0.5 pt-0.5">
+        <h2 className="text-sm font-medium leading-snug">{title}</h2>
+        <p className="text-sm text-muted-foreground">{children}</p>
+      </div>
+    </li>
   );
 }
