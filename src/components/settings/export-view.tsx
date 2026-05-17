@@ -8,12 +8,16 @@ import { toast } from "sonner";
 
 export function ExportView() {
   const feeds = useFeedStore((s) => s.feeds);
+  const folders = useFeedStore((s) => s.folders);
   const [copied, setCopied] = useState(false);
 
   const urlList = generateUrlList(feeds);
 
   const handleDownloadOpml = useCallback(() => {
-    const opml = generateOpmlFile(feeds);
+    // Pass folders so the exported OPML preserves the user's organization
+    // (PR E round-trip fidelity). Older readers ignore the nested <outline>
+    // wrappers and read the inner feed entries flat.
+    const opml = generateOpmlFile(feeds, folders);
     const blob = new Blob([opml], { type: "application/xml" });
     const url = URL.createObjectURL(blob);
 
@@ -29,7 +33,7 @@ export function ExportView() {
     URL.revokeObjectURL(url);
 
     toast("OPML file downloaded");
-  }, [feeds]);
+  }, [feeds, folders]);
 
   const handleCopyUrls = useCallback(async () => {
     await navigator.clipboard.writeText(urlList);

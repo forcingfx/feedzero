@@ -83,19 +83,38 @@ describe("opml-service", () => {
       });
     });
 
-    it("should flatten nested folders and extract all feeds", () => {
+    it("should PRESERVE folder structure (PR E) — feeds carry their parent folder name", () => {
+      // Was: parser flattened nested folders, dropping the organization the
+      // user had spent years building in their previous reader. PR E
+      // captures the immediate parent <outline>'s text/title as folderName
+      // so the importer can recreate folders on the destination side.
       const result = parseOpmlFile(NESTED_OPML);
       expect(isOk(result)).toBe(true);
 
       const feeds = unwrap(result);
       expect(feeds).toHaveLength(3);
 
-      const urls = feeds.map((f) => f.xmlUrl);
-      expect(urls).toContain("https://techcrunch.com/feed/");
-      expect(urls).toContain(
-        "https://feeds.arstechnica.com/arstechnica/features",
+      const techcrunch = feeds.find(
+        (f) => f.xmlUrl === "https://techcrunch.com/feed/",
       );
-      expect(urls).toContain("https://feeds.bbci.co.uk/news/rss.xml");
+      const ars = feeds.find(
+        (f) => f.xmlUrl === "https://feeds.arstechnica.com/arstechnica/features",
+      );
+      const bbc = feeds.find(
+        (f) => f.xmlUrl === "https://feeds.bbci.co.uk/news/rss.xml",
+      );
+      expect(techcrunch?.folderName).toBe("Tech");
+      expect(ars?.folderName).toBe("Tech");
+      expect(bbc?.folderName).toBe("News");
+    });
+
+    it("top-level (unfiled) feeds get folderName=undefined", () => {
+      const result = parseOpmlFile(SAMPLE_OPML);
+      expect(isOk(result)).toBe(true);
+      const feeds = unwrap(result);
+      for (const f of feeds) {
+        expect(f.folderName).toBeUndefined();
+      }
     });
 
     it("should return error for non-OPML content", () => {
@@ -133,6 +152,96 @@ describe("opml-service", () => {
       const feeds = unwrap(result);
       expect(feeds).toHaveLength(1);
       expect(feeds[0].xmlUrl).toBe("https://example.com/feed");
+    });
+  });
+
+  describe("generateOpmlFile — folder grouping (PR E)", () => {
+    it("groups feeds inside <outline> parent groups when folders are provided", () => {
+      // PR E: round-trip fidelity. Export must mirror the import shape so
+      // a user can move feeds between readers without losing organization.
+      const now = Date.now();
+      const folders = [
+        { id: "fld-tech", name: "Tech", createdAt: now },
+        { id: "fld-news", name: "News", createdAt: now },
+      ];
+      const feeds: Feed[] = [
+        {
+          id: "f-tc",
+          url: "https://techcrunch.com/feed/",
+          title: "TechCrunch",
+          description: "",
+          siteUrl: "https://techcrunch.com/",
+          folderId: "fld-tech",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: "f-bbc",
+          url: "https://feeds.bbci.co.uk/news/rss.xml",
+          title: "BBC",
+          description: "",
+          siteUrl: "https://www.bbc.com/",
+          folderId: "fld-news",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: "f-unfiled",
+          url: "https://example.com/feed",
+          title: "Unfiled Example",
+          description: "",
+          siteUrl: "",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+
+      const opml = generateOpmlFile(feeds, folders);
+
+      // Folder outlines exist as wrappers (no xmlUrl, text=folder name)
+      expect(opml).toMatch(/<outline[^>]*text="Tech"[^>]*>[\s\S]*TechCrunch/);
+      expect(opml).toMatch(/<outline[^>]*text="News"[^>]*>[\s\S]*BBC/);
+      // Unfiled feeds stay at top level (not inside any folder)
+      expect(opml).toContain("Unfiled Example");
+    });
+
+    it("round-trip: parse → generate → parse preserves folder membership", () => {
+      const now = Date.now();
+      const folders = [{ id: "fld-tech", name: "Tech", createdAt: now }];
+      const feeds: Feed[] = [
+        {
+          id: "f-tc",
+          url: "https://techcrunch.com/feed/",
+          title: "TechCrunch",
+          description: "",
+          siteUrl: "",
+          folderId: "fld-tech",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+
+      const opml = generateOpmlFile(feeds, folders);
+      const reparsed = parseOpmlFile(opml);
+      expect(isOk(reparsed)).toBe(true);
+      const entries = unwrap(reparsed);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].folderName).toBe("Tech");
+      expect(entries[0].xmlUrl).toBe("https://techcrunch.com/feed/");
+    });
+
+    it("called without folders arg keeps the old flat-list behavior", () => {
+      const feeds = [
+        createMockFeed(
+          "https://example.com/feed",
+          "Example",
+          "https://example.com/",
+        ),
+      ];
+      // Backwards compatible — older callers don't pass folders.
+      const opml = generateOpmlFile(feeds);
+      expect(opml).toContain("Example");
+      expect(opml).toContain("https://example.com/feed");
     });
   });
 

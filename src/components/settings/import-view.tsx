@@ -39,6 +39,8 @@ export function ImportView({ onClose }: ImportViewProps) {
   const reset = useImportStore((s) => s.reset);
 
   const addFeed = useFeedStore((s) => s.addFeed);
+  const createFolder = useFeedStore((s) => s.createFolder);
+  const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,22 +62,26 @@ export function ImportView({ onClose }: ImportViewProps) {
     }
   }, []);
 
-  const extractUrls = useCallback(
-    async (content: string): Promise<string[]> => {
-      // Detect format and parse accordingly
+  /**
+   * Parse the import content into rich entries that carry folder context.
+   * URL-list imports always have folderName=undefined; OPML imports carry
+   * the parent group name when one exists (PR E).
+   */
+  const extractEntries = useCallback(
+    async (
+      content: string,
+    ): Promise<Array<{ xmlUrl: string; folderName?: string }>> => {
       if (isOpmlFormat(content)) {
         const result = parseOpmlFile(content);
-        if (!result.ok) {
-          throw new Error(result.error);
-        }
-        return result.value.map((entry) => entry.xmlUrl);
-      } else {
-        const result = parseUrlList(content);
-        if (!result.ok) {
-          throw new Error(result.error);
-        }
-        return result.value;
+        if (!result.ok) throw new Error(result.error);
+        return result.value.map((entry) => ({
+          xmlUrl: entry.xmlUrl,
+          folderName: entry.folderName,
+        }));
       }
+      const result = parseUrlList(content);
+      if (!result.ok) throw new Error(result.error);
+      return result.value.map((url) => ({ xmlUrl: url }));
     },
     [],
   );
@@ -99,11 +105,13 @@ export function ImportView({ onClose }: ImportViewProps) {
         content = textInput;
       }
 
-      const urls = await extractUrls(content);
-      if (urls.length === 0) {
+      const entries = await extractEntries(content);
+      if (entries.length === 0) {
         setParseError("No valid feed URLs found");
         return;
       }
+
+      const urls = entries.map((e) => e.xmlUrl);
 
       // Upfront quota check. The feed-store also gates per-URL, but doing
       // it once here lets us refuse cleanly before kicking off a loop that
@@ -120,16 +128,46 @@ export function ImportView({ onClose }: ImportViewProps) {
         return;
       }
 
+      // Pre-create one folder per unique folderName so per-feed assignment
+      // afterward is a cheap lookup, and we don't pay createFolder cost on
+      // every loop iteration. PR E.
+      const folderNames = Array.from(
+        new Set(
+          entries
+            .map((e) => e.folderName)
+            .filter((n): n is string => typeof n === "string" && n.length > 0),
+        ),
+      );
+      for (const name of folderNames) {
+        await createFolder(name);
+      }
+      const folderIdByName = new Map<string, string>();
+      for (const f of useFeedStore.getState().folders ?? []) {
+        if (folderNames.includes(f.name)) folderIdByName.set(f.name, f.id);
+      }
+
       // Start import process
       startImport(urls);
 
-      // Process each URL sequentially
-      for (const url of urls) {
-        const result = await addFeed(url);
+      // Process each entry sequentially. After a successful addFeed, look
+      // up the just-added feed by url in the store and move it into the
+      // matching folder (best-effort — a missing folder or feed leaves the
+      // subscription unfiled, which is the safe fallback).
+      for (const entry of entries) {
+        const result = await addFeed(entry.xmlUrl);
         if (result.ok) {
-          recordResult({ url, success: true });
+          if (entry.folderName) {
+            const folderId = folderIdByName.get(entry.folderName);
+            const addedFeed = useFeedStore
+              .getState()
+              .feeds.find((f) => f.url === entry.xmlUrl);
+            if (folderId && addedFeed) {
+              await moveFeedToFolder(addedFeed.id, folderId);
+            }
+          }
+          recordResult({ url: entry.xmlUrl, success: true });
         } else {
-          recordResult({ url, success: false, error: result.error });
+          recordResult({ url: entry.xmlUrl, success: false, error: result.error });
         }
       }
     } catch (err) {
@@ -141,9 +179,11 @@ export function ImportView({ onClose }: ImportViewProps) {
     inputMode,
     selectedFile,
     textInput,
-    extractUrls,
+    extractEntries,
     startImport,
     addFeed,
+    createFolder,
+    moveFeedToFolder,
     recordResult,
   ]);
 
