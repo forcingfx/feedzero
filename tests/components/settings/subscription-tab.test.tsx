@@ -1,10 +1,16 @@
 /**
- * <SubscriptionTab> — what plan am I on, and how do I pay for it?
+ * <SubscriptionTab> — what plan am I on, and how do I activate or pay for it?
  *
- * Free users see the upgrade tier comparison.
- * Paid users see tier card, masked license token (reveal + copy), and
- * "Manage subscription". The "Add another device" action moved out of
- * Subscription into Recovery, so this tab should NOT render it any more.
+ * Free users see:
+ *   - tier badge
+ *   - large "Activate existing license" CTA (opens the paste-token dialog)
+ *   - "Lost your license?" recovery link → /billing/recover
+ *   - "or subscribe" divider + tier comparison cards
+ *
+ * Paid users see:
+ *   - tier card with renewal date, license-token reveal, "Manage subscription"
+ *   - Deactivate-on-this-device action
+ *   - Compact "Looking for a different plan?" strip with alt tiers
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
@@ -15,7 +21,6 @@ import { useLicenseStore } from "@/stores/license-store";
 import {
   setLicenseToken,
   clearLicenseToken,
-  LICENSE_TOKEN_STORAGE_KEY,
 } from "@/core/license/license-token-store";
 import { encodeLicensePayload, type LicenseTier } from "@/core/license/format";
 import { base64UrlEncode } from "@/core/license/crypto";
@@ -69,13 +74,34 @@ describe("<SubscriptionTab>", () => {
   });
 
   describe("free tier", () => {
-    it("shows the Free tier label and the upgrade tier cards", () => {
+    it("shows the Free tier badge", () => {
       renderTab();
       expect(screen.getAllByText(/^Free$/).length).toBeGreaterThan(0);
-      // All four tier cards from SubscriptionUpgrade
-      expect(screen.getByRole("heading", { name: /^Personal$/i })).toBeInTheDocument();
+    });
+
+    it("shows the large 'Activate existing license' primary CTA", () => {
+      renderTab();
+      expect(
+        screen.getByRole("button", { name: /activate existing license/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("shows a 'Lost your license?' recovery link to /billing/recover", () => {
+      renderTab();
+      const link = screen.getByRole("link", { name: /lost your license/i });
+      expect(link.getAttribute("href")).toMatch(/\/billing\/recover/);
+    });
+
+    it("shows the 'or subscribe' divider and all four tier cards below it", () => {
+      renderTab();
+      expect(screen.getByText(/or subscribe/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /^Personal$/i }),
+      ).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: /^Pro$/i })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: /Self-host/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /Self-host/i }),
+      ).toBeInTheDocument();
     });
 
     it("does not show license-token controls when free", () => {
@@ -84,6 +110,18 @@ describe("<SubscriptionTab>", () => {
       expect(
         screen.queryByRole("button", { name: /manage subscription/i }),
       ).toBeNull();
+    });
+
+    it("clicking 'Activate existing license' opens the activation dialog", async () => {
+      const user = userEvent.setup();
+      renderTab();
+      await user.click(
+        screen.getByRole("button", { name: /activate existing license/i }),
+      );
+      expect(
+        screen.getByRole("dialog", { name: /activate existing license/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/license token/i)).toBeInTheDocument();
     });
   });
 
@@ -95,9 +133,6 @@ describe("<SubscriptionTab>", () => {
 
     it("shows the Personal tier label", () => {
       renderTab();
-      // Several DOM nodes mention "Personal" (tier chip, Deactivate copy,
-      // info chip). The tier chip is the canonical one; assert via the
-      // chip's exact text.
       const chips = screen.getAllByText("Personal");
       expect(chips.length).toBeGreaterThan(0);
     });
@@ -136,33 +171,29 @@ describe("<SubscriptionTab>", () => {
       ).toBeInTheDocument();
     });
 
-    it("does NOT render the old 'Add another device' link", () => {
-      // PR B replaced the per-tab "Add another device" button with an
-      // inline cross-link pointing at the Recovery tab. The old link
-      // should be gone.
+    it("does NOT show the 'Activate existing license' CTA (already activated)", () => {
       renderTab();
       expect(
-        screen.queryByRole("link", { name: /add another device/i }),
+        screen.queryByRole("button", { name: /activate existing license/i }),
       ).toBeNull();
     });
 
-    it("offers a 'See Recovery' cross-link that navigates to ?tab=recovery", async () => {
-      const user = userEvent.setup();
+    it("does NOT show the full pricing comparison; only alt-plan suggestions", () => {
       renderTab();
-      await user.click(screen.getByRole("button", { name: /see recovery/i }));
-      expect(screen.getByTestId("probe-path")).toHaveTextContent(
-        "/settings?tab=recovery",
-      );
+      // Free tier card belongs to the free-user upgrade grid, not the
+      // paid-user "alt plans" strip — we deliberately omit it for paid users.
+      expect(screen.queryByRole("heading", { name: /^Free$/i })).toBeNull();
+      // But Pro and Self-host are still visible as alternative-plan affordances.
+      expect(
+        screen.getByRole("heading", { name: /Self-host/i }),
+      ).toBeInTheDocument();
     });
 
-    it("Sign-out button (PR A) was removed from Subscription; license clearing now lives in Subscription's Deactivate (PR C)", () => {
-      // After PR B there is no Sign-out button in the subscription tab.
-      // PR C adds Deactivate; for now we assert the old sign-out is gone.
+    it("offers a Deactivate-on-this-device button", () => {
       renderTab();
       expect(
-        screen.queryByRole("button", { name: /sign out/i }),
-      ).toBeNull();
-      expect(localStorage.getItem(LICENSE_TOKEN_STORAGE_KEY)).not.toBeNull();
+        screen.getByRole("button", { name: /deactivate.*on this device/i }),
+      ).toBeInTheDocument();
     });
   });
 });

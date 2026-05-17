@@ -1,16 +1,18 @@
 /**
- * <DataSyncSection> — inline cloud sync controls for the Account tab.
+ * <DataSyncSection> — switch-toggle cloud sync UX + always-on delete.
  *
- * Replaces the SyncSetupDialog modal for the in-Settings flow. Renders the
- * status view inline (no Dialog wrapper); SetupWizard, ExistingCloudFlow,
- * and confirmation prompts stay as nested dialogs triggered by buttons.
- *
- * Tests cover the user-observable conditional rendering by sync status,
- * not the deep sub-dialog flows (those keep their own SyncSetupDialog
- * tests until that component is deleted).
+ * Verifies user-observable behaviour:
+ *   - Sync toggle is operable when the user has an active license.
+ *   - Sync toggle sits behind a blurred overlay with an Upgrade CTA for
+ *     free-tier hosted users.
+ *   - Delete all data is always clickable regardless of tier.
+ *   - Paid users see a non-blocking subscription-billing warning in the
+ *     delete confirmation, NOT a blocking "cancel subscription first" gate.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { DataSyncSection } from "@/components/settings/data-sync-section";
 import { useSyncStore } from "@/stores/sync-store";
 import { useFeedStore } from "@/stores/feed-store";
@@ -20,6 +22,14 @@ vi.mock("@/core/crypto/passphrase-generator", () => ({
   generatePassphrase: vi.fn().mockResolvedValue("alpha bravo charlie delta"),
 }));
 
+function renderSection() {
+  return render(
+    <MemoryRouter>
+      <DataSyncSection />
+    </MemoryRouter>,
+  );
+}
+
 describe("<DataSyncSection>", () => {
   beforeEach(() => {
     useSyncStore.setState({
@@ -28,79 +38,96 @@ describe("<DataSyncSection>", () => {
       credentials: null,
     });
     useFeedStore.setState({ feeds: [] });
-  });
-
-  it("renders Enable sync and Use existing cloud account buttons when local-only", () => {
-    render(<DataSyncSection />);
-    expect(
-      screen.getByRole("button", { name: /enable sync/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /use existing/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("renders Switch to local / Restore / Log out when synced", () => {
-    useSyncStore.setState({ status: "synced" });
-    render(<DataSyncSection />);
-    expect(
-      screen.getByRole("button", { name: /switch to local/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /restore from cloud/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /log out/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("shows a destructive Delete all data button when the user is on the Free tier", () => {
-    useLicenseStore.setState({ tier: "free", verifying: false });
-    render(<DataSyncSection />);
-    expect(
-      screen.getByRole("button", { name: /delete all data/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("HIDES Delete all data and shows a Manage subscription CTA when the user has an active paid subscription", () => {
-    // Why: a paid user clicking Delete would wipe local data but leave the
-    // Stripe subscription orphaned (still billing them with no app to use
-    // it on). Force them through the portal first so cancellation and data
-    // deletion are sequenced safely.
     useLicenseStore.setState({ tier: "personal", verifying: false });
-    render(<DataSyncSection />);
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("renders a single Cloud sync toggle (the primary affordance)", () => {
+    renderSection();
     expect(
-      screen.queryByRole("button", { name: /delete all data/i }),
-    ).toBeNull();
-    expect(
-      screen.getByRole("button", { name: /manage subscription/i }),
-    ).toBeInTheDocument();
-    // Explanatory copy must mention canceling the subscription first
-    expect(
-      screen.getByText(/cancel.*subscription/i),
+      screen.getByRole("switch", { name: /toggle cloud sync/i }),
     ).toBeInTheDocument();
   });
 
-  it("paid-tier Pro user also sees the Manage subscription gate (not just personal)", () => {
-    useLicenseStore.setState({ tier: "pro", verifying: false });
-    render(<DataSyncSection />);
-    expect(
-      screen.queryByRole("button", { name: /delete all data/i }),
-    ).toBeNull();
-    expect(
-      screen.getByRole("button", { name: /manage subscription/i }),
-    ).toBeInTheDocument();
+  it("toggle is OFF when status is local-only", () => {
+    renderSection();
+    const toggle = screen.getByRole("switch", { name: /toggle cloud sync/i });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
   });
 
-  it("shows status text reflecting current sync state", () => {
+  it("toggle reads ON when status is synced", () => {
     useSyncStore.setState({ status: "synced" });
-    render(<DataSyncSection />);
-    expect(screen.getByText(/encrypted and synced/i)).toBeInTheDocument();
+    renderSection();
+    const toggle = screen.getByRole("switch", { name: /toggle cloud sync/i });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
   });
 
-  it("shows the sync error message when status is error", () => {
-    useSyncStore.setState({ status: "error", error: "fake network blip" });
-    render(<DataSyncSection />);
-    expect(screen.getByText(/fake network blip/i)).toBeInTheDocument();
+  it("free-tier hosted users see an Upgrade-plan overlay over the toggle", () => {
+    useLicenseStore.setState({ tier: "free", verifying: false });
+    renderSection();
+    expect(
+      screen.getByText(/cloud sync requires a subscription/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /upgrade plan/i }),
+    ).toBeInTheDocument();
   });
+
+  it("Delete all data and reset app is visible for free users", () => {
+    useLicenseStore.setState({ tier: "free", verifying: false });
+    renderSection();
+    expect(
+      screen.getByRole("button", { name: /delete all data and reset app/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("Delete all data and reset app is ALSO visible for paid users (no longer gated)", () => {
+    useLicenseStore.setState({ tier: "personal", verifying: false });
+    renderSection();
+    expect(
+      screen.getByRole("button", { name: /delete all data and reset app/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("paid users see a Stripe-billing warning inside the delete confirmation (but it doesn't block)", async () => {
+    const user = userEvent.setup();
+    useLicenseStore.setState({ tier: "personal", verifying: false });
+    renderSection();
+    await user.click(
+      screen.getByRole("button", { name: /delete all data and reset app/i }),
+    );
+    // Inside the dialog: the warning text mentions Stripe but the destructive
+    // button is still operable (not disabled).
+    expect(screen.getByText(/stripe subscription/i)).toBeInTheDocument();
+    const deleteBtn = screen.getByRole("button", { name: /delete everything/i });
+    expect(deleteBtn).not.toBeDisabled();
+  });
+
+  it("syncing state disables the toggle (prevents mid-flight flip)", () => {
+    useLicenseStore.setState({ tier: "personal", verifying: false });
+    useSyncStore.setState({ status: "syncing" });
+    renderSection();
+    const toggle = screen.getByRole("switch", { name: /toggle cloud sync/i });
+    expect(toggle).toBeDisabled();
+  });
+
+  it("does not show passphrase-recovery note when sync is local-only", () => {
+    renderSection();
+    expect(
+      screen.queryByText(/cannot recover your sync passphrase/i),
+    ).toBeNull();
+  });
+
+  it("shows passphrase-recovery note when sync is enabled", () => {
+    useSyncStore.setState({ status: "synced" });
+    renderSection();
+    expect(
+      screen.getByText(/cannot recover your sync passphrase/i),
+    ).toBeInTheDocument();
+  });
+
 });

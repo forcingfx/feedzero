@@ -1,32 +1,24 @@
 /**
  * Inline tier comparison for the Subscription tab.
  *
- * Same four tier cards — Free / Personal / Pro / Self-host — same CTAs,
- * no modal chrome. Personal CTAs use same-tab Stripe Checkout deeplinks;
+ * Renders the four tier cards — Free / Personal / Pro / Self-host — with
+ * checkout deeplinks. Personal CTAs use same-tab Stripe Checkout deeplinks;
  * the customer returns to /billing/success which auto-fills the license.
+ *
+ * The "Already have a FeedZero account? Log in" muted link has been
+ * promoted to a primary "Activate existing license" CTA on the Subscription
+ * tab itself (see <SubscriptionTab>) — that's a top-level action, not a
+ * footnote to pricing.
+ *
+ * <TierCard> is exported so paid users can be shown only the alternative
+ * tiers (upgrade / downgrade) rather than the full pricing grid.
  */
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { openLogin } from "@/lib/open-login";
 
 export function SubscriptionUpgrade() {
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Cloud sync, auto-organize, and more — for the price of a coffee.
-      </p>
-
-      <p className="text-xs text-muted-foreground">
-        Already have a FeedZero account?{" "}
-        <button
-          type="button"
-          onClick={openLogin}
-          className="text-primary underline hover:no-underline"
-        >
-          Log in
-        </button>
-      </p>
-
       <TierCard
         name="Free"
         price="$0"
@@ -91,7 +83,7 @@ export function SubscriptionUpgrade() {
   );
 }
 
-interface TierCardProps {
+export interface TierCardProps {
   name: string;
   price: string;
   priceSub?: string;
@@ -107,7 +99,7 @@ interface TierCardProps {
   secondaryCtaHref?: string;
 }
 
-function TierCard({
+export function TierCard({
   name,
   price,
   priceSub,

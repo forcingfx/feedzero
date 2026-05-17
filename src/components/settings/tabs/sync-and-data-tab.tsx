@@ -1,23 +1,22 @@
 /**
- * Data tab — sync controls, import/export, danger zone.
+ * Sync & Data tab — sync controls, import/export, danger zone.
  *
- * Brings together every "data lifecycle" concern in one place:
- *   - Cloud sync enable/disable, restore from cloud, log out
+ * Brings every "data lifecycle" concern into one place:
+ *   - Cloud sync toggle (gated by license tier on hosted; by /api/sync
+ *     reachability when self-hosted)
+ *   - Passphrase-recovery note (shown only when sync is enabled)
+ *   - Delete all data and reset app (always clickable — independent of
+ *     licensing; matches user spec)
  *   - OPML / URL-list import + export (rendered side-by-side at ≥md)
- *   - Danger zone (delete all data — gated for free tier only)
- *   - [PR C] Lost-passphrase callout
  */
 import { DataSyncSection } from "@/components/settings/data-sync-section";
 import { ImportView } from "@/components/settings/import-view";
 import { ExportView } from "@/components/settings/export-view";
-import { LostPassphrasePanel } from "@/components/settings/tabs/lost-passphrase-panel";
 
-export function DataTab() {
+export function SyncAndDataTab() {
   return (
     <div className="space-y-4 py-2">
       <DataSyncSection />
-
-      <LostPassphrasePanel />
 
       <div className="grid gap-4 md:grid-cols-2">
         <ImportExportCard title="Import">
@@ -39,7 +38,7 @@ function ImportExportCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <div className="min-w-0 rounded-lg border border-border bg-card p-4 space-y-3">
       <h3 className="text-sm font-semibold">{title}</h3>
       {children}
     </div>

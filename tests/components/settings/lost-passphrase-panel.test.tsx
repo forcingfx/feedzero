@@ -1,41 +1,42 @@
 /**
- * PR C: <LostPassphrasePanel> — blunt copy + ContactSupport + no
- * fake reset action.
+ * <LostPassphrasePanel> — short muted note about passphrase recovery.
+ *
+ * The redesign shrank this from a full amber callout box (shown to every
+ * user including local-only) to a one-line note rendered under the sync
+ * toggle only when sync is enabled. Verifies the new copy is present and
+ * the alarming "Lost your sync passphrase?" framing is gone.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { LostPassphrasePanel } from "@/components/settings/tabs/lost-passphrase-panel";
 
-vi.mock("@/core/license/license-token-store", () => ({
-  getLicenseToken: () => null,
-  clearLicenseToken: () => undefined,
-  setLicenseToken: () => undefined,
-  LICENSE_TOKEN_STORAGE_KEY: "feedzero:license-token",
-}));
-
 describe("<LostPassphrasePanel>", () => {
-  it("uses the blunt vault-unrecoverable framing (no escrow key)", () => {
+  it("states FeedZero cannot recover the passphrase", () => {
     render(<LostPassphrasePanel />);
     expect(
-      screen.getByText(/encrypted vault is unrecoverable/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/we don.?t hold any\s*escrow key/i),
+      screen.getByText(/cannot recover your sync passphrase/i),
     ).toBeInTheDocument();
   });
 
-  it("makes clear that recovering the subscription does NOT recover the vault", () => {
-    const { container } = render(<LostPassphrasePanel />);
-    // The "not" word lives inside a <strong>, so the text is split across
-    // DOM nodes. Read the containing paragraph's full textContent.
-    expect(container.textContent ?? "").toMatch(
-      /recovering your subscription does\s+not\s+recover the vault/i,
-    );
+  it("tells the user they can always set up fresh cloud sync", () => {
+    render(<LostPassphrasePanel />);
+    expect(
+      screen.getByText(/set up fresh cloud sync/i),
+    ).toBeInTheDocument();
   });
 
-  it("renders the ContactSupport widget", () => {
+  it("does NOT show the legacy 'Lost your sync passphrase?' headline", () => {
+    // The amber box with a big heading alarmed local-only users. The new
+    // panel is a single muted line.
     render(<LostPassphrasePanel />);
-    expect(screen.getByText("support@feedzero.app")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /lost your sync passphrase/i }),
+    ).toBeNull();
+  });
+
+  it("does NOT render a contact-support card (moved to Help tab)", () => {
+    render(<LostPassphrasePanel />);
+    expect(screen.queryByText("support@feedzero.app")).toBeNull();
   });
 
   it("does NOT offer a passphrase-reset action (it can't exist)", () => {

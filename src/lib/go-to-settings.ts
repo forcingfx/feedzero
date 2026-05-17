@@ -13,8 +13,7 @@ import type { NavigateFunction } from "react-router";
 
 export type SettingsTab =
   | "subscription"
-  | "recovery"
-  | "data"
+  | "sync-and-data"
   | "reading"
   | "help";
 
@@ -32,5 +31,5 @@ export function goToUpgrade(navigate: NavigateFunction): void {
 
 /** Send the user to the sync-management section. */
 export function goToSyncSetup(navigate: NavigateFunction): void {
-  goToSettings(navigate, "data");
+  goToSettings(navigate, "sync-and-data");
 }

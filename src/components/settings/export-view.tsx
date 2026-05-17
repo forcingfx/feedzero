@@ -70,12 +70,12 @@ export function ExportView() {
         Download OPML
       </Button>
 
-      <div className="relative">
+      <div className="relative min-w-0">
         <Textarea
           value={urlList}
           readOnly
           rows={6}
-          className="font-mono text-sm resize-none"
+          className="font-mono text-xs sm:text-sm resize-none min-w-0 max-w-full break-all"
         />
         <Button
           variant="ghost"

@@ -110,19 +110,18 @@ describe("<SubscriptionTab> deactivate (PR C)", () => {
     });
   });
 
-  it("info chip about Data → Switch to local only is shown when paid AND synced", () => {
+  it("info chip about Sync & Data is shown when paid AND synced", () => {
     useSyncStore.setState({ status: "synced" });
     renderTab();
+    expect(screen.getByText(/sync stays on/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/data → switch to local only/i),
+      screen.getByRole("button", { name: /sync & data/i }),
     ).toBeInTheDocument();
   });
 
   it("info chip is hidden when sync is local-only (nothing to disable)", () => {
     useSyncStore.setState({ status: "local-only" });
     renderTab();
-    expect(
-      screen.queryByText(/data → switch to local only/i),
-    ).toBeNull();
+    expect(screen.queryByText(/sync stays on/i)).toBeNull();
   });
 });

@@ -1,3 +1,19 @@
+/**
+ * <ExistingCloudFlow> — connect to an existing cloud store by passphrase.
+ *
+ * Single-mode flow (always merge with local precedence):
+ *   1. User pastes the passphrase from another device.
+ *   2. We probe whether a vault exists for that passphrase — wrong
+ *      passphrase = clear error, no destructive op.
+ *   3. We merge cloud into local; local wins on conflict. Per ADR
+ *      014-equivalent (codified in user spec): local state takes
+ *      precedence because the user is sitting in front of it right now,
+ *      not in front of the other device.
+ *
+ * The replace/merge picker that lived here before was removed in the
+ * redesign — most users picked the wrong option and lost data either way.
+ * Power users who want a clean cloud copy can use "Delete all data" first.
+ */
 import { useState } from "react";
 import { Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
 import {
@@ -9,27 +25,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { checkVaultExists, pullVault } from "@/core/sync/sync-service";
+import { checkVaultExists } from "@/core/sync/sync-service";
 import { toast } from "sonner";
 import type { Result } from "@/utils/result";
 
 type ExistingStep =
   | "passphrase"
   | "checking"
-  | "merge-options"
   | "syncing"
   | "done"
-  | "error";
-type MergeMode = "replace" | "merge";
+  | "error"
+  | "not-found";
 
 interface ExistingCloudFlowProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCancel: () => void;
   localFeedCount: number;
-  onSwitch: (passphrase: string, mode: MergeMode) => Promise<Result<boolean>>;
+  /** Always called with the "merge" mode under the hood; see component header. */
+  onSwitch: (passphrase: string) => Promise<Result<boolean>>;
 }
 
 export function ExistingCloudFlow({
@@ -42,10 +56,8 @@ export function ExistingCloudFlow({
   const [step, setStep] = useState<ExistingStep>("passphrase");
   const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [cloudFeedCount, setCloudFeedCount] = useState(0);
-  const [mergeMode, setMergeMode] = useState<MergeMode>("replace");
 
-  async function handleCheckPassphrase() {
+  async function handleConnect() {
     setStep("checking");
     setError(null);
 
@@ -55,30 +67,13 @@ export function ExistingCloudFlow({
       setStep("error");
       return;
     }
-
     if (!existsResult.value) {
-      setError(
-        "No cloud data found for this passphrase. Check that you entered it correctly.",
-      );
-      setStep("error");
+      setStep("not-found");
       return;
     }
 
-    const pullResult = await pullVault(passphrase);
-    if (!pullResult.ok) {
-      setError(pullResult.error);
-      setStep("error");
-      return;
-    }
-
-    setCloudFeedCount(pullResult.value.feeds.length);
-    setStep("merge-options");
-  }
-
-  async function handleSwitch() {
     setStep("syncing");
-
-    const result = await onSwitch(passphrase, mergeMode);
+    const result = await onSwitch(passphrase);
     if (!result.ok) {
       setError(result.error);
       setStep("error");
@@ -86,7 +81,7 @@ export function ExistingCloudFlow({
     }
 
     setStep("done");
-    toast.success("Connected to cloud account");
+    toast.success("Connected to cloud store");
   }
 
   return (
@@ -97,16 +92,25 @@ export function ExistingCloudFlow({
         {step === "passphrase" && (
           <>
             <DialogHeader>
-              <DialogTitle>Use existing cloud account</DialogTitle>
+              <DialogTitle>Connect existing cloud store</DialogTitle>
               <DialogDescription>
-                Enter your passphrase to connect to an existing cloud account.
+                Enter your passphrase. We&apos;ll merge the cloud store with
+                your local feeds — your local data takes precedence on
+                conflicts.
+                {localFeedCount > 0 && (
+                  <>
+                    {" "}
+                    You currently have {localFeedCount} local feed
+                    {localFeedCount !== 1 ? "s" : ""}.
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (passphrase.trim()) handleCheckPassphrase();
+                if (passphrase.trim()) handleConnect();
               }}
             >
               <div className="space-y-2">
@@ -137,7 +141,7 @@ export function ExistingCloudFlow({
             <DialogHeader>
               <DialogTitle>Checking passphrase</DialogTitle>
               <DialogDescription>
-                Looking for your cloud account...
+                Looking for your cloud store...
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-center py-6">
@@ -146,67 +150,12 @@ export function ExistingCloudFlow({
           </>
         )}
 
-        {step === "merge-options" && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Cloud account found</DialogTitle>
-              <DialogDescription>
-                Found {cloudFeedCount} feed{cloudFeedCount !== 1 ? "s" : ""} in
-                cloud.
-                {localFeedCount > 0 &&
-                  ` You have ${localFeedCount} local feed${localFeedCount !== 1 ? "s" : ""}.`}
-              </DialogDescription>
-            </DialogHeader>
-
-            <RadioGroup
-              value={mergeMode}
-              onValueChange={(v) => setMergeMode(v as MergeMode)}
-              className="space-y-3"
-            >
-              <div className="flex items-start space-x-3">
-                <RadioGroupItem value="replace" id="replace" />
-                <div className="space-y-1">
-                  <Label htmlFor="replace" className="font-medium">
-                    Replace local with cloud
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Your local feeds will be deleted.
-                  </p>
-                </div>
-              </div>
-              {localFeedCount > 0 && (
-                <div className="flex items-start space-x-3">
-                  <RadioGroupItem value="merge" id="merge" />
-                  <div className="space-y-1">
-                    <Label htmlFor="merge" className="font-medium">
-                      Merge feeds
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Keep both local and cloud feeds. Duplicates will be
-                      skipped.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </RadioGroup>
-
-            <DialogFooter className="mt-4 flex-row gap-2 sm:justify-between">
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Cancel
-              </Button>
-              <Button onClick={handleSwitch}>Continue</Button>
-            </DialogFooter>
-          </>
-        )}
-
         {step === "syncing" && (
           <>
             <DialogHeader>
-              <DialogTitle>Switching to cloud</DialogTitle>
+              <DialogTitle>Merging feeds</DialogTitle>
               <DialogDescription>
-                {mergeMode === "merge"
-                  ? "Merging and syncing your feeds..."
-                  : "Importing your cloud data..."}
+                Combining cloud and local feeds…
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-center py-6">
@@ -220,7 +169,7 @@ export function ExistingCloudFlow({
             <DialogHeader>
               <DialogTitle>Connected to cloud</DialogTitle>
               <DialogDescription>
-                Your feeds are now synced with your cloud account.
+                Your feeds are now synced with your cloud store.
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-center py-4">
@@ -230,6 +179,24 @@ export function ExistingCloudFlow({
             </div>
             <DialogFooter>
               <Button onClick={() => onOpenChange(false)}>Done</Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {step === "not-found" && (
+          <>
+            <DialogHeader>
+              <DialogTitle>No cloud store for that passphrase</DialogTitle>
+              <DialogDescription>
+                We didn&apos;t find an existing cloud store for that
+                passphrase. Double-check it, or set up fresh sync instead.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row gap-2 sm:justify-between">
+              <Button variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+              <Button onClick={() => setStep("passphrase")}>Try again</Button>
             </DialogFooter>
           </>
         )}
