@@ -26,6 +26,8 @@
  */
 
 import { hmacSha256, base64UrlEncode, base64UrlDecodeToString } from "./crypto";
+import { findCustomerByEmail } from "../stripe/find-customer-by-email";
+import type { CustomersClient } from "../stripe/find-customer-by-email";
 import { newTraceId } from "../../utils/trace-id";
 import { logError } from "../../utils/log-error";
 import type { Result } from "../../utils/result";
@@ -37,12 +39,9 @@ const ROUTE = "/api/license/recover";
  * contract tests in `tests/server.test.ts`. */
 export const SUPPORTED_METHODS = ["POST"] as const;
 
-/** Minimal subset of Stripe customers.list we depend on. */
-export interface CustomersClient {
-  list(params: { email: string; limit?: number }): Promise<{
-    data: { id: string; email: string | null }[];
-  }>;
-}
+/** Re-exported for callers that previously imported `CustomersClient` from this
+ * module. Single source of truth is now `src/core/stripe/find-customer-by-email.ts`. */
+export type { CustomersClient } from "../stripe/find-customer-by-email";
 
 /** Minimal subset of Stripe billingPortal.sessions.create we depend on. */
 export interface PortalClient {
@@ -154,23 +153,20 @@ export async function handleLicenseRecoverRequest(
     return clientError(parsed.error, 400, traceId);
   }
 
-  let customer: { id: string; email: string | null } | null;
-  try {
-    const list = await options.customers.list({
-      email: parsed.value.email,
-      limit: 1,
-    });
-    customer = list.data[0] ?? null;
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+  const lookup = await findCustomerByEmail(
+    options.customers,
+    parsed.value.email,
+  );
+  if (!lookup.ok) {
     return serverError(
-      `stripe customer lookup failed: ${message}`,
+      lookup.error,
       "StripeApiError",
       502,
       traceId,
       method,
     );
   }
+  const customer = lookup.value.customer;
 
   // Enumeration protection: same shape whether the email is known or not.
   // Stripe's portal magic-link is the real auth gate; we just don't help

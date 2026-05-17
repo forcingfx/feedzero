@@ -244,6 +244,10 @@ What NOT to assert:
 
 Reference: `tests/smoke/release-feed.test.ts`, `tests/smoke/rate-limiter.test.ts`.
 
+## Operations
+
+- **License support runbook** — `docs/operations/license-support.md`. The procedure for handling "I can't recover my license" support emails. Uses `scripts/find-license.ts` (operator CLI) backed by the pure library at `src/core/license/admin-find-license.ts`. Both reuse `findCustomerByEmail` from `src/core/stripe/find-customer-by-email.ts` so the recover-handler and the CLI agree on Stripe-customer lookup semantics.
+
 ## Commit Messages
 
 Conventional commit prefixes (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`). Detailed bodies.
