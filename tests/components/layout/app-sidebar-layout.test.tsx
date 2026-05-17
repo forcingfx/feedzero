@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useSyncStore } from "@/stores/sync-store.ts";
+
+function LocationProbe() {
+  const { pathname, search } = useLocation();
+  return <div data-testid="probe-path">{pathname + search}</div>;
+}
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -21,9 +26,17 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
 function renderSidebar(route = "/feeds") {
   return render(
     <MemoryRouter initialEntries={[route]}>
-      <SidebarProvider>
-        <AppSidebar />
-      </SidebarProvider>
+      <Routes>
+        <Route
+          path="*"
+          element={
+            <SidebarProvider>
+              <AppSidebar />
+              <LocationProbe />
+            </SidebarProvider>
+          }
+        />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -131,18 +144,14 @@ describe("AppSidebar layout structure", () => {
     expect(footer!.textContent).not.toContain("Personal");
   });
 
-  it("clicking the sidebar Settings button opens the unified Settings dialog", async () => {
-    const { useSettingsStore } = await import("@/stores/settings-store.ts");
-    useSettingsStore.setState({ open: false, activeTab: "account" });
+  it("clicking the sidebar Settings button navigates to /settings", async () => {
     const { default: userEvent } = await import("@testing-library/user-event");
     const user = userEvent.setup();
 
     renderSidebar();
 
     await user.click(screen.getByRole("button", { name: /settings/i }));
-    const s = useSettingsStore.getState();
-    expect(s.open).toBe(true);
-    expect(s.activeTab).toBe("account");
+    expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings");
   });
 
   it("renders Explore entry inside Feeds group", () => {

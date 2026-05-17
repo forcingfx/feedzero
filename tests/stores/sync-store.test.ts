@@ -8,6 +8,13 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   deleteVault: vi.fn(),
 }));
 
+vi.mock("../../src/core/license/license-token-store", () => ({
+  clearLicenseToken: vi.fn(),
+  setLicenseToken: vi.fn(),
+  getLicenseToken: vi.fn().mockReturnValue(null),
+  LICENSE_TOKEN_STORAGE_KEY: "feedzero:license-token",
+}));
+
 vi.mock("../../src/core/storage/key-manager", () => ({
   addVaultKeys: vi.fn(),
   removeVaultKeys: vi.fn(),
@@ -129,9 +136,8 @@ describe("sync-store", () => {
     });
   });
 
-  describe("disableSync", () => {
-    it("deletes vault, strips vault keys, and resets state", async () => {
-      mockDeleteVault.mockResolvedValue({ ok: true, value: true });
+  describe("disableSync (purely local after PR C split)", () => {
+    it("strips vault keys, clears credentials, and flips status to local-only", async () => {
       useSyncStore.setState({
         status: "synced",
         credentials: mockCredentials,
@@ -140,27 +146,119 @@ describe("sync-store", () => {
 
       await useSyncStore.getState().disableSync();
 
-      expect(mockDeleteVault).toHaveBeenCalledWith(mockCredentials);
       expect(removeVaultKeys).toHaveBeenCalled();
       const state = useSyncStore.getState();
       expect(state.status).toBe("local-only");
       expect(state.credentials).toBeNull();
+      expect(state.error).toBeNull();
     });
 
-    it("sets error and blocks transition if vault deletion fails", async () => {
-      mockDeleteVault.mockResolvedValue({ ok: false, error: "Network error" });
+    it("does NOT call the server delete endpoint (deletion is a separate primitive)", async () => {
       useSyncStore.setState({
         status: "synced",
         credentials: mockCredentials,
-        lastSyncedAt: Date.now(),
       });
 
       await useSyncStore.getState().disableSync();
 
+      expect(mockDeleteVault).not.toHaveBeenCalled();
+    });
+
+    it("is idempotent — calling twice yields the same final state without errors", async () => {
+      useSyncStore.setState({
+        status: "synced",
+        credentials: mockCredentials,
+      });
+
+      await useSyncStore.getState().disableSync();
+      await useSyncStore.getState().disableSync();
+
       const state = useSyncStore.getState();
-      expect(state.status).toBe("error");
-      expect(state.error).toMatch(/could not delete server data/i);
-      expect(removeVaultKeys).not.toHaveBeenCalled();
+      expect(state.status).toBe("local-only");
+      expect(state.credentials).toBeNull();
+    });
+  });
+
+  describe("deleteCloudVault", () => {
+    it("calls the server DELETE with the credentials and returns ok", async () => {
+      mockDeleteVault.mockResolvedValue({ ok: true, value: true });
+      useSyncStore.setState({ credentials: mockCredentials });
+
+      const result = await useSyncStore.getState().deleteCloudVault();
+
+      expect(mockDeleteVault).toHaveBeenCalledWith(mockCredentials);
+      expect(result.ok).toBe(true);
+    });
+
+    it("returns err('no-credentials') when state has no credentials", async () => {
+      useSyncStore.setState({ credentials: null });
+      const result = await useSyncStore.getState().deleteCloudVault();
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toBe("no-credentials");
+      expect(mockDeleteVault).not.toHaveBeenCalled();
+    });
+
+    it("does NOT mutate store state (only the server is touched)", async () => {
+      mockDeleteVault.mockResolvedValue({ ok: true, value: true });
+      useSyncStore.setState({
+        status: "synced",
+        credentials: mockCredentials,
+      });
+
+      await useSyncStore.getState().deleteCloudVault();
+
+      const state = useSyncStore.getState();
+      expect(state.status).toBe("synced");
+      expect(state.credentials).toEqual(mockCredentials);
+    });
+
+    it("propagates the underlying error on network failure", async () => {
+      mockDeleteVault.mockResolvedValue({ ok: false, error: "network" });
+      useSyncStore.setState({ credentials: mockCredentials });
+
+      const result = await useSyncStore.getState().deleteCloudVault();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toBe("network");
+    });
+  });
+
+  describe("deleteCloudVault + disableSync composition (canonical 'delete vault forever')", () => {
+    it("delete runs first (needs credentials), then disableSync clears state", async () => {
+      const calls: string[] = [];
+      mockDeleteVault.mockImplementation(async () => {
+        calls.push("deleteVault");
+        return { ok: true, value: true };
+      });
+      const removeVaultKeysMock = vi.mocked(removeVaultKeys);
+      removeVaultKeysMock.mockImplementation(() => {
+        calls.push("removeVaultKeys");
+      });
+      useSyncStore.setState({
+        status: "synced",
+        credentials: mockCredentials,
+      });
+
+      const r = await useSyncStore.getState().deleteCloudVault();
+      expect(r.ok).toBe(true);
+      await useSyncStore.getState().disableSync();
+
+      expect(calls).toEqual(["deleteVault", "removeVaultKeys"]);
+      expect(useSyncStore.getState().credentials).toBeNull();
+    });
+
+    it("reversed order surfaces the ordering bug: deleteCloudVault returns no-credentials after disableSync", async () => {
+      useSyncStore.setState({
+        status: "synced",
+        credentials: mockCredentials,
+      });
+
+      await useSyncStore.getState().disableSync();
+      const r = await useSyncStore.getState().deleteCloudVault();
+
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toBe("no-credentials");
+      expect(mockDeleteVault).not.toHaveBeenCalled();
     });
   });
 
@@ -244,7 +342,7 @@ describe("sync-store", () => {
       expect(useSyncStore.getState().status).toBe("error");
     });
 
-    it("migrateToLocalOnly clears credentials, sets status=local-only, and clears pendingMigration", async () => {
+    it("disableSync (now the canonical 'keep reading locally' action) clears credentials, sets status=local-only, and resets error/pendingMigration", async () => {
       useSyncStore.setState({
         credentials: mockCredentials,
         status: "error",
@@ -252,7 +350,7 @@ describe("sync-store", () => {
         error: "license required",
       });
 
-      await useSyncStore.getState().migrateToLocalOnly();
+      await useSyncStore.getState().disableSync();
 
       const s = useSyncStore.getState();
       expect(s.credentials).toBeNull();
@@ -261,13 +359,13 @@ describe("sync-store", () => {
       expect(s.error).toBeNull();
     });
 
-    it("migrateToLocalOnly does NOT attempt to delete the server vault (policy: 90-day retention)", async () => {
+    it("the 'keep reading locally' path does NOT attempt to delete the server vault (policy: 90-day retention)", async () => {
       useSyncStore.setState({
         credentials: mockCredentials,
         pendingMigration: "license-required",
       });
 
-      await useSyncStore.getState().migrateToLocalOnly();
+      await useSyncStore.getState().disableSync();
 
       // The server vault delete would 401 anyway (no license) — skipping it
       // is the whole point. Privacy policy promises 90-day retention then
@@ -291,6 +389,31 @@ describe("sync-store", () => {
       // re-appear on the next pull attempt (which will still 401).
       expect(s.credentials).toBe(mockCredentials);
       expect(s.status).toBe("error");
+    });
+  });
+
+  describe("deactivateLocal", () => {
+    it("clears the license token and disables sync, but keeps the cloud vault and local IndexedDB intact", async () => {
+      const { clearLicenseToken } = await import(
+        "../../src/core/license/license-token-store"
+      );
+      const { destroyLocal } = await import(
+        "../../src/core/storage/key-manager"
+      );
+      useSyncStore.setState({
+        status: "synced",
+        credentials: mockCredentials,
+      });
+
+      await useSyncStore.getState().deactivateLocal();
+
+      expect(vi.mocked(clearLicenseToken)).toHaveBeenCalled();
+      expect(removeVaultKeys).toHaveBeenCalled();
+      expect(mockDeleteVault).not.toHaveBeenCalled();
+      expect(vi.mocked(destroyLocal)).not.toHaveBeenCalled();
+      const s = useSyncStore.getState();
+      expect(s.status).toBe("local-only");
+      expect(s.credentials).toBeNull();
     });
   });
 

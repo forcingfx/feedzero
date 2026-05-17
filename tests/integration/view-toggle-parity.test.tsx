@@ -6,10 +6,15 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { useExtractionStore } from "../../src/stores/extraction-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useKeyboardNav } from "../../src/hooks/use-keyboard-nav.ts";
 import type { Article } from "../../src/types/index.ts";
+
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return <MemoryRouter>{children}</MemoryRouter>;
+}
 
 vi.mock("../../src/core/extractor/extractor.ts", () => ({
   extract: vi.fn().mockReturnValue({
@@ -57,7 +62,7 @@ describe("view toggle behavior parity", () => {
   });
 
   it("H key triggers extraction fetch (keyboard path)", () => {
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
     pressKey("h");
 
@@ -81,7 +86,7 @@ describe("view toggle behavior parity", () => {
 
   it("both paths use identical fetch URL encoding", () => {
     // Keyboard path
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
     pressKey("h");
     const keyboardFetchUrl = vi.mocked(fetch).mock.calls[0][0];
 
@@ -104,7 +109,7 @@ describe("view toggle behavior parity", () => {
     });
 
     // Keyboard path
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
     pressKey("h");
     expect(fetch).not.toHaveBeenCalled();
     expect(useExtractionStore.getState().viewMode).toBe("extracted");
@@ -123,7 +128,7 @@ describe("view toggle behavior parity", () => {
     useExtractionStore.setState({ viewMode: "extracted" });
 
     // Keyboard path
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
     pressKey("h");
     expect(useExtractionStore.getState().viewMode).toBe("feed");
     expect(fetch).not.toHaveBeenCalled();

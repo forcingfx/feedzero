@@ -66,6 +66,7 @@ function renderPage(route = "/feeds") {
         />
         <Route path="/explore" element={<FeedsPage />} />
         <Route path="/stats" element={<FeedsPage />} />
+        <Route path="/settings" element={<FeedsPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -260,7 +261,7 @@ describe("FeedsPage layout — desktop", () => {
     // changes — even when individual panel ids stay stable. The fix is not
     // to remember harder, but to never present a different child set in the
     // first place. The stage is a constant slot whose *content* swaps.
-    for (const route of ["/feeds/f1", "/explore", "/stats"]) {
+    for (const route of ["/feeds/f1", "/explore", "/stats", "/settings"]) {
       const { container, unmount } = renderPage(route);
       const outerGroup = container.querySelector(
         "[data-slot='resizable-panel-group']",
@@ -276,10 +277,11 @@ describe("FeedsPage layout — desktop", () => {
   });
 
   it("inner group exists ONLY on the default route (article list + reader)", () => {
-    // Explore and Stats render a single feature inside the stage with no
-    // inner ResizablePanelGroup. The default route adds a second group for
-    // the list/reader split. This keeps the topology of the *outer* group
-    // constant while letting list/reader stay independently resizable.
+    // Explore, Stats, and Settings render a single feature inside the
+    // stage with no inner ResizablePanelGroup. The default route adds a
+    // second group for the list/reader split. This keeps the topology of
+    // the *outer* group constant while letting list/reader stay
+    // independently resizable.
     const { container: cDefault } = renderPage("/feeds/f1");
     expect(
       cDefault.querySelectorAll("[data-slot='resizable-panel-group']"),
@@ -293,6 +295,11 @@ describe("FeedsPage layout — desktop", () => {
     const { container: cStats } = renderPage("/stats");
     expect(
       cStats.querySelectorAll("[data-slot='resizable-panel-group']"),
+    ).toHaveLength(1);
+
+    const { container: cSettings } = renderPage("/settings");
+    expect(
+      cSettings.querySelectorAll("[data-slot='resizable-panel-group']"),
     ).toHaveLength(1);
   });
 
@@ -324,6 +331,22 @@ describe("FeedsPage layout — desktop", () => {
     const stage = container.querySelector('[data-panel][id="stage"]');
     expect(stage).not.toBeNull();
     // ExploreCatalog content lives inside the stage.
+    expect(stage!.textContent ?? "").not.toBe("");
+  });
+
+  it("settings route renders [sidebar, stage] at the top level with settings inside the stage", () => {
+    // Settings shares the [sidebar | stage] shell with Stats and Explore.
+    // Per PR I's structural invariant, the top-level panels are ALWAYS
+    // [sidebar, stage] on every desktop route — the settings UI lives
+    // INSIDE the stage panel, not as a sibling of sidebar.
+    const { container } = renderPage("/settings");
+    const panels = container.querySelectorAll("[data-panel]");
+    expect(panels).toHaveLength(2);
+    const ids = Array.from(panels).map((p) => p.getAttribute("id"));
+    expect(ids).toEqual(["sidebar", "stage"]);
+    const stage = container.querySelector('[data-panel][id="stage"]');
+    expect(stage).not.toBeNull();
+    // SettingsPage content lives inside the stage.
     expect(stage!.textContent ?? "").not.toBe("");
   });
 

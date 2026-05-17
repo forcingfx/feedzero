@@ -1,16 +1,15 @@
 /**
- * Inline tier comparison for the Account tab.
+ * Inline tier comparison for the Subscription tab.
  *
- * Replaces the UpgradeDialog modal for the in-Settings flow. Same four
- * tier cards — Free / Personal / Pro / Self-host — same CTAs, no modal
- * chrome. Personal CTAs use same-tab Stripe Checkout deeplinks; the
- * customer returns to /billing/success which auto-fills the license.
+ * Same four tier cards — Free / Personal / Pro / Self-host — same CTAs,
+ * no modal chrome. Personal CTAs use same-tab Stripe Checkout deeplinks;
+ * the customer returns to /billing/success which auto-fills the license.
  */
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { openLogin } from "@/lib/open-login";
 
-export function AccountUpgradeSection() {
+export function SubscriptionUpgrade() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">

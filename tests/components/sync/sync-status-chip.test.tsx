@@ -1,50 +1,72 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { SyncStatusChip } from "@/components/sync/sync-status-chip";
 import { useSyncStore } from "@/stores/sync-store";
-import { useSettingsStore } from "@/stores/settings-store";
 import { useLicenseStore } from "@/stores/license-store";
+
+function LocationProbe() {
+  const { pathname, search } = useLocation();
+  return <div data-testid="probe-path">{pathname + search}</div>;
+}
+
+function renderChip() {
+  return render(
+    <MemoryRouter initialEntries={["/feeds"]}>
+      <Routes>
+        <Route
+          path="*"
+          element={
+            <>
+              <SyncStatusChip />
+              <LocationProbe />
+            </>
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 describe("SyncStatusChip", () => {
   beforeEach(() => {
     useSyncStore.setState({
       status: "local-only",
     });
-    useSettingsStore.setState({ open: false, activeTab: "account" });
     useLicenseStore.setState({ tier: "free", verifying: false });
   });
 
   it("shows 'Cloud sync' label", () => {
-    render(<SyncStatusChip />);
+    renderChip();
     expect(screen.getByText("Cloud sync")).toBeInTheDocument();
   });
 
   it("renders a switch in unchecked state for local-only", () => {
-    render(<SyncStatusChip />);
+    renderChip();
     const toggle = screen.getByRole("switch");
     expect(toggle).not.toBeChecked();
   });
 
   it("renders a switch in checked state for synced", () => {
     useSyncStore.setState({ status: "synced" });
-    render(<SyncStatusChip />);
+    renderChip();
     const toggle = screen.getByRole("switch");
     expect(toggle).toBeChecked();
   });
 
-  it("opens Settings on the Account tab when clicked (Phase B unification)", async () => {
+  it("navigates to Settings on the Data tab when clicked", async () => {
     const user = userEvent.setup();
-    render(<SyncStatusChip />);
+    renderChip();
     await user.click(screen.getByText("Cloud sync"));
-    const s = useSettingsStore.getState();
-    expect(s.open).toBe(true);
-    expect(s.activeTab).toBe("account");
+    expect(screen.getByTestId("probe-path")).toHaveTextContent(
+      "/settings?tab=data",
+    );
   });
 
   it("shows spinner animation for syncing status", () => {
     useSyncStore.setState({ status: "syncing" });
-    const { container } = render(<SyncStatusChip />);
+    const { container } = renderChip();
 
     const spinner = container.querySelector(".animate-spin");
     expect(spinner).not.toBeNull();
@@ -52,7 +74,7 @@ describe("SyncStatusChip", () => {
 
   it("switch is checked during syncing", () => {
     useSyncStore.setState({ status: "syncing" });
-    render(<SyncStatusChip />);
+    renderChip();
     expect(screen.getByRole("switch")).toBeChecked();
   });
 });

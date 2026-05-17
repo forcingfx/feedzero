@@ -1,9 +1,10 @@
 import { useEffect, useCallback } from "react";
+import { useNavigate } from "react-router";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { toFolderFeedId } from "@/utils/constants.ts";
-import { openSettings } from "@/lib/open-settings.ts";
+import { goToSettings } from "@/lib/go-to-settings.ts";
 
 /**
  * Keyboard navigation hook for feed reader shortcuts.
@@ -13,15 +14,14 @@ import { openSettings } from "@/lib/open-settings.ts";
  * Actions:      o (open original), e (toggle view), n (explore/add feed)
  */
 export function useKeyboardNav() {
+  const navigate = useNavigate();
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Cmd/Ctrl+, opens settings (works even in inputs).
-    // Drives the store directly — the previous event-indirection lived
-    // because the SettingsMenu dropdown listened for it; the unified
-    // SettingsDialog reads state from useSettingsStore, so no listener
-    // is needed.
+    // Cmd/Ctrl+, navigates to the Settings stage page. The previous
+    // event-indirection lived because the SettingsMenu dropdown listened
+    // for it; Settings is now a route, so we just navigate.
     if (e.key === "," && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      openSettings();
+      goToSettings(navigate);
       return;
     }
 
@@ -76,7 +76,7 @@ export function useKeyboardNav() {
     }
 
     e.preventDefault();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);

@@ -33,6 +33,7 @@ function renderWithRouter(ui: React.ReactNode) {
     <MemoryRouter initialEntries={["/feeds"]}>
       <Routes>
         <Route path="/feeds" element={<>{ui}<LocationProbe /></>} />
+        <Route path="/settings" element={<LocationProbe />} />
         <Route path="/" element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>,
@@ -224,21 +225,19 @@ describe("AutoOrganizePill (wand trigger + popover)", () => {
       expect(screen.queryByTestId("auto-organize-open-dialog")).toBeNull();
     });
 
-    it("clicking the Upgrade CTA opens Settings → Account (via openUpgrade chokepoint)", async () => {
+    it("clicking the Upgrade CTA navigates to Settings → Subscription (via goToUpgrade chokepoint)", async () => {
       // Was: route to /?subscribe=personal-monthly (straight to Stripe).
-      // Now: open the unified Settings dialog on Account so the user sees
-      // the Plan card with full tier comparison before committing.
-      const { useSettingsStore } = await import("@/stores/settings-store.ts");
-      useSettingsStore.setState({ open: false, activeTab: "help" });
+      // Now: navigate to /settings?tab=subscription so the user sees the
+      // Plan card with full tier comparison before committing.
       const user = userEvent.setup();
       setFeeds(12, 0);
       renderWithRouter(<AutoOrganizePill />);
       await user.click(screen.getByTestId("auto-organize-trigger"));
       await user.click(screen.getByTestId("auto-organize-upgrade-cta"));
 
-      const s = useSettingsStore.getState();
-      expect(s.open).toBe(true);
-      expect(s.activeTab).toBe("account");
+      expect(screen.getByTestId("probe-path")).toHaveTextContent(
+        "/settings?tab=subscription",
+      );
     });
   });
 

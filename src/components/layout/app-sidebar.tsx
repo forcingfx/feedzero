@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import {
   RefreshCw,
   Settings,
@@ -29,8 +30,7 @@ import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
-import { requestSyncSetup } from "@/lib/request-sync-setup.ts";
-import { openSettings } from "@/lib/open-settings.ts";
+import { goToSettings, goToSyncSetup } from "@/lib/go-to-settings.ts";
 import { BrandMark } from "@/components/brand/brand-mark.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -73,6 +73,9 @@ function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) 
 function SidebarFooterMenu() {
   const syncStatus = useSyncStore((s) => s.status);
   const isOnline = useIsOnline();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const isActive = pathname === "/settings";
   // SyncBadge returns null when the user is local-only AND online —
   // collapse to a single-line label in that case so "Settings" looks
   // vertically centered instead of top-anchored in an empty two-row grid.
@@ -81,7 +84,8 @@ function SidebarFooterMenu() {
   return (
     <SidebarMenuButton
       size="lg"
-      onClick={() => openSettings()}
+      onClick={() => goToSettings(navigate)}
+      isActive={isActive}
       className="group/settings py-3"
     >
       <div className="flex items-center justify-center size-8 rounded-lg bg-muted text-muted-foreground">
@@ -114,6 +118,7 @@ const LOCAL_STORAGE_WARNING_KEY = "feedzero:local-warning-dismissed";
 function LocalStorageWarning() {
   const feeds = useFeedStore((s) => s.feeds);
   const syncStatus = useSyncStore((s) => s.status);
+  const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => {
     try {
       return localStorage.getItem(LOCAL_STORAGE_WARNING_KEY) === "true";
@@ -150,7 +155,7 @@ function LocalStorageWarning() {
         </button>
       </div>
       <button
-        onClick={() => requestSyncSetup()}
+        onClick={() => goToSyncSetup(navigate)}
         className="mt-1.5 underline hover:no-underline font-medium"
       >
         Enable cloud sync

@@ -1,11 +1,10 @@
 /**
- * Inline cloud-sync controls for the Account tab.
+ * Inline cloud-sync controls for the Data tab.
  *
- * Replaces the SyncSetupDialog modal for the in-Settings flow. Renders the
- * status view + buttons inline (no Dialog wrapper). SetupWizard,
- * ExistingCloudFlow, and confirmation prompts stay as nested dialogs
- * triggered by the inline buttons — Radix Dialog stacks cleanly on top of
- * the parent Settings dialog via portals.
+ * Renders the status view + buttons inline (no Dialog wrapper).
+ * SetupWizard, ExistingCloudFlow, and confirmation prompts stay as
+ * nested dialogs triggered by the inline buttons — Radix Dialog stacks
+ * cleanly on top of the parent stage page via portals.
  */
 import { useState } from "react";
 import {
@@ -40,11 +39,12 @@ import { ExistingCloudFlow } from "@/components/sync/existing-cloud-flow";
 type Confirmation = "none" | "delete" | "disable" | "logout" | "restore";
 type SubFlow = "none" | "setup" | "existing";
 
-export function AccountSyncSection() {
+export function DataSyncSection() {
   const status = useSyncStore((s) => s.status);
   const syncError = useSyncStore((s) => s.error);
   const enableSync = useSyncStore((s) => s.enableSync);
   const disableSync = useSyncStore((s) => s.disableSync);
+  const deleteCloudVault = useSyncStore((s) => s.deleteCloudVault);
   const logout = useSyncStore((s) => s.logout);
   const forceResync = useSyncStore((s) => s.forceResync);
   const switchToExistingCloud = useSyncStore((s) => s.switchToExistingCloud);
@@ -55,18 +55,38 @@ export function AccountSyncSection() {
   const [subFlow, setSubFlow] = useState<SubFlow>("none");
   const [passphrase, setPassphrase] = useState("");
   const [pending, setPending] = useState(false);
+  const [disableError, setDisableError] = useState<string | null>(null);
 
   async function handleStartSetup() {
     setPassphrase(await generatePassphrase());
     setSubFlow("setup");
   }
 
-  async function handleDisableSync() {
+  async function handleDisableKeepVault() {
     setPending(true);
+    setDisableError(null);
     await disableSync();
     setPending(false);
     setConfirmation("none");
-    toast("Sync disabled. Server data deleted.");
+    toast("Sync disabled. Your cloud vault was preserved.");
+  }
+
+  async function handleDisableDeleteVault() {
+    setPending(true);
+    setDisableError(null);
+    // Order matters: deleteCloudVault reads credentials that disableSync clears.
+    const deleteResult = await deleteCloudVault();
+    if (!deleteResult.ok) {
+      setPending(false);
+      setDisableError(
+        `Couldn't delete cloud vault: ${deleteResult.error}. Sync is still on locally — retry, or choose "Keep cloud vault".`,
+      );
+      return;
+    }
+    await disableSync();
+    setPending(false);
+    setConfirmation("none");
+    toast("Sync disabled. Cloud vault deleted.");
   }
 
   function DangerZone() {
@@ -130,6 +150,9 @@ export function AccountSyncSection() {
 
   async function handleDeleteAll() {
     setPending(true);
+    // Best-effort vault deletion first (so we don't leave a server-side
+    // orphan), then local reset, then local sync teardown.
+    await deleteCloudVault();
     await resetApp();
     await disableSync();
     setPending(false);
@@ -266,17 +289,18 @@ export function AccountSyncSection() {
         variant="destructive"
       />
 
-      <Confirm
+      <DisableSyncFork
         open={confirmation === "disable"}
-        onOpenChange={(o) => !o && setConfirmation("none")}
-        icon={<CloudOff className="size-6 text-amber-600" />}
-        iconBg="bg-amber-100"
-        title="Switch to local only?"
-        description="This will delete your encrypted data from the server. Your local data will be kept. This cannot be undone."
-        confirmLabel="Disable sync"
-        loadingLabel="Disabling sync…"
-        isLoading={pending}
-        onConfirm={handleDisableSync}
+        onOpenChange={(o) => {
+          if (!o) {
+            setConfirmation("none");
+            setDisableError(null);
+          }
+        }}
+        pending={pending}
+        error={disableError}
+        onKeepVault={handleDisableKeepVault}
+        onDeleteVault={handleDisableDeleteVault}
       />
 
       <Confirm
@@ -362,6 +386,94 @@ function Confirm(props: ConfirmProps) {
             className="w-full"
             onClick={() => props.onOpenChange(false)}
             disabled={props.isLoading}
+          >
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface DisableSyncForkProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  pending: boolean;
+  error: string | null;
+  onKeepVault: () => void;
+  onDeleteVault: () => void;
+}
+
+/**
+ * "Switch to local only" fork — two destructive paths that look similar
+ * but have very different blast radius. Keep cloud vault is the safe
+ * choice (recoverable on another device); Delete cloud vault forever is
+ * the destructive choice (irreversible, vault is gone). The destructive
+ * variant uses variant="destructive" + explicit "forever" copy so the
+ * user can't accidentally pick it thinking it's the safe option.
+ */
+function DisableSyncFork({
+  open,
+  onOpenChange,
+  pending,
+  error,
+  onKeepVault,
+  onDeleteVault,
+}: DisableSyncForkProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="flex justify-center py-2">
+            <div className="flex size-12 items-center justify-center rounded-full bg-amber-100">
+              <CloudOff className="size-6 text-amber-600" />
+            </div>
+          </div>
+          <DialogTitle className="text-center">Switch to local only?</DialogTitle>
+          <DialogDescription className="text-center">
+            Sync will stop on this device. Your local feeds and articles
+            stay here. Choose what to do with the encrypted vault on the
+            server.
+          </DialogDescription>
+        </DialogHeader>
+
+        {error && (
+          <p className="text-xs text-destructive">{error}</p>
+        )}
+
+        <DialogFooter className="flex-col gap-2 sm:flex-col">
+          <Button
+            className="w-full"
+            onClick={onKeepVault}
+            disabled={pending}
+            aria-busy={pending}
+          >
+            {pending ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <CloudOff className="mr-2 size-4" />
+            )}
+            Keep cloud vault
+          </Button>
+          <Button
+            variant="destructive"
+            className="w-full"
+            onClick={onDeleteVault}
+            disabled={pending}
+            aria-busy={pending}
+          >
+            {pending ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-2 size-4" />
+            )}
+            Delete cloud vault forever
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full"
+            onClick={() => onOpenChange(false)}
+            disabled={pending}
           >
             Cancel
           </Button>

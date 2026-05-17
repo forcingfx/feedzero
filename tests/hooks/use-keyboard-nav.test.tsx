@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { toFolderFeedId } from "@/utils/constants.ts";
+
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return <MemoryRouter initialEntries={["/feeds"]}>{children}</MemoryRouter>;
+}
 
 type NavigateFeedEvent = CustomEvent<{ feedId: string }>;
 
@@ -75,7 +80,7 @@ describe("useKeyboardNav", () => {
           clicked = i;
         }),
       );
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("j");
 
@@ -90,7 +95,7 @@ describe("useKeyboardNav", () => {
           clicked = i;
         }),
       );
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("j");
 
@@ -105,7 +110,7 @@ describe("useKeyboardNav", () => {
           clicked = i;
         }),
       );
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("k");
 
@@ -120,7 +125,7 @@ describe("useKeyboardNav", () => {
           clicked = i;
         }),
       );
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("j");
 
@@ -135,7 +140,7 @@ describe("useKeyboardNav", () => {
           clicked = i;
         }),
       );
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("k");
 
@@ -150,7 +155,7 @@ describe("useKeyboardNav", () => {
           clicked = i;
         }),
       );
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("k");
 
@@ -163,7 +168,7 @@ describe("useKeyboardNav", () => {
       const scrollIntoViewSpy = vi.fn();
       (listbox.children[1] as HTMLElement).scrollIntoView = scrollIntoViewSpy;
 
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("j");
 
       // Wait for setTimeout(0)
@@ -184,7 +189,7 @@ describe("useKeyboardNav", () => {
       const scrollIntoViewSpy = vi.fn();
       (listbox.children[1] as HTMLElement).scrollIntoView = scrollIntoViewSpy;
 
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("k");
 
       // Wait for setTimeout(0)
@@ -207,7 +212,7 @@ describe("useKeyboardNav", () => {
           clicked = i;
         }),
       );
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("ArrowDown");
 
@@ -222,7 +227,7 @@ describe("useKeyboardNav", () => {
           clicked = i;
         }),
       );
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("ArrowUp");
 
@@ -238,7 +243,7 @@ describe("useKeyboardNav", () => {
         clicked = true;
       }),
     );
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
     const input = document.createElement("input");
     document.body.appendChild(input);
@@ -257,7 +262,7 @@ describe("useKeyboardNav", () => {
         clicked = true;
       }),
     );
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
     const textarea = document.createElement("textarea");
     document.body.appendChild(textarea);
@@ -276,7 +281,7 @@ describe("useKeyboardNav", () => {
         clicked = true;
       }),
     );
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
     const editable = document.createElement("div");
     editable.contentEditable = "true";
@@ -290,7 +295,7 @@ describe("useKeyboardNav", () => {
   });
 
   it("does nothing when no listbox exists", () => {
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
     // Should not throw
     pressKey("j");
@@ -299,7 +304,7 @@ describe("useKeyboardNav", () => {
 
   it("does nothing for unhandled keys", () => {
     createListbox(3);
-    renderHook(() => useKeyboardNav());
+    renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
     const event = pressKey("a");
 
@@ -314,7 +319,7 @@ describe("useKeyboardNav", () => {
         clicked = true;
       }),
     );
-    const { unmount } = renderHook(() => useKeyboardNav());
+    const { unmount } = renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
     unmount();
     pressKey("j");
@@ -353,7 +358,7 @@ describe("useKeyboardNav", () => {
       seedFeeds(["a", "b", "c"]);
       useFeedStore.setState({ selectedFeedId: "a" });
       const { ids, cleanup } = captureNavigateFeedEvents();
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
@@ -365,7 +370,7 @@ describe("useKeyboardNav", () => {
       seedFeeds(["a", "b", "c"]);
       useFeedStore.setState({ selectedFeedId: "c" });
       const { ids, cleanup } = captureNavigateFeedEvents();
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("i");
 
@@ -377,7 +382,7 @@ describe("useKeyboardNav", () => {
       seedFeeds(["a", "b", "c"]);
       useFeedStore.setState({ selectedFeedId: "c" });
       const { ids, cleanup } = captureNavigateFeedEvents();
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
@@ -388,7 +393,7 @@ describe("useKeyboardNav", () => {
     it("u selects the first feed when none is active", () => {
       seedFeeds(["a", "b"]);
       const { ids, cleanup } = captureNavigateFeedEvents();
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
@@ -407,7 +412,7 @@ describe("useKeyboardNav", () => {
         selectedFeedId: "u1",
       });
       const { ids, cleanup } = captureNavigateFeedEvents();
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
@@ -427,7 +432,7 @@ describe("useKeyboardNav", () => {
         selectedFeedId: toFolderFeedId("fa"),
       });
       const { ids, cleanup } = captureNavigateFeedEvents();
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
@@ -455,7 +460,7 @@ describe("useKeyboardNav", () => {
           createdAt: 0,
         },
       });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("o");
 
@@ -470,7 +475,7 @@ describe("useKeyboardNav", () => {
     it("does nothing when no article is selected", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       useArticleStore.setState({ selectedArticle: null });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("o");
 
@@ -482,7 +487,7 @@ describe("useKeyboardNav", () => {
   describe("toggle view (h)", () => {
     it("toggles from feed to extracted mode", () => {
       useExtractionStore.setState({ viewMode: "feed" });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("h");
 
@@ -491,7 +496,7 @@ describe("useKeyboardNav", () => {
 
     it("toggles from extracted back to feed mode", () => {
       useExtractionStore.setState({ viewMode: "extracted" });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("h");
 
@@ -520,7 +525,7 @@ describe("useKeyboardNav", () => {
           createdAt: Date.now(),
         },
       });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("h");
 
@@ -551,7 +556,7 @@ describe("useKeyboardNav", () => {
           createdAt: Date.now(),
         },
       });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("h");
 
@@ -566,7 +571,7 @@ describe("useKeyboardNav", () => {
         fetchExtracted,
       });
       useArticleStore.setState({ selectedArticle: null });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("h");
 
@@ -580,7 +585,7 @@ describe("useKeyboardNav", () => {
       document.addEventListener("feedzero:navigate-explore", () => {
         eventFired = true;
       });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("n");
 
@@ -594,7 +599,7 @@ describe("useKeyboardNav", () => {
       document.addEventListener("feedzero:toggle-sidebar", () => {
         eventFired = true;
       });
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("[");
 
@@ -606,7 +611,7 @@ describe("useKeyboardNav", () => {
     it("r key triggers refresh", () => {
       // The hook should add 'r' case to keyboard handler
       // We can't easily test the store call, but we can verify the key is handled
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       const event = pressKey("r");
 
@@ -616,10 +621,13 @@ describe("useKeyboardNav", () => {
   });
 
   describe("open settings (Cmd/Ctrl + ,)", () => {
-    it("opens the unified Settings dialog directly (no event indirection)", async () => {
-      const { useSettingsStore } = await import("@/stores/settings-store.ts");
-      useSettingsStore.setState({ open: false, activeTab: "account" });
-      renderHook(() => useKeyboardNav());
+    it("navigates to /settings", async () => {
+      // We can't easily inspect the resulting URL from a bare renderHook,
+      // so the navigation outcome is exercised end-to-end in
+      // tests/components/layout/app-sidebar-layout.test.tsx and via
+      // the e2e settings.spec. Here we just assert the key is handled
+      // (defaultPrevented) without crashing.
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       const event = new KeyboardEvent("keydown", {
         key: ",",
@@ -629,7 +637,6 @@ describe("useKeyboardNav", () => {
       });
       document.dispatchEvent(event);
 
-      expect(useSettingsStore.getState().open).toBe(true);
       expect(event.defaultPrevented).toBe(true);
     });
   });

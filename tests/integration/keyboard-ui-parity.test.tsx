@@ -7,11 +7,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { useKeyboardNav } from "../../src/hooks/use-keyboard-nav.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useExtractionStore } from "../../src/stores/extraction-store.ts";
 import type { Article } from "../../src/types/index.ts";
+
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return <MemoryRouter>{children}</MemoryRouter>;
+}
 
 // Mock core modules
 vi.mock("../../src/core/storage/db.ts", () => ({
@@ -104,7 +109,7 @@ describe("keyboard-UI behavior parity", () => {
       expect(useFeedStore.getState().isRefreshingAll).toBe(true);
 
       // Now press R while refresh is in progress
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("r");
 
       // Wait for first refresh to complete
@@ -119,7 +124,7 @@ describe("keyboard-UI behavior parity", () => {
       useFeedStore.setState({ refreshAll: refreshAllSpy });
 
       // Keyboard path
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("r");
 
       expect(refreshAllSpy).toHaveBeenCalledTimes(1);
@@ -143,7 +148,7 @@ describe("keyboard-UI behavior parity", () => {
       }) as unknown as typeof fetch;
 
       // Keyboard path
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("h");
 
       expect(useExtractionStore.getState().viewMode).toBe("extracted");
@@ -169,7 +174,7 @@ describe("keyboard-UI behavior parity", () => {
       const eventHandler = vi.fn();
       document.addEventListener("feedzero:navigate-explore", eventHandler);
 
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("n");
 
       expect(eventHandler).toHaveBeenCalledTimes(1);
@@ -184,7 +189,7 @@ describe("keyboard-UI behavior parity", () => {
       document.addEventListener("feedzero:toggle-sidebar", eventHandler);
 
       // Keyboard path
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("[");
 
       expect(eventHandler).toHaveBeenCalledTimes(1);
@@ -202,7 +207,7 @@ describe("keyboard-UI behavior parity", () => {
         .spyOn(window, "open")
         .mockImplementation(() => null);
 
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("o");
 
       expect(windowOpenSpy).toHaveBeenCalledWith(
@@ -221,7 +226,7 @@ describe("keyboard-UI behavior parity", () => {
         .spyOn(window, "open")
         .mockImplementation(() => null);
 
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("o");
 
       expect(windowOpenSpy).not.toHaveBeenCalled();
@@ -247,7 +252,7 @@ describe("keyboard-UI behavior parity", () => {
       article2.addEventListener("click", clickSpy);
 
       // Keyboard path - J should click next article
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("j");
 
       expect(clickSpy).toHaveBeenCalled();
@@ -271,7 +276,7 @@ describe("keyboard-UI behavior parity", () => {
       const eventHandler = vi.fn();
       document.addEventListener("feedzero:navigate-feed", eventHandler);
 
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("u");
 
       expect(eventHandler).toHaveBeenCalledTimes(1);
@@ -292,7 +297,7 @@ describe("keyboard-UI behavior parity", () => {
       const input = document.getElementById("test-input") as HTMLInputElement;
       input.focus();
 
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       // Dispatch from input element
       const event = new KeyboardEvent("keydown", {
@@ -314,7 +319,7 @@ describe("keyboard-UI behavior parity", () => {
       ) as HTMLTextAreaElement;
       textarea.focus();
 
-      renderHook(() => useKeyboardNav());
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       const event = new KeyboardEvent("keydown", {
         key: "r",

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from "react";
+import { useNavigate } from "react-router";
 import { ArrowLeft, Eye, Plus, Loader2, Search, X, Minus, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -19,7 +20,7 @@ import {
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { FeedPreviewSheet } from "@/components/explore/feed-preview-sheet.tsx";
-import { openSettings } from "@/lib/open-settings.ts";
+import { goToSettings } from "@/lib/go-to-settings.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
@@ -598,6 +599,7 @@ interface ExploreCatalogProps {
 export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const addFeed = useFeedStore((s) => s.addFeed);
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<BrowseTab>("featured");
   const [catalog, setCatalog] = useState<GeneratedCatalog | null>(null);
   const [loading, setLoading] = useState(false);
@@ -768,7 +770,7 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => openSettings("import")}
+          onClick={() => goToSettings(navigate, "data")}
         >
           <FileUp className="mr-2 size-4" />
           Import / Export

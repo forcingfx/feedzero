@@ -1,19 +1,21 @@
 import { Cloud, Loader2, CloudAlert } from "lucide-react";
+import { useNavigate } from "react-router";
 import { useSyncStore } from "@/stores/sync-store";
 import { Switch } from "@/components/ui/switch";
-import { requestSyncSetup } from "@/lib/request-sync-setup";
+import { goToSyncSetup } from "@/lib/go-to-settings";
 
 export function SyncStatusChip() {
   const status = useSyncStore((s) => s.status);
+  const navigate = useNavigate();
 
   const isOn = status === "synced" || status === "syncing";
   const isError = status === "error";
   const isSyncing = status === "syncing";
 
   function handleToggle() {
-    // Gated: free users hit UpgradeDialog instead of starting a flow they
-    // can't complete. See src/lib/request-sync-setup.ts.
-    requestSyncSetup();
+    // Gated: free users hit the upgrade affordance on the Settings page
+    // instead of starting a flow they can't complete.
+    goToSyncSetup(navigate);
   }
 
   return (

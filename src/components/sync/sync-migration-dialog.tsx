@@ -28,18 +28,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useSyncStore } from "@/stores/sync-store";
-import { openSettings } from "@/lib/open-settings";
+import { goToSettings } from "@/lib/go-to-settings";
 
 const SELF_HOST_GUIDE_URL = "https://www.feedzero.app/docs/self-hosting";
 
 export function SyncMigrationDialog() {
   const pendingMigration = useSyncStore((s) => s.pendingMigration);
-  const migrateToLocalOnly = useSyncStore((s) => s.migrateToLocalOnly);
+  const disableSync = useSyncStore((s) => s.disableSync);
   const dismissPendingMigration = useSyncStore(
     (s) => s.dismissPendingMigration,
   );
+  const navigate = useNavigate();
 
   const open = pendingMigration === "license-required";
 
@@ -73,7 +75,7 @@ export function SyncMigrationDialog() {
             className="w-full"
             onClick={() => {
               dismissPendingMigration();
-              openSettings("account");
+              goToSettings(navigate, "subscription");
             }}
           >
             Subscribe to Personal — $5/mo
@@ -82,7 +84,11 @@ export function SyncMigrationDialog() {
             variant="outline"
             className="w-full"
             onClick={async () => {
-              await migrateToLocalOnly();
+              // Server vault is unreachable (401 license-required) but our
+              // retention policy promises 90-day preservation — so we just
+              // disable sync locally and leave the cloud vault alone.
+              await disableSync();
+              dismissPendingMigration();
             }}
           >
             Keep reading locally

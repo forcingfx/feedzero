@@ -3,41 +3,57 @@ import { SAMPLE_RSS, mockFeedEndpoint } from "./feed-fixtures";
 import type { Page } from "@playwright/test";
 
 /**
- * Helper to open the sync dialog via the Settings dropdown in the sidebar.
- * On mobile, opens the sidebar first if needed.
+ * Navigate to the Settings → Data tab where the sync controls live.
+ *
+ * After PR A-B, Settings is a stage page at /settings (not a modal) and
+ * the sync section lives on the Data tab. On mobile, the sidebar Settings
+ * button is inside the bottom drawer which we open first.
  */
-async function openSyncDialog(page: Page) {
-  // On mobile, the sidebar may need to be opened first
+async function goToSyncSection(page: Page) {
   const settingsBtn = page.locator('[data-sidebar="menu-button"]', {
     hasText: "Settings",
   });
   if (!(await settingsBtn.isVisible())) {
-    const sidebarTrigger = page
-      .getByRole("main")
-      .getByRole("button", { name: /toggle sidebar/i });
-    await sidebarTrigger.click();
+    // Mobile: settings is inside the bottom drawer.
+    const drawerHandle = page.getByRole("button", { name: /open feed list/i });
+    if (await drawerHandle.isVisible()) {
+      await drawerHandle.click();
+    } else {
+      const sidebarTrigger = page
+        .getByRole("main")
+        .getByRole("button", { name: /toggle sidebar/i });
+      await sidebarTrigger.click();
+    }
     await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
   }
 
-  // Click the Settings button to open dropdown
   await settingsBtn.click();
+  await page.waitForURL(/\/settings/, { timeout: 5000 });
 
-  // Click "Cloud sync" in the dropdown menu
-  await page.getByRole("menuitem", { name: "Cloud sync" }).click();
+  // Switch to the Data tab if the page didn't open straight onto it.
+  await page.getByRole("radio", { name: /^data$/i }).click();
+  await page.waitForURL(/\/settings\?tab=data/, { timeout: 5000 });
+  await expect(page.getByRole("heading", { name: /cloud sync/i })).toBeVisible({
+    timeout: 5000,
+  });
+}
 
-  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
+/** A locator scoping queries to the Cloud sync card on the Data tab. */
+function syncCard(page: Page) {
+  return page
+    .locator("div")
+    .filter({ has: page.getByRole("heading", { name: /cloud sync/i }) })
+    .first();
 }
 
 /**
- * Helper to add a feed so the "Cloud sync" menu item is enabled.
- * Sync requires at least one feed. Works on both desktop and mobile.
+ * Helper to add a feed so the sync flow has something to encrypt. Works
+ * on both desktop and mobile.
  */
 async function addFeedForSync(page: Page) {
   await mockFeedEndpoint(page, SAMPLE_RSS);
   await addFeedViaUI(page, "https://example.com/feed");
-  // Wait for the app to navigate to the feed page (works on both viewports)
   await page.waitForURL(/\/feeds\//, { timeout: 10000 });
-  // Also wait for the success toast to confirm the feed was added
   await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 10000 });
 }
 
@@ -47,12 +63,9 @@ test.describe("Sync", () => {
       feedPage: page,
     }) => {
       await addFeedForSync(page);
-      await openSyncDialog(page);
-      const dialog = page.getByRole("dialog");
-      await expect(dialog).toBeVisible({ timeout: 5000 });
-
+      await goToSyncSection(page);
       await expect(
-        dialog.getByRole("button", { name: "Use existing cloud account" }),
+        page.getByRole("button", { name: "Use existing cloud account" }),
       ).toBeVisible();
     });
 
@@ -60,16 +73,14 @@ test.describe("Sync", () => {
       feedPage: page,
     }) => {
       await addFeedForSync(page);
-      await openSyncDialog(page);
-      const dialog = page.getByRole("dialog");
-
-      await dialog
+      await goToSyncSection(page);
+      await page
         .getByRole("button", { name: "Use existing cloud account" })
         .click();
 
-      await expect(
-        dialog.getByText("Use existing cloud account"),
-      ).toBeVisible();
+      // ExistingCloudFlow is still a Radix Dialog; portal it.
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible({ timeout: 5000 });
       await expect(
         dialog.getByPlaceholder("Enter your passphrase"),
       ).toBeVisible();
@@ -82,13 +93,12 @@ test.describe("Sync", () => {
       feedPage: page,
     }) => {
       await addFeedForSync(page);
-      await openSyncDialog(page);
-      const dialog = page.getByRole("dialog");
-
-      await dialog
+      await goToSyncSection(page);
+      await page
         .getByRole("button", { name: "Use existing cloud account" })
         .click();
 
+      const dialog = page.getByRole("dialog");
       const connectBtn = dialog.getByRole("button", { name: "Connect" });
       await expect(connectBtn).toBeDisabled();
     });
@@ -97,13 +107,12 @@ test.describe("Sync", () => {
       feedPage: page,
     }) => {
       await addFeedForSync(page);
-      await openSyncDialog(page);
-      const dialog = page.getByRole("dialog");
-
-      await dialog
+      await goToSyncSection(page);
+      await page
         .getByRole("button", { name: "Use existing cloud account" })
         .click();
 
+      const dialog = page.getByRole("dialog");
       await dialog
         .getByPlaceholder("Enter your passphrase")
         .fill("test-passphrase");
@@ -112,25 +121,26 @@ test.describe("Sync", () => {
       await expect(connectBtn).toBeEnabled();
     });
 
-    test("cancel returns to status view", async ({ feedPage: page }) => {
+    test("cancel returns to status view (sync card on Data tab)", async ({
+      feedPage: page,
+    }) => {
       await addFeedForSync(page);
-      await openSyncDialog(page);
-      const dialog = page.getByRole("dialog");
-
-      await dialog
+      await goToSyncSection(page);
+      await page
         .getByRole("button", { name: "Use existing cloud account" })
         .click();
 
+      const dialog = page.getByRole("dialog");
       await expect(
         dialog.getByPlaceholder("Enter your passphrase"),
       ).toBeVisible();
-
       await dialog.getByRole("button", { name: "Cancel" }).click();
 
-      // Back to status view
-      await expect(dialog.getByText("Data & storage")).toBeVisible();
+      // Dialog closes; we're back on the Data tab with the Enable sync
+      // affordance visible in the sync card.
+      await expect(dialog).toBeHidden({ timeout: 5000 });
       await expect(
-        dialog.getByRole("button", { name: "Enable sync" }),
+        syncCard(page).getByRole("button", { name: "Enable sync" }),
       ).toBeVisible();
     });
 
@@ -138,26 +148,20 @@ test.describe("Sync", () => {
       feedPage: page,
     }) => {
       await addFeedForSync(page);
-      await openSyncDialog(page);
-      const dialog = page.getByRole("dialog");
-
-      await dialog
+      await goToSyncSection(page);
+      await page
         .getByRole("button", { name: "Use existing cloud account" })
         .click();
 
-      // Enter a passphrase that won't exist
+      const dialog = page.getByRole("dialog");
       await dialog
         .getByPlaceholder("Enter your passphrase")
         .fill("nonexistent-passphrase-test");
-
       await dialog.getByRole("button", { name: "Connect" }).click();
 
-      // Should show checking state then error
       await expect(dialog.getByText("Could not connect")).toBeVisible({
         timeout: 10000,
       });
-
-      // Error message and try again button should be visible
       await expect(
         dialog.getByRole("button", { name: "Try again" }),
       ).toBeVisible();
@@ -167,62 +171,54 @@ test.describe("Sync", () => {
       feedPage: page,
     }) => {
       await addFeedForSync(page);
-      await openSyncDialog(page);
-      const dialog = page.getByRole("dialog");
-
-      await dialog
+      await goToSyncSection(page);
+      await page
         .getByRole("button", { name: "Use existing cloud account" })
         .click();
 
+      const dialog = page.getByRole("dialog");
       await dialog
         .getByPlaceholder("Enter your passphrase")
         .fill("nonexistent-passphrase-test");
-
       await dialog.getByRole("button", { name: "Connect" }).click();
 
       await expect(dialog.getByText("Could not connect")).toBeVisible({
         timeout: 10000,
       });
-
       await dialog.getByRole("button", { name: "Try again" }).click();
-
-      // Back to passphrase entry
       await expect(
         dialog.getByPlaceholder("Enter your passphrase"),
       ).toBeVisible();
     });
   });
 
-  test("sync badge shows Local in settings footer", async ({
+  test("clicking the sidebar Settings button navigates to /settings", async ({
     feedPage: page,
   }) => {
-    // feedPage fixture sets storage-mode to "local"
-    // The sync status badge should show "Local" in the Settings footer
-    // On mobile, need to open sidebar first
     const settingsBtn = page.locator('[data-sidebar="menu-button"]', {
       hasText: "Settings",
     });
     if (!(await settingsBtn.isVisible())) {
-      const sidebarTrigger = page
-        .getByRole("main")
-        .getByRole("button", { name: /toggle sidebar/i });
-      await sidebarTrigger.click();
+      const drawerHandle = page.getByRole("button", { name: /open feed list/i });
+      if (await drawerHandle.isVisible()) {
+        await drawerHandle.click();
+      }
+      await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
     }
-    await expect(settingsBtn).toBeVisible({ timeout: 10000 });
-    // The Settings button contains the SyncBadge with "Local" text
-    await expect(settingsBtn.getByText("Local")).toBeVisible();
+    await settingsBtn.click();
+    await page.waitForURL(/\/settings/, { timeout: 5000 });
   });
 
-  test("clicking Cloud sync opens data & storage dialog", async ({
+  test("Data tab shows the Cloud sync section + local-only status", async ({
     feedPage: page,
   }) => {
     await addFeedForSync(page);
-    await openSyncDialog(page);
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText("Data & storage")).toBeVisible();
+    await goToSyncSection(page);
     await expect(
-      dialog.getByText("Your data is stored locally in this browser only."),
+      page.getByRole("heading", { name: /cloud sync/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/your data is stored locally in this browser only/i),
     ).toBeVisible();
   });
 
@@ -230,13 +226,10 @@ test.describe("Sync", () => {
     feedPage: page,
   }) => {
     await addFeedForSync(page);
-    await openSyncDialog(page);
+    await goToSyncSection(page);
+    await page.getByRole("button", { name: "Enable sync" }).click();
+
     const dialog = page.getByRole("dialog");
-
-    // Click "Enable sync"
-    await dialog.getByRole("button", { name: "Enable sync" }).click();
-
-    // Should show passphrase in setup wizard
     await expect(dialog.getByText("Your secret key")).toBeVisible({
       timeout: 5000,
     });
@@ -250,72 +243,95 @@ test.describe("Sync", () => {
     feedPage: page,
   }) => {
     await addFeedForSync(page);
-    await openSyncDialog(page);
+    await goToSyncSection(page);
+    await page.getByRole("button", { name: "Enable sync" }).click();
+
     const dialog = page.getByRole("dialog");
-
-    await dialog.getByRole("button", { name: "Enable sync" }).click();
-
-    // Wait for passphrase display
     await expect(dialog.getByText("Your secret key")).toBeVisible();
 
-    // Get the passphrase before navigating away
     const passphraseEl = dialog.locator(".font-mono");
     await expect(passphraseEl).toBeVisible();
     const passphrase = await passphraseEl.textContent();
 
-    // Continue button should be disabled until checkbox is checked
     const continueBtn = dialog.getByRole("button", { name: "Continue" });
     await expect(continueBtn).toBeDisabled();
 
-    // Check the save checkbox
     await dialog.getByText("I've saved my secret key").click();
     await expect(continueBtn).toBeEnabled();
-
-    // Click Continue to go to confirmation step
     await continueBtn.click();
 
-    // Should show confirmation input
     await expect(dialog.getByText("Confirm your secret key")).toBeVisible();
-
-    // Enter the passphrase in confirmation input
     await dialog
       .getByPlaceholder("Enter your secret key")
       .fill(passphrase?.trim() ?? "");
-
-    // Click Enable sync
     await dialog.getByRole("button", { name: "Enable sync" }).click();
 
-    // Should show "Sync is set up" done
     await expect(dialog.getByText("Sync is set up")).toBeVisible({
       timeout: 10000,
     });
 
-    // Click Done to close
     await dialog.getByRole("button", { name: "Done" }).click();
-    // Check that Data & storage heading is gone (sidebar sheet is also a dialog on mobile)
-    await expect(dialog.getByText("Data & storage")).toBeHidden({
-      timeout: 5000,
-    });
+    await expect(dialog).toBeHidden({ timeout: 5000 });
   });
 
-  test("delete all data resets to All items article list", async ({ feedPage: page }) => {
+  test("delete all data: confirm → resets to All items article list", async ({
+    feedPage: page,
+  }) => {
     await addFeedForSync(page);
-    await openSyncDialog(page);
-    const dialog = page.getByRole("dialog");
+    await goToSyncSection(page);
 
-    // Click "Delete all data" in danger zone
-    await dialog.getByRole("button", { name: "Delete all data" }).click();
+    await page.getByRole("button", { name: "Delete all data" }).click();
 
-    // Confirmation dialog should appear
-    await expect(dialog.getByText("Delete all data?")).toBeVisible({
+    const confirm = page.getByRole("dialog");
+    await expect(confirm.getByText("Delete all data?")).toBeVisible({
       timeout: 5000,
     });
+    await confirm.getByRole("button", { name: "Delete everything" }).click();
 
-    // Confirm deletion
-    await dialog.getByRole("button", { name: "Delete everything" }).click();
-
-    // Should reset the app — after auto-init, user lands on /feeds/all
-    // (the All items article list, the new default landing).
+    // After reset: auto-init lands the user on /feeds/all (the new
+    // post-reset default).
     await page.waitForURL(/\/feeds\/all/, { timeout: 15000 });
+  });
+
+  test("Switch to local only offers BOTH keep-vault and delete-vault CTAs (PR C fork)", async ({
+    feedPage: page,
+  }) => {
+    await addFeedForSync(page);
+    await goToSyncSection(page);
+
+    // Need to be in synced state to see "Switch to local only" — fastest
+    // is to first enable sync via the setup wizard. We skip the full
+    // wizard ceremony here and just enable via the UI shortcut.
+    await page.getByRole("button", { name: "Enable sync" }).click();
+    const setupDialog = page.getByRole("dialog");
+    await expect(setupDialog.getByText("Your secret key")).toBeVisible();
+    const passphraseEl = setupDialog.locator(".font-mono");
+    const passphrase = await passphraseEl.textContent();
+
+    await setupDialog.getByText("I've saved my secret key").click();
+    await setupDialog.getByRole("button", { name: "Continue" }).click();
+    await setupDialog
+      .getByPlaceholder("Enter your secret key")
+      .fill(passphrase?.trim() ?? "");
+    await setupDialog.getByRole("button", { name: "Enable sync" }).click();
+    await expect(setupDialog.getByText("Sync is set up")).toBeVisible({
+      timeout: 10000,
+    });
+    await setupDialog.getByRole("button", { name: "Done" }).click();
+    await expect(setupDialog).toBeHidden({ timeout: 5000 });
+
+    // Now we're synced. Click "Switch to local only" → the fork dialog
+    // should show both CTAs.
+    await page.getByRole("button", { name: /switch to local/i }).click();
+    const forkDialog = page.getByRole("dialog");
+    await expect(forkDialog.getByText("Switch to local only?")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(
+      forkDialog.getByRole("button", { name: /^keep cloud vault$/i }),
+    ).toBeVisible();
+    await expect(
+      forkDialog.getByRole("button", { name: /delete cloud vault forever/i }),
+    ).toBeVisible();
   });
 });

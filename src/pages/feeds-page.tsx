@@ -32,6 +32,11 @@ const StatsPage = lazy(() =>
     default: m.StatsPage,
   })),
 );
+const SettingsPage = lazy(() =>
+  import("@/pages/settings-page.tsx").then((m) => ({
+    default: m.SettingsPage,
+  })),
+);
 
 /**
  * Listens for the feedzero:toggle-sidebar event and toggles the sidebar.
@@ -59,6 +64,7 @@ export function FeedsPage() {
   const { pathname, search } = useLocation();
   const isExplorePage = pathname === "/explore";
   const isStatsPage = pathname === "/stats";
+  const isSettingsPage = pathname === "/settings";
   const isDesktop = useIsDesktop();
   useKeyboardNav();
   const feeds = useFeedStore((s) => s.feeds);
@@ -130,7 +136,7 @@ export function FeedsPage() {
   const feedsLoaded = useFeedStore((s) => s.feedsLoaded);
   const feedCount = feeds.length;
   useEffect(() => {
-    if (isExplorePage || isStatsPage) return;
+    if (isExplorePage || isStatsPage || isSettingsPage) return;
     if (feedId) return;
     if (!feedsLoaded) return;
     if (feedCount <= 1) {
@@ -138,7 +144,7 @@ export function FeedsPage() {
       return;
     }
     navigate({ pathname: `/feeds/${ALL_FEEDS_ID}`, search }, { replace: true });
-  }, [isExplorePage, isStatsPage, feedId, feedsLoaded, feedCount, navigate, search]);
+  }, [isExplorePage, isStatsPage, isSettingsPage, feedId, feedsLoaded, feedCount, navigate, search]);
 
   const isLoadingArticles = useArticleStore((s) => s.isLoading);
 
@@ -293,7 +299,9 @@ export function FeedsPage() {
   // Mobile: persistent bottom drawer for feed nav, two-panel scroll-snap for list ↔ reader
   if (!isDesktop) {
     // Explore page: no scroll-snap, single panel
-    const showExplore = isExplorePage || (!feedId && feeds.length === 0 && !isStatsPage);
+    const showExplore =
+      isExplorePage ||
+      (!feedId && feeds.length === 0 && !isStatsPage && !isSettingsPage);
 
     return (
       <div className="flex flex-col h-dvh overflow-hidden bg-background">
@@ -304,6 +312,10 @@ export function FeedsPage() {
         {isStatsPage ? (
           <main role="main" className="flex-1 overflow-y-auto">
             <Suspense><StatsPage /></Suspense>
+          </main>
+        ) : isSettingsPage ? (
+          <main role="main" className="flex-1 overflow-y-auto">
+            <Suspense><SettingsPage /></Suspense>
           </main>
         ) : showExplore ? (
           <main role="main" className="flex-1 overflow-y-auto">
@@ -348,6 +360,7 @@ export function FeedsPage() {
   //   OUTER group (id = MAIN): [sidebar | stage] — constant on every route.
   //   STAGE content swaps:
   //     /stats                  → <StatsPage>
+  //     /settings               → <SettingsPage>
   //     /explore (or no feeds)  → <ExploreCatalog>
   //     default                 → INNER group (id = STAGE_INNER) holding
   //                                [article-list | reader]
@@ -360,7 +373,8 @@ export function FeedsPage() {
   //
   // AppSidebar uses collapsible="none" so it renders inline (not
   // fixed-position) and participates naturally in the panel layout.
-  const exploreOrEmpty = isExplorePage || feeds.length === 0;
+  const exploreOrEmpty =
+    isExplorePage || (feeds.length === 0 && !isSettingsPage);
   const showStats = isStatsPage;
   const layoutId = PANEL_LAYOUT_ID.MAIN;
   const sidebarSize = useSharedSidebarSize(layoutId);
@@ -370,6 +384,12 @@ export function FeedsPage() {
     stageContent = (
       <ScrollArea className="h-full">
         <Suspense><StatsPage /></Suspense>
+      </ScrollArea>
+    );
+  } else if (isSettingsPage) {
+    stageContent = (
+      <ScrollArea className="h-full">
+        <Suspense><SettingsPage /></Suspense>
       </ScrollArea>
     );
   } else if (exploreOrEmpty) {

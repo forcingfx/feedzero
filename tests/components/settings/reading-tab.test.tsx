@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { ReadingTab } from "@/components/settings/reading-tab";
+import { ReadingTab } from "@/components/settings/tabs/reading-tab";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
 

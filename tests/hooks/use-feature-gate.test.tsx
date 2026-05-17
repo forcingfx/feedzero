@@ -44,6 +44,7 @@ function renderWithRouter(ui: React.ReactNode) {
     <MemoryRouter initialEntries={["/feeds"]}>
       <Routes>
         <Route path="/feeds" element={<>{ui}<LocationProbe /></>} />
+        <Route path="/settings" element={<LocationProbe />} />
         <Route path="/" element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>,
@@ -95,17 +96,15 @@ describe("useFeatureGate", () => {
     expect(screen.getByTestId("reason")).toHaveTextContent("paid-tier-inactive");
   });
 
-  it("promptUpgrade opens the unified Settings dialog on the Account tab", async () => {
+  it("promptUpgrade navigates to /settings?tab=subscription", async () => {
     // Was: navigate("/?subscribe=personal-monthly") (straight to Stripe).
-    // Now: openUpgrade() → Settings → Account. The Plan card's Subscribe
-    // CTAs are the only remaining in-app path to Stripe Checkout.
-    const { useSettingsStore } = await import("@/stores/settings-store.ts");
-    useSettingsStore.setState({ open: false, activeTab: "help" });
+    // Now: goToUpgrade(navigate) → /settings?tab=subscription. The Plan
+    // card's Subscribe CTAs are the only remaining in-app path to Stripe.
     const user = userEvent.setup();
     renderWithRouter(<GateProbe feature="auto-organize" />);
     await user.click(screen.getByRole("button", { name: /upgrade/i }));
-    const s = useSettingsStore.getState();
-    expect(s.open).toBe(true);
-    expect(s.activeTab).toBe("account");
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/settings?tab=subscription",
+    );
   });
 });
