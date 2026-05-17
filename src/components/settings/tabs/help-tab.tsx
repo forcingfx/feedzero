@@ -14,7 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { ContactSupport } from "@/components/settings/contact-support";
+import { PreflightPanel } from "@/components/settings/preflight-panel";
 import { getLicenseToken } from "@/core/license/license-token-store";
+import { isSelfHosted } from "@/core/features/self-hosted";
+import { runSelfHostPreflight } from "@/core/diagnostics/self-host-preflight";
 
 const isMac =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -127,6 +130,19 @@ export function HelpTab({ onWhatsNew }: HelpTabProps) {
         token={token}
         diagnosticContext={{ Source: "settings-help" }}
       />
+
+      {isSelfHosted() ? (
+        <PreflightPanel
+          runPreflight={() =>
+            runSelfHostPreflight({
+              isSecureContext: globalThis.isSecureContext ?? false,
+              crypto: globalThis.crypto as Pick<Crypto, "subtle"> | undefined,
+              fetch: globalThis.fetch.bind(globalThis),
+              origin: window.location.origin,
+            })
+          }
+        />
+      ) : null}
 
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
