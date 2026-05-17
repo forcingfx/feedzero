@@ -1,10 +1,13 @@
 /**
- * <DataTab> — sync controls + import + export + danger zone in one place.
+ * <SyncAndDataTab> — sync toggle + import + export + danger zone.
+ *
+ * Verifies the consolidated tab renders all three sections without
+ * blowing up on a fresh local-only user.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { DataTab } from "@/components/settings/tabs/data-tab";
+import { SyncAndDataTab } from "@/components/settings/tabs/sync-and-data-tab";
 import { useSyncStore } from "@/stores/sync-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { useLicenseStore } from "@/stores/license-store";
@@ -16,12 +19,12 @@ vi.mock("@/core/crypto/passphrase-generator", () => ({
 function renderTab() {
   return render(
     <MemoryRouter>
-      <DataTab />
+      <SyncAndDataTab />
     </MemoryRouter>,
   );
 }
 
-describe("<DataTab>", () => {
+describe("<SyncAndDataTab>", () => {
   beforeEach(() => {
     useSyncStore.setState({
       status: "local-only",
@@ -29,7 +32,7 @@ describe("<DataTab>", () => {
       credentials: null,
     });
     useFeedStore.setState({ feeds: [] });
-    useLicenseStore.setState({ tier: "free", verifying: false });
+    useLicenseStore.setState({ tier: "personal", verifying: false });
   });
 
   it("renders the Cloud sync section", () => {
@@ -41,7 +44,6 @@ describe("<DataTab>", () => {
 
   it("renders both Import and Export sections side-by-side", () => {
     renderTab();
-    // Headings emitted by the DataTab card wrappers
     expect(
       screen.getByRole("heading", { name: /^Import$/i }),
     ).toBeInTheDocument();
@@ -50,10 +52,10 @@ describe("<DataTab>", () => {
     ).toBeInTheDocument();
   });
 
-  it("free user sees Delete all data inside Danger zone", () => {
+  it("shows the Delete all data and reset app button (always available)", () => {
     renderTab();
     expect(
-      screen.getByRole("button", { name: /delete all data/i }),
+      screen.getByRole("button", { name: /delete all data and reset app/i }),
     ).toBeInTheDocument();
   });
 });

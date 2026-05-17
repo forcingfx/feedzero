@@ -7,27 +7,50 @@
  * deep-linkable and the browser back button walks tab history. Layout
  * matches `<StatsPage>` so the two stage destinations feel like a set.
  */
+import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
+import { isSelfHosted } from "@/core/features/self-hosted";
 import type { SettingsTab } from "@/lib/go-to-settings";
 
 const VALID_TABS: readonly SettingsTab[] = [
   "subscription",
-  "recovery",
-  "data",
+  "sync-and-data",
   "reading",
   "help",
 ];
+
+// Old tab names that point at content now hosted under a different slug.
+// Keep them mapped so deep-links shared before the redesign still land in
+// the right place after the merge into Subscription / Sync & Data.
+const LEGACY_TAB_REDIRECTS: Record<string, SettingsTab> = {
+  recovery: "subscription",
+  data: "sync-and-data",
+};
 
 function isSettingsTab(value: string | null): value is SettingsTab {
   return value !== null && (VALID_TABS as readonly string[]).includes(value);
 }
 
+function defaultTab(): SettingsTab {
+  // Self-hosters never see the Subscription tab, so default them to the
+  // first tab they actually have.
+  return isSelfHosted() ? "sync-and-data" : "subscription";
+}
+
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get("tab");
-  const activeTab: SettingsTab = isSettingsTab(raw) ? raw : "subscription";
+  const legacy = raw ? LEGACY_TAB_REDIRECTS[raw] : undefined;
+  const activeTab: SettingsTab = legacy ?? (isSettingsTab(raw) ? raw : defaultTab());
+
+  useEffect(() => {
+    if (!legacy) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", legacy);
+    setSearchParams(next, { replace: true });
+  }, [legacy, searchParams, setSearchParams]);
 
   function handleTabChange(tab: SettingsTab) {
     const next = new URLSearchParams(searchParams);

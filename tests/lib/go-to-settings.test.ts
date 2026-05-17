@@ -27,8 +27,8 @@ describe("goToSettings", () => {
   });
 
   it("encodes the tab as a query param", () => {
-    goToSettings(navigate, "data");
-    expect(navigate).toHaveBeenCalledWith("/settings?tab=data");
+    goToSettings(navigate, "sync-and-data");
+    expect(navigate).toHaveBeenCalledWith("/settings?tab=sync-and-data");
   });
 
   it("goToUpgrade lands on the subscription tab", () => {
@@ -36,8 +36,8 @@ describe("goToSettings", () => {
     expect(navigate).toHaveBeenCalledWith("/settings?tab=subscription");
   });
 
-  it("goToSyncSetup lands on the data tab", () => {
+  it("goToSyncSetup lands on the sync-and-data tab", () => {
     goToSyncSetup(navigate);
-    expect(navigate).toHaveBeenCalledWith("/settings?tab=data");
+    expect(navigate).toHaveBeenCalledWith("/settings?tab=sync-and-data");
   });
 });

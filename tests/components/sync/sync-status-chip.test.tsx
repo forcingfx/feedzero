@@ -55,12 +55,12 @@ describe("SyncStatusChip", () => {
     expect(toggle).toBeChecked();
   });
 
-  it("navigates to Settings on the Data tab when clicked", async () => {
+  it("navigates to Settings on the Sync & Data tab when clicked", async () => {
     const user = userEvent.setup();
     renderChip();
     await user.click(screen.getByText("Cloud sync"));
     expect(screen.getByTestId("probe-path")).toHaveTextContent(
-      "/settings?tab=data",
+      "/settings?tab=sync-and-data",
     );
   });
 

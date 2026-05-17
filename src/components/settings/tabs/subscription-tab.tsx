@@ -1,20 +1,36 @@
 /**
- * Subscription tab — tier badge, license-token reveal, billing portal.
+ * Subscription tab — what plan am I on, and how do I activate / pay for it?
  *
- * Free users see <SubscriptionUpgrade> (the tier comparison cards).
+ * Free users see, in order:
+ *   1. Tier badge (Free).
+ *   2. Large "Activate existing license" CTA — opens the license-token
+ *      paste dialog. This is the surface a returning customer or someone
+ *      activating a second device lands on; it lived as a muted "Log in"
+ *      link inside the pricing comparison before this redesign, which
+ *      buried it.
+ *   3. "Lost your license?" recovery link → opens /billing/recover.
+ *   4. "or subscribe" divider, then the tier comparison cards.
+ *
  * Paid users see:
  *   - tier card with renewal date
  *   - truncated license key with reveal+copy
  *   - "Manage subscription" → Stripe Customer Portal via openPortal()
- *   - inline "Need another device? See Recovery →" cross-link
- *
- * The "Add another device" action that used to live here moved to the
- * Recovery tab — pasting a token is a recovery surface, not a billing
- * one. PR C will add a "Deactivate FeedZero Personal on this device"
- * button to this tab.
+ *   - "Deactivate on this device" section
+ *   - "Looking for a different plan?" footer showing only the *other*
+ *     tier cards (upgrade or downgrade affordances).
  */
 import { useState } from "react";
-import { Sparkles, Eye, EyeOff, Copy, Check, LogOut, Info } from "lucide-react";
+import {
+  Sparkles,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
+  LogOut,
+  Info,
+  KeyRound,
+  ExternalLink,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,7 +48,8 @@ import { getLicenseToken } from "@/core/license/license-token-store";
 import { decodeLicensePayload } from "@/core/license/format";
 import { base64UrlDecodeToString } from "@/core/license/crypto";
 import type { LicensePayload } from "@/core/license/format";
-import { SubscriptionUpgrade } from "@/components/settings/subscription-upgrade";
+import { SubscriptionUpgrade, TierCard } from "@/components/settings/subscription-upgrade";
+import { ActivateLicenseDialog } from "@/components/settings/activate-license-dialog";
 import { openPortal } from "@/lib/open-portal";
 import { maskToken } from "@/lib/format-license";
 import { goToSettings } from "@/lib/go-to-settings";
@@ -69,6 +86,8 @@ export function SubscriptionTab() {
 }
 
 function FreeView() {
+  const [activateOpen, setActivateOpen] = useState(false);
+
   return (
     <div className="space-y-4 py-2">
       <div className="flex items-center gap-2">
@@ -79,7 +98,39 @@ function FreeView() {
           You&apos;re on the Free tier.
         </span>
       </div>
+
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <Button
+          type="button"
+          size="lg"
+          className="w-full"
+          onClick={() => setActivateOpen(true)}
+        >
+          <KeyRound className="mr-2 size-4" />
+          Activate existing license
+        </Button>
+        <p className="text-xs text-muted-foreground text-center">
+          <a
+            href="/billing/recover"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="underline hover:no-underline inline-flex items-center gap-1"
+          >
+            Lost your license?
+            <ExternalLink className="size-3" />
+          </a>
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        <span>or subscribe</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
       <SubscriptionUpgrade />
+
+      <ActivateLicenseDialog open={activateOpen} onOpenChange={setActivateOpen} />
     </div>
   );
 }
@@ -208,17 +259,6 @@ function PaidView({ tier }: PaidViewProps) {
           </Button>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          Need to activate on another device?{" "}
-          <button
-            type="button"
-            onClick={() => goToSettings(navigate, "recovery")}
-            className="underline hover:no-underline"
-          >
-            See Recovery →
-          </button>
-        </p>
-
         {portalError && (
           <Alert variant="destructive">
             <AlertDescription>{portalError}</AlertDescription>
@@ -233,10 +273,10 @@ function PaidView({ tier }: PaidViewProps) {
               sync without canceling, use{" "}
               <button
                 type="button"
-                onClick={() => goToSettings(navigate, "data")}
+                onClick={() => goToSettings(navigate, "sync-and-data")}
                 className="underline hover:no-underline"
               >
-                Data → Switch to local only
+                Sync &amp; Data
               </button>
               .
             </span>
@@ -264,12 +304,81 @@ function PaidView({ tier }: PaidViewProps) {
         </Button>
       </div>
 
+      <AlternativePlans currentTier={tier} />
+
       <DeactivateConfirm
         open={deactivateOpen}
         onOpenChange={setDeactivateOpen}
         pending={deactivatePending}
         onConfirm={onConfirmDeactivate}
         tierLabel={tierLabel}
+      />
+    </div>
+  );
+}
+
+interface AlternativePlansProps {
+  currentTier: "personal" | "pro";
+}
+
+/**
+ * Compact "looking for a different plan?" strip for paid users.
+ *
+ * Pro users see Personal as a downgrade option (and Self-host as an
+ * always-relevant escape hatch). Personal users see Pro as an upgrade
+ * (still coming soon as of 2026) and Self-host. We deliberately omit the
+ * Free card here — telling a paying customer "downgrade to Free" buries
+ * the Deactivate action that's right above this strip.
+ */
+function AlternativePlans({ currentTier }: AlternativePlansProps) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground uppercase tracking-wider">
+        Looking for a different plan?
+      </p>
+      {currentTier === "pro" && (
+        <TierCard
+          name="Personal"
+          price="$5/mo"
+          priceSub="or $50/yr — save 17%"
+          blurb="Sync across every device. Unlimited feeds."
+          features={[
+            "End-to-end encrypted cloud sync",
+            "Auto-organize folders",
+            "Unlimited feeds",
+          ]}
+          cta="Switch to Personal"
+          ctaHref="/?subscribe=personal-monthly"
+        />
+      )}
+      {currentTier === "personal" && (
+        <TierCard
+          name="Pro"
+          price="Coming 2026"
+          blurb="When RSS becomes your work."
+          comingSoon
+          features={[
+            "Everything in Personal",
+            "AI Signal — summaries & briefings",
+            "Full-text search across articles",
+            "Send to Kindle",
+          ]}
+          cta="Coming soon"
+          ctaDisabled
+        />
+      )}
+      <TierCard
+        name="Self-host"
+        price="$0 · MIT"
+        blurb="Run your own copy. Every shipped feature unlocked."
+        features={[
+          "Unlimited feeds, cloud sync on your own server",
+          "No license check, no kill switch",
+          "Open source under MIT",
+        ]}
+        cta="Self-hosting guide →"
+        ctaHref="https://www.feedzero.app/docs/self-hosting"
+        ctaTargetBlank
       />
     </div>
   );
@@ -299,7 +408,16 @@ function DeactivateConfirm({
             We&apos;ll clear the license token from this browser and switch
             sync off locally. Your subscription stays active and your
             encrypted cloud vault stays intact — you can reactivate any
-            time with the token (Recovery tab) or by signing in again.
+            time by pasting the token again, or via{" "}
+            <a
+              href="/billing/recover"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline"
+            >
+              email recovery
+            </a>
+            .
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex-col gap-2 sm:flex-col">

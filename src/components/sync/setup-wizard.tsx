@@ -1,4 +1,17 @@
-import { useState, useCallback } from "react";
+/**
+ * <SetupWizard> — single-screen "turn on fresh cloud sync" flow.
+ *
+ * One screen: the auto-generated passphrase is displayed with copy +
+ * "I've saved my secret key" checkbox. Clicking Enable derives the
+ * keys, encrypts the local data, and pushes it. The previous two-step
+ * (display + confirm-by-retype) was removed — the checkbox is the
+ * contract, and re-typing a 4-word EFF passphrase didn't catch typos in
+ * practice (people copy-pasted from the same place).
+ *
+ * If the user closes the dialog before clicking Enable, no keys are
+ * persisted; the dialog can be reopened with a fresh passphrase.
+ */
+import { useCallback, useState } from "react";
 import { Copy, Check, Loader2, ShieldCheck } from "lucide-react";
 import {
   Dialog,
@@ -11,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
-type SetupStep = "passphrase" | "confirm" | "syncing" | "done";
+type SetupStep = "passphrase" | "syncing" | "done";
 
 interface SetupWizardProps {
   open: boolean;
@@ -29,8 +42,6 @@ export function SetupWizard({
   const [step, setStep] = useState<SetupStep>("passphrase");
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [confirmInput, setConfirmInput] = useState("");
-  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(passphrase);
@@ -53,7 +64,7 @@ export function SetupWizard({
               <DialogTitle>Your secret key</DialogTitle>
               <DialogDescription>
                 This key is the only way to access your synced data. Save it
-                somewhere safe — it cannot be recovered.
+                somewhere safe — FeedZero cannot recover it if you lose it.
               </DialogDescription>
             </DialogHeader>
 
@@ -85,66 +96,10 @@ export function SetupWizard({
             </label>
 
             <DialogFooter>
-              <Button
-                onClick={() => setStep("confirm")}
-                disabled={!saved}
-              >
-                Continue
+              <Button onClick={handleEnable} disabled={!saved}>
+                Enable sync
               </Button>
             </DialogFooter>
-          </>
-        )}
-
-        {step === "confirm" && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Confirm your secret key</DialogTitle>
-              <DialogDescription>
-                Enter your secret key to confirm you've saved it correctly.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const normalized = confirmInput.toLowerCase().trim();
-                const expected = passphrase.toLowerCase().trim();
-                if (normalized === expected) {
-                  setConfirmError(null);
-                  handleEnable();
-                } else {
-                  setConfirmError("That doesn't match. Try again.");
-                }
-              }}
-            >
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Enter your secret key"
-                  value={confirmInput}
-                  onChange={(e) => {
-                    setConfirmInput(e.target.value);
-                    setConfirmError(null);
-                  }}
-                  autoComplete="off"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-                {confirmError && (
-                  <p className="text-sm text-destructive">{confirmError}</p>
-                )}
-              </div>
-
-              <DialogFooter className="mt-4 flex-row gap-2 sm:justify-between">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep("passphrase")}
-                >
-                  Back
-                </Button>
-                <Button type="submit">Enable sync</Button>
-              </DialogFooter>
-            </form>
           </>
         )}
 

@@ -1,7 +1,9 @@
 /**
  * <SubscriptionUpgrade> — inline tier comparison shown to free users
  * inside the Subscription tab. Four tier cards (Free / Personal / Pro /
- * Self-host); same CTAs.
+ * Self-host); same CTAs. The "Log in" affordance was promoted out of this
+ * card into a top-level "Activate existing license" CTA on the Subscription
+ * tab — it is no longer this component's responsibility.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -45,17 +47,8 @@ describe("<SubscriptionUpgrade>", () => {
     expect(link.getAttribute("href")).toMatch(/self-host/);
   });
 
-  it("offers a secondary 'Already have an account? Log in' affordance that opens the device wizard", async () => {
-    // When a free user is routed to the upgrade Plan card via the chokepoint,
-    // they should ALSO see a path to log in if they already have a license
-    // (e.g. they bought on another device). Otherwise they might re-purchase.
-    const { useLoginStore } = await import("@/stores/login-store.ts");
-    useLoginStore.setState({ open: false });
-    const { default: userEvent } = await import("@testing-library/user-event");
-    const user = userEvent.setup();
+  it("does NOT render a 'Log in' link anymore — that affordance moved up to the Subscription tab as 'Activate existing license'", () => {
     render(<SubscriptionUpgrade />);
-    const loginBtn = screen.getByRole("button", { name: /log in/i });
-    await user.click(loginBtn);
-    expect(useLoginStore.getState().open).toBe(true);
+    expect(screen.queryByRole("button", { name: /^log in$/i })).toBeNull();
   });
 });

@@ -30,7 +30,7 @@ async function goToImportExportTab(page: Page) {
     { timeout: 10000 },
   );
   await page.getByRole("button", { name: "Import / Export" }).click();
-  await page.waitForURL(/\/settings\?tab=data/, { timeout: 5000 });
+  await page.waitForURL(/\/settings\?tab=sync-and-data/, { timeout: 5000 });
   await expect(
     page.getByRole("heading", { name: /^Settings$/i }),
   ).toBeVisible();
