@@ -182,6 +182,21 @@ export async function pullVault(auth: SyncAuth): Promise<Result<VaultData>> {
     const response = await syncFetch(`/api/sync?vaultId=${vaultId}`);
 
     if (!response.ok) {
+      // 404 = "no vault exists for this derived vaultId". The two real
+      // user-facing causes are (a) first sync from this passphrase (no
+      // vault has ever been pushed) or (b) typo in the passphrase on a
+      // restore. Either way the raw "Sync pull failed (404): Vault not
+      // found" string leaks implementation and tells the user nothing
+      // actionable. Translate it. Other statuses still pass through —
+      // a 401/500 is useful diagnostic information.
+      if (response.status === 404) {
+        return err(
+          "No cloud vault was found for this passphrase. " +
+            "If this is your first device, push from there first. " +
+            "If you're restoring on a new device, double-check the passphrase — " +
+            "every word matters and order matters.",
+        );
+      }
       const text = await response.text();
       return err(`Sync pull failed (${response.status}): ${text}`);
     }

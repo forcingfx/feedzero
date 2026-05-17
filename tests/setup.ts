@@ -38,6 +38,19 @@ for (const name of ["localStorage", "sessionStorage"] as const) {
   }
 }
 
+// happy-dom defaults isSecureContext to false. AppInit now refuses to
+// initialize in an insecure context (the fix for feedback #88), so without
+// this default every component test that mounts <App> would hit the new
+// "secure context required" screen. Production tests that want to exercise
+// the insecure-context branch override this per-test.
+if (typeof globalThis.isSecureContext === "undefined" || globalThis.isSecureContext === false) {
+  Object.defineProperty(globalThis, "isSecureContext", {
+    value: true,
+    writable: true,
+    configurable: true,
+  });
+}
+
 afterEach(() => {
   cleanup();
 });

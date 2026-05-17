@@ -95,29 +95,65 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 
 ## Self-Hosting
 
-FeedZero can run entirely on your own infrastructure:
+Self-hosting is a first-class deployment. One master switch, one preflight,
+and a reverse proxy with TLS is everything you need.
 
 ```bash
-VITE_SELF_HOSTED=1 npm run build:all
-npm run serve
+git clone https://github.com/forcingfx/feedzero.git
+cd feedzero
+echo "VITE_SELF_HOSTED=1" > .env.production
+echo "SELF_HOSTED=1"      >> .env.production   # runtime mirror of the build flag
+npm install
+npm run build:all
+npm run serve                                  # binds 0.0.0.0:3000
 ```
 
-This starts a standalone Hono server with all API endpoints. Point your reverse proxy at it.
+Then put Caddy or nginx in front of `:3000` with a TLS cert pointing at a
+hostname you control. **HTTPS is non-negotiable** — browsers gate the Web
+Crypto API (which encrypts your data at rest) behind a secure context, so
+plain `http://<lan-ip>:3000` will refuse to start. The app detects this and
+shows you the fix.
 
-### `VITE_SELF_HOSTED=1`
+**See the full guide:** [feedzero.app/docs/self-hosting](https://feedzero.app/docs/self-hosting)
 
-The hosted build at my.feedzero.app gates some features behind the Personal tier (currently auto-organize; later: filters, mute keywords). Setting `VITE_SELF_HOSTED=1` at build time bypasses every tier gate — every shipped feature is available to self-hosters at no charge. Features marked "coming soon" stay unavailable until the code lands; the flag doesn't conjure them into existence.
+### What `VITE_SELF_HOSTED=1` does
 
-Persist the flag in a `.env.production` file at the repo root if you build via CI:
+It's the **single master switch** for self-hosting:
 
-```
-# .env.production
-VITE_SELF_HOSTED=1
-```
+- Bypasses every tier gate — every shipped Personal feature is available at no charge.
+- Hides Subscribe / pricing UI.
+- Disables the paid-tier API enforcement (`LAUNCH_PAID_TIER` is forced off).
+- Switches the upstream User-Agent to a browser-like string (fewer WAF blocks).
 
-See [docs/decisions/012-open-core-feature-gating.md](docs/decisions/012-open-core-feature-gating.md) for the design and the honor-system tradeoff.
+Features marked "coming soon" stay unavailable until the code lands — the
+flag doesn't conjure them into existence.
 
-For Vercel deployment, `git push` to a connected repository. The `api/` directory contains serverless function wrappers.
+`VITE_SELF_HOSTED=1` is a build-time flag (rebuild after changing).
+`SELF_HOSTED=1` is its runtime mirror used by the server. Set both for the
+single-switch invariant to hold end-to-end.
+
+### What you give up vs. the hosted deployment
+
+Self-hosting is supported but not magical. Things you lose:
+
+- **Upstream rate-limiting**: the hosted deployment uses Upstash to smooth
+  bursts; without it, a bulk refresh on a fresh IP can trigger upstream 429s.
+  Symptoms appear as feeds that work on `my.feedzero.app` but fail locally.
+- **IP reputation**: the hosted deployment shares infrastructure IPs known to
+  upstreams. Fresh datacenter/residential IPs may be blocked by Cloudflare-class
+  WAFs. The new browser-like User-Agent default mitigates but doesn't eliminate this.
+- **Automatic TLS**: your reverse proxy must provide it. Caddy is the path of
+  least resistance.
+- **Managed sync storage backups**: the filesystem adapter writes to
+  `data/`; back it up yourself.
+
+See [docs/decisions/014-self-host-first-class.md](docs/decisions/014-self-host-first-class.md) for the design rationale and the messaging lesson from feedback #88.
+
+### Vercel deployment
+
+For Vercel deployment, `git push` to a connected repository. The `api/`
+directory contains serverless function wrappers; `scripts/build-api.js`
+bundles them.
 
 ## Tech Stack
 

@@ -57,7 +57,30 @@ export async function discoverFeed(
     // Fetch the page HTML (reused for strategies 1 and 3)
     const pageResponse = await proxyFetch("/api/page", url);
     if (!pageResponse.ok) {
-      return err("Could not fetch the page for feed discovery.");
+      // Surface the upstream HTTP status so the user sees the actual cause.
+      // Pre-2026-05 code collapsed every failure to "Could not fetch the
+      // page", and discovery's final "No RSS feed could be found" then
+      // misled self-hosters whose real problem was upstream rate-limiting
+      // or IP-reputation blocks. See feedback issue #97.
+      const status = pageResponse.status;
+      if (status === 429) {
+        const retryAfter = pageResponse.headers?.get?.("retry-after");
+        return err(
+          retryAfter
+            ? `Upstream rate-limited this request (429). Try again in ${retryAfter}s.`
+            : "Upstream rate-limited this request (429). Try again later.",
+        );
+      }
+      if (status === 403) {
+        return err(
+          "Upstream blocked our request (403). Some sites block non-browser " +
+            "fetchers — try copying the RSS link directly instead of the homepage URL.",
+        );
+      }
+      if (status >= 500) {
+        return err(`Upstream server error (${status}). Try again later.`);
+      }
+      return err(`Could not fetch the page for feed discovery (HTTP ${status}).`);
     }
     const html = await pageResponse.text();
 

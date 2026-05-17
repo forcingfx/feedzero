@@ -217,8 +217,31 @@ describe("App sync-aware init", () => {
     });
   });
 
-  it("shows error when crypto.subtle is unavailable", async () => {
-    // Simulate missing crypto.subtle (Lockdown Mode)
+  it("shows the secure-context guidance screen when isSecureContext is false", async () => {
+    // Self-host scenario from feedback #88: user loads the app over plain
+    // HTTP from a LAN IP. The pre-fix code showed a misleading "iOS
+    // Lockdown Mode" error; the new screen names the real cause (no
+    // secure context) and points the user at the self-hosting guide.
+    const original = globalThis.isSecureContext;
+    Object.defineProperty(globalThis, "isSecureContext", {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
+
+    useAppStore.setState({ hasCompletedOnboarding: false });
+
+    const { findByText } = render(<App />);
+    expect(await findByText(/secure context|HTTPS/i)).toBeInTheDocument();
+
+    Object.defineProperty(globalThis, "isSecureContext", {
+      value: original,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it("shows the crypto-missing screen when subtle is unavailable but context is secure (Lockdown Mode)", async () => {
     const originalSubtle = globalThis.crypto?.subtle;
     Object.defineProperty(globalThis.crypto, "subtle", {
       value: undefined,
@@ -227,14 +250,9 @@ describe("App sync-aware init", () => {
 
     useAppStore.setState({ hasCompletedOnboarding: false });
 
-    render(<App />);
+    const { findByText } = render(<App />);
+    expect(await findByText(/Web Crypto|Lockdown/i)).toBeInTheDocument();
 
-    await waitFor(() => {
-      const state = useAppStore.getState();
-      expect(state.error).toContain("crypto");
-    });
-
-    // Restore
     Object.defineProperty(globalThis.crypto, "subtle", {
       value: originalSubtle,
       configurable: true,
