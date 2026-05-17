@@ -167,20 +167,23 @@ test.describe("Layout and scroll", () => {
     expect(leftAfter).toBe(leftBefore);
   });
 
-  test("panels are resizable via drag handle", async ({ feedPage: page }) => {
+  test("outer handle resizes sidebar vs stage", async ({ feedPage: page }) => {
+    // Two-tier model: the outer ResizablePanelGroup has [sidebar, stage] —
+    // the only place sidebar width changes. Drag the *first* (outer) handle
+    // and assert the sidebar panel's width changed. .first() is required
+    // because the default route also renders an inner group (article-list +
+    // reader) with its own handle.
     await setupFeed(page);
 
-    // Get the resize handle
-    const handle = page.locator('[data-slot="resizable-handle"]');
-    await expect(handle).toBeVisible();
+    const outerHandle = page.locator('[data-slot="resizable-handle"]').first();
+    await expect(outerHandle).toBeVisible();
 
-    // Get initial panel widths
-    const panelsBefore = await page
-      .locator('[data-slot="resizable-panel"]')
-      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
+    const sidebar = page.locator('[data-panel][id="sidebar"]');
+    const widthBefore = await sidebar.evaluate(
+      (el) => el.getBoundingClientRect().width,
+    );
 
-    // Drag the handle 100px to the right
-    const handleBox = await handle.boundingBox();
+    const handleBox = await outerHandle.boundingBox();
     if (handleBox) {
       await page.mouse.move(
         handleBox.x + handleBox.width / 2,
@@ -188,23 +191,64 @@ test.describe("Layout and scroll", () => {
       );
       await page.mouse.down();
       await page.mouse.move(
-        handleBox.x + handleBox.width / 2 + 100,
+        handleBox.x + handleBox.width / 2 + 80,
         handleBox.y + handleBox.height / 2,
         { steps: 10 },
       );
       await page.mouse.up();
     }
 
-    // Panel widths should have changed
-    const panelsAfter = await page
-      .locator('[data-slot="resizable-panel"]')
-      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
+    const widthAfter = await sidebar.evaluate(
+      (el) => el.getBoundingClientRect().width,
+    );
+    expect(Math.abs(widthAfter - widthBefore)).toBeGreaterThan(10);
+  });
 
-    // At least one panel width should have changed after drag
-    const widthChanged =
-      Math.abs(panelsAfter[0] - panelsBefore[0]) > 10 ||
-      Math.abs(panelsAfter[1] - panelsBefore[1]) > 10;
-    expect(widthChanged).toBe(true);
+  test("inner handle resizes article-list vs reader, leaves sidebar alone", async ({
+    feedPage: page,
+  }) => {
+    // The inner ResizablePanelGroup persists the article-list/reader split
+    // independently of the sidebar. Dragging its handle must NOT change the
+    // sidebar's width — that's the structural promise of the two-tier model.
+    await setupFeed(page);
+
+    const handles = page.locator('[data-slot="resizable-handle"]');
+    await expect(handles).toHaveCount(2);
+    const innerHandle = handles.nth(1);
+
+    const sidebar = page.locator('[data-panel][id="sidebar"]');
+    const articleList = page.locator('[data-panel][id="article-list"]');
+    const sidebarWidthBefore = await sidebar.evaluate(
+      (el) => el.getBoundingClientRect().width,
+    );
+    const listWidthBefore = await articleList.evaluate(
+      (el) => el.getBoundingClientRect().width,
+    );
+
+    const handleBox = await innerHandle.boundingBox();
+    if (handleBox) {
+      await page.mouse.move(
+        handleBox.x + handleBox.width / 2,
+        handleBox.y + handleBox.height / 2,
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        handleBox.x + handleBox.width / 2 + 80,
+        handleBox.y + handleBox.height / 2,
+        { steps: 10 },
+      );
+      await page.mouse.up();
+    }
+
+    const sidebarWidthAfter = await sidebar.evaluate(
+      (el) => el.getBoundingClientRect().width,
+    );
+    const listWidthAfter = await articleList.evaluate(
+      (el) => el.getBoundingClientRect().width,
+    );
+
+    expect(Math.abs(listWidthAfter - listWidthBefore)).toBeGreaterThan(10);
+    expect(Math.abs(sidebarWidthAfter - sidebarWidthBefore)).toBeLessThan(2);
   });
 
   test("sidebar collapse/expand via trigger", async ({ feedPage: page }) => {

@@ -88,27 +88,40 @@ export const ARTICLE_GROUPING = {
 } as const;
 
 /**
- * Group ids for the desktop ResizablePanelGroup. Each layout shape gets its own
- * id so react-resizable-panels persists widths independently — switching from
- * the 3-panel feeds layout to the 2-panel explore/stats layout must not
- * clobber the user's preferred sidebar/article-list/reader proportions.
+ * Group ids for the desktop ResizablePanelGroup tree.
+ *
+ * Two-tier model:
+ *
+ *   OUTER group (id = MAIN)          → constant topology on every route:
+ *     ├─ ResizablePanel "sidebar"      [the only place sidebar width lives]
+ *     └─ ResizablePanel "stage"        [a slot whose content swaps per route]
+ *
+ *   STAGE content (per route):
+ *     /explore | /stats | (empty feeds) → single feature component
+ *     default                            → INNER group (id = STAGE_INNER):
+ *                                            ├─ "article-list"
+ *                                            └─ "reader"
+ *
+ * Why a stable outer topology: react-resizable-panels keys saved layouts by
+ * group id PLUS the shape of children at mount. When the children shape
+ * changes, the library recomputes layout from each panel's `defaultSize` —
+ * which produced a visible sidebar resize whenever the user navigated
+ * between routes (Explore/Stats added/removed siblings of the sidebar).
+ * Keeping the outer group's children as always [sidebar, stage] makes the
+ * rule "sidebar size only changes by drag or window resize" hold by
+ * construction.
+ *
+ * Why a separate inner group: the article-list/reader split should stay
+ * independently resizable across feed navigation, and its own saved state
+ * is keyed by STAGE_INNER, so it's untouched by the outer group's state.
+ *
+ * Historical note: PR F unified the outer group id to MAIN. That fixed the
+ * id, but not the topology — children still varied per route. This refactor
+ * (the "stage" model) completes that fix.
  */
 export const PANEL_LAYOUT_ID = {
-  /**
-   * Single stable layout id used across every route.
-   *
-   * react-resizable-panels persists panel sizes per group id, so a single
-   * stable id means the sidebar width is preserved naturally as the user
-   * navigates between /feeds, /explore, /stats. Conditionally-rendered
-   * child panels (reader on /feeds, single content on /explore) don't
-   * affect the sidebar's stored size because each panel has its own
-   * `id` within the group.
-   *
-   * Prior model used distinct ids per layout shape (`:feeds`, `:single`),
-   * which made the sidebar visibly resize on every navigation — that's
-   * the bug PR F fixed.
-   */
   MAIN: "feedzero:layout:main",
+  STAGE_INNER: "feedzero:layout:stage-inner",
 } as const;
 
 const textEncoder = new TextEncoder();
