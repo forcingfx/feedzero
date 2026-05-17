@@ -34,4 +34,18 @@ describe("<AccountUpgradeSection>", () => {
     const link = screen.getByRole("link", { name: /self-host/i });
     expect(link.getAttribute("href")).toMatch(/self-host/);
   });
+
+  it("offers a secondary 'Already have an account? Log in' affordance that opens the device wizard", async () => {
+    // When a free user is routed to the upgrade Plan card via the chokepoint,
+    // they should ALSO see a path to log in if they already have a license
+    // (e.g. they bought on another device). Otherwise they might re-purchase.
+    const { useLoginStore } = await import("@/stores/login-store.ts");
+    useLoginStore.setState({ open: false });
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    render(<AccountUpgradeSection />);
+    const loginBtn = screen.getByRole("button", { name: /log in/i });
+    await user.click(loginBtn);
+    expect(useLoginStore.getState().open).toBe(true);
+  });
 });

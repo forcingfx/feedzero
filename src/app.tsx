@@ -9,6 +9,7 @@ import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
 import { SettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
@@ -172,6 +173,7 @@ export function App() {
             have router context. */}
         <SyncMigrationDialog />
         <SettingsDialog />
+        <DeviceSetupWizard />
         <Toaster position="bottom-center" />
       </BrowserRouter>
       <SpeedInsights />
