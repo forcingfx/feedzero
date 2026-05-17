@@ -62,6 +62,14 @@ export function BillingIssued() {
   }, [recoveryToken]);
 
   if (phase === "missing-token" || phase === "error") {
+    const supportBody =
+      `Phase: ${phase}\n` +
+      (error ? `Error: ${error}\n` : "") +
+      `\n(Add your subscription email and anything else helpful here.)`;
+    const supportHref =
+      "mailto:support@feedzero.app?" +
+      `subject=${encodeURIComponent("Recovery link didn't work")}&` +
+      `body=${encodeURIComponent(supportBody)}`;
     return (
       <div className="mx-auto max-w-md p-8 space-y-4">
         <h1 className="text-2xl font-semibold">Recovery link {phase === "missing-token" ? "missing" : "invalid"}</h1>
@@ -71,9 +79,19 @@ export function BillingIssued() {
               "We couldn't find a recovery token in this link. The link may have expired or been used already."}
           </AlertDescription>
         </Alert>
-        <Button asChild>
-          <a href="/billing/recover">Try again</a>
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button asChild>
+            <a href="/billing/recover">Try again</a>
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Already tried this?{" "}
+            <a href={supportHref} className="underline">
+              Email support
+            </a>{" "}
+            with your subscription email — we&apos;ll issue your license
+            directly.
+          </p>
+        </div>
       </div>
     );
   }

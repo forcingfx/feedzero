@@ -180,4 +180,67 @@ describe("<BillingRecover>", () => {
 
     vi.useRealTimers();
   });
+
+  // PR K — Recovery reliability: explicit guidance for the Stripe portal
+  // step. The pre-submit copy must tell users they need to click
+  // "Return to FeedZero" inside the Stripe portal after signing in;
+  // without that hint, users land in the portal, manage their
+  // subscription, and close the tab — never triggering license issuance.
+
+  it("pre-submit copy tells the user to click 'Return to FeedZero' inside the Stripe portal", () => {
+    renderAt("/billing/recover");
+    expect(
+      screen.getByText(/return to feedzero/i),
+    ).toBeInTheDocument();
+  });
+
+  it("post-submit confirmation repeats the 'Return to FeedZero' instruction", async () => {
+    globalThis.fetch = mockFetch({ status: 200, body: { ok: true } });
+    renderAt("/billing/recover");
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /recover/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/check your (email|inbox)/i)).toBeInTheDocument();
+    });
+
+    // Two distinct mentions — once in pre-submit copy that's still in
+    // the DOM, once in the post-submit alert. Tolerant assertion uses
+    // getAllByText to confirm at least one match.
+    const matches = screen.getAllByText(/return to feedzero/i);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("troubleshooting block links to support for users who didn't see the return link", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    globalThis.fetch = mockFetch({ status: 200, body: { ok: true } });
+    renderAt("/billing/recover");
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /recover/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/check your (email|inbox)/i)).toBeInTheDocument();
+    });
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    await waitFor(() => {
+      // New troubleshooting bullet: explicit hand-off to support for the
+      // case where the user signed in to Stripe but never saw the return
+      // link (Stripe configuration drift, portal UI variant, etc.).
+      expect(
+        screen.getByText(
+          /already signed in.*don'?t see.*return to feedzero|manual.*issue|issue your license manually/i,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
 });

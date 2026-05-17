@@ -90,8 +90,9 @@ export function BillingRecover() {
         <h1 className="text-2xl font-semibold">Recover your license</h1>
         <p className="text-sm text-muted-foreground">
           Enter the email you used to subscribe. We&apos;ll send you a sign-in
-          link via Stripe — open it on this device to restore your license
-          and activate sync.
+          link via Stripe — open it on this device, then click{" "}
+          <strong>&ldquo;Return to FeedZero&rdquo;</strong> at the top of the
+          Stripe page to finish activating your license here.
         </p>
       </header>
 
@@ -101,7 +102,9 @@ export function BillingRecover() {
             <AlertDescription>
               Check your email. If a subscription exists for{" "}
               <strong>{email}</strong>, Stripe will send you a sign-in link in
-              the next few minutes. Open it on this device to continue.
+              the next few minutes. Open it on this device, sign in, then
+              click <strong>&ldquo;Return to FeedZero&rdquo;</strong> at the
+              top of the Stripe page to activate your license.
             </AlertDescription>
           </Alert>
           {showTroubleshoot && (
@@ -117,7 +120,21 @@ export function BillingRecover() {
                   or a secondary inbox.
                 </li>
                 <li>
-                  Still stuck?{" "}
+                  Already signed in to Stripe and don&apos;t see a{" "}
+                  <strong>&ldquo;Return to FeedZero&rdquo;</strong> link at the
+                  top? Email{" "}
+                  <a
+                    href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Can't recover my FeedZero license")}&body=${encodeURIComponent(
+                      `Email I used at checkout: ${email}\n\nI signed in to Stripe but couldn't find the Return to FeedZero link.\n`,
+                    )}`}
+                    className="underline"
+                  >
+                    support@feedzero.app
+                  </a>{" "}
+                  — we can issue your license manually.
+                </li>
+                <li>
+                  Still stuck for another reason?{" "}
                   <a
                     href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Can't recover my FeedZero license")}&body=${encodeURIComponent(
                       `Email I used at checkout: ${email}\n\n(Anything else helpful here.)`,
