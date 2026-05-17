@@ -16,6 +16,7 @@ import {
 import type { Feed, Article } from "../../types/index.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
 import { groupByHostForRefresh } from "./group-by-host.ts";
+import { parseRetryAfter } from "./parse-retry-after.ts";
 
 interface AddFeedResult {
   feed: Feed;
@@ -228,6 +229,21 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
   try {
     const response = await proxyFetch("/api/feed", feed.url);
     if (!response.ok) {
+      // Surface Retry-After when the upstream rate-limits us so the user
+      // sees an actionable hint instead of a generic HTTP code. Per
+      // feedback #97 — self-host bulk refresh against fresh IPs trips
+      // upstream WAFs and the user needs to know when to retry.
+      if (response.status === 429) {
+        const retryAt = parseRetryAfter(
+          response.headers?.get?.("retry-after"),
+          Date.now(),
+        );
+        if (retryAt !== null) {
+          const seconds = Math.ceil((retryAt - Date.now()) / 1000);
+          return err(`Upstream rate-limited (429). Retry in ${seconds}s.`);
+        }
+        return err("Upstream rate-limited (429). Retry later.");
+      }
       return err(`Failed to fetch feed (HTTP ${response.status})`);
     }
     const text = await response.text();

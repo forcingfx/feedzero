@@ -491,6 +491,38 @@ describe("refreshFeed", () => {
     expect(result.error).toMatch(/Failed to fetch/);
   });
 
+  it("surfaces Retry-After when the upstream returns 429", async () => {
+    // Self-host scenario from feedback #97: a feed hit by upstream
+    // rate-limiting should tell the user when to retry, not a generic
+    // "Failed to fetch feed (HTTP 429)". The refresh worker doesn't
+    // know how to retry automatically yet (separate piece of work),
+    // but the error message must surface the upstream's hint.
+    const feed = await addTestFeed();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Map([["retry-after", "120"]]),
+    });
+
+    const result = await refreshFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/rate.?limit|429/i);
+    expect(result.error).toMatch(/120s|2 ?min/i);
+  });
+
+  it("falls back to a plain 429 message when no Retry-After is present", async () => {
+    const feed = await addTestFeed();
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Map(),
+    });
+    const result = await refreshFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/rate.?limit|429/i);
+  });
+
   it("should return 'Refresh failed: ...' when fetch throws (outer catch)", async () => {
     const feed = await addTestFeed();
 
