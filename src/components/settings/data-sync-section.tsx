@@ -199,7 +199,11 @@ export function DataSyncSection() {
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-lg border border-border bg-card min-h-[160px]">
+      <div
+        className={`relative overflow-hidden rounded-lg border border-border bg-card ${
+          gated ? "min-h-[160px]" : ""
+        }`}
+      >
         <div
           className={`p-4 space-y-3 ${
             gated ? "pointer-events-none select-none opacity-60" : ""
