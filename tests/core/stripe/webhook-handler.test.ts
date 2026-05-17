@@ -6,6 +6,7 @@ import {
 } from "@/core/stripe/webhook-handler";
 import {
   subscriptionCreatedEvent,
+  subscriptionCreatedEventDahlia,
   subscriptionDeletedEvent,
   subscriptionUpdatedEvent,
   subscriptionUpdatedEventDahlia,
@@ -146,6 +147,53 @@ describe("handleStripeWebhook", () => {
       customerId: CUSTOMER_ID,
       subscriptionId: SUBSCRIPTION_ID,
       tier: "pro",
+    });
+  });
+
+  // Trialing subscriptions arrive with `current_period_end` already set to the
+  // trial-end date. We MUST pass that through as expirySec — otherwise the
+  // issuer falls back to its 31-day default, which is fine for a 30-day trial
+  // (off by ~1 day) but wrong for any other trial length and brittle if the
+  // trial period changes. Pin the license to the subscription's own clock.
+  it("passes current_period_end (top-level) to issuer.issue for trialing subscription.created", async () => {
+    const trialEndSec = nowSec() + 30 * 24 * 60 * 60;
+    const fixture = subscriptionCreatedEvent({
+      customerId: CUSTOMER_ID,
+      subscriptionId: SUBSCRIPTION_ID,
+      tier: "personal",
+      current_period_end: trialEndSec,
+    });
+    const res = await handleStripeWebhook(
+      postFixture(fixture, nowSec()),
+      makeConfig(issuer),
+    );
+    expect(res.status).toBe(200);
+    expect(issuer.issue).toHaveBeenCalledWith({
+      customerId: CUSTOMER_ID,
+      subscriptionId: SUBSCRIPTION_ID,
+      tier: "personal",
+      expirySec: trialEndSec,
+    });
+  });
+
+  it("reads current_period_end from items.data[0] when top-level is missing (dahlia subscription.created)", async () => {
+    const trialEndSec = nowSec() + 30 * 24 * 60 * 60;
+    const fixture = subscriptionCreatedEventDahlia({
+      customerId: CUSTOMER_ID,
+      subscriptionId: SUBSCRIPTION_ID,
+      tier: "personal",
+      current_period_end: trialEndSec,
+    });
+    const res = await handleStripeWebhook(
+      postFixture(fixture, nowSec()),
+      makeConfig(issuer),
+    );
+    expect(res.status).toBe(200);
+    expect(issuer.issue).toHaveBeenCalledWith({
+      customerId: CUSTOMER_ID,
+      subscriptionId: SUBSCRIPTION_ID,
+      tier: "personal",
+      expirySec: trialEndSec,
     });
   });
 

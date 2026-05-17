@@ -141,6 +141,29 @@ describe("LicenseIssuerImpl — issue (interface method)", () => {
     const fetched = await storage.get("interface_method_key_id_xxxxxxxx");
     expect(isOk(fetched) && fetched.value?.customerId).toBe("cus_006");
   });
+
+  // When the Stripe webhook receives `customer.subscription.created` for a
+  // trialing subscription, the subscription's `current_period_end` is the
+  // trial-end date (not 31 days as the issuer's hardcoded default would
+  // assume). The interface must let the caller pin expiry to that value so
+  // the license expires when the trial does, not a day later.
+  it("honors a caller-supplied expirySec via the public interface", async () => {
+    const customExpiry = NOW + 7 * 24 * 3600;
+    const { issuer, storage } = makeIssuer({
+      generateKeyId: () => "interface_expiry_key_id_yyyyyyyy",
+    });
+
+    const result = await issuer.issue({
+      customerId: "cus_007",
+      tier: "personal",
+      subscriptionId: "sub_007",
+      expirySec: customExpiry,
+    });
+    expect(isOk(result)).toBe(true);
+
+    const fetched = await storage.get("interface_expiry_key_id_yyyyyyyy");
+    expect(isOk(fetched) && fetched.value?.expirySec).toBe(customExpiry);
+  });
 });
 
 describe("LicenseIssuerImpl — revoke", () => {

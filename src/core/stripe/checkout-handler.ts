@@ -35,6 +35,24 @@ export const SUPPORTED_METHODS: readonly string[] = ["POST"];
 const ROUTE = "/api/checkout/create-session";
 
 /**
+ * Free-trial duration applied to every Checkout Session this handler creates.
+ *
+ * Why a server-controlled constant (not env var, not Dashboard config, not a
+ * client-supplied flag):
+ *  - Monetary terms must live in code review history, not in dashboards that
+ *    silently drift between staging and live mode.
+ *  - The client cannot be trusted to choose a trial length — an env var
+ *    would just push the same trust problem one layer down.
+ *  - Flags-and-toggles are debt (CLAUDE.md "Principles → Design").
+ *
+ * To shorten or extend the trial: edit this constant. To sunset the trial:
+ * remove the `subscription_data` field from the create call entirely —
+ * Stripe rejects `trial_period_days: 0`, so a zero value is not a valid
+ * off-switch.
+ */
+const TRIAL_PERIOD_DAYS = 30;
+
+/**
  * Minimal subset of `stripe.checkout.sessions.create` we depend on. Defining
  * it here means tests pass a fake without pulling in the Stripe SDK.
  */
@@ -55,6 +73,12 @@ export interface CheckoutClient {
        * without this checkbox the waiver is unenforceable.
        */
       consent_collection?: { terms_of_service: "required" | "none" };
+      /**
+       * Trial-period configuration. Stripe lets the Checkout Session inject
+       * a trial directly on the underlying Subscription. Stripe docs:
+       * https://docs.stripe.com/api/checkout/sessions/create#create_checkout_session-subscription_data
+       */
+      subscription_data?: { trial_period_days: number };
     },
     opts?: { idempotencyKey?: string },
   ): Promise<{ url: string | null; id: string }>;
@@ -224,6 +248,7 @@ export async function handleCreateCheckoutSession(
         // CheckoutClient.create JSDoc for the why; without this, the waiver
         // text in our Terms is unenforceable against an EU consumer.
         consent_collection: { terms_of_service: "required" },
+        subscription_data: { trial_period_days: TRIAL_PERIOD_DAYS },
         ...(parsed.args.customerEmail
           ? { customer_email: parsed.args.customerEmail }
           : {}),
