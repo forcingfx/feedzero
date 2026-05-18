@@ -1,15 +1,28 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { CheckCheck } from "lucide-react";
+import { ArrowUpDown, Check, CheckCheck } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useAppStore } from "@/stores/app-store.ts";
 import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
 import { ArticleItem } from "./article-item.tsx";
 import { ArticleGroupSummaryRow } from "./article-group-summary-row.tsx";
 import { groupArticles } from "@/lib/group-articles.ts";
-import type { Article } from "@/types/index.ts";
+import type { Article, ArticleSortMode } from "@/types/index.ts";
+import { ARTICLE_SORT_MODES } from "@/types/index.ts";
+
+const SORT_LABELS: Record<ArticleSortMode, string> = {
+  "newest": "Newest first",
+  "oldest": "Oldest first",
+  "unread-first": "Unread first",
+};
 
 /**
  * Flat list-entry shape: every row the virtualizer renders is either a
@@ -71,6 +84,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectArticle = useArticleStore((s) => s.selectArticle);
   const markAllAsRead = useArticleStore((s) => s.markAllAsRead);
   const isLoading = useArticleStore((s) => s.isLoading);
+  const articleSortMode = useArticleStore((s) => s.articleSortMode);
+  const setArticleSortMode = useArticleStore((s) => s.setArticleSortMode);
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -242,6 +257,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto relative">
+      <SortMenu mode={articleSortMode} onChange={setArticleSortMode} />
       <ul
         role="listbox"
         aria-label="Articles"
@@ -300,6 +316,41 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
         })}
       </ul>
       <MarkReadPill unreadCount={unreadCount} onMarkAll={markAllAsRead} />
+    </div>
+  );
+}
+
+function SortMenu({
+  mode,
+  onChange,
+}: {
+  mode: ArticleSortMode;
+  onChange: (mode: ArticleSortMode) => void;
+}) {
+  return (
+    <div className="sticky top-0 z-10 flex justify-end px-2 py-1 bg-background/80 backdrop-blur-sm pointer-events-none">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="pointer-events-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            aria-label={`Sort: ${SORT_LABELS[mode]}`}
+          >
+            <ArrowUpDown className="size-3" />
+            <span>{SORT_LABELS[mode]}</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-36">
+          {ARTICLE_SORT_MODES.map((m) => (
+            <DropdownMenuItem key={m} onClick={() => onChange(m)}>
+              <Check
+                className={`size-3.5 mr-1.5 ${mode === m ? "opacity-100" : "opacity-0"}`}
+              />
+              {SORT_LABELS[m]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

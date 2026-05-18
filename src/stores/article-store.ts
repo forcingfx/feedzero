@@ -8,11 +8,13 @@ import { useSyncStore } from "./sync-store.ts";
 import { useFeedStore } from "./feed-store.ts";
 import {
   ALL_FEEDS_ID,
+  LOCAL_STORAGE,
   isFolderFeedId,
   isAggregatedFeedId,
   fromFolderFeedId,
 } from "../utils/constants.ts";
-import type { Article } from "../types/index.ts";
+import type { Article, ArticleSortMode } from "../types/index.ts";
+import { ARTICLE_SORT_MODES } from "../types/index.ts";
 
 /**
  * `articlesByFeedId` is the single source of truth for loaded article data,
@@ -35,12 +37,16 @@ interface ArticleStore {
   articles: Article[];
   selectedArticle: Article | null;
   isLoading: boolean;
+  /** User-chosen sort order for the visible article list; persisted. */
+  articleSortMode: ArticleSortMode;
   /** Preload every article into the store; used on startup and on refresh. */
   preloadAll: () => Promise<void>;
   loadArticles: (feedId: string) => Promise<void>;
   selectArticle: (article: Article | null) => Promise<void>;
   markAsRead: (articleId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  /** Switch sort order; re-derives the visible list immediately. No-op on unknown modes. */
+  setArticleSortMode: (mode: ArticleSortMode) => void;
 }
 
 /** Delay before an opened article is marked as read (ms). */
@@ -63,9 +69,40 @@ export function selectUnreadCount(
   return count;
 }
 
-/** Sort articles by publishedAt descending (most recent first). */
-function sortArticles(articles: Article[]): Article[] {
-  return [...articles].sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0));
+/**
+ * Sort articles according to the current user-chosen mode.
+ * "newest" — publishedAt descending (the historical default).
+ * "oldest" — publishedAt ascending.
+ * "unread-first" — unread group first, read group second; newest-first within each.
+ */
+function sortArticles(articles: Article[], mode: ArticleSortMode = "newest"): Article[] {
+  const newestFirst = (a: Article, b: Article) =>
+    (b.publishedAt ?? 0) - (a.publishedAt ?? 0);
+  if (mode === "oldest") {
+    return [...articles].sort(
+      (a, b) => (a.publishedAt ?? 0) - (b.publishedAt ?? 0),
+    );
+  }
+  if (mode === "unread-first") {
+    return [...articles].sort((a, b) => {
+      if (a.read !== b.read) return a.read ? 1 : -1;
+      return newestFirst(a, b);
+    });
+  }
+  return [...articles].sort(newestFirst);
+}
+
+/** Read the persisted sort mode, or fall back to "newest" if absent / invalid. */
+function loadPersistedSortMode(): ArticleSortMode {
+  try {
+    const raw = globalThis.localStorage?.getItem(LOCAL_STORAGE.ARTICLE_SORT_MODE);
+    if (raw && (ARTICLE_SORT_MODES as readonly string[]).includes(raw)) {
+      return raw as ArticleSortMode;
+    }
+  } catch {
+    // localStorage unavailable (private mode / SSR / sandboxed iframe) — fall through.
+  }
+  return "newest";
 }
 
 /** Group an article list into per-feed buckets. */
@@ -80,16 +117,19 @@ function groupByFeedId(articles: Article[]): Record<string, Article[]> {
 /**
  * Derive the visible article list for the requested (possibly aggregated)
  * feed id. ALL_FEEDS_ID flat-maps every loaded feed; folder feed ids restrict
- * to folder members; a concrete feed id returns that feed's list directly.
+ * to folder members; a concrete feed id returns that feed's list.
+ * All paths apply the current sort mode so switching the mode always
+ * re-orders the visible list.
  */
 function deriveVisibleArticles(
   articlesByFeedId: Record<string, Article[]>,
   feedId: string,
+  sortMode: ArticleSortMode,
 ): Article[] {
   if (feedId === ALL_FEEDS_ID) {
     const flat: Article[] = [];
     for (const list of Object.values(articlesByFeedId)) flat.push(...list);
-    return sortArticles(flat);
+    return sortArticles(flat, sortMode);
   }
   if (isFolderFeedId(feedId)) {
     const folderId = fromFolderFeedId(feedId)!;
@@ -103,9 +143,9 @@ function deriveVisibleArticles(
     for (const [id, list] of Object.entries(articlesByFeedId)) {
       if (memberIds.has(id)) flat.push(...list);
     }
-    return sortArticles(flat);
+    return sortArticles(flat, sortMode);
   }
-  return articlesByFeedId[feedId] ?? [];
+  return sortArticles(articlesByFeedId[feedId] ?? [], sortMode);
 }
 
 /** Replace articles for a set of feeds and refresh the visible list. */
@@ -138,6 +178,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   articles: [],
   selectedArticle: null,
   isLoading: false,
+  articleSortMode: loadPersistedSortMode(),
 
   preloadAll: async () => {
     const result = await getAllArticles();
@@ -148,7 +189,12 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   loadArticles: async (feedId) => {
     // Show whatever we already have for this view instantly — derived from
     // the source of truth, no separate cache to keep in sync.
-    const cachedVisible = deriveVisibleArticles(get().articlesByFeedId, feedId);
+    const sortMode = get().articleSortMode;
+    const cachedVisible = deriveVisibleArticles(
+      get().articlesByFeedId,
+      feedId,
+      sortMode,
+    );
     set({
       articles: cachedVisible,
       selectedArticle: null,
@@ -184,7 +230,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     const nextByFeed = mergeFetchedArticles(get(), feedId, fetched);
     set({
       articlesByFeedId: nextByFeed,
-      articles: deriveVisibleArticles(nextByFeed, feedId),
+      articles: deriveVisibleArticles(nextByFeed, feedId, get().articleSortMode),
       isLoading: false,
     });
   },
@@ -277,6 +323,25 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       await updateArticle({ ...article, read: true });
     }
     useSyncStore.getState().scheduleSyncPush();
+  },
+
+  setArticleSortMode: (mode) => {
+    // Guard so a typo or stale persisted value (after we drop a mode in a
+    // future version) doesn't corrupt the store with an unknown literal.
+    if (!(ARTICLE_SORT_MODES as readonly string[]).includes(mode)) return;
+    try {
+      globalThis.localStorage?.setItem(LOCAL_STORAGE.ARTICLE_SORT_MODE, mode);
+    } catch {
+      // localStorage write failed (private mode / quota) — keep the in-memory
+      // change anyway so the current session reflects the user's choice.
+    }
+    // Re-sort the visible list in place. The set of visible articles doesn't
+    // change with sort mode — only their order — so we don't need to know
+    // the active feed id to do this correctly.
+    set({
+      articleSortMode: mode,
+      articles: sortArticles(get().articles, mode),
+    });
   },
 }));
 

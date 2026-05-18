@@ -70,6 +70,7 @@ export const LOCAL_STORAGE = {
   FOLDER_CUSTOM_ORDER: "feedzero:folder-custom-order",
   AUTO_ORGANIZE_DISMISSED_COUNT: "feedzero:auto-organize-dismissed-count",
   GROUP_ARTICLE_FLOODS: "feedzero:group-article-floods",
+  ARTICLE_SORT_MODE: "feedzero:article-sort-mode",
 } as const;
 
 /**

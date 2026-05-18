@@ -46,7 +46,9 @@ describe("article-store", () => {
       articlesByFeedId: {},
       selectedArticle: null,
       isLoading: false,
+      articleSortMode: "newest",
     });
+    window.localStorage.removeItem("feedzero:article-sort-mode");
     vi.clearAllMocks();
   });
 
@@ -411,6 +413,77 @@ describe("article-store", () => {
       expect(useArticleStore.getState().selectedArticle?.feedId).toBe(
         "feed-in-folder",
       );
+    });
+  });
+
+  describe("article sort mode", () => {
+    // Reader-polish quick win: power users want to flip between newest,
+    // oldest, and unread-first without leaving the article pane. Sort is a
+    // user preference, persisted to localStorage so it survives reload.
+    const at = (id: string, publishedAt: number, read = false) => ({
+      id,
+      feedId: "f1",
+      guid: id,
+      title: id,
+      link: `https://example.com/${id}`,
+      content: "",
+      summary: "",
+      author: "",
+      publishedAt,
+      read,
+      createdAt: 0,
+    });
+
+    it("defaults to 'newest' so the historical sort behaviour is preserved", () => {
+      expect(useArticleStore.getState().articleSortMode).toBe("newest");
+    });
+
+    it("setArticleSortMode('oldest') reverses the chronological order in the visible list", async () => {
+      const articles = [at("old", 100), at("mid", 200), at("new", 300)];
+      vi.mocked(getArticles).mockResolvedValue({ ok: true, value: articles });
+      await useArticleStore.getState().loadArticles("f1");
+
+      useArticleStore.getState().setArticleSortMode("oldest");
+
+      expect(useArticleStore.getState().articles.map((a) => a.id)).toEqual([
+        "old",
+        "mid",
+        "new",
+      ]);
+    });
+
+    it("setArticleSortMode('unread-first') groups unread before read; within each group, newest first", async () => {
+      const articles = [
+        at("read-newest", 400, true),
+        at("unread-old", 100, false),
+        at("read-old", 200, true),
+        at("unread-newest", 300, false),
+      ];
+      vi.mocked(getArticles).mockResolvedValue({ ok: true, value: articles });
+      await useArticleStore.getState().loadArticles("f1");
+
+      useArticleStore.getState().setArticleSortMode("unread-first");
+
+      expect(useArticleStore.getState().articles.map((a) => a.id)).toEqual([
+        "unread-newest",
+        "unread-old",
+        "read-newest",
+        "read-old",
+      ]);
+    });
+
+    it("persists the chosen mode to localStorage", () => {
+      useArticleStore.getState().setArticleSortMode("oldest");
+      expect(window.localStorage.getItem("feedzero:article-sort-mode")).toBe(
+        "oldest",
+      );
+    });
+
+    it("rejects unknown modes (no-op, keeps previous mode)", () => {
+      useArticleStore.getState().setArticleSortMode("newest");
+      // @ts-expect-error — intentionally bad input
+      useArticleStore.getState().setArticleSortMode("random-nonsense");
+      expect(useArticleStore.getState().articleSortMode).toBe("newest");
     });
   });
 });
