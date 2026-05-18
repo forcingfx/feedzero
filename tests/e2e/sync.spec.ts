@@ -9,6 +9,16 @@ import type { Page } from "@playwright/test";
  * "Sync & Data", and the primary sync affordance is a <Switch> toggle (not
  * the prior "Enable sync" / "Use existing cloud account" buttons).
  *
+ * IMPORTANT: in e2e the default tier is `free` and the build is hosted, so
+ * the Cloud sync card mounts with the frosted-glass gate overlay. The
+ * gate wraps its content in `aria-hidden=true` so screen readers focus on
+ * the upgrade CTA rather than the blurred toggle. That means the
+ * "Cloud sync" <h3> is unreachable via Playwright's `getByRole`
+ * (which filters out aria-hidden) when this helper runs. We wait on the
+ * Danger zone heading instead — it's a sibling card, always rendered,
+ * never aria-hidden, so it's a reliable signal that the Sync & Data tab
+ * has actually mounted.
+ *
  * On mobile, the sidebar Settings button is inside the bottom drawer which
  * we open first.
  */
@@ -36,9 +46,11 @@ async function goToSyncSection(page: Page) {
   // Switch to the Sync & Data tab if the page didn't open straight onto it.
   await page.getByRole("radio", { name: /sync and data/i }).click();
   await page.waitForURL(/\/settings\?tab=sync-and-data/, { timeout: 5000 });
-  await expect(page.getByRole("heading", { name: /cloud sync/i })).toBeVisible({
-    timeout: 5000,
-  });
+  // Always-visible anchor — see the helper docstring on why this is NOT
+  // the Cloud sync heading.
+  await expect(
+    page.getByRole("heading", { name: /danger zone/i }),
+  ).toBeVisible({ timeout: 5000 });
 }
 
 async function addFeedForSync(page: Page) {
@@ -51,18 +63,20 @@ async function addFeedForSync(page: Page) {
 }
 
 test.describe("Sync", () => {
-  test("Sync & Data tab shows the Cloud sync section + local-only status", async ({
+  test("Sync & Data tab gates the cloud sync toggle for free-tier hosted users", async ({
     feedPage: page,
   }) => {
     await addFeedForSync(page);
     await goToSyncSection(page);
-    await expect(
-      page.getByRole("heading", { name: /cloud sync/i }),
-    ).toBeVisible();
-    // Free-tier hosted users see the upgrade overlay rather than the
-    // local-only status — assert the gate is present.
+    // The Cloud sync card content is aria-hidden behind the frosted-glass
+    // gate; the user-visible state is the overlay's headline. Asserting on
+    // the overlay text (not the hidden heading) matches what the user
+    // actually sees and what they can interact with.
     await expect(
       page.getByText(/cloud sync requires a subscription/i),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /upgrade plan/i }),
     ).toBeVisible();
   });
 
