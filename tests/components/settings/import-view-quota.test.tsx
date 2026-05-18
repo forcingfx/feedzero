@@ -73,7 +73,7 @@ describe("ImportView quota refusal", () => {
       { length: 10 },
       (_, i) => `https://example.com/import-${i}.xml`,
     ).join("\n");
-    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(ten);
 
@@ -98,7 +98,7 @@ describe("ImportView quota refusal", () => {
       { length: 4 },
       (_, i) => `https://example.com/fits-${i}.xml`,
     ).join("\n");
-    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(four);
 
@@ -120,7 +120,7 @@ describe("ImportView quota refusal", () => {
       { length: 50 },
       (_, i) => `https://example.com/paid-${i}.xml`,
     ).join("\n");
-    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(fifty);
 
@@ -144,7 +144,7 @@ describe("ImportView quota refusal", () => {
       { length: 50 },
       (_, i) => `https://example.com/prelaunch-${i}.xml`,
     ).join("\n");
-    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(fifty);
 

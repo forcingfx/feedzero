@@ -83,7 +83,7 @@ describe("ImportView — preserves OPML folder structure (PR E)", () => {
     render(<ImportView onClose={() => {}} />);
 
     await user.click(screen.getByLabelText(/paste text/i));
-    const textarea = screen.getByPlaceholderText(/paste opml xml or feed urls/i);
+    const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(FOLDERED_OPML);
     await user.click(screen.getByRole("button", { name: /import feeds/i }));
