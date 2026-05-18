@@ -91,6 +91,10 @@ vi.mock("../../../src/core/storage/db.ts", () => {
       feeds.set(feed.url, feed);
       return { ok: true, value: true };
     }),
+    updateFeed: vi.fn(async (feed) => {
+      feeds.set(feed.url, feed);
+      return { ok: true, value: true };
+    }),
     addArticles: vi.fn(async (arts) => {
       for (const a of arts) articles.set(a.id, a);
       return { ok: true, value: true };
@@ -535,6 +539,127 @@ describe("refreshFeed", () => {
     expect(isErr(result)).toBe(true);
     expect(result.error).toMatch(/Refresh failed/);
     expect(result.error).toMatch(/connection reset/);
+  });
+
+  it("surfaces upstream Retry-After seconds when the server returns 429", async () => {
+    // The proxy propagates Retry-After verbatim for 429/503. Surfacing it
+    // in the error message lets the UI tell the user "this feed asked us
+    // to back off for N seconds" rather than the bare HTTP code.
+    const feed = await addTestFeed();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Headers({ "Retry-After": "60" }),
+    });
+
+    const result = await refreshFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/429/);
+    expect(result.error).toMatch(/retry after 60s/i);
+  });
+
+  it("surfaces upstream Retry-After seconds when the server returns 503", async () => {
+    const feed = await addTestFeed();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      headers: new Headers({ "Retry-After": "30" }),
+    });
+
+    const result = await refreshFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/503/);
+    expect(result.error).toMatch(/retry after 30s/i);
+  });
+
+  it("falls back to bare HTTP status when Retry-After is absent", async () => {
+    const feed = await addTestFeed();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Headers(),
+    });
+
+    const result = await refreshFeed(feed);
+    expect(isErr(result)).toBe(true);
+    expect(result.error).toMatch(/429/);
+    expect(result.error).not.toMatch(/retry after/i);
+  });
+
+  describe("freshness timestamps", () => {
+    // Stale-feed UI: every refresh must persist when we last reached the
+    // publisher so the sidebar can show a stale indicator after N days of
+    // silent failure. Two timestamps because they answer different questions:
+    //   lastFetchedAt          → "did we even try recently?"
+    //   lastSuccessfulFetchAt  → "did the publisher actually respond?"
+    it("records both lastFetchedAt and lastSuccessfulFetchAt on success", async () => {
+      const before = Date.now();
+      const feed = await addTestFeed();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      await refreshFeed(feed);
+
+      expect(db.updateFeed).toHaveBeenCalled();
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.lastFetchedAt).toBeGreaterThanOrEqual(before);
+      expect(lastCall.lastSuccessfulFetchAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it("records only lastFetchedAt on HTTP failure (publisher unreachable)", async () => {
+      const feed = await addTestFeed();
+      const baselineSuccess = feed.lastSuccessfulFetchAt; // undefined for fresh feed
+      const before = Date.now();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        headers: new Headers(),
+      });
+      await refreshFeed(feed);
+
+      expect(db.updateFeed).toHaveBeenCalled();
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.lastFetchedAt).toBeGreaterThanOrEqual(before);
+      expect(lastCall.lastSuccessfulFetchAt).toBe(baselineSuccess);
+    });
+
+    it("records only lastFetchedAt when fetch throws (network error)", async () => {
+      const feed = await addTestFeed();
+      const before = Date.now();
+
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("connection reset"));
+      await refreshFeed(feed);
+
+      expect(db.updateFeed).toHaveBeenCalled();
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.lastFetchedAt).toBeGreaterThanOrEqual(before);
+      expect(lastCall.lastSuccessfulFetchAt).toBeUndefined();
+    });
+
+    it("preserves a prior lastSuccessfulFetchAt across a failing refresh", async () => {
+      // Feed has been successfully fetched in the past; a transient failure
+      // must not clobber that history — the stale-indicator threshold counts
+      // from the prior success.
+      const feed = await addTestFeed();
+      const yesterday = Date.now() - 24 * 60 * 60 * 1000;
+      feed.lastSuccessfulFetchAt = yesterday;
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: new Headers(),
+      });
+      await refreshFeed(feed);
+
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.lastSuccessfulFetchAt).toBe(yesterday);
+    });
   });
 });
 

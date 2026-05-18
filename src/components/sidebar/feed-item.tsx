@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils.ts";
 import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
+import { isFeedStale } from "@/lib/stale-feed.ts";
 import {
   SidebarMenuAction,
   SidebarMenuBadge,
@@ -92,6 +93,13 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
           <FeedFavicon siteUrl={feed.siteUrl} />
           <span className="truncate">{feed.title}</span>
           {isRefreshing && <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />}
+          {!isRefreshing && isFeedStale(feed) && (
+            <AlertTriangle
+              className="size-3 shrink-0 text-amber-500"
+              aria-label="This feed hasn't updated in over 14 days"
+              data-testid="stale-feed-indicator"
+            />
+          )}
         </SidebarMenuButton>
       )}
       <DropdownMenu>

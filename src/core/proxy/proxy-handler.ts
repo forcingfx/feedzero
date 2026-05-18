@@ -133,13 +133,13 @@ export async function handleProxyRequest(
       const cleaned = cleanFeedContent(text);
       return new Response(cleaned, {
         status: response.status,
-        headers: { "Content-Type": contentType },
+        headers: buildResponseHeaders(contentType, response),
       });
     }
 
     return new Response(body, {
       status: response.status,
-      headers: { "Content-Type": contentType },
+      headers: buildResponseHeaders(contentType, response),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
@@ -154,6 +154,23 @@ export async function handleProxyRequest(
     );
     return new Response(`Proxy error: ${message}`, { status: 502 });
   }
+}
+
+/**
+ * Build the response headers for an upstream passthrough. Always sets
+ * Content-Type. For 429/503, propagates Retry-After verbatim (RFC 7231 §7.1.3)
+ * so the client can back off instead of hammering the origin.
+ */
+function buildResponseHeaders(
+  contentType: string,
+  upstream: Response,
+): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": contentType };
+  if (upstream.status === 429 || upstream.status === 503) {
+    const retryAfter = upstream.headers.get("Retry-After");
+    if (retryAfter) headers["Retry-After"] = retryAfter;
+  }
+  return headers;
 }
 
 /** Extract target URL from POST body (preferred) or GET query param (fallback). */
