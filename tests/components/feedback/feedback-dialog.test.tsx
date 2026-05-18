@@ -29,31 +29,140 @@ describe("FeedbackDialog", () => {
     vi.unstubAllGlobals();
   });
 
-  it("submits the message to /api/feedback as JSON POST", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
+  describe("channel surfaces (issue #102)", () => {
+    it("links out to the public GitHub issues page", () => {
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+      const link = screen.getByRole("link", { name: /browse on github/i });
+      expect(link.getAttribute("href")).toBe(
+        "https://github.com/forcingfx/feedzero/issues",
+      );
+      expect(link.getAttribute("target")).toBe("_blank");
+    });
 
-    const onOpenChange = vi.fn();
-    render(<FeedbackDialog open={true} onOpenChange={onOpenChange} />);
+    it("exposes a mailto link to support", () => {
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+      const link = screen.getByRole("link", { name: /email support/i });
+      expect(link.getAttribute("href")).toBe("mailto:support@feedzero.app");
+    });
 
-    const textarea = screen.getByPlaceholderText("What's on your mind?");
-    await userEvent.type(textarea, "I love this app");
-    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+    it("warns that a provided email becomes visible on the public GitHub issue", () => {
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+      expect(
+        screen.getByText(/email will be visible on the public github issue/i),
+      ).toBeInTheDocument();
+    });
+  });
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      "/api/feedback",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          "Content-Type": "application/json",
+  describe("submission payload", () => {
+    it("submits message-only when no email is provided", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
         }),
-        body: JSON.stringify({ message: "I love this app" }),
-      }),
-    );
+      );
+
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+      await userEvent.type(
+        screen.getByPlaceholderText("What's on your mind?"),
+        "I love this app",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /send/i }));
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/feedback",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ message: "I love this app" }),
+        }),
+      );
+    });
+
+    it("includes the email in the payload when the user provides one", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+      await userEvent.type(
+        screen.getByPlaceholderText("What's on your mind?"),
+        "Found a bug",
+      );
+      await userEvent.type(
+        screen.getByLabelText(/email/i),
+        "alice@example.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /send/i }));
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/feedback",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            message: "Found a bug",
+            email: "alice@example.com",
+          }),
+        }),
+      );
+    });
+
+    it("trims whitespace from the email before sending", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+      await userEvent.type(
+        screen.getByPlaceholderText("What's on your mind?"),
+        "hello",
+      );
+      await userEvent.type(
+        screen.getByLabelText(/email/i),
+        "  bob@example.com  ",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /send/i }));
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/feedback",
+        expect.objectContaining({
+          body: JSON.stringify({
+            message: "hello",
+            email: "bob@example.com",
+          }),
+        }),
+      );
+    });
+
+    it("omits the email key entirely when only whitespace is entered", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+      await userEvent.type(
+        screen.getByPlaceholderText("What's on your mind?"),
+        "hello",
+      );
+      await userEvent.type(screen.getByLabelText(/email/i), "   ");
+      await userEvent.click(screen.getByRole("button", { name: /send/i }));
+
+      // No email field in the body — server should treat as anonymous.
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/feedback",
+        expect.objectContaining({
+          body: JSON.stringify({ message: "hello" }),
+        }),
+      );
+    });
   });
 
   it("shows success toast and closes the dialog when submission succeeds", async () => {

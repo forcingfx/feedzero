@@ -5,14 +5,19 @@
  * token with `repo` scope, scoped to the issues repo) and GITHUB_REPO env var
  * in the form "owner/repo" (e.g. "forcingfx/feedzero").
  *
- * No user identity is collected. The message is the only content posted.
+ * Anonymous by default. If the user supplies an email, it is appended to the
+ * issue body as a "Reply to:" line so the maintainer can email them back. The
+ * UI surfaces a warning that the email becomes part of the public issue
+ * before the user types it — see <FeedbackDialog>.
  */
 
 interface FeedbackBody {
   message?: string;
+  email?: string;
 }
 
 const MAX_MESSAGE_LENGTH = 2000;
+const MAX_EMAIL_LENGTH = 254;
 
 /**
  * HTTP methods this handler accepts. Used by the routing contract test in
@@ -56,6 +61,21 @@ export async function handleFeedbackRequest(
     );
   }
 
+  // Email is optional. Reject obviously malformed values so a stray copy-paste
+  // doesn't end up in the public issue body, but keep validation permissive —
+  // the maintainer is the one who'll actually try replying.
+  const email = body.email?.trim();
+  if (email) {
+    if (email.length > MAX_EMAIL_LENGTH || !email.includes("@")) {
+      return jsonResponse(
+        { ok: false, error: "Email looks invalid" },
+        400,
+      );
+    }
+  }
+
+  const issueBody = email ? `${message}\n\n— Reply to: ${email}` : message;
+
   try {
     const response = await fetch(
       `https://api.github.com/repos/${repo}/issues`,
@@ -70,7 +90,7 @@ export async function handleFeedbackRequest(
         },
         body: JSON.stringify({
           title: `Feedback: ${message.slice(0, 80)}${message.length > 80 ? "…" : ""}`,
-          body: message,
+          body: issueBody,
           labels: ["feedback"],
         }),
       },

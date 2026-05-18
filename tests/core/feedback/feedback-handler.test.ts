@@ -124,6 +124,62 @@ describe("handleFeedbackRequest", () => {
     expect(sent.labels).toEqual(["feedback"]);
   });
 
+  it("appends a 'Reply to:' line to the issue body when an email is provided (issue #102)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await handleFeedbackRequest(
+      postJson({
+        message: "Could not subscribe to https://example.com/feed",
+        email: "alice@example.com",
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.body).toBe(
+      "Could not subscribe to https://example.com/feed\n\n— Reply to: alice@example.com",
+    );
+    // The title is built from the raw message, not the augmented body — the
+    // user's email should not leak into the issue title.
+    expect(sent.title).not.toContain("alice@example.com");
+  });
+
+  it("rejects an email missing the '@' separator with 400", async () => {
+    const res = await handleFeedbackRequest(
+      postJson({ message: "hi", email: "not-an-email" }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/email/i);
+  });
+
+  it("rejects an email longer than 254 characters with 400", async () => {
+    const longEmail = "a".repeat(250) + "@x.io";
+    const res = await handleFeedbackRequest(
+      postJson({ message: "hi", email: longEmail }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("treats whitespace-only email as absent (no Reply-to line, no validation failure)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await handleFeedbackRequest(
+      postJson({ message: "hi", email: "   " }),
+    );
+    expect(res.status).toBe(200);
+
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.body).toBe("hi");
+    expect(sent.body).not.toContain("Reply to");
+  });
+
   it("truncates the issue title at 80 characters with an ellipsis", async () => {
     const longMessage = "a".repeat(150);
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
