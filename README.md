@@ -55,8 +55,8 @@ Paste any URL into the "Add feed" input:
 
 ### Cloud Sync (Optional)
 
-1. Open Settings → Data & Storage
-2. Enable cloud sync
+1. Open Settings → Sync & Data
+2. Toggle Cloud sync on
 3. Save your 4-word passphrase — it's the only way to access your data
 
 Your passphrase never leaves your browser. The server stores only encrypted blobs.
@@ -114,7 +114,40 @@ Crypto API (which encrypts your data at rest) behind a secure context, so
 plain `http://<lan-ip>:3000` will refuse to start. The app detects this and
 shows you the fix.
 
+> ⚠️ Use a real cert. Caddy's `tls internal` directive and self-signed
+> certs trigger a browser warning *before* FeedZero loads. Browsers won't
+> accept the cert silently and the app can't help you past that screen.
+> Use Let's Encrypt (the Caddy default for public domains) or your own
+> CA + import it into your client browser's trust store.
+
 **See the full guide:** [feedzero.app/docs/self-hosting](https://feedzero.app/docs/self-hosting)
+
+### Troubleshooting
+
+When something doesn't work, open **Settings → Help → Self-host preflight**.
+It runs four cheap probes and tells you exactly which layer is wrong:
+
+| Check | What it means when it fails |
+|-------|----------------------------|
+| Secure context (HTTPS or localhost) | Browser refuses Web Crypto on the current origin. Fix TLS or visit from `localhost`. |
+| Web Crypto API exposed | iOS Lockdown Mode or an ancient browser. |
+| `/api/feed` reachable | Reverse proxy isn't routing `/api/*` to FeedZero's `:3000`. |
+| `/api/sync` reachable | Same as above for the sync route. |
+
+Common pitfalls:
+
+- **"My browser shows a TLS warning before FeedZero loads."** That's a
+  certificate problem, not a FeedZero problem. See the TLS callout above.
+- **"Feeds work on `my.feedzero.app` but fail on my server."** Almost
+  always upstream rate-limiting (429) or WAF-class blocking from your
+  IP. The browser-like User-Agent default mitigates but doesn't
+  eliminate it. Set `FEED_USER_AGENT="MyReader/1.0 (contact: me@example.com)"`
+  if you want an identifying UA upstream operators can allowlist.
+- **"`/api/sync` returns 401 even though I'm self-hosting."** You set
+  `LAUNCH_PAID_TIER=1`. Don't. The `SELF_HOSTED=1` master switch
+  suppresses it, but only if you haven't *also* set the paid-tier flag
+  on the same process.
+- **"Reset hangs."** Pre-`v0.9.x` only. Updating fixes it.
 
 ### What `VITE_SELF_HOSTED=1` does
 

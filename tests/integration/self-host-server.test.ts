@@ -70,6 +70,33 @@ describe("self-host server integration", () => {
       expect(res.status).toBeLessThan(500);
     });
 
+    it("HEAD without a vaultId returns 400 — the Settings gate overlay probe path", async () => {
+      // `data-sync-section.tsx::probeSyncServer()` fires `HEAD /api/sync`
+      // with NO query string and treats any `< 500` response as "server
+      // reachable". The exact status must be 400 ("Invalid or missing
+      // vaultId"). If the handler ever started returning 5xx for malformed
+      // input, the overlay would silently invert from "locked" to
+      // "available" and self-hosters would be told sync is ready when it
+      // isn't. Lock the response code, not just `< 500`.
+      const app = buildSelfHostApp();
+      const res = await app.request("/api/sync", { method: "HEAD" });
+      expect(res.status).toBe(400);
+    });
+
+    it("HEAD with the literal vaultId=preflight string returns 400 — the runSelfHostPreflight() probe path", async () => {
+      // `core/diagnostics/self-host-preflight.ts` probes `HEAD
+      // /api/sync?vaultId=preflight`. The string "preflight" is
+      // deliberately not 64-hex, so validation rejects it. The preflight
+      // helper treats the 400 as "server is up". Same regression class as
+      // the Settings overlay test above: a future "loud failure" patch
+      // returning 5xx would break the preflight without an explicit lock.
+      const app = buildSelfHostApp();
+      const res = await app.request("/api/sync?vaultId=preflight", {
+        method: "HEAD",
+      });
+      expect(res.status).toBe(400);
+    });
+
     it("PUT writes the encrypted vault to disk; GET reads it back", async () => {
       const app = buildSelfHostApp();
       const payload = JSON.stringify({ ciphertext: "deadbeef", iv: "0011" });

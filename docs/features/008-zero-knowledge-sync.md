@@ -39,21 +39,21 @@ Feature: Zero-knowledge cloud sync
     When they add a feed, remove a feed, refresh feeds, or read an article
     Then a debounced push (5s) sends the updated encrypted vault to the server
 
-  Scenario: User disables sync
+  Scenario: User turns off sync — keep cloud store
     Given a sync-enabled user
-    When they switch to local-only from the Data & Storage dialog
-    Then the encrypted vault is deleted from the server
+    When they flip the Cloud sync toggle off on the Sync & Data tab
+    And choose "Keep cloud store" in the confirmation fork
+    Then sync stops locally
+    And the encrypted vault remains on the server (recoverable on another device)
     And local data is preserved
-    And the sync status chip turns amber
 
-  Scenario: User logs out (clear local, keep cloud)
+  Scenario: User turns off sync — delete cloud store
     Given a sync-enabled user
-    When they click "Log out of this device" from the Data & Storage dialog
-    And confirm the action
-    Then all local data is deleted (IndexedDB, localStorage)
-    And the encrypted cloud vault is NOT deleted
-    And the app returns to the onboarding screen
-    And they can later recover by entering their passphrase
+    When they flip the Cloud sync toggle off on the Sync & Data tab
+    And choose "Delete cloud store forever" in the confirmation fork
+    Then the encrypted vault is deleted from the server
+    And sync stops locally
+    And local data is preserved
 
   Scenario: Refresh pulls cross-device changes first
     Given a sync-enabled user with feeds on multiple devices
@@ -65,52 +65,45 @@ Feature: Zero-knowledge cloud sync
 
   Scenario: Local-only user enables sync later
     Given a local-only user
-    When they click Enable sync in the Data & Storage dialog
-    Then they are guided through passphrase generation and confirmation
-    And their data is encrypted and pushed to the server
+    When they flip the Cloud sync toggle on on the Sync & Data tab
+    And choose "Set up new cloud sync" in the chooser
+    Then they are guided through passphrase generation
+    And on Enable, their data is encrypted and pushed to the server
 
-  Scenario: Local-only user switches to existing cloud account (replace)
+  Scenario: Local-only user connects an existing cloud store (always-merge, local wins)
     Given a local-only user with feeds
-    And a cloud account exists with different feeds
-    When they click "Use existing cloud account" in the Data & Storage dialog
+    And a cloud store exists with different feeds
+    When they flip the Cloud sync toggle on on the Sync & Data tab
+    And choose "Connect existing cloud store" in the chooser
     And enter the existing passphrase
-    And choose "Replace local with cloud"
-    Then their local feeds are deleted
-    And the cloud feeds are imported
-    And they become a sync-enabled user
-
-  Scenario: Local-only user switches to existing cloud account (merge)
-    Given a local-only user with feeds
-    And a cloud account exists with different feeds
-    When they click "Use existing cloud account" in the Data & Storage dialog
-    And enter the existing passphrase
-    And choose "Merge feeds"
     Then their local feeds are preserved
-    And the cloud feeds are merged (duplicates by URL skipped)
-    And the merged vault is pushed to the server
+    And cloud feeds not already present locally are added
+    And feeds present in both keep the local title, folder, and read state
+    And the merged vault is pushed back to the server
     And they become a sync-enabled user
 
   Scenario: Invalid passphrase shows error
     Given a local-only user
-    When they click "Use existing cloud account" in the Data & Storage dialog
-    And enter an invalid passphrase
-    Then they see an error "No cloud data found for this passphrase"
+    When they choose "Connect existing cloud store" on the Sync & Data tab
+    And enter a passphrase that doesn't match any cloud store
+    Then they see "No cloud store for that passphrase"
     And can try again or cancel
 
   Scenario: Server never sees plaintext
     Given any sync operation
     Then the server only stores/retrieves opaque encrypted blobs
     And vault IDs are derived from the passphrase (not the data)
-
-  Scenario: Restore from cloud after stale local state
-    Given a sync-enabled user whose local state has drifted from the cloud
-    When they click "Restore from cloud" in the Data & Storage dialog
-    And confirm the replace
-    Then the cloud vault is pulled and imported into local storage
-    And the feed and article stores refresh in place
-    And a toast reports "Restored N feeds from cloud."
-    And the dialog closes
 ```
+
+### Sync actions no longer in the UI (post-redesign)
+
+The sync store still exposes `logout()` (wipe local, preserve cloud) and
+`forceResync()` (replace local with cloud), but neither has a button on the
+Sync & Data tab. Toggle-OFF-then-ON with the same passphrase is the path
+that covers the "I want cloud's view of my data" case via the
+always-merge connect flow. A full local wipe with cloud preserved isn't
+surfaced — users who need it can clear browser site data, or use "Delete
+all data and reset app" if they're also fine deleting cloud. See ADR 016.
 
 ## Architecture
 
