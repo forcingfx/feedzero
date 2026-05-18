@@ -3,6 +3,19 @@
 ## Status
 Refreshed 2026-05-16 against first competitor scan. Sections sharpened with concrete competitive data; markers below show what moved.
 
+<!-- changed 2026-05-16: focus declaration added -->
+## Focus
+
+**FeedZero will be great at one thing: fetching feeds reliably and presenting them in a reader that's a pleasure to use.** That is the trunk. Everything else — sync, AI, social, recommendations, team workspaces, market intelligence — is a branch we either prune or grow only when it strengthens the trunk.
+
+Concretely:
+
+- **Build:** anything that makes feed fetching more reliable, more respectful of the publisher, or makes reading faster, calmer, and more legible.
+- **Defer:** AI summarization, advanced filtering rules, social graph features, native apps. These are not bad — they just don't compound on the trunk and they trade against the privacy stance.
+- **Refuse:** anything that requires server-side access to plaintext (algorithmic feeds, cross-user discovery, server-side ML). These contradict §3 and are not on any roadmap.
+
+When in doubt, the test is: _does this change make FeedZero a better reader of RSS, today, for one person?_ If yes, ship it. If it makes FeedZero a better something-else (a knowledge graph, an AI tool, a team product), it goes on a wishlist, not a sprint.
+
 ## Framework
 
 A.G. Lafley + Roger Martin, _Playing to Win_ (2013). Five cascading strategic choices:
@@ -64,7 +77,7 @@ What winning is **not**: maximum DAU, paid conversion, or feature-parity with Fe
 
 **Channels:** <!-- changed 2026-05-16 -->
 - Word of mouth in privacy-conscious circles (still the only channel that compounds for this audience).
-- **Explicit migration paths from shutdowns**: Pocket → FeedZero importer (Pocket exported HTML/CSV); TT-RSS → OPML import path; Omnivore → JSON import. Each ships with a landing page that ranks for the shutdown event. This is the highest-leverage acquisition opportunity in the category right now.
+- **Explicit migration paths from shutdowns**: Pocket → FeedZero importer (Pocket exported HTML, parser at `src/core/opml/pocket-parser.ts` as of 2026-05-18); TT-RSS → OPML import path (already supported); Omnivore → JSON import (TODO). Each ships with a landing page that ranks for the shutdown event — copy drafted in [`docs/marketing/`](../marketing/), deployment tracked in [`docs/marketing/TODO.md`](../marketing/TODO.md). This is the highest-leverage acquisition opportunity in the category right now.
 - EFF-adjacent, Privacy Guides, Tor Project mentions.
 - Hacker News / r/privacy / r/selfhosted launches.
 - Self-hosted communities (selfh.st, awesome-selfhosted) — listing visibility.

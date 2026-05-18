@@ -165,6 +165,20 @@ bundles them.
 - **Extraction**: Defuddle
 - **Testing**: Vitest, Playwright, React Testing Library
 
+## Sustainability commitment
+
+FeedZero is built as a sustainable business, not a venture-funded runway. The category around us has gotten brutal — Pocket shut down November 2025, Omnivore November 2024, Tiny Tiny RSS's original maintainer retired the project the same month, Artifact closed January 2024. Each of those services took user data with them.
+
+The structural commitments that keep FeedZero around:
+
+- **No external runway to outrun.** No VC, no board demanding hockey-stick growth. We grow at the pace the work supports.
+- **No data we cannot lose.** The server holds opaque encrypted blobs. There is nothing here to sell, sublicense, or accidentally leak — see [docs/vault-format.md](docs/vault-format.md) for the format.
+- **Lossless exit at all times.** OPML import/export round-trips, the [vault format](docs/vault-format.md) is publicly documented, and the entire server runs as a single Hono binary you can self-host. If FeedZero ever shuts down, your data leaves with you.
+- **Open source.** The privacy claims and the code that delivers them are auditable today.
+- **Focused.** We are great at one thing: fetching feeds reliably and presenting them in a reader that's a pleasure to use. We decline features that would distract from that, even when the market is asking for them — see [docs/strategy/003-playing-to-win.md](docs/strategy/003-playing-to-win.md).
+
+If you're migrating from a product that just shut down, you're welcome here. We'll still be here when the next one does.
+
 ## Security
 
 Found a vulnerability? See [SECURITY.md](SECURITY.md) for reporting guidelines.
