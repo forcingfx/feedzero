@@ -69,3 +69,71 @@ jobs:
 
       - name: Build
         run: npm run build:all
+
+  build-self-host:
+    name: Build (self-hosted bundle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: test
+    # The default `build` job ships the Vercel-mode bundle (paid tier
+    # visible). Self-hosters set VITE_SELF_HOSTED=1 before `npm run
+    # build:all`, which flips the tier gates and hides the Subscribe UI
+    # (see ADR 014). That code path was previously only exercised by
+    # unit tests stubbing `import.meta.env`; this job verifies the real
+    # build artifact compiles under the flag, so a self-host-specific
+    # regression cannot pass CI silently.
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build self-hosted bundle
+        env:
+          VITE_SELF_HOSTED: '1'
+        run: npm run build:all
+
+      # Boot `npm run serve` (the Hono entrypoint self-hosters use) against
+      # the self-hosted bundle and probe the endpoints a fresh deployment
+      # touches first. Catches:
+      #   - `serve()` from @hono/node-server fails to bind / start
+      #   - static handler for `./dist` isn't wired (SPA HTML 404)
+      #   - HEAD /api/sync probe used by the Settings gate overlay returns 5xx
+      #   - feedback handler doesn't gracefully degrade when env is unset
+      # In-process `createApp` tests cover the routing contracts; this step
+      # specifically exercises the assembled `startServer` path.
+      - name: Boot self-hosted server and smoke endpoints
+        env:
+          SELF_HOSTED: '1'
+          SYNC_STORAGE: memory
+          PORT: '3100'
+        run: |
+          npm run serve >/tmp/fz-serve.log 2>&1 &
+          SERVE_PID=$!
+          trap "kill $SERVE_PID 2>/dev/null || true" EXIT
+          # Wait for the server to bind. Up to ~10s; fail fast if it never
+          # answers so the job doesn't sit until timeout.
+          for i in {1..20}; do
+            if curl -fsS -o /dev/null http://localhost:3100/; then break; fi
+            sleep 0.5
+          done
+          set -e
+          # SPA HTML must be served.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3100/)" = "200"
+          # HEAD probe used by the Settings sync gate overlay (ADR 016) must
+          # respond < 500 so the overlay distinguishes "server up" from
+          # "server unreachable".
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X HEAD "http://localhost:3100/api/sync?vaultId=$(printf 'a%.0s' {1..64})")
+          test "$STATUS" -lt 500
+          # Feedback degrades gracefully when GITHUB_FEEDBACK_TOKEN is unset.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"message":"hi"}' http://localhost:3100/api/feedback)" = "503"
+          echo "Self-host runtime smoke passed."
+
+      - name: Dump server log on failure
+        if: failure()
+        run: tail -100 /tmp/fz-serve.log || true
