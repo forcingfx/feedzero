@@ -9,7 +9,6 @@ import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
-import { SpeedInsights } from "@vercel/speed-insights/react";
 import { AppLayout } from "@/pages/app-layout.tsx";
 import { FeedsRoute } from "@/pages/feeds-route.tsx";
 import { StageView } from "@/pages/stage-view.tsx";
@@ -265,7 +264,6 @@ export function App() {
         <DeviceSetupWizard />
         <Toaster position="bottom-center" />
       </BrowserRouter>
-      <SpeedInsights />
     </>
   );
 }
