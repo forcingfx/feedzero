@@ -3,6 +3,8 @@ import type { FeedCache } from "./feed-cache.ts";
 import type { CatalogStorageAdapter } from "../catalog/catalog-types.ts";
 import { cleanFeedContent } from "../cleaner/cleaner.ts";
 import { pickUserAgent } from "./pick-user-agent.ts";
+import { logError } from "../../utils/log-error.ts";
+import { newTraceId } from "../../utils/trace-id.ts";
 
 /**
  * HTTP methods the proxy handler accepts.
@@ -143,15 +145,18 @@ export async function handleProxyRequest(
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
-    console.error(
-      JSON.stringify({
-        level: "error",
-        context: "proxy",
-        target: url,
-        error: message,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    // Privacy: the target URL is the user's subscribed feed. Logging it
+    // would persist a list of "what user N is reading" in the operator's
+    // log retention. Use the allow-listed logError so only error class +
+    // message land in stdout; the user can quote the traceId in support.
+    logError({
+      route: "/api/feed",
+      method: "POST",
+      status: 502,
+      traceId: newTraceId(),
+      errClass: e instanceof Error ? e.constructor.name : "Error",
+      errMsg: message,
+    });
     return new Response(`Proxy error: ${message}`, { status: 502 });
   }
 }
