@@ -1,0 +1,28 @@
+# FeedZero reverse-proxy config.
+# Hostname + ACME email come from the .env file (HOSTNAME, ACME_EMAIL)
+# via docker-compose. No edits to this file are normally needed.
+#
+# For a LAN-only deployment (no public hostname), see the alternative
+# block at the bottom — uncomment it and comment out the main site.
+
+{
+    # Caddy registers anonymously with Let's Encrypt when ACME_EMAIL is
+    # empty. Set it in `.env` to receive renewal failure notifications.
+    email {$ACME_EMAIL}
+}
+
+{$HOSTNAME} {
+    reverse_proxy feedzero:3000
+    encode zstd gzip
+}
+
+# --- LAN-only alternative ---------------------------------------------
+# Use this when you don't have a public DNS hostname. Caddy mints its
+# own root CA and self-signed certs. Trust the root on each client
+# device — see docs/self-hosting.md for OS-specific instructions.
+#
+# :443 {
+#     tls internal
+#     reverse_proxy feedzero:3000
+#     encode zstd gzip
+# }

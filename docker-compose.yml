@@ -1,0 +1,58 @@
+# FeedZero — minimal self-host stack.
+#
+# Defaults are tuned for the common case: pull a pre-built image from
+# the GitHub Container Registry, run behind Caddy with automatic TLS.
+#
+# Settings live in `.env` (copy `.env.example`). See docs/self-hosting.md
+# for the full walkthrough.
+
+services:
+  feedzero:
+    # Pre-built image. To build locally instead (e.g. before the first
+    # release is published, or when developing changes), run:
+    #
+    #   docker compose build
+    #   docker compose up -d
+    #
+    # The `build:` section below tells compose how.
+    image: ghcr.io/forcingfx/feedzero:${FEEDZERO_VERSION:-latest}
+    build:
+      context: .
+      args:
+        NODE_VERSION: 22-alpine
+    container_name: feedzero
+    restart: unless-stopped
+    environment:
+      SELF_HOSTED: "1"
+      SYNC_STORAGE: filesystem
+      SYNC_FILESYSTEM_DIR: /data/vaults
+      PORT: "3000"
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: feedzero-caddy
+    restart: unless-stopped
+    environment:
+      # Substituted into Caddyfile via `{$VAR}` syntax. `:?err` makes
+      # compose refuse to start if HOSTNAME isn't set, so users get a
+      # clear "you forgot to fill in .env" message instead of Caddy
+      # silently trying to fetch a cert for `feedzero.example.com`.
+      HOSTNAME: ${HOSTNAME:?Set HOSTNAME in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - feedzero
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -1,11 +1,13 @@
 // @ts-nocheck
-// api/icon.ts
+// src/utils/result.ts
 function ok(value) {
   return { ok: true, value };
 }
 function err(error) {
   return { ok: false, error };
 }
+
+// src/core/proxy/validate-url.ts
 var BLOCKED_HOSTNAMES = /* @__PURE__ */ new Set([
   "localhost",
   "127.0.0.1",
@@ -54,6 +56,8 @@ function validateProxyUrl(url) {
   }
   return ok(parsed);
 }
+
+// src/core/cleaner/tracker-stripper.ts
 var TRACKER_DOMAINS = [
   "pixel.quantserve.com",
   "sb.scorecardresearch.com",
@@ -96,6 +100,8 @@ function stripTrackers(html) {
     (imgTag) => isTrackingPixel(imgTag) ? "" : imgTag
   );
 }
+
+// src/core/cleaner/link-cleaner.ts
 var TRACKING_PARAMS = /* @__PURE__ */ new Set([
   "utm_source",
   "utm_medium",
@@ -138,6 +144,8 @@ function cleanLinks(html) {
     return `${attr}="${cleanUrl(url)}"`;
   });
 }
+
+// src/core/cleaner/cleaner.ts
 function cleanFeedContent(raw) {
   let result = raw;
   result = result.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, content) => {
@@ -150,7 +158,69 @@ function cleanFeedContent(raw) {
   });
   return result;
 }
+
+// src/core/proxy/pick-user-agent.ts
+var DEFAULT_USER_AGENT = "FeedZero/1.0 (RSS Reader)";
+var BROWSER_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0";
+function pickUserAgent(env) {
+  const explicit = env.FEED_USER_AGENT;
+  if (explicit && explicit.length > 0) return explicit;
+  if (env.SELF_HOSTED === "1") return BROWSER_USER_AGENT;
+  return DEFAULT_USER_AGENT;
+}
+
+// src/utils/log-error.ts
+var ALLOWED_FIELDS = [
+  "route",
+  "method",
+  "status",
+  "traceId",
+  "errClass",
+  "errMsg"
+];
+function logError(fields) {
+  const safe = {};
+  for (const key of ALLOWED_FIELDS) {
+    safe[key] = fields[key];
+  }
+  safe.ts = (/* @__PURE__ */ new Date()).toISOString();
+  console.error(JSON.stringify(safe));
+  if (fields.errClass === "AcceptedWithIssue") {
+    const url = process.env.OPERATOR_ALERT_URL;
+    if (url) {
+      void fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(safe)
+      }).catch(() => {
+      });
+    }
+  }
+}
+
+// src/utils/trace-id.ts
+function newTraceId() {
+  return "req_" + crypto.randomUUID().split("-")[0];
+}
+
+// src/core/proxy/proxy-handler.ts
 async function handleProxyRequest(req, defaultContentType, options) {
+  if (options?.rateLimit) {
+    const clientId = await options.rateLimit.clientIdFor(req);
+    const result = await options.rateLimit.limiter.check(clientId);
+    if (!result.allowed) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "rate limit exceeded" }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "Retry-After": String(result.retryAfterSec ?? 60)
+          }
+        }
+      );
+    }
+  }
   const target = await extractTargetUrl(req);
   const validation = validateProxyUrl(target);
   if (!validation.ok) {
@@ -172,7 +242,7 @@ async function handleProxyRequest(req, defaultContentType, options) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15e3);
     const response = await fetch(url, {
-      headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
+      headers: { "User-Agent": pickUserAgent(process.env) },
       signal: controller.signal
     });
     clearTimeout(timeout);
@@ -191,26 +261,33 @@ async function handleProxyRequest(req, defaultContentType, options) {
       const cleaned = cleanFeedContent(text);
       return new Response(cleaned, {
         status: response.status,
-        headers: { "Content-Type": contentType }
+        headers: buildResponseHeaders(contentType, response)
       });
     }
     return new Response(body, {
       status: response.status,
-      headers: { "Content-Type": contentType }
+      headers: buildResponseHeaders(contentType, response)
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
-    console.error(
-      JSON.stringify({
-        level: "error",
-        context: "proxy",
-        target: url,
-        error: message,
-        timestamp: (/* @__PURE__ */ new Date()).toISOString()
-      })
-    );
+    logError({
+      route: "/api/feed",
+      method: "POST",
+      status: 502,
+      traceId: newTraceId(),
+      errClass: e instanceof Error ? e.constructor.name : "Error",
+      errMsg: message
+    });
     return new Response(`Proxy error: ${message}`, { status: 502 });
   }
+}
+function buildResponseHeaders(contentType, upstream) {
+  const headers = { "Content-Type": contentType };
+  if (upstream.status === 429 || upstream.status === 503) {
+    const retryAfter = upstream.headers.get("Retry-After");
+    if (retryAfter) headers["Retry-After"] = retryAfter;
+  }
+  return headers;
 }
 async function extractTargetUrl(req) {
   if (req.method === "POST") {
@@ -224,6 +301,8 @@ async function extractTargetUrl(req) {
   const url = new URL(req.url, "http://localhost");
   return url.searchParams.get("url");
 }
+
+// api/icon.ts
 async function GET(req) {
   return handleProxyRequest(req, "image/x-icon");
 }

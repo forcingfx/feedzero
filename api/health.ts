@@ -6,7 +6,7 @@ function isFlagEnabled(name, env = process.env) {
 function resolveVersion() {
   const viteVersion = readViteAppVersion();
   if (viteVersion) return viteVersion;
-  return process.env.APP_VERSION ?? "unknown";
+  return "0.9.0";
 }
 function readViteAppVersion() {
   try {

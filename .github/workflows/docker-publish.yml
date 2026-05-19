@@ -1,0 +1,91 @@
+name: Publish self-host image
+
+# Builds the FeedZero Docker image and pushes it to GHCR
+# (ghcr.io/forcingfx/feedzero) on every version tag.
+#
+# Self-hosters use this image via docker-compose.yml; the published
+# multi-arch (amd64 + arm64) build means Raspberry Pi users don't
+# rebuild from source on every update.
+#
+# Triggers:
+#   * push tag v*.*.*  — full release, tagged with version + `latest`
+#   * workflow_dispatch — manual rebuild, tagged with the commit SHA
+#
+# To cut a release:
+#   git tag v0.9.1
+#   git push origin v0.9.1
+#
+# The workflow tags the image as `v0.9.1`, `0.9`, and `latest`. Pin
+# in self-host .env via `FEEDZERO_VERSION=v0.9.1` for stability.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build + push multi-arch image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU (arm64 emulation for cross-arch builds)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/feedzero
+          # Tags:
+          #   * On version tag: vX.Y.Z, X.Y, latest
+          #   * On manual dispatch: short SHA
+          tags: |
+            type=semver,pattern={{version}},prefix=v
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build + push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          # arm64 covers Pi 4/5 + Apple-silicon hosts running docker
+          # locally; amd64 covers everything else.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Builds are slow without a remote cache — share state
+          # across runs via GitHub's actions cache.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Version reported by /api/health comes from package.json
+          # via scripts/build-api.js (it inlines pkgVersion into the
+          # bundles at build time). The /new-release skill bumps
+          # package.json before tagging, so the git tag and the
+          # baked version stay aligned.

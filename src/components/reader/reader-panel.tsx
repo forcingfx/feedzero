@@ -14,7 +14,12 @@ import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { hasSummarySubheading } from "@/lib/content-modes.ts";
 import { pickExtractedContent } from "@/lib/pick-extracted-content.ts";
-import { needsExtraction } from "@/core/extractor/extractor.ts";
+// needsExtraction lives in its own Defuddle-free module so the reader
+// can ask "does this article need extraction?" without pulling the
+// extractor pipeline into the first-paint bundle. extractor.ts
+// re-exports it for backwards compatibility, but importing from the
+// dedicated module here is what actually keeps Defuddle out.
+import { needsExtraction } from "@/core/extractor/needs-extraction.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Article } from "@/types/index.ts";
 import { Kbd } from "@/components/ui/kbd.tsx";

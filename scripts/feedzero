@@ -1,0 +1,282 @@
+#!/usr/bin/env sh
+# FeedZero self-host CLI.
+#
+# Wraps the docker-compose commands a self-hoster runs on day 1
+# (up, down) and day 2 (update, backup, logs). POSIX shell — works
+# on macOS, Linux, WSL2, and Git Bash on Windows.
+#
+# Usage:
+#   ./scripts/feedzero <command> [args]
+#
+# Run with no arguments to see the full help.
+
+set -eu
+
+# ──────────────────────────────────────────────────────────────────
+# Setup
+# ──────────────────────────────────────────────────────────────────
+
+# Resolve repo root from this script's location so the CLI works
+# regardless of where it's invoked from.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
+red()    { printf '\033[31m%s\033[0m\n' "$1" >&2; }
+green()  { printf '\033[32m%s\033[0m\n' "$1"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$1" >&2; }
+dim()    { printf '\033[2m%s\033[0m\n' "$1"; }
+
+# Detect docker compose (modern) vs docker-compose (legacy)
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE="docker-compose"
+else
+  red "Docker Compose not found."
+  red "  Install Docker Desktop (macOS/Windows) or"
+  red "  the docker-compose-plugin package (Linux)."
+  exit 1
+fi
+
+require_env() {
+  if [ ! -f .env ]; then
+    red ".env not found in $REPO_ROOT"
+    red "  Copy the template and edit it:"
+    red "    cp .env.example .env"
+    red "  At minimum, set HOSTNAME."
+    exit 1
+  fi
+}
+
+confirm() {
+  printf '\033[33m%s [y/N] \033[0m' "$1" >&2
+  read -r answer
+  case "$answer" in
+    y|Y|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# ──────────────────────────────────────────────────────────────────
+# Commands
+# ──────────────────────────────────────────────────────────────────
+
+cmd_up() {
+  require_env
+  green "Starting FeedZero..."
+  # --remove-orphans so a renamed/removed service doesn't linger.
+  # The first run on a fresh box needs --build because no image
+  # has been published yet. We pass it unconditionally; if the
+  # image is already in place it's a no-op.
+  $COMPOSE up -d --build --remove-orphans
+  green "Started. Check logs with: ./scripts/feedzero logs"
+}
+
+cmd_down() {
+  green "Stopping FeedZero..."
+  $COMPOSE down
+}
+
+cmd_restart() {
+  green "Restarting FeedZero..."
+  $COMPOSE restart
+}
+
+cmd_update() {
+  require_env
+  green "Pulling latest image..."
+  $COMPOSE pull
+  green "Recreating containers..."
+  $COMPOSE up -d --remove-orphans
+  green "Update complete. Tail logs for 5s to confirm boot:"
+  # `timeout` is GNU-only; fall back to a shell-based timer.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 5 $COMPOSE logs --tail=20 feedzero || true
+  else
+    $COMPOSE logs --tail=20 feedzero
+  fi
+}
+
+cmd_logs() {
+  service="${1:-}"
+  if [ -n "$service" ]; then
+    $COMPOSE logs -f "$service"
+  else
+    $COMPOSE logs -f
+  fi
+}
+
+cmd_status() {
+  $COMPOSE ps
+  echo
+  dim "Health check (may be unhealthy briefly during startup):"
+  $COMPOSE ps --format 'table {{.Name}}\t{{.Status}}\t{{.Health}}' 2>/dev/null || true
+}
+
+cmd_backup() {
+  # Read DATA_DIR from .env, falling back to ./data
+  data_dir="./data"
+  if [ -f .env ]; then
+    # shellcheck disable=SC1091
+    . ./.env
+    data_dir="${DATA_DIR:-./data}"
+  fi
+
+  if [ ! -d "$data_dir" ]; then
+    red "Data directory not found: $data_dir"
+    red "  Is FeedZero actually running here?"
+    exit 1
+  fi
+
+  mkdir -p backups
+  timestamp="$(date -u +%Y-%m-%dT%H%M%SZ)"
+  out="backups/feedzero-${timestamp}.tar.gz"
+  green "Backing up $data_dir to $out..."
+  tar czf "$out" "$data_dir"
+  size="$(du -h "$out" | awk '{print $1}')"
+  green "Backup complete: $out ($size)"
+}
+
+cmd_restore() {
+  archive="${1:-}"
+  if [ -z "$archive" ]; then
+    red "Usage: ./scripts/feedzero restore <archive.tar.gz>"
+    exit 1
+  fi
+  if [ ! -f "$archive" ]; then
+    red "Archive not found: $archive"
+    exit 1
+  fi
+
+  data_dir="./data"
+  if [ -f .env ]; then
+    # shellcheck disable=SC1091
+    . ./.env
+    data_dir="${DATA_DIR:-./data}"
+  fi
+
+  yellow "WARNING: this will overwrite $data_dir with $archive."
+  if ! confirm "Continue?"; then
+    yellow "Aborted."
+    exit 0
+  fi
+
+  green "Stopping containers so the data dir is quiescent..."
+  $COMPOSE down
+
+  green "Extracting $archive..."
+  tar xzf "$archive"
+
+  green "Restart with: ./scripts/feedzero up"
+}
+
+cmd_doctor() {
+  ok="yes"
+
+  echo "Checking prerequisites..."
+  if docker --version >/dev/null 2>&1; then
+    green "  ✓ docker installed: $(docker --version)"
+  else
+    red   "  ✗ docker not installed"
+    ok="no"
+  fi
+
+  if $COMPOSE version >/dev/null 2>&1; then
+    green "  ✓ compose available: $($COMPOSE version --short 2>/dev/null || echo unknown)"
+  else
+    red   "  ✗ docker compose not available"
+    ok="no"
+  fi
+
+  if [ -f .env ]; then
+    green "  ✓ .env present"
+    if grep -qE '^HOSTNAME=feedzero\.example\.com$' .env 2>/dev/null; then
+      yellow "  ! HOSTNAME still set to the example value — edit .env"
+      ok="no"
+    fi
+  else
+    red   "  ✗ .env missing (copy from .env.example)"
+    ok="no"
+  fi
+
+  if [ -f Caddyfile ] && [ -f docker-compose.yml ]; then
+    green "  ✓ Caddyfile + docker-compose.yml present"
+  else
+    red   "  ✗ missing Caddyfile or docker-compose.yml"
+    ok="no"
+  fi
+
+  if [ "$ok" = "yes" ]; then
+    green "All prerequisites OK."
+  else
+    red "Some checks failed — see above."
+    exit 1
+  fi
+}
+
+cmd_help() {
+  cat <<'EOF'
+FeedZero self-host CLI.
+
+Usage:
+  ./scripts/feedzero <command> [args]
+
+Commands:
+  up                     Start FeedZero + Caddy (first run builds if needed).
+  down                   Stop the stack.
+  restart                Restart without recreating containers.
+  update                 Pull the latest image and restart.
+  logs [service]         Tail logs (all services, or just feedzero / caddy).
+  status                 Show container state + health.
+  backup                 Snapshot the vault data into backups/feedzero-<ts>.tar.gz.
+  restore <archive>      Restore from a backup tarball (asks before overwriting).
+  doctor                 Sanity-check the environment (docker, .env, configs).
+  help                   This message.
+
+Common flows:
+  First-time install:
+    cp .env.example .env
+    # edit HOSTNAME (and ACME_EMAIL)
+    ./scripts/feedzero up
+
+  Update:
+    ./scripts/feedzero update
+
+  Backup:
+    ./scripts/feedzero backup
+
+  Trouble?
+    ./scripts/feedzero doctor
+    ./scripts/feedzero logs caddy        # cert / TLS issues
+    ./scripts/feedzero logs feedzero     # app issues
+
+Windows users running PowerShell natively: use scripts/feedzero.ps1
+(same commands). WSL2 / Git Bash can run this script directly.
+EOF
+}
+
+# ──────────────────────────────────────────────────────────────────
+# Dispatch
+# ──────────────────────────────────────────────────────────────────
+
+cmd="${1:-help}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+  up)      cmd_up      "$@" ;;
+  down)    cmd_down    "$@" ;;
+  restart) cmd_restart "$@" ;;
+  update)  cmd_update  "$@" ;;
+  logs)    cmd_logs    "$@" ;;
+  status)  cmd_status  "$@" ;;
+  backup)  cmd_backup  "$@" ;;
+  restore) cmd_restore "$@" ;;
+  doctor)  cmd_doctor  "$@" ;;
+  help|-h|--help) cmd_help ;;
+  *)
+    red "Unknown command: $cmd"
+    cmd_help
+    exit 1
+    ;;
+esac

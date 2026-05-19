@@ -5,7 +5,7 @@
  * both produce identical behavior: switching mode AND triggering fetch.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { useExtractionStore } from "../../src/stores/extraction-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
@@ -61,33 +61,45 @@ describe("view toggle behavior parity", () => {
     });
   });
 
-  it("H key triggers extraction fetch (keyboard path)", () => {
+  it("H key triggers extraction fetch (keyboard path)", async () => {
     renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
     pressKey("h");
 
     expect(useExtractionStore.getState().viewMode).toBe("extracted");
-    expect(fetch).toHaveBeenCalledWith("/api/page", expect.objectContaining({
-      method: "POST",
-      body: JSON.stringify({ url: "https://example.com/article" }),
-    }));
+    // Extractor + adapter registry are lazy-loaded; wait for them.
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/page",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ url: "https://example.com/article" }),
+        }),
+      );
+    });
   });
 
-  it("switchToExtracted triggers extraction fetch (click path)", () => {
+  it("switchToExtracted triggers extraction fetch (click path)", async () => {
     // Simulates what handleModeChange does when user clicks Extracted button
     useExtractionStore.getState().switchToExtracted(testArticle.link);
 
     expect(useExtractionStore.getState().viewMode).toBe("extracted");
-    expect(fetch).toHaveBeenCalledWith("/api/page", expect.objectContaining({
-      method: "POST",
-      body: JSON.stringify({ url: "https://example.com/article" }),
-    }));
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/page",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ url: "https://example.com/article" }),
+        }),
+      );
+    });
   });
 
-  it("both paths use identical fetch URL encoding", () => {
+  it("both paths use identical fetch URL encoding", async () => {
     // Keyboard path
     renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
     pressKey("h");
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
     const keyboardFetchUrl = vi.mocked(fetch).mock.calls[0][0];
 
     // Reset for click path
@@ -96,6 +108,7 @@ describe("view toggle behavior parity", () => {
 
     // Click path
     useExtractionStore.getState().switchToExtracted(testArticle.link);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
     const clickFetchUrl = vi.mocked(fetch).mock.calls[0][0];
 
     expect(keyboardFetchUrl).toBe(clickFetchUrl);

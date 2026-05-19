@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { waitFor } from "@testing-library/react";
 import { useExtractionStore } from "../../src/stores/extraction-store.ts";
 
 vi.mock("../../src/core/extractor/extractor.ts", () => ({
@@ -140,11 +141,20 @@ describe("extraction-store", () => {
         .getState()
         .switchToExtracted("https://example.com/post");
 
+      // viewMode flips synchronously.
       expect(useExtractionStore.getState().viewMode).toBe("extracted");
-      expect(fetch).toHaveBeenCalledWith("/api/page", expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ url: "https://example.com/post" }),
-      }));
+      // The extractor + adapter registry are lazy-loaded (so Defuddle
+      // stays out of the first-paint bundle). The fetch fires after
+      // both dynamic imports resolve — wait for it.
+      await waitFor(() => {
+        expect(fetch).toHaveBeenCalledWith(
+          "/api/page",
+          expect.objectContaining({
+            method: "POST",
+            body: JSON.stringify({ url: "https://example.com/post" }),
+          }),
+        );
+      });
     });
 
     it("does not fetch if content is already cached", () => {
@@ -171,7 +181,7 @@ describe("extraction-store", () => {
   });
 
   describe("toggleViewMode", () => {
-    it("switches from feed to extracted and triggers fetch", () => {
+    it("switches from feed to extracted and triggers fetch", async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         text: () => Promise.resolve("<html><body><p>Content</p></body></html>"),
@@ -189,7 +199,7 @@ describe("extraction-store", () => {
       useExtractionStore.getState().toggleViewMode("https://example.com/post");
 
       expect(useExtractionStore.getState().viewMode).toBe("extracted");
-      expect(fetch).toHaveBeenCalled();
+      await waitFor(() => expect(fetch).toHaveBeenCalled());
     });
 
     it("switches from extracted back to feed without fetching", () => {

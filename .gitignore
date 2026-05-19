@@ -3,6 +3,7 @@ dist/
 coverage/
 .env
 .env.*
+!.env.example
 test-results/
 playwright-report/
 # Personal Claude Code config + permissions, not for the public repo.
