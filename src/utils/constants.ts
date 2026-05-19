@@ -1,5 +1,13 @@
 export const DB_NAME = "feedzero";
-export const DB_VERSION = 4;
+/**
+ * Dexie schema version. Bump when adding tables or changing indexes.
+ *  4 → feeds, articles, folders, meta
+ *  5 → + smartFilters (user-defined virtual feeds)
+ *
+ * Dexie auto-creates new tables on open; no migration code needed
+ * because each new table starts empty and existing tables are untouched.
+ */
+export const DB_VERSION = 5;
 
 export const CRYPTO = {
   ALGORITHM: "AES-GCM",
@@ -14,6 +22,24 @@ export const SCHEMA_VERSION = 1;
 
 /** Special feed ID for the global "All items" view. */
 export const ALL_FEEDS_ID = "all";
+
+/**
+ * Special feed ID for the cross-feed starred view. Selects every article
+ * whose `starred` flag is true, ordered by `starredAt` descending. Like
+ * ALL_FEEDS_ID and folder feeds, this is a virtual aggregated view —
+ * articles still belong to their real feed and inherit per-article
+ * provenance (favicon + feed title) in the article list.
+ */
+export const STARRED_FEED_ID = "starred";
+
+/**
+ * Prefix applied to a smart-filter id to form an aggregated "filter feed"
+ * id (e.g. filter `abc-123` becomes the selected feed id
+ * `filter:abc-123`, which represents that filter's virtual article view).
+ * Mirrors FOLDER_FEED_PREFIX so the existing dispatch sites — routing,
+ * sidebar selection, breadcrumbs — only learn one new branch.
+ */
+export const FILTER_FEED_PREFIX = "filter:";
 
 /**
  * Prefix applied to a folder id to form an aggregated "folder feed" id.
@@ -39,14 +65,41 @@ export function fromFolderFeedId(feedId: string): string | null {
     : null;
 }
 
+/** Whether the given feed id is the starred-view virtual feed. */
+export function isStarredFeedId(feedId: string): boolean {
+  return feedId === STARRED_FEED_ID;
+}
+
+/** Build a smart-filter virtual feed id from a filter id. */
+export function toFilterFeedId(filterId: string): string {
+  return `${FILTER_FEED_PREFIX}${filterId}`;
+}
+
+/** Whether the given feed id represents a smart-filter view. */
+export function isFilterFeedId(feedId: string): boolean {
+  return feedId.startsWith(FILTER_FEED_PREFIX);
+}
+
+/** Extract the filter id from a filter-feed id, or null if not a filter feed. */
+export function fromFilterFeedId(feedId: string): string | null {
+  return isFilterFeedId(feedId)
+    ? feedId.slice(FILTER_FEED_PREFIX.length)
+    : null;
+}
+
 /**
  * Whether the given feed id represents an aggregated view across multiple
- * feeds (global "All items" or a folder feed). Used by components that
- * must show per-article provenance (feed title + favicon) when multiple
- * feeds are displayed together.
+ * feeds (global "All items", a folder feed, the starred view, or a smart
+ * filter). Used by components that must show per-article provenance
+ * (feed title + favicon) when multiple feeds are displayed together.
  */
 export function isAggregatedFeedId(feedId: string): boolean {
-  return feedId === ALL_FEEDS_ID || isFolderFeedId(feedId);
+  return (
+    feedId === ALL_FEEDS_ID ||
+    isFolderFeedId(feedId) ||
+    isStarredFeedId(feedId) ||
+    isFilterFeedId(feedId)
+  );
 }
 
 /**
@@ -139,5 +192,5 @@ export const SYNC = {
   /** Maximum vault payload size in bytes (5 MB). */
   MAX_VAULT_SIZE: 5 * 1024 * 1024,
   /** Sync data format version for forward compatibility. */
-  FORMAT_VERSION: 1,
+  FORMAT_VERSION: 2,
 } as const;

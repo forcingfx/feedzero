@@ -1,7 +1,14 @@
 import { ok, err } from "../../utils/result.ts";
 import type { Result } from "../../utils/result.ts";
 import { SCHEMA_VERSION } from "../../utils/constants.ts";
-import type { Feed, Article, CreateFeedInput, CreateArticleInput } from "../../types/index.ts";
+import type {
+  Feed,
+  Article,
+  SmartFilter,
+  CreateFeedInput,
+  CreateArticleInput,
+  CreateSmartFilterInput,
+} from "../../types/index.ts";
 
 export { SCHEMA_VERSION };
 
@@ -73,4 +80,34 @@ export function validateArticle(article: unknown): Result<Article> {
     return err("Article missing required fields");
   }
   return ok(article as Article);
+}
+
+/**
+ * Create a new smart-filter object with defaults.
+ * Whitespace-only names are rejected so the sidebar never renders an
+ * invisible row.
+ */
+export function createSmartFilter({
+  name,
+  rule,
+  icon,
+  color,
+  sortMode,
+  limit,
+}: CreateSmartFilterInput): Result<SmartFilter> {
+  const trimmed = name?.trim() ?? "";
+  if (!trimmed) return err("Smart filter requires a name");
+  if (!rule) return err("Smart filter requires a rule");
+  const now = Date.now();
+  return ok({
+    id: crypto.randomUUID(),
+    name: trimmed,
+    icon,
+    color,
+    sortMode,
+    limit,
+    rule,
+    createdAt: now,
+    updatedAt: now,
+  });
 }

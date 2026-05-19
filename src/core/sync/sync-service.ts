@@ -78,6 +78,10 @@ async function resolveVaultId(auth: SyncAuth): Promise<Result<string>> {
 
 /**
  * Export all local data as a VaultData object.
+ * Strips article body fields (content/summary) — they're large and the
+ * canonical source on every device is the publisher feed plus on-demand
+ * extraction (or the persisted `extractedContent` for starred articles,
+ * which DOES ride along).
  */
 export async function exportVault(): Promise<Result<VaultData>> {
   const result = await exportAll();
@@ -91,14 +95,24 @@ export async function exportVault(): Promise<Result<VaultData>> {
       content: "",
       summary: "",
     })),
+    folders: result.value.folders,
+    smartFilters: result.value.smartFilters,
   });
 }
 
 /**
  * Replace all local data with the contents of a VaultData object.
+ * Folders + smartFilters are forwarded verbatim, including the
+ * `undefined`-vs-`[]` distinction — see importAll for the back-compat
+ * contract.
  */
 export async function importVault(vault: VaultData): Promise<Result<boolean>> {
-  return importAll(vault.feeds, vault.articles);
+  return importAll({
+    feeds: vault.feeds,
+    articles: vault.articles,
+    folders: vault.folders,
+    smartFilters: vault.smartFilters,
+  });
 }
 
 /**
@@ -286,10 +300,46 @@ export function mergeVaults(
     }
   }
 
+  // Folders + smartFilters: dedup by id, local wins on collision.
+  // Mirrors the feeds-by-URL rule. A v1 cloud vault omits both keys, in
+  // which case the local set survives untouched.
+  const mergedFolders = mergeByIdLocalWins(
+    localVault.folders,
+    cloudVault.folders,
+  );
+  const mergedSmartFilters = mergeByIdLocalWins(
+    localVault.smartFilters,
+    cloudVault.smartFilters,
+  );
+
   return ok({
     version: SYNC.FORMAT_VERSION,
     exportedAt: Date.now(),
     feeds: mergedFeeds,
     articles: mergedArticles,
+    folders: mergedFolders,
+    smartFilters: mergedSmartFilters,
   });
+}
+
+/**
+ * Merge two arrays of records keyed by `id`. Local entries are
+ * preserved; cloud-only entries are appended. Returns `undefined` only
+ * when both inputs are `undefined`, so the v1-cloud case doesn't lose
+ * the local set.
+ */
+function mergeByIdLocalWins<T extends { id: string }>(
+  local: T[] | undefined,
+  cloud: T[] | undefined,
+): T[] | undefined {
+  if (local === undefined && cloud === undefined) return undefined;
+  const merged = [...(local ?? [])];
+  const seen = new Set(merged.map((x) => x.id));
+  for (const item of cloud ?? []) {
+    if (!seen.has(item.id)) {
+      merged.push(item);
+      seen.add(item.id);
+    }
+  }
+  return merged;
 }

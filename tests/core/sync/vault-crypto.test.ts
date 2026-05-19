@@ -7,6 +7,7 @@ import {
   decryptVault,
 } from "@/core/sync/vault-crypto";
 import { isOk, isErr, unwrap } from "@/utils/result";
+import { SYNC } from "@/utils/constants";
 import type { VaultData } from "@/core/sync/types";
 
 function makeVault(overrides: Partial<VaultData> = {}): VaultData {
@@ -125,7 +126,7 @@ describe("vault-crypto", () => {
     it("encrypted vault has the expected shape", async () => {
       const key = unwrap(await deriveVaultKey("carbon mango velvet prism"));
       const encrypted = unwrap(await encryptVault(key, makeVault()));
-      expect(encrypted.version).toBe(1);
+      expect(encrypted.version).toBe(SYNC.FORMAT_VERSION);
       expect(Array.isArray(encrypted.iv)).toBe(true);
       expect(encrypted.iv.length).toBe(12);
       expect(typeof encrypted.ciphertext).toBe("string");

@@ -1,12 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
-import { ChevronLeft, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Loader2,
+  Star,
+} from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { hasSummarySubheading } from "@/lib/content-modes.ts";
+import { pickExtractedContent } from "@/lib/pick-extracted-content.ts";
 import { needsExtraction } from "@/core/extractor/extractor.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Article } from "@/types/index.ts";
@@ -44,6 +51,7 @@ interface ReaderPanelProps {
 export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: ReaderPanelProps = {}) {
   const isDesktop = useIsDesktop();
   const article = useArticleStore((s) => s.selectedArticle);
+  const toggleStar = useArticleStore((s) => s.toggleStar);
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
@@ -178,7 +186,10 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
     return wrap(emptyState);
   }
 
-  const cachedExtraction = article.link ? cache[article.link] : undefined;
+  // Prefer the persisted extractedContent (background prefetch service)
+  // over the in-memory on-demand cache. Persisted content survives reload
+  // and rides through the encrypted vault to other devices.
+  const cachedExtraction = pickExtractedContent(article, cache);
   const extractionStatus = article.link
     ? cachedExtraction
       ? "available" as const
@@ -264,6 +275,33 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                 </TooltipContent>
               </Tooltip>
             )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  data-testid="star-toggle"
+                  type="button"
+                  onClick={() => toggleStar(article!.id)}
+                  aria-label={article.starred ? "Remove star" : "Star article"}
+                  aria-pressed={Boolean(article.starred)}
+                  className={cn(
+                    "inline-flex items-center transition-colors",
+                    article.starred
+                      ? "text-amber-500 hover:text-amber-600"
+                      : "text-muted-foreground/60 hover:text-muted-foreground",
+                  )}
+                >
+                  <Star
+                    className={cn(
+                      "size-3.5",
+                      article.starred && "fill-current",
+                    )}
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {article.starred ? "Unstar" : "Star"} <Kbd className="ml-1">s</Kbd>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </header>
 
