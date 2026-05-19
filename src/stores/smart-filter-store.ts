@@ -37,11 +37,23 @@ import { ok, err } from "../utils/result.ts";
 interface SmartFilterStore {
   filters: SmartFilter[];
   isLoading: boolean;
+  /** True when the editor dialog is open. The dialog component
+   *  subscribes to this and renders accordingly. */
+  editorOpen: boolean;
+  /** The filter being edited, or null when creating a new one. */
+  editorTarget: SmartFilter | null;
   loadFilters: () => Promise<void>;
   createFilter: (input: CreateSmartFilterInput) => Promise<Result<SmartFilter>>;
   updateFilter: (filter: SmartFilter) => Promise<Result<SmartFilter>>;
   removeFilter: (id: string) => Promise<void>;
   duplicateFilter: (id: string) => Promise<Result<SmartFilter>>;
+  /**
+   * Open the editor dialog. Pass an existing filter to edit, or null
+   * (default) to create. Gate-locked: a closed gate toasts the
+   * upgrade prompt and does NOT open the dialog.
+   */
+  openEditor: (target?: SmartFilter | null) => void;
+  closeEditor: () => void;
 }
 
 /** True when the current session is allowed to mutate filters. */
@@ -83,6 +95,8 @@ function schedulePush(): void {
 export const useSmartFilterStore = create<SmartFilterStore>((set, get) => ({
   filters: [],
   isLoading: false,
+  editorOpen: false,
+  editorTarget: null,
 
   loadFilters: async () => {
     set({ isLoading: true });
@@ -149,4 +163,11 @@ export const useSmartFilterStore = create<SmartFilterStore>((set, get) => ({
       limit: source.limit,
     });
   },
+
+  openEditor: (target = null) => {
+    if (rejectIfGateClosed()) return;
+    set({ editorOpen: true, editorTarget: target });
+  },
+
+  closeEditor: () => set({ editorOpen: false, editorTarget: null }),
 }));
