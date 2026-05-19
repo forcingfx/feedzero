@@ -87,13 +87,40 @@ describe("StatsPage", () => {
     globalThis.fetch = fetchMockResponses({
       "action=popular": { ok: true, feeds: POPULAR_FEEDS },
       "action=count": { ok: true, count: 2415 },
-      "stats-sync": { ok: true, vaults: 87 },
+      "stats-sync": { ok: true, vaults: 87, lastUpdatedAt: null },
     });
     renderStats();
     await waitFor(() => {
       expect(screen.getByTestId("stat-vaults")).toHaveTextContent("87");
       expect(screen.getByTestId("stat-feeds")).toHaveTextContent(/2,?415/);
     });
+  });
+
+  it("renders the most recent vault write time when lastUpdatedAt is set", async () => {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    globalThis.fetch = fetchMockResponses({
+      "action=popular": { ok: true, feeds: [] },
+      "action=count": { ok: true, count: 0 },
+      "stats-sync": { ok: true, vaults: 1, lastUpdatedAt: fiveMinutesAgo },
+    });
+    renderStats();
+    const node = await screen.findByTestId("stat-last-write");
+    // Tolerant matcher — "5 minutes ago", "5 min ago", "5m ago" all fine.
+    expect(node.textContent).toMatch(/5\s*(m|min|minute)/i);
+    expect(node.textContent).toMatch(/ago/i);
+  });
+
+  it("omits the last-write line when lastUpdatedAt is null", async () => {
+    globalThis.fetch = fetchMockResponses({
+      "action=popular": { ok: true, feeds: [] },
+      "action=count": { ok: true, count: 0 },
+      "stats-sync": { ok: true, vaults: 0, lastUpdatedAt: null },
+    });
+    renderStats();
+    await waitFor(() => {
+      expect(screen.getByTestId("stat-vaults")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("stat-last-write")).toBeNull();
   });
 
   it("renders the top-feeds leaderboard with subscriber counts (including <5)", async () => {

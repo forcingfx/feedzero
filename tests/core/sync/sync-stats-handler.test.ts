@@ -10,13 +10,13 @@ describe("sync-stats-handler", () => {
     adapter = createMemoryAdapter();
   });
 
-  it("returns zero count when no vaults exist", async () => {
+  it("returns zero count and null lastUpdatedAt when no vaults exist", async () => {
     const request = new Request("http://localhost/api/stats/sync");
     const response = await handleSyncStatsRequest(request, adapter);
     expect(response.status).toBe(200);
 
     const data = await response.json();
-    expect(data).toEqual({ ok: true, vaults: 0 });
+    expect(data).toEqual({ ok: true, vaults: 0, lastUpdatedAt: null });
   });
 
   it("returns correct count after storing vaults", async () => {
@@ -28,7 +28,21 @@ describe("sync-stats-handler", () => {
     expect(response.status).toBe(200);
 
     const data = await response.json();
-    expect(data).toEqual({ ok: true, vaults: 2 });
+    expect(data.ok).toBe(true);
+    expect(data.vaults).toBe(2);
+    expect(typeof data.lastUpdatedAt).toBe("number");
+  });
+
+  it("surfaces the most recent put time as lastUpdatedAt", async () => {
+    const before = Date.now();
+    await adapter.put("a".repeat(64), '{"ok":true}');
+    const after = Date.now();
+
+    const request = new Request("http://localhost/api/stats/sync");
+    const response = await handleSyncStatsRequest(request, adapter);
+    const data = await response.json();
+    expect(data.lastUpdatedAt).toBeGreaterThanOrEqual(before);
+    expect(data.lastUpdatedAt).toBeLessThanOrEqual(after);
   });
 
   it("returns updated count after deleting a vault", async () => {

@@ -318,10 +318,17 @@ describe("UpstashSyncAdapter", () => {
     // are 64-hex-char strings (enforced by VAULT_ID_PATTERN in sync-handler),
     // so this is structurally impossible. This test pins that invariant.
 
-    it("uses 'vault:' prefix for all keys — no collision with license: namespace", async () => {
+    it("uses 'vault' namespace for all keys — no collision with license: namespace", async () => {
       await adapter.put(VAULT_ID, SAMPLE_VAULT_JSON);
       const keys = [...client.store.keys()];
-      expect(keys.every((k) => k.startsWith("vault:"))).toBe(true);
+      // The vault namespace covers both 'vault:<id>' payload keys and the
+      // observability-only 'vault-meta:lastUpdatedAt' singleton. Neither
+      // collides with the license module's 'license:*' / 'customer:*'.
+      // The hyphen on the meta key keeps it OUT of the 'vault:*' SCAN
+      // pattern used by `count()` — see VAULT_KEY_PREFIX in upstash-adapter.
+      expect(
+        keys.every((k) => k.startsWith("vault:") || k.startsWith("vault-meta:")),
+      ).toBe(true);
       expect(keys.some((k) => k.startsWith("license:"))).toBe(false);
       expect(keys.some((k) => k.startsWith("customer:"))).toBe(false);
     });

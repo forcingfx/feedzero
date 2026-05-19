@@ -21,16 +21,22 @@ export async function handleSyncStatsRequest(
     );
   }
 
-  const result = await adapter.count();
-  if (!result.ok) {
+  const countResult = await adapter.count();
+  if (!countResult.ok) {
     return new Response(
-      JSON.stringify({ ok: false, error: result.error }),
+      JSON.stringify({ ok: false, error: countResult.error }),
       { status: 500, headers: API_HEADERS },
     );
   }
 
+  // lastUpdatedAt is observability-only — a failure to resolve it must not
+  // brick /api/stats-sync (which is the only REQUIRED endpoint for the
+  // /stats page, per stats-page.tsx loadAll). Degrade to null on error.
+  const lastResult = await adapter.lastUpdatedAt();
+  const lastUpdatedAt = lastResult.ok ? lastResult.value : null;
+
   return new Response(
-    JSON.stringify({ ok: true, vaults: result.value }),
+    JSON.stringify({ ok: true, vaults: countResult.value, lastUpdatedAt }),
     { status: 200, headers: API_HEADERS },
   );
 }
