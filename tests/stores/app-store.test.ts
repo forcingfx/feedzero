@@ -173,24 +173,34 @@ describe("app-store", () => {
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
 
-    it("forces re-onboarding when no keys exist", async () => {
+    it("forces re-onboarding when no keys exist (without destroying server vault)", async () => {
       vi.mocked(restore).mockResolvedValue({ status: "no-keys" });
 
       await useAppStore.getState().initializeReturningUser();
 
-      expect(destroy).toHaveBeenCalled();
+      // No-keys means there's nothing local to destroy AND no vault
+      // credentials in memory to issue a server DELETE — but the
+      // contract is explicit: a boot-time recovery cascade must never
+      // call destroy(). This guards against future regressions where
+      // a refactor reintroduces a destructive path.
+      expect(destroy).not.toHaveBeenCalled();
       expect(useAppStore.getState().isDbReady).toBe(false);
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
     });
 
-    it("forces re-onboarding when keys are invalid", async () => {
+    it("surfaces recovery prompt when keys are invalid (NEVER deletes server vault)", async () => {
       vi.mocked(restore).mockResolvedValue({ status: "invalid-keys" });
 
       await useAppStore.getState().initializeReturningUser();
 
-      expect(destroy).toHaveBeenCalled();
+      // This is the critical invariant: an "invalid keys" outcome
+      // at boot must NEVER delete the server vault. The user might
+      // have just had a transient localStorage glitch, a partial
+      // browser update, or a key-format migration mid-flight — none
+      // of these justify destroying the cloud backup. Issue #117.
+      expect(destroy).not.toHaveBeenCalled();
       expect(useAppStore.getState().isDbReady).toBe(false);
-      expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
+      expect(useAppStore.getState().recoveryMode).toBe("invalid-keys");
     });
 
     it("restores sync credentials for sync users", async () => {

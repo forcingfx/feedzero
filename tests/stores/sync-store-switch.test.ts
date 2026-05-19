@@ -24,7 +24,30 @@ vi.mock("../../src/core/storage/key-manager", () => ({
   addVaultKeys: vi.fn(),
   removeVaultKeys: vi.fn(),
   destroyLocal: vi.fn().mockResolvedValue(undefined),
-  rekeyFromPassphrase: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  persistDerivedKeysFromOpenDb: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: {} }),
+  assertKeyDataCoupling: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: undefined }),
+}));
+
+vi.mock("../../src/core/storage/db", () => ({
+  close: vi.fn(),
+  deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  open: vi.fn().mockResolvedValue({ ok: true, value: true }),
+}));
+
+vi.mock("../../src/stores/feed-store", () => ({
+  useFeedStore: {
+    getState: () => ({ loadFeeds: vi.fn().mockResolvedValue(undefined) }),
+  },
+}));
+
+vi.mock("../../src/stores/article-store", () => ({
+  useArticleStore: {
+    getState: () => ({ preloadAll: vi.fn().mockResolvedValue(undefined) }),
+  },
 }));
 
 import {
@@ -122,20 +145,40 @@ describe("sync-store switchToExistingCloud", () => {
       expect(state.error).toBeNull();
     });
 
-    it("re-keys from cloud passphrase after import", async () => {
+    it("opens fresh DB with cloud passphrase BEFORE importing (issue #117)", async () => {
+      // This is the structural fix: the DB must be opened with keys
+      // derived from the cloud passphrase before importVault encrypts
+      // anything. Previously, importVault ran first (under stale local
+      // keys), then a rekey wrote NEW keys to localStorage — leaving
+      // key/data drift that nuked the server vault on next reload.
       mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
 
-      const { rekeyFromPassphrase } =
-        await import("../../src/core/storage/key-manager");
+      const db = await import("../../src/core/storage/db");
+      const keyManager = await import("../../src/core/storage/key-manager");
 
       await useSyncStore
         .getState()
         .switchToExistingCloud("cloud-passphrase", "replace");
 
-      expect(rekeyFromPassphrase).toHaveBeenCalledWith("cloud-passphrase", {
-        sync: true,
-      });
+      // Order verification: close → deleteDatabase → open → import → persist.
+      const closeOrder = vi.mocked(db.close).mock.invocationCallOrder[0]!;
+      const deleteOrder = vi.mocked(db.deleteDatabase).mock
+        .invocationCallOrder[0]!;
+      const openOrder = vi.mocked(db.open).mock.invocationCallOrder[0]!;
+      const importOrder = mockImportVault.mock.invocationCallOrder[0]!;
+      const persistOrder = vi.mocked(keyManager.persistDerivedKeysFromOpenDb)
+        .mock.invocationCallOrder[0]!;
+
+      expect(closeOrder).toBeLessThan(deleteOrder);
+      expect(deleteOrder).toBeLessThan(openOrder);
+      expect(openOrder).toBeLessThan(importOrder);
+      expect(importOrder).toBeLessThan(persistOrder);
+      expect(vi.mocked(db.open)).toHaveBeenCalledWith("cloud-passphrase");
+      expect(keyManager.persistDerivedKeysFromOpenDb).toHaveBeenCalledWith(
+        "cloud-passphrase",
+        { sync: true },
+      );
     });
 
     it("sets status to syncing during operation", async () => {
