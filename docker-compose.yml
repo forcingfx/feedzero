@@ -1,23 +1,21 @@
 # FeedZero — minimal self-host stack.
 #
-# Two services:
-#   feedzero — the SPA + Hono server on :3000 (no TLS)
-#   caddy    — TLS terminator on :443, forwarding to feedzero
+# Defaults are tuned for the common case: pull a pre-built image from
+# the GitHub Container Registry, run behind Caddy with automatic TLS.
 #
-# Why Caddy: Web Crypto requires a secure context. Loading the app over
-# plain http://<lan-ip>:3000 from another device refuses to start.
-# Caddy ships free TLS via Let's Encrypt out of the box; configure the
-# Caddyfile with your domain.
-#
-# Usage:
-#   1. Edit Caddyfile to point at your domain.
-#   2. docker compose up -d
-#   3. Visit https://<your-domain>
-#
-# Sync vaults persist under ./data/vaults. Back it up.
+# Settings live in `.env` (copy `.env.example`). See docs/self-hosting.md
+# for the full walkthrough.
 
 services:
   feedzero:
+    # Pre-built image. To build locally instead (e.g. before the first
+    # release is published, or when developing changes), run:
+    #
+    #   docker compose build
+    #   docker compose up -d
+    #
+    # The `build:` section below tells compose how.
+    image: ghcr.io/forcingfx/feedzero:${FEEDZERO_VERSION:-latest}
     build:
       context: .
       args:
@@ -25,15 +23,12 @@ services:
     container_name: feedzero
     restart: unless-stopped
     environment:
-      # Self-hosting master switch (runtime mirror of the build flag).
       SELF_HOSTED: "1"
-      # Filesystem sync adapter — vaults under /data/vaults in the container.
       SYNC_STORAGE: filesystem
       SYNC_FILESYSTEM_DIR: /data/vaults
       PORT: "3000"
     volumes:
-      - ./data:/data
-    # No host port published — Caddy reaches it on the internal network.
+      - ${DATA_DIR:-./data}:/data
     expose:
       - "3000"
 
@@ -41,6 +36,13 @@ services:
     image: caddy:2-alpine
     container_name: feedzero-caddy
     restart: unless-stopped
+    environment:
+      # Substituted into Caddyfile via `{$VAR}` syntax. `:?err` makes
+      # compose refuse to start if HOSTNAME isn't set, so users get a
+      # clear "you forgot to fill in .env" message instead of Caddy
+      # silently trying to fetch a cert for `feedzero.example.com`.
+      HOSTNAME: ${HOSTNAME:?Set HOSTNAME in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
     ports:
       - "80:80"
       - "443:443"

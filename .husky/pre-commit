@@ -21,7 +21,10 @@ secret_patterns='\.env(\..+)?$|\.pem$|\.key$|(^|/)id_rsa$|(^|/)id_ed25519$'
 staged="$(git diff --cached --name-only --diff-filter=ACM)"
 
 if [ -n "$staged" ]; then
-  blocked="$(printf '%s\n' "$staged" | grep -E "$secret_patterns" || true)"
+  # Allow `.env.example` (and any `*.example` template) through. These
+  # are the conventional shape for "copy this and fill in your values"
+  # files — no secrets, by convention.
+  blocked="$(printf '%s\n' "$staged" | grep -E "$secret_patterns" | grep -Ev '\.example$' || true)"
   if [ -n "$blocked" ]; then
     red "Refusing to commit secret-shaped files:"
     printf '%s\n' "$blocked" | sed 's/^/    /' >&2
