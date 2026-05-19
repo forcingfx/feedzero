@@ -1,13 +1,14 @@
 /**
  * Feature-gate capability map + pure gateState() function.
  *
- * One source of truth for "which tier unlocks which feature, and is it
- * actually shipped yet". Pure module — no React, no I/O — so the matrix
- * is exhaustively testable and consumable from both the React hook and
- * defensive store-level guards.
+ * Binary capability gating ("does this tier have this feature at all").
+ * The canonical data lives in `tier-matrix.ts`; this module projects
+ * the matrix into the legacy `{ requiredTier, status }` shape consumed
+ * by `useFeatureGate`, store-level guards, and tests.
  *
  * Three gate dimensions:
- *  1. `requiredTier`  — minimum tier that unlocks the feature.
+ *  1. `requiredTier`  — minimum tier that unlocks the feature
+ *                       (lowest available tier in the matrix entry).
  *  2. `status`        — "shipped" or "coming-soon". Coming-soon features
  *                       return `not-built` regardless of tier or self-hosted
  *                       (the code isn't there to enable).
@@ -16,24 +17,22 @@
  *
  * Reason codes are returned alongside `enabled` so callers can render
  * accurate UI ("Upgrade to Personal" vs "Coming soon" vs the live feature).
+ *
+ * Continuous limits (e.g. the 25-feed cap on Free) live in `quotas.ts`,
+ * also derived from the same matrix.
  */
 
 import type { LicenseTier } from "../license/format";
+import {
+  GATED_FEATURE_IDS,
+  TIER_MATRIX,
+  getRequiredTier,
+  type FeatureId,
+} from "./tier-matrix";
 
 export type Tier = LicenseTier;
 
-export type Feature =
-  | "cloud-sync"
-  | "auto-organize"
-  | "offline-prefetch"
-  | "filters"
-  | "mute-keywords"
-  | "search"
-  | "ai-signal"
-  | "authenticated-fetchers"
-  | "send-to-kindle"
-  | "bridges"
-  | "themes-commercial";
+export type Feature = (typeof GATED_FEATURE_IDS)[number];
 
 export type FeatureStatus = "shipped" | "coming-soon";
 
@@ -42,19 +41,18 @@ export interface FeatureSpec {
   status: FeatureStatus;
 }
 
-export const FEATURE_MAP: Record<Feature, FeatureSpec> = {
-  "cloud-sync":             { requiredTier: "personal", status: "shipped" },
-  "auto-organize":          { requiredTier: "personal", status: "shipped" },
-  "offline-prefetch":       { requiredTier: "personal", status: "shipped" },
-  "filters":                { requiredTier: "personal", status: "shipped" },
-  "mute-keywords":          { requiredTier: "personal", status: "coming-soon" },
-  "search":                 { requiredTier: "pro",      status: "coming-soon" },
-  "ai-signal":              { requiredTier: "pro",      status: "coming-soon" },
-  "authenticated-fetchers": { requiredTier: "pro",      status: "coming-soon" },
-  "send-to-kindle":         { requiredTier: "pro",      status: "coming-soon" },
-  "bridges":                { requiredTier: "pro",      status: "coming-soon" },
-  "themes-commercial":      { requiredTier: "pro",      status: "coming-soon" },
-};
+/**
+ * Legacy projection of the tier matrix down to `{ requiredTier, status }`
+ * for every gated feature. Kept for back-compat with the components,
+ * stores, and tests that already iterate over it. New code should
+ * prefer `tier-matrix.ts` directly.
+ */
+export const FEATURE_MAP: Record<Feature, FeatureSpec> = Object.fromEntries(
+  GATED_FEATURE_IDS.map((id) => [
+    id,
+    { requiredTier: getRequiredTier(id), status: TIER_MATRIX[id].status },
+  ]),
+) as Record<Feature, FeatureSpec>;
 
 export type GateReason =
   | "ok"
@@ -77,7 +75,7 @@ export interface GateState {
   requiredTier: Tier;
 }
 
-const TIER_ORDER: Record<Tier, number> = { free: 0, personal: 1, pro: 2 };
+const TIER_RANK: Record<Tier, number> = { free: 0, personal: 1, pro: 2 };
 
 /**
  * Evaluate the gate for a feature given the current user's tier, the
@@ -111,8 +109,10 @@ export function gateState(
   if (isSelfHosted) {
     return { enabled: true, reason: "self-hosted-bypass", requiredTier: spec.requiredTier };
   }
-  if (TIER_ORDER[currentTier] >= TIER_ORDER[spec.requiredTier]) {
+  if (TIER_RANK[currentTier] >= TIER_RANK[spec.requiredTier]) {
     return { enabled: true, reason: "ok", requiredTier: spec.requiredTier };
   }
   return { enabled: false, reason: "tier-locked", requiredTier: spec.requiredTier };
 }
+
+export type { FeatureId };
