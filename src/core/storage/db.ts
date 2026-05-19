@@ -11,7 +11,7 @@ import {
   decrypt,
   importCryptoKey,
 } from "./crypto.ts";
-import type { Feed, Article, Folder } from "../../types/index.ts";
+import type { Feed, Article, Folder, SmartFilter } from "../../types/index.ts";
 
 interface DexieRecord {
   id: string;
@@ -49,6 +49,7 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
       feeds: "id, &url",
       articles: "id, feedId, [feedId+guid]",
       folders: "id",
+      smartFilters: "id",
       meta: "key",
     });
 
@@ -91,6 +92,7 @@ export async function openWithKeys(
       feeds: "id, &url",
       articles: "id, feedId, [feedId+guid]",
       folders: "id",
+      smartFilters: "id",
       meta: "key",
     });
 
@@ -510,11 +512,41 @@ export async function removeFolder(id: string): Promise<Result<boolean>> {
   }
 }
 
+// --- Smart filter operations ---
+
+export async function addSmartFilter(
+  filter: SmartFilter,
+): Promise<Result<boolean>> {
+  return putEncrypted("smartFilters", filter.id, filter);
+}
+
+export async function getSmartFilters(): Promise<Result<SmartFilter[]>> {
+  return getAllDecrypted<SmartFilter>("smartFilters");
+}
+
+export async function updateSmartFilter(
+  filter: SmartFilter,
+): Promise<Result<boolean>> {
+  return putEncrypted("smartFilters", filter.id, filter);
+}
+
+export async function removeSmartFilter(
+  id: string,
+): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    await ctx.db.table("smartFilters").delete(id);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove smart filter: ${(e as Error).message}`);
+  }
+}
+
 // --- Internal helpers ---
 
 /** Encrypt an array of records into Dexie-ready objects with HMAC-hashed indexes. */
 async function encryptRecords(
-  items: Array<Feed | Article>,
+  items: Array<Feed | Article | Folder | SmartFilter>,
 ): Promise<DexieRecord[]> {
   const ctx = requireOpen();
   const records: DexieRecord[] = [];

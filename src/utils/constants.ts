@@ -1,5 +1,13 @@
 export const DB_NAME = "feedzero";
-export const DB_VERSION = 4;
+/**
+ * Dexie schema version. Bump when adding tables or changing indexes.
+ *  4 → feeds, articles, folders, meta
+ *  5 → + smartFilters (user-defined virtual feeds)
+ *
+ * Dexie auto-creates new tables on open; no migration code needed
+ * because each new table starts empty and existing tables are untouched.
+ */
+export const DB_VERSION = 5;
 
 export const CRYPTO = {
   ALGORITHM: "AES-GCM",
