@@ -169,6 +169,11 @@ Three-tier strategy. See [docs/testing-strategy.md](docs/testing-strategy.md) fo
 - Routing contract tests in `server.test.ts` verify every Vercel wrapper (`api/*.ts`) exports a handler for every method the shared handler supports.
 - Integration contract tests verify `proxyFetch()` builds requests `handleProxyRequest()` can parse. Mock only the outbound external fetch, never the client/server boundary.
 - **Rule**: When a mock replaces a real function at a system boundary, a separate contract test must verify both sides agree on the interface.
+- **Mock at the boundary, not at the collaborator.** The boundary is the network, the filesystem, the system clock. `db.ts`, `key-manager.ts`, and the `sync-service` helpers are *internal collaborators* — mocking them lets the contract drift silently. Three SEV incidents (`2026-05-12`, `2026-05-14`, `2026-05-19`) shared a pattern: store logic green, store↔db contract broken. The 2026-05-19 incident report names it: "*The destroy cascade had a test that asserted `destroy` was called — verifying the bug as a feature.*" When you need to test a store mutator end-to-end, run it against the real `db.ts` via `fake-indexeddb` and mock only the network. Templates: `tests/integration/feed-store-db.test.ts`, `tests/integration/sync-store-db.test.ts`.
+
+**Vitest gotchas**:
+- `vi.restoreAllMocks()` calls `.mockRestore()` on **every** mock — including the `vi.fn().mockResolvedValue(...)` returns from module factories like `vi.mock("@/core/storage/db.ts", () => ({ getFeeds: vi.fn().mockResolvedValue(...) }))`. After a single `restoreAllMocks`, the next test sees `getFeeds()` return `undefined` and you spend twenty minutes chasing an "unhandled rejection" trace. Use targeted `mySpy.mockRestore()` on the specific spy you created in the test.
+- When asserting "this hook called `navigate()`", spy on `useNavigate` directly rather than rendering a `<LocationProbe>` and reading `useLocation()` from a module-level variable. `renderHook` doesn't flush the route-driven re-render synchronously, so the probe captures stale state. Pattern: `vi.spyOn(ReactRouter, "useNavigate").mockReturnValue(navigateSpy)` in `beforeEach`, `expect(navigateSpy).toHaveBeenCalledWith("/feeds/b")` in the assertion.
 
 ### App Initialization Flow
 
@@ -247,6 +252,26 @@ Reference: `tests/smoke/release-feed.test.ts`, `tests/smoke/rate-limiter.test.ts
 ## Operations
 
 - **License support runbook** — `docs/operations/license-support.md`. The procedure for handling "I can't recover my license" support emails. Uses `scripts/find-license.ts` (operator CLI) backed by the pure library at `src/core/license/admin-find-license.ts`. Both reuse `findCustomerByEmail` from `src/core/stripe/find-customer-by-email.ts` so the recover-handler and the CLI agree on Stripe-customer lookup semantics.
+
+## Auditing the codebase
+
+When asked to "level up the codebase," "review and find what to fix," or similar open-ended improvement requests:
+
+1. **Map first. Do not edit.** Read the territory before proposing anything. Useful one-shot signals:
+   - `git log --since='6 months ago' --pretty=format: --name-only | grep -v '^$' | sort | uniq -c | sort -rn | head -25` — churn hotspots; the file changed most often is usually where bugs concentrate.
+   - `find src -name '*.ts' -o -name '*.tsx' | xargs wc -l | sort -rn | head -30` — file size outliers; a low-churn big file is fine, a high-churn big file is the next refactor.
+   - `grep -rl 'vi.mock("@/core/storage/db.ts"' tests/stores/` — store tests that mock the boundary they should verify (see the contract-tests rule above).
+   - `grep -rln 'from "@/components"' src/core src/stores` — boundary violations (core/stores importing UI). Must be empty.
+   - `find docs/incidents -type f` — known fragile zones; the next bug is usually adjacent to the last one.
+   - Commit-fix ratio over the last quarter: `git log --since='3 months ago' --pretty=format:'%s' | grep -ciE '^(fix|hotfix|revert)'` divided by total commits. >25% is a smell.
+
+2. **Write a short ranked memo before any code.** Three to seven findings. Each one: what costs, what buys, why now. Not an essay — one paragraph per finding. The memo is the spec the user approves before any commit. Refuse a finding if you cannot answer at least two of: "removes a class of bug? removes a class of confusion? unblocks future speed?"
+
+3. **Ship one commit per finding.** Smallest-risk first, so a surprise on a harder finding does not block the easier ones. Every commit is type-clean, test-green, and self-contained. The branch is the audit; the commits are the findings; the PR description maps commits ↔ findings.
+
+4. **Refuse to rewrite working modules because their style offends you.** A 889-line file with zero recent bugs and zero recent churn is not a target. The same file when you are about to invest in three new additions is. (See "Split a big file when the next investment is committed.")
+
+5. **For larger users of the audit pattern** — when the user accepts the full memo and asks you to "ship all findings" — be explicit about the trade-off vs. one-PR-per-finding. State up front that you will land one branch with one commit per finding so each is reviewable independently, and recommend the user split for serious follow-ups.
 
 ## Commit Messages
 
@@ -340,7 +365,7 @@ Working code-review checklist (adapted from [Lukaszuk's clean-code summary](http
 
 **General** — Follow surrounding-code conventions. Keep it simple. Boy Scout Rule (leave files cleaner). Always find the root cause; a symptom-fix that doesn't explain the symptom is a bug waiting to recur.
 
-**Design** — Push configurable data to high levels. Prefer polymorphism / dispatch tables to long `if/else` or `switch`; state machines live in dedicated modules. Use dependency injection over globals/singletons. Law of Demeter — no `a.b().c().d()` chains. Don't over-configure; flags and toggles are debt.
+**Design** — Push configurable data to high levels. Prefer polymorphism / dispatch tables to long `if/else` or `switch`; state machines live in dedicated modules. Use dependency injection over globals/singletons. Law of Demeter — no `a.b().c().d()` chains. Don't over-configure; flags and toggles are debt. When N call sites repeat the same M-step dance, extract a helper — the win is not LOC, it's making intentional omissions visible (see the Key Patterns rule). When a single component branches on `pathname` for more than two routes, you are writing a router by hand — use the router instead.
 
 **Names** — Descriptive, unambiguous, pronounceable, searchable. `i`/`j`/`tmp` only in tight obvious loops. Replace magic numbers with named constants. Meaningful distinctions (`userInfo` vs `userData` is a smell). No type-encoding prefixes (`strName`, `IUser`).
 
@@ -376,11 +401,19 @@ Working code-review checklist (adapted from [Lukaszuk's clean-code summary](http
 - **No-auto-destroy invariant**: No automated code path may delete server-side vault data. `destroy()` (`src/core/storage/key-manager.ts`) has exactly one sanctioned caller — `useAppStore.getState().resetApp`, which must be invoked from an explicit user-confirmation UI (the "Wipe and start over" `<AlertDialog>` on `InvalidKeysScreen` or the equivalent Settings reset). Boot-time canary failures route to `recoveryMode: "invalid-keys"` instead of `destroy()`. Issue #117 root-caused a chain of silent vault deletion to a boot-time auto-destroy cascade; ADR 018 is the durable rule. The runtime check `assertKeyDataCoupling()` is called at the end of every key-touching flow (`initFresh`, `applyCloudVault`, `restore`) to enforce the key-data coupling invariant mechanically rather than by convention.
 - **Shared mutable headers leak Content-Length**: `@hono/node-server` mutates the `headers` record passed to `new Response(body, { headers })` by appending the computed `Content-Length`. A `const HEADERS = {...}` shared across responses lets a small response's `Content-Length` leak into a large response's headers, truncating the body at the receiver. The shared-state pattern is now a code-review smell — see `apiHeaders()` in `src/core/sync/sync-handler.ts` for the correct pattern (function returning a fresh object per call). This was the proximate cause of issue #117's `JSON.parse: unterminated string` reports.
 - **Feature gating is honor-system open-core**: Client-side tier gates live in `src/core/features/feature-gates.ts` and consume tier from `useLicenseStore` (`src/stores/license-store.ts`). React components call `useFeatureGate(feature)`; store actions call `gateState(...)` directly for defense-in-depth. Self-hosters bypass via `VITE_SELF_HOSTED=1` at build time. Coming-soon features stay locked regardless. See ADR 012.
+- **Honor-system gating is the right shape when server enforcement would require telemetry.** The privacy principles (process on device, encrypt at rest with keys the operator cannot read, no behavioural analytics) make per-user metering a contradiction. A determined bypass is functionally self-hosting, which the product already endorses. Document the trade-off in the gate's JSDoc — `src/core/features/quotas.ts` lines 9–13 is the model. Do not add server-side gates unless the value at stake justifies storing the metric server-side and you can name the privacy cost honestly in an ADR.
+- **Route-by-router, not route-by-flag.** When a single page component keeps growing flag branches (`isExplorePage`, `isStatsPage`, `isSettingsPage`), split into a layout route + `<Outlet />` + sibling child routes. ADR 013's stable outer panel topology is best served this way because `<Outlet />` is one stable React node — react-resizable-panels sees the same children across route changes. Template: `src/pages/app-layout.tsx` + `src/pages/feeds-route.tsx` + `src/pages/stage-view.tsx`.
+- **Avoid DOM `CustomEvent`s when props, router state, or context will do.** They are global side channels: tracing "who fires this" requires a global grep. The only justified case is a listener that cannot be reached through the React tree — e.g., a hook called above a Provider that needs to talk to a component inside it (`feedzero:toggle-sidebar` is the model). Default order of choice: `useNavigate` / URL params → props → context → `CustomEvent` (last resort).
+- **Boot orchestration belongs in store actions, not in component effects.** A component running three cascading `useEffect`s that coordinate via `useStore.getState()` reads is too much logic for a component. Hoist the sequence into a store action; the component reacts to state. Template: `app-store.startNewUserOnboarding` runs secure-context check + passphrase generation + `initialize` + `completeOnboarding`; `AppInit` just fires the action and renders the resulting `securityProblem`/`error`/`isDbReady`.
+- **Extract a helper when the same multi-step dance repeats N times.** The point is not LOC. The point is that an *intentional* omission becomes visibly different from the default path, instead of hiding inside copy-paste variation. Template: `reloadFeeds + schedulePush` in `src/stores/feed-store.ts` — once every mutator routes through them, the action that intentionally skips `schedulePush()` (e.g., `setFolderOpen`, `reorderFeeds`) is a one-line outlier the reviewer can see.
+- **Split a big file when the next investment is committed, not before.** A low-churn 800-line file is fine if no one is editing it. The same file when you know the next three additions are queued deserves a pluggable split first — otherwise each new addition compounds the size and the next reviewer pays the cost. Template: `src/components/explore/` is now a shell + per-tab files + `TAB_DESCRIPTORS` registry because the curated catalog (use-case packs, editorial collections, bridges) is the next investment area.
 
 ---
 
 **Visual changes must be visually verified** in a real browser — not just by checking class names in unit tests. Use Playwright screenshots or the dev server.
 
 **Red-Green-Refactor. No test, no code. No refactor, no commit. No mock without a contract. No deployment without verification.**
+
+**Mock at the boundary, not the collaborator. Route by router, not by flag. Orchestrate in stores, not in components. Extract helpers to make omissions visible.**
 
 **FeedZero protects people. Act accordingly.**
