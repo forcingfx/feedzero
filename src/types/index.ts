@@ -81,3 +81,74 @@ export interface CreateArticleInput {
   author?: string;
   publishedAt?: number | null;
 }
+
+/**
+ * User-defined "smart playlist" for articles. Pulls articles from every
+ * loaded feed where `rule` evaluates true. Live — no materialization.
+ *
+ * Storage: encrypted at rest in the `smartFilters` Dexie table; rides
+ * through the encrypted vault to other devices (VaultData v3+).
+ */
+export interface SmartFilter {
+  id: string;
+  name: string;
+  /** Lucide-react icon name; defaults to "Filter" when omitted. */
+  icon?: string;
+  /** Optional Tailwind color token for the sidebar accent. */
+  color?: string;
+  rule: ConditionGroup;
+  /** Per-filter sort override; falls back to the user's article sort mode. */
+  sortMode?: ArticleSortMode;
+  /** Optional cap on returned articles. */
+  limit?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Recursive boolean composition for smart filters.
+ * `match: "all"` = AND, `match: "any"` = OR. `not: true` negates the
+ * whole group, letting users express "none of these match".
+ */
+export interface ConditionGroup {
+  kind: "group";
+  match: "all" | "any";
+  not?: boolean;
+  children: Array<Condition | ConditionGroup>;
+}
+
+/**
+ * Discriminated union over every supported filter condition.
+ *
+ * Text operators are case-insensitive. `matches` is an anchored regex
+ * — invalid patterns are rejected by `validation.ts` at edit time,
+ * never persisted.
+ *
+ * `feed` / `folder` ids reference the user's own data and must stay in
+ * sync with the local stores; the evaluator gracefully treats unknown
+ * ids as "no match" so a deleted feed never freezes a filter.
+ *
+ * `filterRef` lets one filter reference another by id. The evaluator
+ * passes a `visiting: Set<string>` cycle guard — a self-loop or
+ * mutual reference resolves to `false` rather than infinite recursion.
+ */
+export type Condition =
+  | { kind: "title";        op: "contains" | "not-contains" | "equals" | "matches"; value: string }
+  | { kind: "author";       op: "contains" | "not-contains" | "equals"; value: string }
+  | { kind: "content";      op: "contains" | "not-contains" | "matches"; value: string }
+  | { kind: "feed";         op: "in" | "not-in"; value: string[] }
+  | { kind: "folder";       op: "in" | "not-in"; value: string[] }
+  | { kind: "publishedAt";  op: "in-last-days" | "in-last-hours" | "before" | "after" | "between"; value: number | [number, number] }
+  | { kind: "read";         op: "is"; value: boolean }
+  | { kind: "starred";      op: "is"; value: boolean }
+  | { kind: "extracted";    op: "is"; value: boolean }
+  | { kind: "filterRef";    op: "matches"; value: string };
+
+export interface CreateSmartFilterInput {
+  name: string;
+  rule: ConditionGroup;
+  icon?: string;
+  color?: string;
+  sortMode?: ArticleSortMode;
+  limit?: number;
+}

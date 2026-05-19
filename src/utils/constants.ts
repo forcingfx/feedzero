@@ -25,6 +25,15 @@ export const ALL_FEEDS_ID = "all";
 export const STARRED_FEED_ID = "starred";
 
 /**
+ * Prefix applied to a smart-filter id to form an aggregated "filter feed"
+ * id (e.g. filter `abc-123` becomes the selected feed id
+ * `filter:abc-123`, which represents that filter's virtual article view).
+ * Mirrors FOLDER_FEED_PREFIX so the existing dispatch sites — routing,
+ * sidebar selection, breadcrumbs — only learn one new branch.
+ */
+export const FILTER_FEED_PREFIX = "filter:";
+
+/**
  * Prefix applied to a folder id to form an aggregated "folder feed" id.
  * e.g. folder `abc-123` becomes the selected feed id `folder:abc-123`,
  * which represents the aggregated stream of every feed in that folder.
@@ -53,17 +62,35 @@ export function isStarredFeedId(feedId: string): boolean {
   return feedId === STARRED_FEED_ID;
 }
 
+/** Build a smart-filter virtual feed id from a filter id. */
+export function toFilterFeedId(filterId: string): string {
+  return `${FILTER_FEED_PREFIX}${filterId}`;
+}
+
+/** Whether the given feed id represents a smart-filter view. */
+export function isFilterFeedId(feedId: string): boolean {
+  return feedId.startsWith(FILTER_FEED_PREFIX);
+}
+
+/** Extract the filter id from a filter-feed id, or null if not a filter feed. */
+export function fromFilterFeedId(feedId: string): string | null {
+  return isFilterFeedId(feedId)
+    ? feedId.slice(FILTER_FEED_PREFIX.length)
+    : null;
+}
+
 /**
  * Whether the given feed id represents an aggregated view across multiple
- * feeds (global "All items", a folder feed, or the starred view). Used by
- * components that must show per-article provenance (feed title + favicon)
- * when multiple feeds are displayed together.
+ * feeds (global "All items", a folder feed, the starred view, or a smart
+ * filter). Used by components that must show per-article provenance
+ * (feed title + favicon) when multiple feeds are displayed together.
  */
 export function isAggregatedFeedId(feedId: string): boolean {
   return (
     feedId === ALL_FEEDS_ID ||
     isFolderFeedId(feedId) ||
-    isStarredFeedId(feedId)
+    isStarredFeedId(feedId) ||
+    isFilterFeedId(feedId)
   );
 }
 
