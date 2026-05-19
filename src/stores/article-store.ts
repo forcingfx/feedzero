@@ -12,10 +12,17 @@ import {
   isFolderFeedId,
   isAggregatedFeedId,
   isStarredFeedId,
+  isFilterFeedId,
   fromFolderFeedId,
+  fromFilterFeedId,
 } from "../utils/constants.ts";
 import type { Article, ArticleSortMode } from "../types/index.ts";
 import { ARTICLE_SORT_MODES } from "../types/index.ts";
+import { useSmartFilterStore } from "./smart-filter-store.ts";
+import {
+  buildContext,
+  evaluateFilter,
+} from "../core/filters/evaluator.ts";
 
 /**
  * `articlesByFeedId` is the single source of truth for loaded article data,
@@ -135,11 +142,13 @@ function sortStarredArticles(articles: Article[]): Article[] {
  * Derive the visible article list for the requested (possibly aggregated)
  * feed id. ALL_FEEDS_ID flat-maps every loaded feed; folder feed ids restrict
  * to folder members; STARRED_FEED_ID flat-maps every starred article across
- * every feed; a concrete feed id returns that feed's list.
- * All paths apply the current sort mode so switching the mode always
- * re-orders the visible list — except the starred view, which is always
- * ordered by `starredAt` descending so the user's most recent saves stay
- * on top.
+ * every feed; FILTER_FEED_PREFIX ids run the smart-filter evaluator over
+ * every article and apply per-filter sort + limit overrides; a concrete
+ * feed id returns that feed's list.
+ *
+ * Every path applies the current sort mode so switching the mode always
+ * re-orders the visible list — except the starred view (always by
+ * `starredAt` desc) and smart filters with a `sortMode` override.
  */
 function deriveVisibleArticles(
   articlesByFeedId: Record<string, Article[]>,
@@ -158,6 +167,9 @@ function deriveVisibleArticles(
     }
     return sortStarredArticles(flat);
   }
+  if (isFilterFeedId(feedId)) {
+    return deriveFilteredArticles(articlesByFeedId, feedId, sortMode);
+  }
   if (isFolderFeedId(feedId)) {
     const folderId = fromFolderFeedId(feedId)!;
     const memberIds = new Set(
@@ -175,6 +187,40 @@ function deriveVisibleArticles(
   return sortArticles(articlesByFeedId[feedId] ?? [], sortMode);
 }
 
+/**
+ * Evaluate a smart filter against every loaded article and return the
+ * matching set, sorted + optionally limited per the filter's overrides.
+ * Unknown filter id resolves to an empty list (no error) so a stale
+ * URL after deletion is a soft fail.
+ */
+function deriveFilteredArticles(
+  articlesByFeedId: Record<string, Article[]>,
+  feedId: string,
+  fallbackSortMode: ArticleSortMode,
+): Article[] {
+  const filterId = fromFilterFeedId(feedId);
+  if (!filterId) return [];
+  const filter = useSmartFilterStore
+    .getState()
+    .filters.find((f) => f.id === filterId);
+  if (!filter) return [];
+
+  const ctx = buildContext({
+    feeds: useFeedStore.getState().feeds,
+    filters: useSmartFilterStore.getState().filters,
+  });
+
+  const matched: Article[] = [];
+  for (const list of Object.values(articlesByFeedId)) {
+    for (const article of list) {
+      if (evaluateFilter(filter, article, ctx)) matched.push(article);
+    }
+  }
+
+  const sorted = sortArticles(matched, filter.sortMode ?? fallbackSortMode);
+  return filter.limit !== undefined ? sorted.slice(0, filter.limit) : sorted;
+}
+
 /** Replace articles for a set of feeds and refresh the visible list. */
 function mergeFetchedArticles(
   state: Pick<ArticleStore, "articlesByFeedId">,
@@ -185,6 +231,7 @@ function mergeFetchedArticles(
   if (
     feedId === ALL_FEEDS_ID ||
     isStarredFeedId(feedId) ||
+    isFilterFeedId(feedId) ||
     isFolderFeedId(feedId)
   ) {
     // Bulk paths return articles from many feeds — replace each feed's
@@ -233,15 +280,21 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     });
 
     // Fetch fresh data in the background and merge it back into the source
-    // of truth. Four paths mirror the four kinds of feed id:
+    // of truth. Five paths mirror the five kinds of feed id:
     // - ALL_FEEDS_ID: one bulk query; results replace every feed bucket.
     // - STARRED_FEED_ID: one bulk query; filter retains only `starred`
     //   articles but every fetched article still updates its feed bucket
     //   so other views stay consistent.
+    // - filter:<id>: one bulk query; evaluator runs over every loaded
+    //   article in deriveVisibleArticles.
     // - folder:<id>: one bulk query, filtered on read to the folder's members.
     // - concrete feed id: targeted per-feed query.
     let fetched: Article[] = [];
-    if (feedId === ALL_FEEDS_ID || isStarredFeedId(feedId)) {
+    if (
+      feedId === ALL_FEEDS_ID ||
+      isStarredFeedId(feedId) ||
+      isFilterFeedId(feedId)
+    ) {
       const result = await getAllArticles();
       fetched = result.ok ? result.value : [];
     } else if (isFolderFeedId(feedId)) {
