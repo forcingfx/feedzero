@@ -96,18 +96,29 @@ describe("key-manager", () => {
       expect(localStorageMock.getItem(LOCAL_STORAGE.DERIVED_KEYS)).not.toBeNull();
     });
 
-    it("attempts to delete previous server vault when skipServerCleanup is false and stored vault keys exist", async () => {
-      // Run a real sync init first so stored vault keys are valid JWK,
-      // then a second init without skipServerCleanup should trigger deleteVault.
-      await initFresh("first passphrase here now", {
-        sync: true,
-        skipServerCleanup: true,
-      });
-      vi.mocked(deleteVault).mockClear();
+    it(
+      "attempts to delete previous server vault when skipServerCleanup is false and stored vault keys exist",
+      async () => {
+        // Run a real sync init first so stored vault keys are valid JWK,
+        // then a second init without skipServerCleanup should trigger deleteVault.
+        //
+        // Two real `initFresh({ sync: true })` calls means four real PBKDF2
+        // derivations end-to-end (~2.5s each on slow CI), which crosses
+        // Vitest's 5s default and produced the 2026-05-19 pre-push flake.
+        // The seeding-via-real-init is intentional (it locks down the
+        // localStorage shape contract), so the right fix is to give the
+        // crypto room to run, not to swap in a hand-rolled JWK fixture.
+        await initFresh("first passphrase here now", {
+          sync: true,
+          skipServerCleanup: true,
+        });
+        vi.mocked(deleteVault).mockClear();
 
-      await initFresh("second passphrase here now", { sync: true });
-      expect(deleteVault).toHaveBeenCalledOnce();
-    });
+        await initFresh("second passphrase here now", { sync: true });
+        expect(deleteVault).toHaveBeenCalledOnce();
+      },
+      15000,
+    );
 
     it("does not call deleteVault when no previous vault keys exist", async () => {
       // No stored keys at all
