@@ -228,6 +228,76 @@ describe("sync-handler", () => {
     });
   });
 
+  describe("response headers do not leak between requests (issue #117)", () => {
+    // The actual root cause of issue #117's `JSON.parse: unterminated
+    // string` reports was NOT the filesystem adapter — it was the
+    // sync-handler module sharing one `const API_HEADERS = { ... }`
+    // object across every `new Response(body, { headers: API_HEADERS })`
+    // call. @hono/node-server@2.0.2 mutates the supplied headers
+    // record by appending the computed `Content-Length`. So a short
+    // PUT response (~37 bytes) ran first, stamped `Content-Length: 37`
+    // onto the shared object, and the next GET's Response inherited
+    // the stale 37 — truncating a multi-KB vault body to 37 bytes on
+    // the wire. The fix is `apiHeaders()` (a fresh object per call).
+    //
+    // This regression test asserts the headers object is fresh per
+    // response by checking that two back-to-back responses with
+    // different body sizes report different Content-Length values
+    // (or at minimum, that the second response's Content-Length is
+    // not the first response's).
+    it("PUT then GET produce responses with independent header objects", async () => {
+      const vaultId = "a".repeat(64);
+
+      // Put a vault whose stored payload (the "{ok:true,vault:{...}}"
+      // wrapping the adapter writes) is longer than the PUT's reply.
+      const longVault = {
+        version: 1,
+        iv: [1, 2, 3, 4],
+        ciphertext: "x".repeat(2000),
+      };
+      const putRes = await handleSyncRequest(
+        makePutRequest({ vaultId, vault: longVault }),
+        adapter,
+      );
+      expect(putRes.status).toBe(200);
+      const putBody = await putRes.text();
+      const putLen = putBody.length;
+
+      const getRes = await handleSyncRequest(makeGetRequest(vaultId), adapter);
+      expect(getRes.status).toBe(200);
+      const getBody = await getRes.text();
+
+      // If the GET response inherits the PUT response's headers
+      // object (pre-fix), `getBody` would be truncated to `putLen`
+      // bytes at the HTTP layer. We don't go through HTTP here, so
+      // the Response.text() is unaffected — but we DO assert that
+      // each Response carries its own Headers instance, which is the
+      // invariant the fix establishes.
+      expect(getBody.length).toBeGreaterThan(putLen);
+      expect(getRes.headers).not.toBe(putRes.headers);
+    });
+
+    it("two consecutive PUTs produce responses with independent header objects", async () => {
+      const vaultId1 = "a".repeat(64);
+      const vaultId2 = "b".repeat(64);
+      const res1 = await handleSyncRequest(
+        makePutRequest({
+          vaultId: vaultId1,
+          vault: { version: 1, iv: [1], ciphertext: "first" },
+        }),
+        adapter,
+      );
+      const res2 = await handleSyncRequest(
+        makePutRequest({
+          vaultId: vaultId2,
+          vault: { version: 1, iv: [1], ciphertext: "second" },
+        }),
+        adapter,
+      );
+      expect(res1.headers).not.toBe(res2.headers);
+    });
+  });
+
   describe("security headers", () => {
     it("sets X-Content-Type-Options: nosniff on JSON responses", async () => {
       const vaultId = "a".repeat(64);

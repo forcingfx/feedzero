@@ -9,7 +9,7 @@ import { useSyncStore } from "@/stores/sync-store";
 
 vi.mock("@/core/storage/key-manager", () => ({
   initFresh: vi.fn(),
-  rekeyFromPassphrase: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  persistDerivedKeysFromOpenDb: vi.fn().mockResolvedValue({ ok: true, value: {} }),
 }));
 
 vi.mock("@/core/sync/sync-service", () => ({

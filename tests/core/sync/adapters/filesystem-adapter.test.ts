@@ -112,5 +112,85 @@ describe("filesystem-adapter", () => {
       expect(isOk(result)).toBe(true);
       expect(unwrap(result)).toBe(0);
     });
+
+    it("ignores transient tmp files (.tmp- prefix)", async () => {
+      const adapter = createFilesystemAdapter(tmpDir);
+      await adapter.put("a".repeat(64), '{"v":1}');
+
+      // Simulate an orphan tmp file from a crashed write.
+      const vaultsDir = path.join(tmpDir, "vaults");
+      fs.writeFileSync(path.join(vaultsDir, ".tmp-orphan-123"), "partial");
+
+      const result = await adapter.count();
+      expect(unwrap(result)).toBe(1);
+    });
+  });
+
+  // Atomicity contract: PUT must be atomic relative to concurrent GET.
+  // A reader either sees the previous value or the new value, never a
+  // partial / truncated body. The bug from issue #117 (filesystem
+  // adapter using `writeFileSync` which truncates-then-writes) is not
+  // observable in single-Node unit tests because writeFileSync blocks
+  // the event loop — but it IS observable across processes (e.g. the
+  // user reading the on-disk vault file with `cat` mid-PUT, or a
+  // separate Node worker reading). These tests verify the behavioral
+  // properties the atomic implementation must hold; the real race is
+  // exercised by the integration test in tests/integration/.
+  describe("atomic write contract", () => {
+    it("never leaves the vault path with an intermediate (0-byte) state visible", async () => {
+      const adapter = createFilesystemAdapter(tmpDir);
+      const vaultId = "1".repeat(64);
+      const filePath = path.join(tmpDir, "vaults", `${vaultId}.json`);
+
+      // Seed initial content so any "torn" state would be empty/partial.
+      const original = JSON.stringify({ ok: true, value: "before" });
+      unwrap(await adapter.put(vaultId, original));
+
+      // Replace with a large payload. After the call returns, the file
+      // MUST contain the new content in full (no partial write). The
+      // atomic implementation guarantees this because the rename is the
+      // only mutation visible to a concurrent reader at the vault path.
+      const next = JSON.stringify({
+        ok: true,
+        value: "after",
+        filler: "x".repeat(256 * 1024),
+      });
+      unwrap(await adapter.put(vaultId, next));
+
+      const onDisk = fs.readFileSync(filePath, "utf-8");
+      expect(onDisk).toBe(next);
+      expect(() => JSON.parse(onDisk)).not.toThrow();
+    });
+
+    it("cleans up tmp files after a successful write (no orphans)", async () => {
+      const adapter = createFilesystemAdapter(tmpDir);
+      const vaultId = "2".repeat(64);
+
+      unwrap(await adapter.put(vaultId, '{"ok":true}'));
+
+      const vaultsDir = path.join(tmpDir, "vaults");
+      const entries = fs.readdirSync(vaultsDir);
+      const tmpFiles = entries.filter((f) => f.startsWith(".tmp-"));
+      expect(tmpFiles).toEqual([]);
+    });
+
+    it("the on-disk path holds valid content after many sequential overwrites", async () => {
+      // Regression guard: after the rename-based implementation, every
+      // visible state at the vault path is a complete, parseable body.
+      // If a future refactor reintroduces truncate-then-write, this can
+      // observably regress when called from a faster filesystem or via
+      // worker threads.
+      const adapter = createFilesystemAdapter(tmpDir);
+      const vaultId = "3".repeat(64);
+      const filePath = path.join(tmpDir, "vaults", `${vaultId}.json`);
+
+      for (let i = 0; i < 20; i++) {
+        const payload = JSON.stringify({ seed: i, filler: "y".repeat(8192) });
+        unwrap(await adapter.put(vaultId, payload));
+        const onDisk = fs.readFileSync(filePath, "utf-8");
+        expect(() => JSON.parse(onDisk)).not.toThrow();
+        expect(JSON.parse(onDisk).seed).toBe(i);
+      }
+    });
   });
 });

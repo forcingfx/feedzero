@@ -23,10 +23,12 @@ import {
   checkSecureContext,
   type SecureContextProblemKind,
 } from "@/core/security/secure-context.ts";
+import { InvalidKeysScreen } from "@/components/recovery/invalid-keys-screen";
 
 function AppInit({ children }: { children: React.ReactNode }) {
   const isDbReady = useAppStore((s) => s.isDbReady);
   const error = useAppStore((s) => s.error);
+  const recoveryMode = useAppStore((s) => s.recoveryMode);
   const hasCompletedOnboarding = useAppStore((s) => s.hasCompletedOnboarding);
   const checkOnboardingStatus = useAppStore((s) => s.checkOnboardingStatus);
   const initialize = useAppStore((s) => s.initialize);
@@ -164,6 +166,13 @@ function AppInit({ children }: { children: React.ReactNode }) {
         ) : null}
       </div>
     );
+  }
+
+  // Invalid-keys recovery screen replaces the previous boot-time
+  // auto-destroy cascade. Surface explicit choices instead of silently
+  // deleting the user's cloud vault (issue #117).
+  if (recoveryMode === "invalid-keys") {
+    return <InvalidKeysScreen />;
   }
 
   if (error) {

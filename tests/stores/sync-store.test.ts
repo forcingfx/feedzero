@@ -19,7 +19,7 @@ vi.mock("../../src/core/storage/key-manager", () => ({
   addVaultKeys: vi.fn(),
   removeVaultKeys: vi.fn(),
   destroyLocal: vi.fn().mockResolvedValue(undefined),
-  rekeyFromPassphrase: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  persistDerivedKeysFromOpenDb: vi.fn().mockResolvedValue({ ok: true, value: {} }),
 }));
 
 vi.mock("../../src/core/sync/vault-crypto", () => ({

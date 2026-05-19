@@ -10,11 +10,31 @@ import {
 const VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;
 const ROUTE = "/api/sync";
 
-const API_HEADERS = {
-  "Content-Type": "application/json",
-  "Access-Control-Allow-Origin": "*",
-  "X-Content-Type-Options": "nosniff",
-} as const;
+/**
+ * Build a fresh headers object for each response.
+ *
+ * **Why this isn't a shared `const` object:** `@hono/node-server@2.0.2`
+ * MUTATES the headers object passed to `new Response(body, { headers })`
+ * by appending a computed `Content-Length`. If two responses share the
+ * same headers object reference, the second response inherits the
+ * first response's Content-Length — which truncates the body at the
+ * receiver. This was the root cause of issue #117's
+ * `JSON.parse: unterminated string at column N` errors: a small PUT
+ * response (~37 bytes: `{"ok":true,"updatedAt":<ms>}`) ran first,
+ * stamped `Content-Length: 37` onto the shared object, and the next
+ * GET response (the encrypted vault, kilobytes long) was sent with
+ * `Content-Length: 37` and got cut off after 37 bytes on the wire.
+ * Self-hosters with multiple devices observed it; paid users on the
+ * hosted backend never did (the bug requires shared in-process state
+ * across requests, which Vercel's per-request lambdas don't have).
+ */
+function apiHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "X-Content-Type-Options": "nosniff",
+  };
+}
 
 /**
  * Per-request context threaded through the per-method handlers. Holds the
@@ -27,7 +47,7 @@ interface RequestContext {
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: API_HEADERS });
+  return new Response(JSON.stringify(body), { status, headers: apiHeaders() });
 }
 
 /**
@@ -93,7 +113,7 @@ async function handleGet(
   }
   if (result.value === null) return clientError("Vault not found", 404, ctx);
 
-  return new Response(result.value, { status: 200, headers: API_HEADERS });
+  return new Response(result.value, { status: 200, headers: apiHeaders() });
 }
 
 async function handlePut(

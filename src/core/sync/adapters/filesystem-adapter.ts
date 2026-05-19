@@ -4,6 +4,7 @@ import { ok, err } from "../../../utils/result.ts";
 import type { SyncStorageAdapter } from "../types.ts";
 
 const VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;
+const TMP_PREFIX = ".tmp-";
 
 function validateVaultId(vaultId: string): boolean {
   return VAULT_ID_PATTERN.test(vaultId);
@@ -12,6 +13,18 @@ function validateVaultId(vaultId: string): boolean {
 /**
  * Filesystem storage adapter for self-hosting.
  * Stores vaults as JSON files under `{dataDir}/vaults/{vaultId}.json`.
+ *
+ * Atomicity contract (see SyncStorageAdapter): every `put` writes to a
+ * sibling tmp file then `rename`s it onto the destination. `rename` is
+ * atomic within a single directory on POSIX, so a concurrent reader (a
+ * second process, an external `cat`, a worker thread) either sees the
+ * previous inode or the new one, never a half-written body. Without
+ * this — i.e. with a bare `writeFileSync` — the destination file goes
+ * through a 0-byte state between truncate and write, which produced
+ * the `JSON.parse: unterminated string` errors reported in issue #117.
+ *
+ * Crash-recovery: orphan `${TMP_PREFIX}*` files left by an interrupted
+ * write are ignored by `count()` and overwritten on the next `put`.
  */
 export function createFilesystemAdapter(dataDir: string): SyncStorageAdapter {
   const vaultsDir = path.join(dataDir, "vaults");
@@ -37,13 +50,28 @@ export function createFilesystemAdapter(dataDir: string): SyncStorageAdapter {
       if (!validateVaultId(vaultId)) {
         return err("Invalid vault ID");
       }
+      const destPath = path.join(vaultsDir, `${vaultId}.json`);
+      // Same-directory tmp file so `rename` stays within one filesystem
+      // (POSIX guarantees atomicity only for same-volume renames). The
+      // pid + random suffix prevents collisions if multiple processes
+      // (or threads) race on the same vaultId. `flag: 'wx'` makes the
+      // open fail rather than silently reuse an existing tmp file, so
+      // we never write to a stale fd from a previous crash.
+      const tmpPath = path.join(
+        vaultsDir,
+        `${TMP_PREFIX}${process.pid}-${Math.random().toString(36).slice(2)}-${vaultId}`,
+      );
       try {
         fs.mkdirSync(vaultsDir, { recursive: true });
-        fs.writeFileSync(
-          path.join(vaultsDir, `${vaultId}.json`),
-          data,
-          "utf-8",
-        );
+        try {
+          fs.writeFileSync(tmpPath, data, { encoding: "utf-8", flag: "wx" });
+          fs.renameSync(tmpPath, destPath);
+        } catch (writeErr) {
+          // Best-effort cleanup of the partial tmp; ignore unlink errors
+          // since the orphan-sweep on read/count handles leftovers anyway.
+          try { fs.rmSync(tmpPath, { force: true }); } catch { /* noop */ }
+          throw writeErr;
+        }
         return ok(true);
       } catch (e) {
         return err(`Failed to write vault: ${(e as Error).message}`);
@@ -67,7 +95,9 @@ export function createFilesystemAdapter(dataDir: string): SyncStorageAdapter {
 
     async count() {
       try {
-        const files = fs.readdirSync(vaultsDir).filter((f) => f.endsWith(".json"));
+        const files = fs
+          .readdirSync(vaultsDir)
+          .filter((f) => f.endsWith(".json") && !f.startsWith(TMP_PREFIX));
         return ok(files.length);
       } catch (e) {
         if ((e as { code?: string }).code === "ENOENT") {

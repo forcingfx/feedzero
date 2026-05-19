@@ -12,7 +12,7 @@ import {
   removeVaultKeys,
   destroy,
   destroyLocal,
-  rekeyFromPassphrase,
+  persistDerivedKeysFromOpenDb,
 } from "@/core/storage/key-manager";
 import { close } from "@/core/storage/db";
 import { deleteVault } from "@/core/sync/sync-service";
@@ -269,7 +269,7 @@ describe("key-manager", () => {
     });
   });
 
-  describe("rekeyFromPassphrase", () => {
+  describe("persistDerivedKeysFromOpenDb", () => {
     it("re-derives keys for a local session", async () => {
       // Bootstrap a DB so getSalt() has something to read
       await initFresh("first passphrase here now", {
@@ -277,7 +277,7 @@ describe("key-manager", () => {
         skipServerCleanup: true,
       });
 
-      const result = await rekeyFromPassphrase("first passphrase here now", {
+      const result = await persistDerivedKeysFromOpenDb("first passphrase here now", {
         sync: false,
       });
       expect(result.ok).toBe(true);
@@ -293,7 +293,7 @@ describe("key-manager", () => {
         skipServerCleanup: true,
       });
 
-      const result = await rekeyFromPassphrase("first passphrase here now", {
+      const result = await persistDerivedKeysFromOpenDb("first passphrase here now", {
         sync: true,
       });
       expect(result.ok).toBe(true);

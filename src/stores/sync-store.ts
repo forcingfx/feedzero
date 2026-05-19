@@ -13,8 +13,10 @@ import {
   addVaultKeys,
   removeVaultKeys,
   destroyLocal,
-  rekeyFromPassphrase,
+  persistDerivedKeysFromOpenDb,
+  assertKeyDataCoupling,
 } from "../core/storage/key-manager.ts";
+import { close, deleteDatabase, open } from "../core/storage/db.ts";
 import { clearLicenseToken } from "../core/license/license-token-store.ts";
 import type { Result } from "../utils/result.ts";
 import { ok, err } from "../utils/result.ts";
@@ -335,6 +337,10 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     }
     const credentials = credsResult.value;
 
+    // Mode-specific source data: either the cloud vault directly
+    // (replace) or local merged with cloud (merge). The destructive
+    // local rewrite happens INSIDE applyCloudVault — only after pull
+    // succeeds. If pull fails, the local DB is untouched.
     if (mode === "replace") {
       const pullResult = await pullVault(credentials);
       if (!pullResult.ok) {
@@ -342,18 +348,10 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         return pullResult;
       }
 
-      const importResult = await importVault(pullResult.value);
-      if (!importResult.ok) {
-        set({ status: "error", error: importResult.error });
-        return importResult;
-      }
-
-      // importAll re-encrypts data with current keys, but we need keys
-      // derived from the cloud passphrase for future sessions
-      const rekeyResult = await rekeyFromPassphrase(passphrase, { sync: true });
-      if (!rekeyResult.ok) {
-        set({ status: "error", error: rekeyResult.error });
-        return rekeyResult;
+      const applyResult = await applyCloudVault(passphrase, pullResult.value);
+      if (!applyResult.ok) {
+        set({ status: "error", error: applyResult.error });
+        return applyResult;
       }
 
       set({
@@ -365,7 +363,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return ok(true);
     }
 
-    // Merge mode: export local, pull cloud, merge, import, push
+    // Merge mode: snapshot local, pull cloud, merge in memory, then
+    // apply the merged result. Push the (now-cloud-passphrase-encrypted)
+    // result so the cloud reflects the merge.
     const exportResult = await exportVault();
     if (!exportResult.ok) {
       set({ status: "error", error: exportResult.error });
@@ -384,22 +384,16 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return mergeResult;
     }
 
-    const importResult = await importVault(mergeResult.value);
-    if (!importResult.ok) {
-      set({ status: "error", error: importResult.error });
-      return importResult;
+    const applyResult = await applyCloudVault(passphrase, mergeResult.value);
+    if (!applyResult.ok) {
+      set({ status: "error", error: applyResult.error });
+      return applyResult;
     }
 
     const pushResult = await pushVault(credentials);
     if (!pushResult.ok) {
       set({ status: "error", error: pushResult.error });
       return err(pushResult.error);
-    }
-
-    const rekeyResult = await rekeyFromPassphrase(passphrase, { sync: true });
-    if (!rekeyResult.ok) {
-      set({ status: "error", error: rekeyResult.error });
-      return rekeyResult;
     }
 
     set({
@@ -411,3 +405,68 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     return ok(true);
   },
 }));
+
+/**
+ * Atomically replace local DB contents with a cloud-derived vault.
+ *
+ * **The fix for issue #117's key/data drift.** Previously the flow was
+ * `importVault(...)` → `rekeyFromPassphrase(passphrase)`, which encrypted
+ * the cloud data under the OLD in-memory keys while writing NEW keys to
+ * localStorage. The next session's canary check failed → auto-destroy
+ * cascade deleted the server vault.
+ *
+ * The correct order:
+ *  1. Close the current DB (drops stale in-memory crypto state).
+ *  2. Delete local IndexedDB (wipes data encrypted under old keys).
+ *  3. `open(passphrase)` — derives fresh DB keys from the cloud
+ *     passphrase and sets them as the new in-memory `cryptoKey`.
+ *  4. `importVault(...)` — encrypts the cloud data under the new keys.
+ *  5. `persistDerivedKeysFromOpenDb` — writes the now-aligned keys to
+ *     localStorage. After this, `restore()` on a future session opens
+ *     the DB with keys that match what's on disk. Canary check passes.
+ *  6. Refresh in-memory stores (feeds, articles) so the sidebar
+ *     reflects the newly-imported data immediately — mirrors the
+ *     pattern in `forceResync` and fixes the "sidebar stays empty
+ *     after restore" symptom from #117.
+ *
+ * The function is destructive after step 2. If `importVault` fails,
+ * local data is gone, but the source `vault` argument is still in
+ * memory and the user can retry. The cloud vault is never modified by
+ * this function (no push, no delete).
+ */
+async function applyCloudVault(
+  passphrase: string,
+  vault: import("../core/sync/types.ts").VaultData,
+): Promise<Result<boolean>> {
+  close();
+  const deleteResult = await deleteDatabase();
+  if (!deleteResult.ok) return deleteResult;
+
+  const openResult = await open(passphrase);
+  if (!openResult.ok) return openResult;
+
+  const importResult = await importVault(vault);
+  if (!importResult.ok) return importResult;
+
+  const persistResult = await persistDerivedKeysFromOpenDb(passphrase, {
+    sync: true,
+  });
+  if (!persistResult.ok) return persistResult;
+
+  // Mechanical invariant check: stored keys MUST decrypt on-disk data.
+  // If this fails, the close/delete/open/import sequence above has
+  // somehow drifted (regression). We surface an error instead of
+  // letting the next session's canary fail and trigger a destroy.
+  const couplingResult = await assertKeyDataCoupling();
+  if (!couplingResult.ok) return couplingResult;
+
+  // Refresh in-memory store state. Without this, the sidebar shows
+  // empty until the user navigates (issue #117 symptom). Lazy imports
+  // avoid a circular dependency at module load.
+  const { useFeedStore } = await import("./feed-store.ts");
+  await useFeedStore.getState().loadFeeds();
+  const { useArticleStore } = await import("./article-store.ts");
+  await useArticleStore.getState().preloadAll();
+
+  return ok(true);
+}

@@ -15,6 +15,34 @@ import {
   getFeeds,
   getSalt,
 } from "./db.ts";
+
+/**
+ * Verify the key-data coupling invariant in code (not just docs).
+ *
+ * The invariant from CLAUDE.md: stored derived keys must always be
+ * able to decrypt the local IndexedDB contents. Any operation that
+ * modifies stored keys without re-encrypting data, or re-encrypts data
+ * without updating stored keys, is a bug.
+ *
+ * Mechanism: read one record (via `getFeeds`, the same canary `restore`
+ * uses) using the current in-memory `cryptoKey`. If decryption fails,
+ * keys and data are drifted — the caller's flow is structurally wrong.
+ *
+ * Call sites: end of every flow that touches encryption keys. Today:
+ * `initFresh` (after open + store), `applyCloudVault` (after close +
+ * delete + open + import + persist), and `restore` (implicit via its
+ * existing canary). Adding a new key-touching flow without an
+ * assertion call is the kind of regression issue #117 exposed.
+ */
+export async function assertKeyDataCoupling(): Promise<Result<void>> {
+  const result = await getFeeds();
+  if (!result.ok) {
+    return err(
+      `Key-data coupling violated: stored keys cannot decrypt local data (${result.error})`,
+    );
+  }
+  return ok(undefined);
+}
 import type { SyncCredentials } from "../sync/sync-service.ts";
 
 /** Serializable key material stored in localStorage (JWK format). */
@@ -164,6 +192,18 @@ export async function initFresh(
     storeKeys(material);
     localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, options?.sync ? "sync" : "local");
 
+    // 5. Verify the key-data coupling invariant. If this fails, the
+    //    function's contract is broken and we want to know loudly.
+    //    A freshly-initialized DB has no records, so getFeeds returns
+    //    an empty list — which is `ok([])`, not an error. The check
+    //    surfaces decryption-key mismatch, not "empty DB."
+    const couplingResult = await assertKeyDataCoupling();
+    if (!couplingResult.ok) {
+      await deleteDatabase();
+      clearAllStorage();
+      return err(couplingResult.error);
+    }
+
     return ok({ credentials });
   } catch (e) {
     // Roll back on any unexpected error
@@ -256,7 +296,20 @@ export function removeVaultKeys(): void {
 
 /**
  * Destroy everything: delete server vault, local DB, and all stored keys.
- * Used by resetApp. Best-effort vault deletion.
+ *
+ * WARNING: This is destructive AND remote. It issues a DELETE against
+ * the sync server using the locally-stored vault credentials, which
+ * removes the user's encrypted cloud backup. Never call from an
+ * automated recovery path (boot-time canary failure, transient state
+ * error, etc.) — only from a user-confirmed reset action. The only
+ * legitimate caller is `useAppStore.getState().resetApp` (which is
+ * wired to an explicit confirmation dialog in the UI). Adding more
+ * callers requires either (a) routing through `resetApp`, or (b)
+ * proving the new call site is gated by a user action.
+ *
+ * Issue #117 root-caused a chain of data loss to an automated
+ * boot-time call of this function from `initializeReturningUser` —
+ * see the comment there and ADR 018.
  */
 export async function destroy(): Promise<void> {
   await tryDeleteServerVault();
@@ -274,11 +327,27 @@ export async function destroyLocal(): Promise<void> {
 }
 
 /**
- * Re-derive all keys from a passphrase and re-open the DB.
- * Used by switchToExistingCloud after importAll re-encrypts data
- * with the cloud passphrase.
+ * Persist derived keys (DB + optional vault) to localStorage so a
+ * future session can re-open the same DB via `openWithKeys`.
+ *
+ * **Precondition:** the DB must already be open with keys derived from
+ * `passphrase` (i.e. `open(passphrase)` was called and the in-memory
+ * `cryptoKey` / `hmacKey` correspond to data on disk). This function
+ * does NOT re-open the DB and does NOT update in-memory key state.
+ *
+ * Key-data coupling invariant: callers MUST ensure the passphrase
+ * passed here matches the in-memory key state at the time of the call.
+ * Re-deriving with the wrong passphrase here would write JWKs to
+ * localStorage that can't decrypt the on-disk data — the next
+ * `restore()` would fail the canary check, and (pre-#117 fix) would
+ * have triggered the auto-destroy cascade.
+ *
+ * Replaces the pre-#117 `rekeyFromPassphrase`, whose JSDoc claimed to
+ * "re-derive keys AND re-open the DB" but only did the first. Callers
+ * (sync-store.switchToExistingCloud) were structurally guaranteed to
+ * leave key/data drift on disk. Renamed to reveal the precondition.
  */
-export async function rekeyFromPassphrase(
+export async function persistDerivedKeysFromOpenDb(
   passphrase: string,
   options?: { sync: boolean },
 ): Promise<Result<{ credentials: SyncCredentials | null }>> {

@@ -12,7 +12,7 @@ import {
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
-import { initFresh, rekeyFromPassphrase } from "@/core/storage/key-manager";
+import { initFresh } from "@/core/storage/key-manager";
 import { pullVault, importVault } from "@/core/sync/sync-service";
 
 export function RecoveryStep() {
@@ -52,10 +52,15 @@ export function RecoveryStep() {
 
     const credentials = initResult.value.credentials;
 
-    // 3. Import the pulled vault data and restore sync state
+    // 3. Import the pulled vault data and restore sync state.
+    //    `initFresh` already opened a fresh DB with passphrase-derived
+    //    keys AND wrote those keys to localStorage. `importVault` runs
+    //    encryption against the same in-memory keys, so on-disk
+    //    ciphertext matches what `restore()` will use on next session.
+    //    No separate "rekey" step needed — see #117 for the bug the
+    //    old extra rekey call masked.
     if (credentials) {
       await importVault(pullResult.value);
-      await rekeyFromPassphrase(trimmed, { sync: true });
       useSyncStore.getState().restoreSync(credentials);
     }
 
