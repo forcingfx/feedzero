@@ -1,7 +1,24 @@
 import { create } from "zustand";
-import { extract } from "../core/extractor/extractor.ts";
-import { registry } from "../core/extractor/adapters/index.ts";
 import { proxyFetch } from "../core/proxy/proxy-fetch.ts";
+
+/**
+ * Defuddle is the bulk of the production bundle's "ready to extract"
+ * cost — it ships with a DOM cleaner and a heuristic pipeline that
+ * dwarfs the rest of the reader. Most reading sessions never click
+ * "Extracted", so we pay the bytes for a feature the user may not use.
+ *
+ * Solution: import extract() + the adapter registry only when
+ * `fetchExtracted` actually runs. Vite splits these into their own
+ * chunk; first paint drops the Defuddle weight; the toggle still
+ * feels instant because the chunk is one network round-trip.
+ */
+async function loadExtractor(): Promise<typeof import("../core/extractor/extractor.ts")> {
+  return import("../core/extractor/extractor.ts");
+}
+async function loadAdapterRegistry(): Promise<typeof import("../core/extractor/adapters/index.ts")> {
+  return import("../core/extractor/adapters/index.ts");
+}
+
 export type ExtractionStatus = "idle" | "extracting" | "available" | "failed";
 
 interface ExtractionStore {
@@ -70,6 +87,13 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
     });
 
     try {
+      // Lazy-load the extractor + adapter registry. Both pull in
+      // Defuddle's HTML pipeline, which we don't want on first paint.
+      const [{ extract }, { registry }] = await Promise.all([
+        loadExtractor(),
+        loadAdapterRegistry(),
+      ]);
+
       const adapter = registry.findAdapter(url);
       const sourceUrl = adapter?.getSourceUrl?.(url) ?? url;
 

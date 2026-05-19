@@ -7,7 +7,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { hasSummarySubheading } from "@/lib/content-modes.ts";
-import { needsExtraction } from "@/core/extractor/extractor.ts";
+import { needsExtraction } from "@/core/extractor/needs-extraction.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Article } from "@/types/index.ts";
 import { Kbd } from "@/components/ui/kbd.tsx";
