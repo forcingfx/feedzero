@@ -10,8 +10,10 @@ import {
   isFilterFeedId,
   fromFilterFeedId,
 } from "@/utils/constants.ts";
-import { SidebarProvider } from "@/components/ui/sidebar.tsx";
+import { SidebarMenu, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
+import { NewFolderInput } from "@/components/sidebar/new-folder-input.tsx";
+import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 
 interface MobileNavDrawerProps {
@@ -109,23 +111,26 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                 <SidebarBody
                   onFeedSelect={handleSelect}
                   onBeforeNavigate={() => setOpen(false)}
+                  hideNewFolderInput
                 />
               </div>
             </div>
 
             {/*
-              Settings pinned as a fixed drawer footer (outside the scroll).
-              The 2026-05-19 bug had Settings as the last item INSIDE the
-              scroll — so with a long feed list, it sat below the visible
-              area and required scrolling to reach. As a settings entry
-              point it should always be one tap away regardless of feed
-              count; pinning it outside the scroll is the durable fix.
-              `shrink-0` so it can't be squeezed when content is short.
+              Always-reachable footer (outside the scroll). Holds the two
+              affordances a user with 50+ feeds shouldn't have to scroll
+              past every row to reach: "New folder" (folder management)
+              and "Settings" (app preferences). 2026-05-19 bug report
+              proved the inline-at-bottom-of-scroll placement broke under
+              long lists. `shrink-0` so the footer can't be squeezed.
             */}
             <div
               data-testid="drawer-section"
               className="shrink-0 border-t bg-background px-3 py-1 pb-[calc(env(safe-area-inset-bottom)_+_(100vh_-_100dvh)_+_0.25rem)]"
             >
+              <SidebarMenu>
+                <NewFolderInput trailing={<AutoOrganizePill />} />
+              </SidebarMenu>
               <button
                 type="button"
                 onClick={handleSettings}

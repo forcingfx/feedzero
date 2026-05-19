@@ -241,6 +241,44 @@ describe("MobileNavDrawer", () => {
     expect(drawer.contains(settingsBtn)).toBe(true);
   });
 
+  it("'New folder' affordance also stays pinned outside the scroll so it's reachable with many feeds", async () => {
+    // Same always-reachable invariant as Settings: with a 50-feed list,
+    // a power user shouldn't have to scroll past every feed to reach
+    // folder management. NewFolderInput renders inside SidebarFeedList
+    // by default; the mobile drawer suppresses that and renders its own
+    // copy in the pinned footer.
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: Array.from({ length: 50 }, (_, i) =>
+        makeFeed(`f${i}`, `Feed ${i}`),
+      ),
+    });
+    const { container } = renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+
+    const drawer = await waitFor(() => {
+      const d = container.ownerDocument.querySelector(
+        "[data-testid='drawer-content']",
+      );
+      if (!d) throw new Error("drawer not mounted");
+      return d;
+    });
+    const scroll = drawer.querySelector("[data-testid='drawer-scroll']");
+
+    // The "New folder" entry-point button (collapsed state). Exactly one
+    // instance must render inside the drawer — duplication would mean
+    // SidebarFeedList wasn't told to suppress its copy.
+    const newFolderButtons = await screen.findAllByRole("button", {
+      name: "New folder",
+    });
+    expect(newFolderButtons).toHaveLength(1);
+    const newFolderBtn = newFolderButtons[0];
+
+    expect(scroll).not.toBeNull();
+    expect(scroll!.contains(newFolderBtn)).toBe(false);
+    expect(drawer.contains(newFolderBtn)).toBe(true);
+  });
+
   it("drawer scroll container prevents horizontal scrolling", async () => {
     const user = userEvent.setup();
     const { container } = renderDrawer();
