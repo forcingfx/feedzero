@@ -189,4 +189,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and guidelines.
 
 ## License
 
-MIT
+AGPL-3.0-or-later. See [LICENSE](LICENSE) for the full text.
+
+If you run a modified version of FeedZero as a public-facing service,
+section 13 of the AGPL requires you to offer your users access to the
+source of that modified version. The default deployment satisfies this
+out of the box because the source is already public — for any fork, host
+the diff somewhere your users can reach.
