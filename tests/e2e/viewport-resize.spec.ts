@@ -24,10 +24,13 @@ test.describe("Viewport resize", () => {
       { timeout: 10000 },
     );
 
-    const sidebar = page.locator('[data-sidebar="sidebar"]');
+    // The desktop sidebar uses collapsible="none", which renders the outer
+    // container with data-slot="sidebar" (the data-sidebar="sidebar"
+    // attribute only appears in the collapsible="offcanvas" branch).
+    const sidebar = page.locator('[data-slot="sidebar"]');
     await expect(sidebar).toBeVisible({ timeout: 5000 });
 
-    // Resize to mobile — sidebar should hide (offcanvas)
+    // Resize to mobile — desktop sidebar unmounts; the Vaul drawer takes over.
     await page.setViewportSize({ width: 393, height: 851 });
     await page.waitForTimeout(500); // let React re-render after breakpoint change
 
@@ -38,16 +41,17 @@ test.describe("Viewport resize", () => {
     await expect(sidebar).toBeVisible({ timeout: 5000 });
   });
 
-  test("three-panel desktop layout renders at 900px (no gap zone)", async ({
+  test("three-panel desktop layout renders at the lg breakpoint (1024px)", async ({
     page,
   }) => {
-    // useIsDesktop and useIsMobile both use 768px as their threshold, so
-    // there is no gap zone. At 900px the full desktop 3-panel layout should
-    // render with the persistent sidebar — no offcanvas trigger needed.
+    // PR F intentionally raised useIsDesktop to >=1024px (Tailwind `lg`) so
+    // the narrow-viewport canvas-blank bug couldn't recur. Below 1024px the
+    // mobile snap-scroll layout takes over. This test pins the threshold —
+    // at exactly 1024px the desktop 3-panel layout must render.
     await skipOnboarding(page);
     await mockFeedEndpoint(page, SAMPLE_RSS);
 
-    await page.setViewportSize({ width: 900, height: 720 });
+    await page.setViewportSize({ width: 1024, height: 720 });
     await page.goto("/feeds");
     await page.waitForFunction(
       () => !document.body.textContent?.includes("Loading"),
@@ -62,8 +66,9 @@ test.describe("Viewport resize", () => {
       .first();
     await expect(panels).toBeVisible({ timeout: 5000 });
 
-    // Persistent sidebar should be visible (no trigger needed to open it)
-    const sidebar = page.locator('[data-sidebar="sidebar"]');
+    // Persistent sidebar should be visible (no trigger needed to open it).
+    // See the sibling test above for why data-slot, not data-sidebar.
+    const sidebar = page.locator('[data-slot="sidebar"]');
     await expect(sidebar).toBeVisible({ timeout: 5000 });
   });
 });
