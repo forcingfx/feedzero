@@ -1,5 +1,7 @@
 # FeedZero
 
+www.feedzero.app
+
 A privacy-first RSS reader that runs entirely in your browser. No accounts, no tracking, no analytics. Your reading habits stay yours.
 
 ## What It Does
