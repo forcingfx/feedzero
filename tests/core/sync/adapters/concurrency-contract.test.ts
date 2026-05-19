@@ -141,6 +141,42 @@ function testAdapterContract(name: string, factory: AdapterFactory): void {
       }
     });
 
+    it("lastUpdatedAt returns null when no vaults exist", async () => {
+      const result = await adapter.lastUpdatedAt();
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result)).toBeNull();
+    });
+
+    it("lastUpdatedAt returns the put time (epoch ms) after a write", async () => {
+      const before = Date.now();
+      const id = "f".repeat(64);
+      await adapter.put(id, JSON.stringify({ hello: "world" }));
+      const after = Date.now();
+
+      const result = await adapter.lastUpdatedAt();
+      expect(isOk(result)).toBe(true);
+      const ts = unwrap(result);
+      expect(typeof ts).toBe("number");
+      // 1ms slack on both ends — filesystem adapters floor mtime to an
+      // integer ms, and on Linux mtime carries sub-ms precision that
+      // doesn't agree with `Date.now()` to the millisecond. The interface
+      // contract explicitly says "don't rely on sub-second precision".
+      expect(ts).toBeGreaterThanOrEqual(before - 1);
+      expect(ts).toBeLessThanOrEqual(after + 1);
+    });
+
+    it("lastUpdatedAt advances after a second put", async () => {
+      const id = "9".repeat(64);
+      await adapter.put(id, "first");
+      const first = unwrap(await adapter.lastUpdatedAt());
+      // Sleep slightly so the timestamp can actually advance even on
+      // coarse-resolution clocks (some filesystems round mtime to 1s).
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      await adapter.put(id, "second");
+      const second = unwrap(await adapter.lastUpdatedAt());
+      expect(second).toBeGreaterThan(first as number);
+    });
+
     it("count reflects only completed writes (no in-flight intermediates)", async () => {
       const ids = ["1", "2", "3", "4"].map((c) => c.repeat(64));
       const writes = ids.map((id) =>

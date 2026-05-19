@@ -7,6 +7,7 @@ import type { SyncStorageAdapter } from "../types.ts";
  */
 export function createMemoryAdapter(): SyncStorageAdapter {
   const store = new Map<string, string>();
+  let lastPutAt: number | null = null;
 
   return {
     async get(vaultId) {
@@ -14,6 +15,7 @@ export function createMemoryAdapter(): SyncStorageAdapter {
     },
     async put(vaultId, data) {
       store.set(vaultId, data);
+      lastPutAt = Date.now();
       return ok(true);
     },
     async delete(vaultId) {
@@ -22,6 +24,9 @@ export function createMemoryAdapter(): SyncStorageAdapter {
     },
     async count() {
       return ok(store.size);
+    },
+    async lastUpdatedAt() {
+      return ok(store.size === 0 ? null : lastPutAt);
     },
   };
 }
