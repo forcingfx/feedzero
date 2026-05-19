@@ -157,12 +157,16 @@ function testAdapterContract(name: string, factory: AdapterFactory): void {
       expect(isOk(result)).toBe(true);
       const ts = unwrap(result);
       expect(typeof ts).toBe("number");
-      // 1ms slack on both ends — filesystem adapters floor mtime to an
-      // integer ms, and on Linux mtime carries sub-ms precision that
-      // doesn't agree with `Date.now()` to the millisecond. The interface
-      // contract explicitly says "don't rely on sub-second precision".
-      expect(ts).toBeGreaterThanOrEqual(before - 1);
-      expect(ts).toBeLessThanOrEqual(after + 1);
+      // Wide slack to match the interface contract's "don't rely on
+      // sub-second precision" wording. Filesystem adapters floor mtime to
+      // an integer ms, and on virtualized CI runners the kernel clock that
+      // backs `mtimeMs` can drift single-digit ms from `Date.now()`. The
+      // assertion's purpose is "the timestamp is fresh, not from a previous
+      // test" — not "millisecond-perfect". 100ms is well below the test's
+      // own timing budget while immune to clock skew flakes (see CI run
+      // 26097099049: ts was 1ms below `before - 1`).
+      expect(ts).toBeGreaterThanOrEqual(before - 100);
+      expect(ts).toBeLessThanOrEqual(after + 100);
     });
 
     it("lastUpdatedAt advances after a second put", async () => {
