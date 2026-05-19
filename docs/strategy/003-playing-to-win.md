@@ -138,7 +138,7 @@ How FeedZero measures and adapts:
 - **GitHub signal.** Stars, issue volume by category, PR cadence. Issues clustered by `002`'s themes — a spike in any cluster updates the next run's focus.
 - **Release cadence.** Tracked via the `new-release` skill. Slowing cadence is a leading indicator of capability rot.
 - **This document.** Refreshed via `/research-competitors`. Cadence: weekly while feasible, monthly minimum. Each refresh produces a dated run log in `runs/` — the strategy's audit trail is in git. <!-- changed 2026-05-16 --> Plus: any competitor shutdown event (`001`'s "stale/dead" table grows by a row) triggers an out-of-cycle refresh of §2 and §3 within 48 hours — the migration acquisition window is short.
-- **External review.** Annual security audit (see `docs/audit-2026-03-22.md` for the template). The privacy claim is only as good as the last audit.
+- **External review.** Annual security audit (see `docs/reports/audit-2026-03-22.md` for the template). The privacy claim is only as good as the last audit.
 - **Failure signals.** Three specific events that should trigger immediate strategy review, not wait for the weekly: (a) a sync incident that exposes plaintext (architectural failure), (b) a competitor shipping audited E2E sync (wedge erosion), (c) <!-- changed 2026-05-16 --> a major shutdown adding a row to `001`'s stale/dead table — section 2's "Where to Play" should re-rank migration channels. All three invalidate sections above and must propagate down the cascade.
 
 ## Cascade coherence check

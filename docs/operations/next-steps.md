@@ -1,4 +1,4 @@
-# NEXT-STEPS.md — actions only you can take
+# Next steps — actions only you can take
 
 This file lists the things I (the agent) cannot do — credential rotations, Dashboard configuration, business decisions — and which I deliberately left for you after shipping the unified Settings + license robustness work.
 
