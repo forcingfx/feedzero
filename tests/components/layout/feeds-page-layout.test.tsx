@@ -83,6 +83,7 @@ vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getFeed: vi.fn(),
   removeFeed: vi.fn(),
+  getSmartFilters: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 vi.mock("@/core/feeds/feed-service.ts", () => ({

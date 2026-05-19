@@ -57,6 +57,7 @@ vi.mock("@/core/storage/db.ts", () => ({
   updateFeed: vi.fn().mockResolvedValue({ ok: true, value: true }),
   getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   addFolder: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  getSmartFilters: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 vi.mock("@/stores/sync-store", () => ({
