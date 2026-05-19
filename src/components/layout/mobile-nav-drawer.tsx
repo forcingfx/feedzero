@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { ChevronUp, Layers, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, STARRED_FEED_ID } from "@/utils/constants.ts";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { goToSettings } from "@/lib/go-to-settings.ts";
@@ -40,7 +40,9 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const handleLabel =
     selectedFeedId === ALL_FEEDS_ID
       ? "All items"
-      : activeFeed?.title ?? "Feeds";
+      : selectedFeedId === STARRED_FEED_ID
+        ? "Starred"
+        : activeFeed?.title ?? "Feeds";
 
   return (
     <Drawer.Root open={open} onOpenChange={setOpen} snapPoints={[0.85]}>
