@@ -1,9 +1,60 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
-import { FeedsPage } from "@/pages/feeds-page.tsx";
+import { lazy, Suspense } from "react";
+import { useNavigate } from "react-router";
+import { AppLayout } from "@/pages/app-layout.tsx";
+import { FeedsRoute } from "@/pages/feeds-route.tsx";
+import { StageView } from "@/pages/stage-view.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
+
+const ExploreCatalog = lazy(() =>
+  import("@/components/explore/explore-catalog.tsx").then((m) => ({
+    default: m.ExploreCatalog,
+  })),
+);
+const StatsPage = lazy(() =>
+  import("@/components/stats/stats-page.tsx").then((m) => ({
+    default: m.StatsPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("@/pages/settings-page.tsx").then((m) => ({
+    default: m.SettingsPage,
+  })),
+);
+
+function ExploreRoute() {
+  const navigate = useNavigate();
+  return (
+    <StageView>
+      <Suspense>
+        <ExploreCatalog onFeedAdded={(id) => navigate(`/feeds/${id}`)} />
+      </Suspense>
+    </StageView>
+  );
+}
+
+function StatsRoute() {
+  return (
+    <StageView>
+      <Suspense>
+        <StatsPage />
+      </Suspense>
+    </StageView>
+  );
+}
+
+function SettingsRoute() {
+  return (
+    <StageView>
+      <Suspense>
+        <SettingsPage />
+      </Suspense>
+    </StageView>
+  );
+}
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -58,15 +109,17 @@ function renderPage(route = "/feeds") {
   return render(
     <MemoryRouter initialEntries={[route]}>
       <Routes>
-        <Route path="/feeds" element={<FeedsPage />} />
-        <Route path="/feeds/:feedId" element={<FeedsPage />} />
-        <Route
-          path="/feeds/:feedId/articles/:articleId"
-          element={<FeedsPage />}
-        />
-        <Route path="/explore" element={<FeedsPage />} />
-        <Route path="/stats" element={<FeedsPage />} />
-        <Route path="/settings" element={<FeedsPage />} />
+        <Route element={<AppLayout />}>
+          <Route path="/feeds" element={<FeedsRoute />} />
+          <Route path="/feeds/:feedId" element={<FeedsRoute />} />
+          <Route
+            path="/feeds/:feedId/articles/:articleId"
+            element={<FeedsRoute />}
+          />
+          <Route path="/explore" element={<ExploreRoute />} />
+          <Route path="/stats" element={<StatsRoute />} />
+          <Route path="/settings" element={<SettingsRoute />} />
+        </Route>
       </Routes>
     </MemoryRouter>,
   );
@@ -92,6 +145,13 @@ describe("FeedsPage layout — desktop", () => {
       error: null,
       isRefreshingAll: false,
       refreshingFeedIds: new Set(),
+      // Both the bare-/feeds → /explore-or-all redirect (AppLayout) and the
+      // empty-feeds redirect (FeedsRoute) are gated on feedsLoaded. Layout
+      // tests want to inspect the rendered panels for whatever feeds are
+      // in store *now* — keep feedsLoaded=false so neither redirect fires
+      // and the panel structure stays the unit under test. Behavior tests
+      // that assert on redirects set feedsLoaded=true explicitly.
+      feedsLoaded: false,
     });
     useArticleStore.setState({
       articles: [],

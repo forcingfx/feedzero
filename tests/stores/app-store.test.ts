@@ -255,4 +255,65 @@ describe("app-store", () => {
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
     });
   });
+
+  describe("startNewUserOnboarding", () => {
+    beforeEach(() => {
+      // Reset side-effect state between tests
+      useAppStore.setState({
+        isDbReady: false,
+        error: null,
+        hasCompletedOnboarding: null,
+        securityProblem: null,
+      });
+      vi.mocked(initFresh).mockResolvedValue({
+        ok: true,
+        value: { credentials: null },
+      });
+    });
+
+    it("completes the full sequence on a healthy environment", async () => {
+      // happy-dom defaults to isSecureContext=true via tests/setup.ts
+      await useAppStore.getState().startNewUserOnboarding();
+
+      expect(initFresh).toHaveBeenCalled();
+      const state = useAppStore.getState();
+      expect(state.isDbReady).toBe(true);
+      expect(state.hasCompletedOnboarding).toBe(true);
+      expect(state.securityProblem).toBeNull();
+      expect(state.error).toBeNull();
+    });
+
+    it("surfaces a security problem when the context is insecure (no DB init)", async () => {
+      const originalSecure = globalThis.isSecureContext;
+      Object.defineProperty(globalThis, "isSecureContext", {
+        value: false,
+        configurable: true,
+      });
+      try {
+        await useAppStore.getState().startNewUserOnboarding();
+      } finally {
+        Object.defineProperty(globalThis, "isSecureContext", {
+          value: originalSecure,
+          configurable: true,
+        });
+      }
+
+      expect(initFresh).not.toHaveBeenCalled();
+      const state = useAppStore.getState();
+      expect(state.securityProblem).not.toBeNull();
+      expect(state.securityProblem?.kind).toBe("insecure-context");
+      expect(state.isDbReady).toBe(false);
+      expect(state.hasCompletedOnboarding).toBeNull();
+    });
+
+    it("does not complete onboarding when initialize sets an error", async () => {
+      vi.mocked(initFresh).mockResolvedValue({ ok: false, error: "boom" });
+
+      await useAppStore.getState().startNewUserOnboarding();
+
+      const state = useAppStore.getState();
+      expect(state.error).toBe("boom");
+      expect(state.hasCompletedOnboarding).toBeNull();
+    });
+  });
 });
