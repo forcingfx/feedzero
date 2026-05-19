@@ -20,3 +20,9 @@ playwright-report/
 
 # Private operational/strategy docs — not for the public repo
 docs/internal/
+
+# Claude Code skill manifest — local state, not for the public repo
+skills-lock.json
+
+# Output of scripts/take-screenshot.js — regenerated on demand
+feedzero-screenshot.png

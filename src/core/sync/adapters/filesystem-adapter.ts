@@ -106,5 +106,29 @@ export function createFilesystemAdapter(dataDir: string): SyncStorageAdapter {
         return err(`Failed to count vaults: ${(e as Error).message}`);
       }
     },
+
+    async lastUpdatedAt() {
+      try {
+        const files = fs
+          .readdirSync(vaultsDir)
+          .filter((f) => f.endsWith(".json") && !f.startsWith(TMP_PREFIX));
+        if (files.length === 0) return ok(null);
+        let maxMs = 0;
+        for (const f of files) {
+          const stat = fs.statSync(path.join(vaultsDir, f));
+          if (stat.mtimeMs > maxMs) maxMs = stat.mtimeMs;
+        }
+        // Floor to an integer ms — Node returns sub-ms precision on Linux,
+        // and a stat written between two Date.now() calls can read as
+        // strictly greater than the bracketing `Date.now()` upper bound.
+        // The adapter contract specifies epoch ms, not nanoseconds.
+        return ok(Math.floor(maxMs));
+      } catch (e) {
+        if ((e as { code?: string }).code === "ENOENT") {
+          return ok(null);
+        }
+        return err(`Failed to read vault timestamps: ${(e as Error).message}`);
+      }
+    },
   };
 }

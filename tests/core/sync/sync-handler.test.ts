@@ -347,6 +347,7 @@ describe("sync-handler", () => {
         async put() { return err("adapter down"); },
         async delete() { return err("adapter down"); },
         async count() { return err("adapter down"); },
+        async lastUpdatedAt() { return err("adapter down"); },
       };
     }
 

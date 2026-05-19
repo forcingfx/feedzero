@@ -78,5 +78,30 @@ export function createVercelBlobAdapter(): SyncStorageAdapter {
         return err(`Vercel Blob count failed: ${(e as Error).message}`);
       }
     },
+
+    async lastUpdatedAt() {
+      try {
+        const { list } = await import("@vercel/blob");
+        let maxMs: number | null = null;
+        let cursor: string | undefined;
+
+        do {
+          const result = await list({
+            prefix: "vaults/",
+            limit: 1000,
+            ...(cursor ? { cursor } : {}),
+          });
+          for (const blob of result.blobs) {
+            const ms = new Date(blob.uploadedAt).getTime();
+            if (maxMs === null || ms > maxMs) maxMs = ms;
+          }
+          cursor = result.hasMore ? result.cursor : undefined;
+        } while (cursor);
+
+        return ok(maxMs);
+      } catch (e) {
+        return err(`Vercel Blob lastUpdatedAt failed: ${(e as Error).message}`);
+      }
+    },
   };
 }

@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { readFileSync } from "fs";
-import { toWebRequest, sendWebResponse } from "./vite-dev-proxy.js";
+import { toWebRequest, sendWebResponse } from "./scripts/dev-proxy.js";
 
 // Inject the current package.json version as a build-time constant so
 // the SPA and dev server can identify which build is running. The

@@ -179,4 +179,4 @@ If you implement a third-party reader, branch on `EncryptedVault.version` and re
 
 ## Audit
 
-The cryptographic claims here are open to independent audit. The reference implementation is short (under 100 lines including comments), is exercised by the test suite in `tests/core/sync/`, and was reviewed during the audit captured in [docs/audit-2026-03-22.md](./audit-2026-03-22.md). Discrepancies between this document and the code are bugs in this document — report them at [github.com/forcingfx/feedzero/issues](https://github.com/forcingfx/feedzero/issues).
+The cryptographic claims here are open to independent audit. The reference implementation is short (under 100 lines including comments), is exercised by the test suite in `tests/core/sync/`, and was reviewed during the audit captured in [docs/reports/audit-2026-03-22.md](./reports/audit-2026-03-22.md). Discrepancies between this document and the code are bugs in this document — report them at [github.com/forcingfx/feedzero/issues](https://github.com/forcingfx/feedzero/issues).
