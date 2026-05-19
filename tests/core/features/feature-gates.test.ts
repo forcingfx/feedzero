@@ -97,7 +97,10 @@ describe("gateState — shipped features (paid tier inactive / pre-launch)", () 
 
   it("coming-soon features stay not-built even when paid tier is inactive", () => {
     // Inactivating the paid tier mustn't pretend that code exists.
-    const state = gateState("filters", "free", false, false);
+    // `mute-keywords` is still gated coming-soon (per FEATURE_MAP);
+    // `filters` flipped to shipped when the smart-filters feature
+    // landed (slice 5 of that change).
+    const state = gateState("mute-keywords", "free", false, false);
     expect(state.enabled).toBe(false);
     expect(state.reason).toBe("not-built");
   });

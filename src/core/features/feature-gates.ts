@@ -46,7 +46,7 @@ export const FEATURE_MAP: Record<Feature, FeatureSpec> = {
   "cloud-sync":             { requiredTier: "personal", status: "shipped" },
   "auto-organize":          { requiredTier: "personal", status: "shipped" },
   "offline-prefetch":       { requiredTier: "personal", status: "shipped" },
-  "filters":                { requiredTier: "personal", status: "coming-soon" },
+  "filters":                { requiredTier: "personal", status: "shipped" },
   "mute-keywords":          { requiredTier: "personal", status: "coming-soon" },
   "search":                 { requiredTier: "pro",      status: "coming-soon" },
   "ai-signal":              { requiredTier: "pro",      status: "coming-soon" },
