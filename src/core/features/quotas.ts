@@ -3,8 +3,9 @@
  *
  * Distinct from `feature-gates.ts` because quotas are continuous (a count
  * compared against a limit) rather than binary (do I have this capability).
- * Both modules share the same `Tier` model from license-store and the same
- * self-hosted bypass from `self-hosted.ts`.
+ * Both modules share the same `Tier` model from license-store, the same
+ * self-hosted bypass from `self-hosted.ts`, and now the same canonical
+ * source: `tier-matrix.ts`.
  *
  * Honor-system enforcement: the server cannot read decrypted feed count out
  * of the zero-knowledge sync vault, so the limit lives in the client. A
@@ -14,9 +15,16 @@
  */
 
 import type { Tier } from "./feature-gates";
+import { getLimit } from "./tier-matrix";
 
-/** Maximum feed subscriptions on hosted Free tier. */
-export const FREE_FEED_LIMIT = 25;
+/**
+ * Maximum feed subscriptions on hosted Free tier. Sourced from the
+ * canonical tier matrix so changes to the cap happen in exactly one
+ * place. The non-null assertion is safe because the matrix declares
+ * `feed-subscriptions` as available on `free` with a numeric limit;
+ * tests verify both invariants.
+ */
+export const FREE_FEED_LIMIT = getLimit("feed-subscriptions", "free") as number;
 
 export type QuotaCheck =
   | { ok: true }
