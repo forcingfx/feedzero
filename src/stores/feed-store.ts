@@ -15,6 +15,7 @@ import {
   refreshAllFeeds,
   reloadFeed,
 } from "../core/feeds/feed-service.ts";
+import { prefetchStarredArticles } from "../core/extractor/prefetch-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { useLicenseStore } from "./license-store.ts";
@@ -135,6 +136,32 @@ function schedulePush(): void {
   useSyncStore.getState().scheduleSyncPush();
 }
 
+/**
+ * Kick off background full-text prefetch for starred articles. Gated on
+ * the `offline-prefetch` feature so free users don't trigger network
+ * activity they can't benefit from; self-hosters bypass via the standard
+ * `self-hosted-bypass` precedence in `gateState`.
+ *
+ * Fire-and-forget so the refresh UI doesn't block on a (potentially
+ * multi-second) batch of page fetches. When the batch actually persists
+ * new `extractedContent`, refresh the article-store cache so the UI
+ * picks it up without a manual reload.
+ */
+function schedulePrefetch(): void {
+  const gate = gateState(
+    "offline-prefetch",
+    useLicenseStore.getState().tier,
+    isSelfHosted(),
+    isPaidTierActive(),
+  );
+  if (!gate.enabled) return;
+  void prefetchStarredArticles().then((result) => {
+    if (result.ok && result.value.extracted > 0) {
+      void useArticleStore.getState().preloadAll();
+    }
+  });
+}
+
 export const useFeedStore = create<FeedStore>((set, get) => ({
   feeds: [],
   folders: [],
@@ -240,6 +267,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     } finally {
       set({ isRefreshingAll: false });
     }
+    schedulePrefetch();
   },
 
   reloadSingleFeed: async (feedId) => {

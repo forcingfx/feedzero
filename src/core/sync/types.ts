@@ -1,12 +1,28 @@
-import type { Feed, Article } from "../../types/index.ts";
+import type { Feed, Article, Folder, SmartFilter } from "../../types/index.ts";
 import type { Result } from "../../utils/result.ts";
 
-/** Plaintext vault structure before encryption (client-side only). */
+/**
+ * Plaintext vault structure before encryption (client-side only).
+ *
+ * Version history (the `version` field is informational; consumers must
+ * tolerate older shapes — see the back-compat rule below):
+ *  1 — feeds + articles only.
+ *  2 — adds optional `folders` + `smartFilters` (this version).
+ *
+ * Back-compat rule (importVault, mergeVaults, importAll): a vault that
+ * OMITS `folders` or `smartFilters` keys must NOT wipe the local rows.
+ * `undefined` = "no opinion from the source"; `[]` = "the source has
+ * zero rows" and is distinct from undefined. Without this the first
+ * push from a pre-v2 client would silently delete a v2 client's
+ * organisational data.
+ */
 export interface VaultData {
   version: number;
   exportedAt: number;
   feeds: Feed[];
   articles: Article[];
+  folders?: Folder[];
+  smartFilters?: SmartFilter[];
 }
 
 /** Encrypted vault as stored on the server. */

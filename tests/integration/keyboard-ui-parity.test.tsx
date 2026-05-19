@@ -24,7 +24,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 // Mock core modules
 vi.mock("../../src/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   updateArticle: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
@@ -39,6 +41,15 @@ vi.mock("../../src/core/feeds/feed-service.ts", () => ({
   refreshAllFeeds: vi
     .fn()
     .mockResolvedValue({ ok: true, value: { results: [] } }),
+}));
+
+// 'r' triggers refreshAll → schedulePrefetch (fire-and-forget). Stub the
+// service so the background promise doesn't trip the unhandled-rejection
+// guard with an unrelated db mock gap.
+vi.mock("../../src/core/extractor/prefetch-service.ts", () => ({
+  prefetchStarredArticles: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: { extracted: 0, failed: 0 } }),
 }));
 
 vi.mock("../../src/core/sync/sync-service", () => ({
@@ -239,6 +250,39 @@ describe("keyboard-UI behavior parity", () => {
       expect(windowOpenSpy).not.toHaveBeenCalled();
 
       windowOpenSpy.mockRestore();
+    });
+  });
+
+  describe("S key vs Star button click", () => {
+    it("S key toggles star on the selected article via the same store action", async () => {
+      const article = mockArticle("a1", "f1");
+      useArticleStore.setState({
+        selectedArticle: article,
+        articles: [article],
+        articlesByFeedId: { f1: [article] },
+      });
+
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+      pressKey("s");
+
+      // toggleStar persists async; wait one microtask so the store
+      // settles before the assertion.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const updated = useArticleStore.getState().articles[0];
+      expect(updated.starred).toBe(true);
+    });
+
+    it("S key is a no-op when no article is selected", async () => {
+      useArticleStore.setState({ selectedArticle: null });
+
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+      pressKey("s");
+      await Promise.resolve();
+
+      // No articles in the store at all — nothing to toggle, no throw.
+      expect(useArticleStore.getState().selectedArticle).toBeNull();
     });
   });
 

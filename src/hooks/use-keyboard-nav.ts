@@ -11,7 +11,9 @@ import { goToSettings } from "@/lib/go-to-settings.ts";
  *
  * Article nav:  j/k (next/prev — directly opens article)
  * Feed nav:     u/i (next/prev feed)
- * Actions:      o (open original), e (toggle view), n (explore/add feed)
+ * Actions:      o (open original), h (toggle view), n (explore/add feed),
+ *               s (star/unstar selected), [ (toggle sidebar), r (refresh),
+ *               Space / Shift+Space (scroll reader by viewport)
  *
  * Navigation goes through `useNavigate()` directly. The sidebar toggle
  * still uses a DOM CustomEvent because `useKeyboardNav` is called above
@@ -66,6 +68,9 @@ export function useKeyboardNav() {
         break;
       case "n":
         navigate("/explore?focus=search");
+        break;
+      case "s":
+        toggleStarOnSelected();
         break;
       case "[":
         toggleSidebar();
@@ -202,6 +207,11 @@ function toggleView() {
   const { toggleViewMode } = useExtractionStore.getState();
   const { selectedArticle } = useArticleStore.getState();
   toggleViewMode(selectedArticle?.link);
+}
+
+function toggleStarOnSelected() {
+  const { selectedArticle, toggleStar } = useArticleStore.getState();
+  if (selectedArticle) toggleStar(selectedArticle.id);
 }
 
 /** Scroll the reader panel by one viewport height. Shift+Space scrolls up. */

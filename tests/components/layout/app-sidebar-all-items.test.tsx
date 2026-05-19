@@ -65,10 +65,16 @@ describe("AppSidebar All items entry", () => {
     );
     const texts = Array.from(menuButtons).map((btn) => btn.textContent);
 
-    // Explore at top of Feeds group, then All items
-    expect(texts[0]).toContain("Explore");
-    expect(texts[1]).toContain("All items");
-    expect(texts[2]).toContain("Tech News");
+    // Ordering invariant: Explore first, then All items. The Filters
+    // section (when the filters gate is open in pre-launch mode) and
+    // the per-feed list both come after — exact positions vary as more
+    // entries land, but Explore → All items → … is stable.
+    const exploreIdx = texts.findIndex((t) => t?.includes("Explore"));
+    const allItemsIdx = texts.findIndex((t) => t?.includes("All items"));
+    const techIdx = texts.findIndex((t) => t?.includes("Tech News"));
+    expect(exploreIdx).toBe(0);
+    expect(allItemsIdx).toBe(1);
+    expect(techIdx).toBeGreaterThan(allItemsIdx);
   });
 
   it("calls onFeedSelect with ALL_FEEDS_ID when clicked", async () => {

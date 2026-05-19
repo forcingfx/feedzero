@@ -439,7 +439,10 @@ describe("Database", () => {
         }),
       );
 
-      const importResult = await importAll([newFeed], [newArticle]);
+      const importResult = await importAll({
+        feeds: [newFeed],
+        articles: [newArticle],
+      });
       expect(isOk(importResult)).toBe(true);
 
       // Old data should be gone
@@ -477,7 +480,10 @@ describe("Database", () => {
       const exported = unwrap(await exportAll());
 
       // Clear and reimport
-      const importResult = await importAll(exported.feeds, exported.articles);
+      const importResult = await importAll({
+        feeds: exported.feeds,
+        articles: exported.articles,
+      });
       expect(isOk(importResult)).toBe(true);
 
       // Verify data matches

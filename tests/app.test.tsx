@@ -45,6 +45,7 @@ vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getSmartFilters: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 import { addFeedFlow, refreshAllFeeds } from "@/core/feeds/feed-service";

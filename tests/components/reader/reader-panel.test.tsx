@@ -10,6 +10,7 @@ import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn(),
   updateArticle: vi.fn(),
+  getSmartFilters: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 vi.mock("@/core/extractor/extractor.ts", () => ({

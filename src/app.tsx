@@ -4,9 +4,11 @@ import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSyncStore } from "@/stores/sync-store.ts";
+import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
+import { SmartFilterEditorDialog } from "@/components/smart-filters/smart-filter-editor-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { AppLayout } from "@/pages/app-layout.tsx";
@@ -81,6 +83,7 @@ function AppInit({ children }: { children: React.ReactNode }) {
   const loadFeeds = useFeedStore((s) => s.loadFeeds);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const preloadArticles = useArticleStore((s) => s.preloadAll);
+  const loadSmartFilters = useSmartFilterStore((s) => s.loadFilters);
   const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
@@ -123,6 +126,10 @@ function AppInit({ children }: { children: React.ReactNode }) {
         }
         preloadArticles();
       });
+      // Load smart filters once on boot. Like folders, they're
+      // user-defined config that the sidebar needs immediately;
+      // the encrypted-blob read is cheap (typically <10 rows).
+      void loadSmartFilters();
       // Sync users: initializeReturningUser already pulled the cloud vault,
       // so an immediate refreshAll() would do a redundant second pull whose
       // importAll's clear+bulkPut window races with consumers reading feeds.
@@ -131,7 +138,7 @@ function AppInit({ children }: { children: React.ReactNode }) {
         refreshAll();
       }
     }
-  }, [isDbReady, loadFeeds, refreshAll, preloadArticles, addFeed]);
+  }, [isDbReady, loadFeeds, refreshAll, preloadArticles, loadSmartFilters, addFeed]);
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -262,6 +269,7 @@ export function App() {
             have router context. */}
         <SyncMigrationDialog />
         <DeviceSetupWizard />
+        <SmartFilterEditorDialog />
         <Toaster position="bottom-center" />
       </BrowserRouter>
     </>

@@ -1,7 +1,14 @@
 import { useNavigate, useLocation } from "react-router";
-import { Compass, Layers } from "lucide-react";
+import { Compass, Layers, Star, Plus } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { useArticleStore } from "@/stores/article-store.ts";
+import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
+import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
+import {
+  ALL_FEEDS_ID,
+  STARRED_FEED_ID,
+  toFilterFeedId,
+} from "@/utils/constants.ts";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -9,6 +16,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar.tsx";
 import { SidebarFeedList } from "@/components/sidebar/sidebar-feed-list.tsx";
+import { SmartFilterItem } from "@/components/sidebar/smart-filter-item.tsx";
 
 interface SidebarBodyProps {
   onFeedSelect: (feedId: string) => void;
@@ -28,11 +36,32 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
   const { pathname } = useLocation();
   const feeds = useFeedStore((s) => s.feeds);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
+  const articlesByFeedId = useArticleStore((s) => s.articlesByFeedId);
+  const smartFilters = useSmartFilterStore((s) => s.filters);
+  const openFilterEditor = useSmartFilterStore((s) => s.openEditor);
+  const filtersGate = useFeatureGate("filters");
   const isExplorePage = pathname === "/explore";
+
+  // Show "Starred" once the user has actually starred something; before
+  // that, the entry would land on an empty view and feels like clutter.
+  // The article-store buckets are the source of truth, so the entry
+  // appears as soon as toggleStar runs — no extra plumbing required.
+  const hasStarredArticles = Object.values(articlesByFeedId).some((list) =>
+    list.some((a) => a.starred),
+  );
+
+  // Filters section is gated. Free users don't see it at all — keeps
+  // the empty state honest and avoids the "upgrade to unlock"
+  // clutter pattern.
+  const showFiltersSection = filtersGate.enabled;
 
   function handleExplore() {
     onBeforeNavigate?.();
     navigate("/explore");
+  }
+
+  function handleCreateFilter() {
+    openFilterEditor(null);
   }
 
   return (
@@ -59,6 +88,43 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
               <span>All items</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {hasStarredArticles && (
+            <SidebarMenuItem key="starred">
+              <SidebarMenuButton
+                isActive={selectedFeedId === STARRED_FEED_ID}
+                onClick={() => onFeedSelect(STARRED_FEED_ID)}
+                tooltip="Starred"
+                data-testid="sidebar-starred-link"
+              >
+                <Star className="size-4 text-amber-500" />
+                <span>Starred</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {showFiltersSection && (
+            <>
+              <SidebarSeparator className="mx-0 my-1" />
+              <SidebarMenuItem key="filters-header">
+                <SidebarMenuButton
+                  onClick={handleCreateFilter}
+                  tooltip="New smart filter"
+                  data-testid="sidebar-new-filter"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="size-4" />
+                  <span>New filter</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {smartFilters.map((filter) => (
+                <SmartFilterItem
+                  key={filter.id}
+                  filter={filter}
+                  isSelected={selectedFeedId === toFilterFeedId(filter.id)}
+                  onSelect={() => onFeedSelect(toFilterFeedId(filter.id))}
+                />
+              ))}
+            </>
+          )}
           <SidebarSeparator className="mx-0 my-1" />
           <SidebarFeedList onFeedSelect={onFeedSelect} />
         </>

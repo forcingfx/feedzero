@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { Star } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Article } from "@/types/index.ts";
@@ -54,8 +55,21 @@ export const ArticleItem = memo(function ArticleItem({
           }`}
         />
         <div className="min-w-0">
-          <div className={article.read ? "text-foreground/70" : "text-foreground font-medium"}>
+          <div
+            className={
+              article.read
+                ? "text-foreground/70"
+                : "text-foreground font-medium"
+            }
+          >
             {decodeEntities(article.title)}
+            {article.starred && (
+              <Star
+                data-testid="article-star-indicator"
+                aria-label="Starred"
+                className="inline-block align-text-bottom ml-1.5 size-3 shrink-0 text-amber-500 fill-current"
+              />
+            )}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
             {feedTitle && (

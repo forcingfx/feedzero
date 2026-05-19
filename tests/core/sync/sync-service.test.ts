@@ -3,6 +3,7 @@ import "fake-indexeddb/auto";
 import { open, close, addFeed, addArticles } from "@/core/storage/db";
 import { createFeed, createArticle } from "@/core/storage/schema";
 import { unwrap, isOk, isErr } from "@/utils/result";
+import { SYNC } from "@/utils/constants";
 
 // Must import after fake-indexeddb
 import {
@@ -44,7 +45,7 @@ describe("sync-service", () => {
       const result = await exportVault();
       expect(isOk(result)).toBe(true);
       const vault = unwrap(result);
-      expect(vault.version).toBe(1);
+      expect(vault.version).toBe(SYNC.FORMAT_VERSION);
       expect(vault.feeds).toHaveLength(1);
       expect(vault.feeds[0].title).toBe("Example");
       expect(vault.articles).toHaveLength(1);
@@ -148,7 +149,7 @@ describe("sync-service", () => {
 
       const body = JSON.parse(options.body);
       expect(body.vaultId).toMatch(/^[0-9a-f]{64}$/);
-      expect(body.vault.version).toBe(1);
+      expect(body.vault.version).toBe(SYNC.FORMAT_VERSION);
       expect(typeof body.vault.ciphertext).toBe("string");
     });
 
