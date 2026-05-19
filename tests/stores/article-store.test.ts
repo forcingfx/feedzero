@@ -549,6 +549,46 @@ describe("article-store", () => {
 
       expect(updateArticle).not.toHaveBeenCalled();
     });
+
+    it("updates selectedArticle so the reader's star icon reflects the new state immediately", async () => {
+      // The reader subscribes to `selectedArticle`, not `articlesByFeedId`.
+      // Before the fix, toggleStar mutated the bucket lists but left
+      // `selectedArticle` pointing at the stale (pre-toggle) snapshot —
+      // the persisted star flipped, but the icon stayed grey until the
+      // user navigated away and back.
+      const article = mockArticle("a1");
+      useArticleStore.setState({
+        articlesByFeedId: { f1: [article] },
+        articles: [article],
+        selectedArticle: article,
+      });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().toggleStar("a1");
+
+      const sel = useArticleStore.getState().selectedArticle;
+      expect(sel?.id).toBe("a1");
+      expect(sel?.starred).toBe(true);
+    });
+
+    it("leaves selectedArticle alone when a different article is toggled", async () => {
+      // Only the article currently in the reader should re-key. Toggling
+      // a sibling row should not swap the reader's selection.
+      const a1 = mockArticle("a1");
+      const a2 = mockArticle("a2");
+      useArticleStore.setState({
+        articlesByFeedId: { f1: [a1, a2] },
+        articles: [a1, a2],
+        selectedArticle: a1,
+      });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().toggleStar("a2");
+
+      const sel = useArticleStore.getState().selectedArticle;
+      expect(sel?.id).toBe("a1");
+      expect(Boolean(sel?.starred)).toBe(false);
+    });
   });
 
   describe("starred virtual feed (STARRED_FEED_ID)", () => {

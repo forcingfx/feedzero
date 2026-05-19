@@ -408,6 +408,13 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
         })();
 
     set(applyArticleUpdate(get(), updated));
+    // The reader subscribes to `selectedArticle` (a separate slice from
+    // `articlesByFeedId`), so refresh it too when the toggled article is
+    // currently open — otherwise the icon stays grey until the user
+    // navigates away. Mirrors the markAsRead helper above.
+    if (get().selectedArticle?.id === updated.id) {
+      set({ selectedArticle: updated });
+    }
     const persistResult = await updateArticle(updated);
     if (persistResult.ok) {
       useSyncStore.getState().scheduleSyncPush();
