@@ -1,28 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
+import * as ReactRouter from "react-router";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { toFolderFeedId } from "@/utils/constants.ts";
 
+const navigateSpy = vi.fn();
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return <MemoryRouter initialEntries={["/feeds"]}>{children}</MemoryRouter>;
-}
-
-type NavigateFeedEvent = CustomEvent<{ feedId: string }>;
-
-function captureNavigateFeedEvents() {
-  const ids: string[] = [];
-  const handler = (e: Event) => {
-    ids.push((e as NavigateFeedEvent).detail.feedId);
-  };
-  document.addEventListener("feedzero:navigate-feed", handler);
-  return {
-    ids,
-    cleanup: () => document.removeEventListener("feedzero:navigate-feed", handler),
-  };
 }
 
 vi.mock("@/core/storage/db.ts", () => ({
@@ -63,12 +52,17 @@ function pressKey(key: string, target: EventTarget = document) {
 }
 
 describe("useKeyboardNav", () => {
+  let useNavigateSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     document.body.innerHTML = "";
+    navigateSpy.mockReset();
+    useNavigateSpy = vi.spyOn(ReactRouter, "useNavigate").mockReturnValue(navigateSpy);
   });
 
   afterEach(() => {
     document.body.innerHTML = "";
+    useNavigateSpy.mockRestore();
   });
 
   describe("article navigation (j/k)", () => {
@@ -354,51 +348,43 @@ describe("useKeyboardNav", () => {
       });
     }
 
-    it("u dispatches navigate-feed for the next unfiled feed", () => {
+    it("u navigates to the next unfiled feed", () => {
       seedFeeds(["a", "b", "c"]);
       useFeedStore.setState({ selectedFeedId: "a" });
-      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
-      expect(ids).toEqual(["b"]);
-      cleanup();
+      expect(navigateSpy).toHaveBeenCalledWith("/feeds/b");
     });
 
-    it("i dispatches navigate-feed for the previous unfiled feed", () => {
+    it("i navigates to the previous unfiled feed", () => {
       seedFeeds(["a", "b", "c"]);
       useFeedStore.setState({ selectedFeedId: "c" });
-      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("i");
 
-      expect(ids).toEqual(["b"]);
-      cleanup();
+      expect(navigateSpy).toHaveBeenCalledWith("/feeds/b");
     });
 
     it("u does not advance past the last feed in the logical list", () => {
       seedFeeds(["a", "b", "c"]);
       useFeedStore.setState({ selectedFeedId: "c" });
-      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
-      expect(ids).toEqual(["c"]);
-      cleanup();
+      expect(navigateSpy).toHaveBeenCalledWith("/feeds/c");
     });
 
     it("u selects the first feed when none is active", () => {
       seedFeeds(["a", "b"]);
-      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
-      expect(ids).toEqual(["a"]);
-      cleanup();
+      expect(navigateSpy).toHaveBeenCalledWith("/feeds/a");
     });
 
     it("u traverses into a folder header after the last unfiled feed", () => {
@@ -411,13 +397,11 @@ describe("useKeyboardNav", () => {
         folderOpenState: { fa: true },
         selectedFeedId: "u1",
       });
-      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
-      expect(ids).toEqual([toFolderFeedId("fa")]);
-      cleanup();
+      expect(navigateSpy).toHaveBeenCalledWith(`/feeds/${toFolderFeedId("fa")}`);
     });
 
     it("u entering a closed folder also opens that folder", () => {
@@ -431,14 +415,12 @@ describe("useKeyboardNav", () => {
         // Already on the folder header, so the next press steps into its child.
         selectedFeedId: toFolderFeedId("fa"),
       });
-      const { ids, cleanup } = captureNavigateFeedEvents();
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("u");
 
-      expect(ids).toEqual(["f1"]);
+      expect(navigateSpy).toHaveBeenCalledWith("/feeds/f1");
       expect(useFeedStore.getState().folderOpenState.fa).toBe(true);
-      cleanup();
     });
   });
 
@@ -580,16 +562,12 @@ describe("useKeyboardNav", () => {
   });
 
   describe("add feed (n)", () => {
-    it("dispatches feedzero:navigate-explore custom event", () => {
-      let eventFired = false;
-      document.addEventListener("feedzero:navigate-explore", () => {
-        eventFired = true;
-      });
+    it("navigates to /explore with ?focus=search so the catalog opens with the search input focused", () => {
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
 
       pressKey("n");
 
-      expect(eventFired).toBe(true);
+      expect(navigateSpy).toHaveBeenCalledWith("/explore?focus=search");
     });
   });
 

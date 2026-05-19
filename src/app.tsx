@@ -1,17 +1,18 @@
-import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router";
+import { useEffect, useState, lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router";
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSyncStore } from "@/stores/sync-store.ts";
 import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
-import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
-import { FeedsPage } from "@/pages/feeds-page.tsx";
+import { AppLayout } from "@/pages/app-layout.tsx";
+import { FeedsRoute } from "@/pages/feeds-route.tsx";
+import { StageView } from "@/pages/stage-view.tsx";
 import { BillingSuccess } from "@/pages/billing-success.tsx";
 import { BillingCancelled } from "@/pages/billing-cancelled.tsx";
 import { BillingRecover } from "@/pages/billing-recover.tsx";
@@ -19,31 +20,69 @@ import { BillingIssued } from "@/pages/billing-issued.tsx";
 import { SubscribeDeeplink } from "@/components/billing/subscribe-deeplink.tsx";
 import { useLicenseStore } from "@/stores/license-store.ts";
 import { Button } from "@/components/ui/button.tsx";
-import {
-  checkSecureContext,
-  type SecureContextProblemKind,
-} from "@/core/security/secure-context.ts";
 import { InvalidKeysScreen } from "@/components/recovery/invalid-keys-screen";
+
+const ExploreCatalog = lazy(() =>
+  import("@/components/explore/explore-catalog.tsx").then((m) => ({
+    default: m.ExploreCatalog,
+  })),
+);
+const StatsPage = lazy(() =>
+  import("@/components/stats/stats-page.tsx").then((m) => ({
+    default: m.StatsPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("@/pages/settings-page.tsx").then((m) => ({
+    default: m.SettingsPage,
+  })),
+);
+
+function ExploreRoute() {
+  const navigate = useNavigate();
+  return (
+    <StageView>
+      <Suspense>
+        <ExploreCatalog onFeedAdded={(id) => navigate(`/feeds/${id}`)} />
+      </Suspense>
+    </StageView>
+  );
+}
+
+function StatsRoute() {
+  return (
+    <StageView>
+      <Suspense>
+        <StatsPage />
+      </Suspense>
+    </StageView>
+  );
+}
+
+function SettingsRoute() {
+  return (
+    <StageView>
+      <Suspense>
+        <SettingsPage />
+      </Suspense>
+    </StageView>
+  );
+}
 
 function AppInit({ children }: { children: React.ReactNode }) {
   const isDbReady = useAppStore((s) => s.isDbReady);
   const error = useAppStore((s) => s.error);
   const recoveryMode = useAppStore((s) => s.recoveryMode);
+  const securityProblem = useAppStore((s) => s.securityProblem);
   const hasCompletedOnboarding = useAppStore((s) => s.hasCompletedOnboarding);
   const checkOnboardingStatus = useAppStore((s) => s.checkOnboardingStatus);
-  const initialize = useAppStore((s) => s.initialize);
-  const completeOnboarding = useAppStore((s) => s.completeOnboarding);
   const initializeReturningUser = useAppStore((s) => s.initializeReturningUser);
+  const startNewUserOnboarding = useAppStore((s) => s.startNewUserOnboarding);
   const resetApp = useAppStore((s) => s.resetApp);
   const loadFeeds = useFeedStore((s) => s.loadFeeds);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const preloadArticles = useArticleStore((s) => s.preloadAll);
   const [isResetting, setIsResetting] = useState(false);
-  const [securityProblem, setSecurityProblem] = useState<{
-    kind: SecureContextProblemKind;
-    message: string;
-    origin?: string;
-  } | null>(null);
 
   useEffect(() => {
     checkOnboardingStatus();
@@ -52,41 +91,22 @@ function AppInit({ children }: { children: React.ReactNode }) {
     void useLicenseStore.getState().refresh();
   }, []);
 
-  // Returning users: restore from stored keys
+  // Returning users: restore from stored keys.
   useEffect(() => {
     if (hasCompletedOnboarding === true && !isDbReady) {
       initializeReturningUser();
     }
   }, [hasCompletedOnboarding, isDbReady, initializeReturningUser]);
 
-  // New users: auto-initialize with local-only mode (no onboarding modal)
+  // New users: fire the full new-user boot sequence in app-store.
+  // The action handles secure-context check + passphrase generation +
+  // DB init + completeOnboarding; AppInit just renders the resulting
+  // state (isDbReady / error / securityProblem).
   useEffect(() => {
     if (hasCompletedOnboarding === false && !isDbReady) {
-      const check = checkSecureContext({
-        isSecureContext: globalThis.isSecureContext ?? false,
-        crypto: globalThis.crypto as Pick<Crypto, "subtle"> | undefined,
-        origin: typeof window !== "undefined" ? window.location.origin : undefined,
-      });
-      if (!check.ok) {
-        setSecurityProblem({ kind: check.kind, message: check.error, origin: check.origin });
-        return;
-      }
-      generatePassphrase()
-        .then((passphrase) => initialize(passphrase, { sync: false }))
-        .then(() => {
-          // initialize() reports failures by setting `error` on the store
-          // without throwing. Don't mark onboarding complete in that case —
-          // the user needs to see the error and retry, not be promoted to a
-          // returning user with a half-initialized DB.
-          if (!useAppStore.getState().error) completeOnboarding();
-        })
-        .catch((err) => {
-          useAppStore.getState().setError(
-            err instanceof Error ? err.message : "Initialization failed",
-          );
-        });
+      void startNewUserOnboarding();
     }
-  }, [hasCompletedOnboarding, isDbReady, initialize, completeOnboarding]);
+  }, [hasCompletedOnboarding, isDbReady, startNewUserOnboarding]);
 
   const addFeed = useFeedStore((s) => s.addFeed);
 
@@ -220,15 +240,17 @@ export function App() {
       <BrowserRouter>
         <AppInit>
           <Routes>
-            <Route path="/feeds" element={<FeedsPage />} />
-            <Route path="/feeds/:feedId" element={<FeedsPage />} />
-            <Route
-              path="/feeds/:feedId/articles/:articleId"
-              element={<FeedsPage />}
-            />
-            <Route path="/explore" element={<FeedsPage />} />
-            <Route path="/stats" element={<FeedsPage />} />
-            <Route path="/settings" element={<FeedsPage />} />
+            <Route element={<AppLayout />}>
+              <Route path="/feeds" element={<FeedsRoute />} />
+              <Route path="/feeds/:feedId" element={<FeedsRoute />} />
+              <Route
+                path="/feeds/:feedId/articles/:articleId"
+                element={<FeedsRoute />}
+              />
+              <Route path="/explore" element={<ExploreRoute />} />
+              <Route path="/stats" element={<StatsRoute />} />
+              <Route path="/settings" element={<SettingsRoute />} />
+            </Route>
             <Route path="/billing/success" element={<BillingSuccess />} />
             <Route path="/billing/cancelled" element={<BillingCancelled />} />
             <Route path="/billing/recover" element={<BillingRecover />} />

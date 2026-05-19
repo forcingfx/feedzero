@@ -5,17 +5,20 @@
  * UI click counterparts. This prevents bugs where keyboard and mouse
  * paths diverge over time.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
+import * as ReactRouter from "react-router";
 import { useKeyboardNav } from "../../src/hooks/use-keyboard-nav.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useExtractionStore } from "../../src/stores/extraction-store.ts";
 import type { Article } from "../../src/types/index.ts";
 
+const navigateSpy = vi.fn();
+
 function Wrapper({ children }: { children: React.ReactNode }) {
-  return <MemoryRouter>{children}</MemoryRouter>;
+  return <MemoryRouter initialEntries={["/feeds"]}>{children}</MemoryRouter>;
 }
 
 // Mock core modules
@@ -66,6 +69,8 @@ function pressKey(key: string) {
 }
 
 describe("keyboard-UI behavior parity", () => {
+  let useNavigateSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = "";
@@ -89,6 +94,13 @@ describe("keyboard-UI behavior parity", () => {
       viewMode: "feed",
       statusMap: {},
     });
+
+    navigateSpy.mockReset();
+    useNavigateSpy = vi.spyOn(ReactRouter, "useNavigate").mockReturnValue(navigateSpy);
+  });
+
+  afterEach(() => {
+    useNavigateSpy.mockRestore();
   });
 
   describe("R key vs Refresh button", () => {
@@ -170,16 +182,11 @@ describe("keyboard-UI behavior parity", () => {
   });
 
   describe("N key navigates to explore", () => {
-    it("dispatches feedzero:navigate-explore", () => {
-      const eventHandler = vi.fn();
-      document.addEventListener("feedzero:navigate-explore", eventHandler);
-
+    it("navigates to /explore?focus=search", () => {
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("n");
 
-      expect(eventHandler).toHaveBeenCalledTimes(1);
-
-      document.removeEventListener("feedzero:navigate-explore", eventHandler);
+      expect(navigateSpy).toHaveBeenCalledWith("/explore?focus=search");
     });
   });
 
@@ -260,11 +267,11 @@ describe("keyboard-UI behavior parity", () => {
   });
 
   describe("U/I keys vs Feed button click", () => {
-    it("U dispatches feedzero:navigate-feed for the next feed in the logical list", () => {
-      // U / I now traverse feed-store state instead of DOM buttons so they
-      // can reach feeds hidden inside collapsed folders. The contract is a
-      // feedzero:navigate-feed event that FeedsPage turns into a URL push —
-      // same single source of truth as clicking a feed in the sidebar.
+    it("U navigates to the next feed in the logical list", () => {
+      // U / I traverse feed-store state instead of DOM buttons so they
+      // can reach feeds hidden inside collapsed folders. They call
+      // `navigate()` directly — same single source of truth as clicking
+      // a feed in the sidebar.
       useFeedStore.setState({
         feeds: [
           { id: "f1", url: "x", title: "Feed 1", description: "", siteUrl: "", createdAt: 0, updatedAt: 0 },
@@ -273,18 +280,10 @@ describe("keyboard-UI behavior parity", () => {
         selectedFeedId: "f1",
       });
 
-      const eventHandler = vi.fn();
-      document.addEventListener("feedzero:navigate-feed", eventHandler);
-
       renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
       pressKey("u");
 
-      expect(eventHandler).toHaveBeenCalledTimes(1);
-      const detail = (eventHandler.mock.calls[0][0] as CustomEvent<{ feedId: string }>)
-        .detail;
-      expect(detail.feedId).toBe("f2");
-
-      document.removeEventListener("feedzero:navigate-feed", eventHandler);
+      expect(navigateSpy).toHaveBeenCalledWith("/feeds/f2");
     });
   });
 

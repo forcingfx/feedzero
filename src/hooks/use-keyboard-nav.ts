@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, type NavigateFunction } from "react-router";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
@@ -12,6 +12,11 @@ import { goToSettings } from "@/lib/go-to-settings.ts";
  * Article nav:  j/k (next/prev — directly opens article)
  * Feed nav:     u/i (next/prev feed)
  * Actions:      o (open original), e (toggle view), n (explore/add feed)
+ *
+ * Navigation goes through `useNavigate()` directly. The sidebar toggle
+ * still uses a DOM CustomEvent because `useKeyboardNav` is called above
+ * SidebarProvider in the desktop tree (and on mobile there's no provider
+ * at all — the drawer listens for the same event).
  */
 export function useKeyboardNav() {
   const navigate = useNavigate();
@@ -48,10 +53,10 @@ export function useKeyboardNav() {
         moveArticle(-1);
         break;
       case "u":
-        moveFeedFocus(1);
+        moveFeedFocus(1, navigate);
         break;
       case "i":
-        moveFeedFocus(-1);
+        moveFeedFocus(-1, navigate);
         break;
       case "o":
         openOriginal();
@@ -60,7 +65,7 @@ export function useKeyboardNav() {
         toggleView();
         break;
       case "n":
-        navigateToExplore();
+        navigate("/explore?focus=search");
         break;
       case "[":
         toggleSidebar();
@@ -167,7 +172,7 @@ function buildLogicalFeedList(): string[] {
   return ids;
 }
 
-function moveFeedFocus(direction: 1 | -1) {
+function moveFeedFocus(direction: 1 | -1, navigate: NavigateFunction) {
   const list = buildLogicalFeedList();
   if (list.length === 0) return;
   const { selectedFeedId, feeds, setFolderOpen } = useFeedStore.getState();
@@ -183,9 +188,7 @@ function moveFeedFocus(direction: 1 | -1) {
     setFolderOpen(childFeed.folderId, true);
   }
 
-  document.dispatchEvent(
-    new CustomEvent("feedzero:navigate-feed", { detail: { feedId: nextId } }),
-  );
+  navigate(`/feeds/${nextId}`);
 }
 
 function openOriginal() {
@@ -210,10 +213,6 @@ function scrollReader(direction: 1 | -1) {
   if (reader) {
     reader.scrollBy({ top: direction * reader.clientHeight * 0.8, behavior: "smooth" });
   }
-}
-
-function navigateToExplore() {
-  document.dispatchEvent(new CustomEvent("feedzero:navigate-explore"));
 }
 
 function toggleSidebar() {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
+import { lazy, Suspense } from "react";
 
 vi.mock("../../../src/stores/app-store.ts", () => ({
   useAppStore: Object.assign(
@@ -9,10 +10,27 @@ vi.mock("../../../src/stores/app-store.ts", () => ({
   ),
 }));
 
-import { FeedsPage } from "../../../src/pages/feeds-page.tsx";
+import { AppLayout } from "../../../src/pages/app-layout.tsx";
+import { StageView } from "../../../src/pages/stage-view.tsx";
 import { useFeedStore } from "../../../src/stores/feed-store.ts";
 
-describe("/stats route via FeedsPage", () => {
+const StatsPage = lazy(() =>
+  import("../../../src/components/stats/stats-page.tsx").then((m) => ({
+    default: m.StatsPage,
+  })),
+);
+
+function StatsRoute() {
+  return (
+    <StageView>
+      <Suspense>
+        <StatsPage />
+      </Suspense>
+    </StageView>
+  );
+}
+
+describe("/stats route via AppLayout", () => {
   let originalFetch: typeof fetch;
 
   beforeEach(() => {
@@ -34,7 +52,9 @@ describe("/stats route via FeedsPage", () => {
     render(
       <MemoryRouter initialEntries={["/stats"]}>
         <Routes>
-          <Route path="/stats" element={<FeedsPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/stats" element={<StatsRoute />} />
+          </Route>
         </Routes>
       </MemoryRouter>,
     );

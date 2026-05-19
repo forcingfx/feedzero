@@ -6,9 +6,12 @@ import { ExploreCatalog } from "@/components/explore/explore-catalog.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { feedCatalog } from "@/lib/feed-catalog.ts";
 
-function renderCatalog(props: React.ComponentProps<typeof ExploreCatalog> = {}) {
+function renderCatalog(
+  props: React.ComponentProps<typeof ExploreCatalog> = {},
+  initialPath: string = "/explore",
+) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
       <ExploreCatalog {...props} />
     </MemoryRouter>,
   );
@@ -231,16 +234,20 @@ describe("ExploreCatalog", () => {
     expect(screen.getByText(/to clear/)).toBeInTheDocument();
   });
 
-  it("focuses search input on feedzero:focus-explore-search event", async () => {
-    renderCatalog();
+  it("focuses search input when the route includes ?focus=search", async () => {
+    renderCatalog({}, "/explore?focus=search");
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
-    input.blur();
-
-    document.dispatchEvent(new CustomEvent("feedzero:focus-explore-search"));
 
     await waitFor(() => {
       expect(input).toHaveFocus();
     });
+  });
+
+  it("does not auto-focus search input without the ?focus=search param", () => {
+    renderCatalog();
+
+    const input = screen.getByPlaceholderText(/search feeds or paste/i);
+    expect(input).not.toHaveFocus();
   });
 });

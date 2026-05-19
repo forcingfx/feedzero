@@ -6,6 +6,11 @@ import {
 } from "../core/storage/key-manager.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
 import { useSyncStore } from "./sync-store.ts";
+import { generatePassphrase } from "../core/crypto/passphrase-generator.ts";
+import {
+  checkSecureContext,
+  type SecureContextProblemKind,
+} from "../core/security/secure-context.ts";
 
 /**
  * Recoverable boot-time failure modes that require explicit user
@@ -23,18 +28,39 @@ import { useSyncStore } from "./sync-store.ts";
  */
 export type RecoveryMode = "invalid-keys";
 
+/**
+ * The browser environment isn't safe to run FeedZero in. Surfaced
+ * when {@link AppStore.startNewUserOnboarding} discovers the page
+ * was loaded without a secure context or without `crypto.subtle`.
+ * AppInit renders an explanatory screen in this state.
+ */
+export type SecurityProblem = {
+  kind: SecureContextProblemKind;
+  message: string;
+  origin?: string;
+};
+
 interface AppStore {
   isDbReady: boolean;
   error: string | null;
   hasCompletedOnboarding: boolean | null;
   /** Non-null when the user must take explicit action to recover. */
   recoveryMode: RecoveryMode | null;
+  /** Non-null when the browser environment is incompatible. */
+  securityProblem: SecurityProblem | null;
   /** When true, the article list collapses same-feed flood runs into stacks. */
   groupArticleFloods: boolean;
   /** Initialize a fresh DB for new users (onboarding). */
   initialize: (passphrase: string, options?: { sync: boolean }) => Promise<void>;
   /** Restore DB for returning users from stored keys. */
   initializeReturningUser: () => Promise<void>;
+  /**
+   * The full new-user boot sequence: secure-context check, generate
+   * passphrase, init a fresh DB, mark onboarding complete. AppInit
+   * fires this once when it detects a never-onboarded user. Failures
+   * set either `securityProblem` (environment) or `error` (init).
+   */
+  startNewUserOnboarding: () => Promise<void>;
   setError: (error: string | null) => void;
   /** Clear the recovery prompt (e.g. after the user picks an action). */
   clearRecoveryMode: () => void;
@@ -67,11 +93,12 @@ function readGroupArticleFloods(): boolean {
 // loss. The dedup is still useful to avoid double-pulling the vault.
 let initReturningUserInFlight: Promise<void> | null = null;
 
-export const useAppStore = create<AppStore>((set) => ({
+export const useAppStore = create<AppStore>((set, get) => ({
   isDbReady: false,
   error: null,
   hasCompletedOnboarding: null,
   recoveryMode: null,
+  securityProblem: null,
   groupArticleFloods: readGroupArticleFloods(),
 
   initialize: async (passphrase, options) => {
@@ -149,6 +176,36 @@ export const useAppStore = create<AppStore>((set) => ({
     });
 
     return initReturningUserInFlight;
+  },
+
+  startNewUserOnboarding: async () => {
+    const check = checkSecureContext({
+      isSecureContext: globalThis.isSecureContext ?? false,
+      crypto: globalThis.crypto as Pick<Crypto, "subtle"> | undefined,
+      origin:
+        typeof window !== "undefined" ? window.location.origin : undefined,
+    });
+    if (!check.ok) {
+      set({
+        securityProblem: {
+          kind: check.kind,
+          message: check.error,
+          origin: check.origin,
+        },
+      });
+      return;
+    }
+    try {
+      const passphrase = await generatePassphrase();
+      await get().initialize(passphrase, { sync: false });
+      // initialize() reports failures by setting `error` on the store
+      // without throwing. Don't mark onboarding complete in that case —
+      // the user needs to see the error and retry, not be promoted to
+      // a returning user with a half-initialized DB.
+      if (!get().error) get().completeOnboarding();
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : "Initialization failed" });
+    }
   },
 
   setError: (error) => set({ error }),
