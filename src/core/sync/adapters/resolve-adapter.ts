@@ -105,5 +105,8 @@ function wrapAsyncAdapter(
     async count() {
       return (await adapterPromise).count();
     },
+    async lastUpdatedAt() {
+      return (await adapterPromise).lastUpdatedAt();
+    },
   };
 }

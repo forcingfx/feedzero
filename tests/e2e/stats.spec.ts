@@ -50,7 +50,7 @@ test.describe("Public stats dashboard", () => {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ ok: true, vaults: 87 }),
+        body: JSON.stringify({ ok: true, vaults: 87, lastUpdatedAt: null }),
       }),
     );
   });

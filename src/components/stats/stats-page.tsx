@@ -17,6 +17,7 @@ interface StatsData {
   vaults: number;
   totalFeeds: number;
   topFeeds: CatalogFeedDTO[];
+  lastUpdatedAt: number | null;
 }
 
 type LoadState =
@@ -62,10 +63,21 @@ export function StatsPage() {
 function ReadyState({ data }: { data: StatsData }) {
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-4 mb-2">
         <Stat label="Vaults" value={data.vaults} testId="stat-vaults" />
         <Stat label="Feeds tracked" value={data.totalFeeds} testId="stat-feeds" />
       </div>
+      {data.lastUpdatedAt !== null && (
+        <p
+          data-testid="stat-last-write"
+          className="mb-8 text-xs text-muted-foreground"
+        >
+          Most recent vault write: {formatRelativeTime(data.lastUpdatedAt)}{" "}
+          <span className="opacity-70">
+            ({new Date(data.lastUpdatedAt).toISOString().replace(/\.\d{3}Z$/, "Z")})
+          </span>
+        </p>
+      )}
 
       <h2 className="text-base font-semibold mb-3">Top feeds by request volume</h2>
       <div
@@ -154,14 +166,36 @@ async function loadAll(): Promise<StatsData> {
       `/api/catalog?action=popular&limit=${TOP_FEED_LIMIT}`,
     ),
     fetchJsonOptional<{ ok: boolean; count?: number; error?: string }>(`/api/catalog?action=count`),
-    fetchJson<{ ok: boolean; vaults?: number; error?: string }>(`/api/stats-sync`),
+    fetchJson<{
+      ok: boolean;
+      vaults?: number;
+      lastUpdatedAt?: number | null;
+      error?: string;
+    }>(`/api/stats-sync`),
   ]);
   if (!sync.ok) throw new Error("stats endpoint failed");
   return {
     vaults: sync.vaults ?? 0,
     totalFeeds: count?.count ?? 0,
     topFeeds: popular?.feeds ?? [],
+    lastUpdatedAt: sync.lastUpdatedAt ?? null,
   };
+}
+
+/**
+ * Coarse relative-time formatter for the stats page. Resolution caps at
+ * "days" — anything older switches to an absolute ISO date in the caller's
+ * sibling span, so we don't need months/years here.
+ */
+function formatRelativeTime(epochMs: number, now: number = Date.now()): string {
+  const deltaSec = Math.max(0, Math.round((now - epochMs) / 1000));
+  if (deltaSec < 60) return `${deltaSec} second${deltaSec === 1 ? "" : "s"} ago`;
+  const deltaMin = Math.round(deltaSec / 60);
+  if (deltaMin < 60) return `${deltaMin} minute${deltaMin === 1 ? "" : "s"} ago`;
+  const deltaHr = Math.round(deltaMin / 60);
+  if (deltaHr < 24) return `${deltaHr} hour${deltaHr === 1 ? "" : "s"} ago`;
+  const deltaDay = Math.round(deltaHr / 24);
+  return `${deltaDay} day${deltaDay === 1 ? "" : "s"} ago`;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

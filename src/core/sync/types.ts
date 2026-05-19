@@ -63,4 +63,17 @@ export interface SyncStorageAdapter {
   put(vaultId: string, data: string): Promise<Result<boolean>>;
   delete(vaultId: string): Promise<Result<boolean>>;
   count(): Promise<Result<number>>;
+  /**
+   * Epoch milliseconds of the most recent successful `put`, or `null` if
+   * no vaults exist. Surfaced via `/api/stats-sync` so operators can verify
+   * sync PUTs are still landing from a single mobile-friendly URL — the
+   * proximate motivation was the post-#117 "is anyone actually syncing?"
+   * question with no good answer short of trawling Vercel logs.
+   *
+   * Resolution is best-effort and adapter-specific: filesystem uses file
+   * mtime (1-second granularity on most volumes), Upstash uses a meta key
+   * updated synchronously on every put, Vercel Blob queries blob upload
+   * timestamps. Don't rely on sub-second precision.
+   */
+  lastUpdatedAt(): Promise<Result<number | null>>;
 }

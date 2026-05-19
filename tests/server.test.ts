@@ -375,7 +375,9 @@ describe("server", () => {
       const res = await app.request("/api/stats-sync");
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ ok: true, vaults: 1 });
+      expect(data.ok).toBe(true);
+      expect(data.vaults).toBe(1);
+      expect(typeof data.lastUpdatedAt).toBe("number");
     });
 
     it("GET /api/stats-sync returns zero with no vaults", async () => {
@@ -383,7 +385,7 @@ describe("server", () => {
       const res = await app.request("/api/stats-sync");
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ ok: true, vaults: 0 });
+      expect(data).toEqual({ ok: true, vaults: 0, lastUpdatedAt: null });
     });
   });
 

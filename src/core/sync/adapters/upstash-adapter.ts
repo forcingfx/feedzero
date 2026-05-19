@@ -64,6 +64,12 @@ export interface UpstashSyncClient {
 
 const VAULT_KEY_PREFIX = "vault:";
 const SCAN_PAGE_SIZE = 100;
+// Singleton meta key tracking the most recent PUT time (epoch ms as a
+// stringified number). Written synchronously inside `put()` so the value
+// always reflects the most recent successful write. Lives in the same
+// keyspace as vault payloads but cannot collide with a vault: VAULT_KEY_PREFIX
+// applies to a 64-hex vaultId, this key is a fixed namespaced literal.
+const LAST_UPDATED_KEY = "vault-meta:lastUpdatedAt";
 
 function vaultKey(vaultId: string): string {
   return VAULT_KEY_PREFIX + vaultId;
@@ -105,6 +111,15 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
   async put(vaultId: string, data: string): Promise<Result<boolean>> {
     return tryUpstash(async () => {
       await this.client.set(vaultKey(vaultId), data);
+      // Best-effort meta write. We deliberately don't roll back the vault
+      // SET on meta failure — the vault is the source of truth; the meta
+      // key is observability only. A failed meta write surfaces as a stale
+      // lastUpdatedAt on /stats but never as data loss.
+      try {
+        await this.client.set(LAST_UPDATED_KEY, String(Date.now()));
+      } catch {
+        /* observability-only, see comment above */
+      }
       return true;
     });
   }
@@ -133,6 +148,18 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
         // defensive and treat both 0 and "0" as completion.
       } while (cursor !== 0 && cursor !== "0");
       return total;
+    });
+  }
+
+  async lastUpdatedAt(): Promise<Result<number | null>> {
+    return tryUpstash(async () => {
+      const raw = await this.client.get<string>(LAST_UPDATED_KEY);
+      if (raw === null || raw === undefined) return null;
+      const ms = Number(raw);
+      // Defensive: if a future SDK upgrade or operator-side `redis-cli SET`
+      // writes garbage into the meta key, return null rather than NaN —
+      // the JSON response stays parseable on the client.
+      return Number.isFinite(ms) ? ms : null;
     });
   }
 }

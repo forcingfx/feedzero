@@ -32,4 +32,16 @@ describe.skipIf(SKIP)("production /api/stats-sync (live)", () => {
     const body = await res.json();
     expect(body.vaults).toBeGreaterThan(0);
   }, 10_000);
+
+  it("returns a lastUpdatedAt epoch ms within the last 30 days", async () => {
+    // If new vaults aren't being written, this number stops advancing.
+    // 30-day window is generous — sub-monthly churn means sync is dead
+    // and we should investigate (Vercel logs + Upstash dashboard).
+    const res = await fetch(`${BASE_URL}/api/stats-sync`);
+    const body = await res.json();
+    expect(typeof body.lastUpdatedAt).toBe("number");
+    const ageMs = Date.now() - body.lastUpdatedAt;
+    expect(ageMs).toBeGreaterThanOrEqual(0);
+    expect(ageMs).toBeLessThan(30 * 24 * 60 * 60 * 1000);
+  }, 10_000);
 });

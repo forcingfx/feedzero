@@ -5,7 +5,7 @@
  * unit-tested independently of running the full Vite server. The dev-proxy
  * has historically been a source of bugs that only surface end-to-end (e.g.
  * the Stripe webhook signature dropped because Content-Type was the only
- * header forwarded). Pinning these helpers in tests/vite-dev-proxy.test.ts
+ * header forwarded). Pinning these helpers in tests/scripts/dev-proxy.test.ts
  * catches that class of regression locally rather than in a manual smoke run.
  */
 
