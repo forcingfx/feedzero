@@ -667,4 +667,83 @@ describe("ReaderPanel", () => {
       expect(useExtractionStore.getState().viewMode).toBe("feed");
     });
   });
+
+  describe("star toggle placement (mobile-friendly)", () => {
+    // The old layout dropped the star into the meta line alongside the
+    // feed name, date and external-link icon. That line uses flex-wrap,
+    // so on narrow mobile widths the star wrapped to its own line and
+    // sat with a 14px tap-target — too small for a thumb. The new
+    // pattern parks the star next to the view-mode pills with a
+    // pill-sized hit area.
+
+    function renderWithArticle(overrides = {}) {
+      useArticleStore.setState({
+        selectedArticle: mockArticle(overrides),
+        articles: [],
+        isLoading: false,
+      });
+      return render(<ReaderPanel />);
+    }
+
+    it("the star button is a child of the reader action row, not the meta line", () => {
+      const { container } = renderWithArticle();
+      const star = screen.getByTestId("star-toggle");
+      const meta = screen.getByTestId("article-meta-line");
+      expect(meta.contains(star)).toBe(false);
+
+      const actionRow = container.querySelector(
+        '[data-testid="reader-action-row"]',
+      );
+      expect(actionRow).not.toBeNull();
+      expect(actionRow!.contains(star)).toBe(true);
+    });
+
+    it("the reader action row also contains the view-mode pills (Feed / Full text)", () => {
+      const { container } = renderWithArticle();
+      const actionRow = container.querySelector(
+        '[data-testid="reader-action-row"]',
+      )!;
+      // Pills are buttons with literal text "Feed" and "Full text". Both
+      // must be descendants of the same row that holds the star.
+      expect(actionRow.textContent).toMatch(/Feed/);
+      expect(actionRow.textContent).toMatch(/Full text/);
+    });
+
+    it("the star button has an explicit min-height for thumb-tappability", () => {
+      // Pills are roughly 28px tall (px-3 py-1). The star button should
+      // match or exceed that so the touch target isn't a 14px icon.
+      renderWithArticle();
+      const star = screen.getByTestId("star-toggle");
+      // h-7 = 28px (Tailwind). Allow h-8 / h-9 as future bumps.
+      expect(star.className).toMatch(/\bh-(7|8|9|10)\b/);
+    });
+
+    it("clicking the star toggles the article's starred state via the store", async () => {
+      const { updateArticle } = await import("@/core/storage/db.ts");
+      vi.mocked(updateArticle).mockResolvedValue({
+        ok: true,
+        value: undefined as unknown as boolean,
+      });
+      const user = userEvent.setup();
+      const article = mockArticle({ starred: false });
+      useArticleStore.setState({
+        selectedArticle: article,
+        articlesByFeedId: { f1: [article] },
+        articles: [],
+        isLoading: false,
+      });
+      render(<ReaderPanel />);
+
+      await user.click(screen.getByTestId("star-toggle"));
+
+      // Wait for the async store mutation to land.
+      await act(async () => {
+        await Promise.resolve();
+      });
+      const updated = useArticleStore
+        .getState()
+        .articlesByFeedId.f1.find((a) => a.id === "a1");
+      expect(updated?.starred).toBe(true);
+    });
+  });
 });
