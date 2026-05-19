@@ -11,6 +11,7 @@ import {
 } from "@/lib/catalog-search.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
+import { upgradeToast } from "@/lib/upgrade-toast.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
@@ -87,6 +88,8 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
       setSearchQuery("");
       const newFeedId = useFeedStore.getState().selectedFeedId;
       if (newFeedId && onFeedAdded) onFeedAdded(newFeedId);
+    } else if (result.reason === "free-quota-exceeded") {
+      upgradeToast(result.error, navigate, { id: toastId });
     } else {
       toast.error(result.error || "Failed to add feed", { id: toastId });
     }

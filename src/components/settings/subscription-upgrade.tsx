@@ -42,6 +42,7 @@ export function SubscriptionUpgrade() {
         features={[
           "Everything in Free",
           "End-to-end encrypted cloud sync",
+          "Smart filters — query your feeds by keyword, tag, or source",
           "Auto-organize folders",
           "Unlimited feeds",
         ]}
@@ -68,12 +69,12 @@ export function SubscriptionUpgrade() {
 
       <TierCard
         name="Self-host"
-        price="$0 · MIT"
+        price="$0 · AGPL"
         blurb="Run your own copy. Every shipped feature unlocked."
         features={[
           "Unlimited feeds, cloud sync on your own server",
           "No license check, no kill switch",
-          "Open source under MIT",
+          "Open source under AGPL-3.0",
         ]}
         cta="Self-hosting guide →"
         ctaHref="https://www.feedzero.app/docs/self-hosting"

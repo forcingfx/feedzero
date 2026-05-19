@@ -27,7 +27,17 @@ import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
 import { toast } from "sonner";
 import type { Feed, Folder, FeedSortMode } from "../types/index.ts";
-import type { Result } from "../utils/result.ts";
+
+/**
+ * `addFeed` result. Result-shaped plus an optional `reason` on the err
+ * branch so call sites can distinguish a quota refusal (route the user to
+ * upgrade) from a generic failure (show "Failed to add"). Stays a
+ * structural superset of `Result<void>` so existing readers of
+ * `.ok` / `.error` continue to compile without change.
+ */
+export type AddFeedResult =
+  | { ok: true; value: void }
+  | { ok: false; error: string; reason?: "free-quota-exceeded" };
 
 /** Whether a feed is the official FeedZero release notes feed. */
 function isReleaseFeed(feed: Feed): boolean {
@@ -61,7 +71,7 @@ interface FeedStore {
    *  with an empty store before the DB is read. */
   feedsLoaded: boolean;
   loadFeeds: () => Promise<void>;
-  addFeed: (url: string) => Promise<Result<void>>;
+  addFeed: (url: string) => Promise<AddFeedResult>;
   removeFeed: (feedId: string) => Promise<void>;
   renameFeed: (feedId: string, newTitle: string) => Promise<void>;
   setFeedPreferFullText: (feedId: string, value: boolean) => Promise<void>;
@@ -199,7 +209,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     if (!quota.ok) {
       const message = quotaErrorMessage(quota);
       set({ error: message });
-      return { ok: false, error: message } as const;
+      return {
+        ok: false,
+        error: message,
+        reason: "free-quota-exceeded",
+      } as const;
     }
 
     set({ isLoading: true, error: null });
