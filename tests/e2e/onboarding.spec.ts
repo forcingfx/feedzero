@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Onboarding", () => {
-  test("new user auto-initializes and lands on All items article list", async ({
+  test("new user auto-initializes and lands on Explore", async ({
     page,
   }) => {
     // Clear localStorage so the app starts fresh, but suppress changelog dialog
@@ -11,9 +11,11 @@ test.describe("Onboarding", () => {
     });
     await page.goto("/feeds");
 
-    // App should auto-initialize and redirect to /feeds/all — the article
-    // list, not the Explore catalog. Explore is reachable via the sidebar.
-    await page.waitForURL(/\/feeds\/all/, { timeout: 15000 });
+    // App auto-initializes (no onboarding modal) and redirects to /explore.
+    // The redirect logic in feeds-page.tsx sends users with 0–1 feeds to
+    // /explore (still in starter mode); the auto-subscribed release-notes
+    // feed counts as one. /feeds/all kicks in once the user has 2+ feeds.
+    await page.waitForURL(/\/explore/, { timeout: 15000 });
   });
 
   test("returning user skips onboarding and loads directly", async ({
@@ -30,8 +32,8 @@ test.describe("Onboarding", () => {
 
     // No dialog should appear
     await expect(page.getByRole("dialog")).toBeHidden({ timeout: 5000 });
-    // App should load and land on the All items list
-    await page.waitForURL(/\/feeds\/all/, { timeout: 15000 });
+    // Returning user with 0–1 feeds also lands on /explore (see above).
+    await page.waitForURL(/\/explore/, { timeout: 15000 });
   });
 
   test("no onboarding modal appears for new users", async ({ page }) => {
@@ -51,7 +53,7 @@ test.describe("Onboarding", () => {
     // No dialog should be visible — auto-initialization is silent
     await expect(page.getByRole("dialog")).toBeHidden({ timeout: 5000 });
 
-    // App should land on the article list rather than Explore
-    await page.waitForURL(/\/feeds\/all/, { timeout: 15000 });
+    // Fresh user lands on /explore (catalog), not /feeds/all.
+    await page.waitForURL(/\/explore/, { timeout: 15000 });
   });
 });

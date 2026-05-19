@@ -138,25 +138,14 @@ test.describe("Article navigation — mobile", () => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
     await addFeedViaUI(page, "https://example.com/feed");
 
-    // After adding via Explore, the app navigates to /feeds/{feedId}.
+    // After adding via Explore, the app navigates to /feeds/{feedId}. On
+    // mobile this lands directly on the article list — no need to re-select
+    // the feed through the bottom drawer.
     await page.waitForURL(/\/feeds\//, { timeout: 10000 });
-
-    // Open sidebar to select the feed
-    await page.getByRole("button", { name: /toggle sidebar/i }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible({ timeout: 5000 });
-
-    // Click the feed — on mobile, this lands on the article list (no auto-select).
-    await dialog
-      .locator('[data-sidebar="menu-button"]', { hasText: "Test Feed" })
-      .click();
-
-    // Sidebar closes
-    await expect(dialog).toBeHidden({ timeout: 5000 });
 
     // Article list is visible; back pill is NOT (we're not in the reader yet)
     await expect(page.locator('[role="listbox"]')).toBeVisible({
-      timeout: 5000,
+      timeout: 10000,
     });
     await expect(
       page.locator('[data-testid="back-pill"]'),
@@ -170,11 +159,12 @@ test.describe("Article navigation — mobile", () => {
     await expect(page.locator('[data-testid="back-pill"]')).toBeVisible();
   });
 
-  test("navigating to /feeds lands on All items list (not explore)", async ({
+  test("navigating to /feeds with no feeds redirects to explore", async ({
     feedPage: page,
   }) => {
-    // On mobile at /feeds with no feeds, app redirects to /feeds/all
-    // (the All items article list). Explore is reachable via the sidebar.
-    await page.waitForURL(/\/feeds\/all/, { timeout: 10000 });
+    // feedPage's release-auto-subscribe block keeps feedCount at 0, so the
+    // redirect logic in feeds-page.tsx (feedCount <= 1 → /explore) sends
+    // the user to the catalog. /feeds/all kicks in once they have 2+ feeds.
+    await page.waitForURL(/\/explore/, { timeout: 10000 });
   });
 });

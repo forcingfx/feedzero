@@ -18,10 +18,10 @@ import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
 import { SAMPLE_RSS, mockFeedEndpoint } from "./feed-fixtures";
 
 async function sidebarWidth(page: import("@playwright/test").Page) {
-  // The first panel inside the outer group is the sidebar (left of the
-  // stage). data-panel-id values come from react-resizable-panels' own
-  // attribute conventions — they're stable across versions.
-  const sidebar = page.locator("[data-panel-group-id='feedzero:layout:main'] [data-panel]").first();
+  // react-resizable-panels renders each Panel as <div data-panel id="<id>">.
+  // Only the outer group has a panel with id="sidebar"; the inner stage
+  // group's panels are id="article-list" and "reader". No need to scope.
+  const sidebar = page.locator('[data-panel][id="sidebar"]');
   await expect(sidebar).toBeVisible();
   const box = await sidebar.boundingBox();
   if (!box) throw new Error("sidebar panel had no bounding box");
@@ -40,8 +40,11 @@ test.describe("Sidebar width stability across routes (ADR 013)", () => {
     // Make the sidebar a different size than the default so we can detect
     // a "reset to default" regression. Drag is preferable to a synthetic
     // setSize because it exercises the real persistence path.
+    // The outer group's resize handle sits between [sidebar] and [stage].
+    // Our wrapper marks separators with data-slot="resizable-handle" — the
+    // inner stage group adds its own handle, so .first() picks the outer one.
     const handle = page
-      .locator("[data-panel-group-id='feedzero:layout:main'] [data-resize-handle]")
+      .locator('[data-slot="resizable-handle"]')
       .first();
     const handleBox = await handle.boundingBox();
     if (!handleBox) throw new Error("resize handle had no bounding box");
