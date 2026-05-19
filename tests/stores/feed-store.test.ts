@@ -310,6 +310,24 @@ describe("feed-store", () => {
         expect(useFeedStore.getState().error).toMatch(/Free limit of 25/);
       });
 
+      it("tags the failure with reason='free-quota-exceeded' so callers can route the user to upgrade", async () => {
+        // The shared upgrade pattern (feature visible → click → upgrade
+        // toast) depends on callers being able to tell a quota refusal
+        // apart from a network/parse error. The reason discriminator is
+        // the contract: every add-feed call site reads it.
+        useLicenseStore.setState({ tier: "free", verifying: false });
+        seedFeeds(25);
+
+        const result = await useFeedStore
+          .getState()
+          .addFeed("https://new.com/feed");
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.reason).toBe("free-quota-exceeded");
+        }
+      });
+
       it("does NOT block Free user with 100 feeds when the paid tier is inactive (pre-launch)", async () => {
         useLicenseStore.setState({ tier: "free", verifying: false });
         vi.mocked(isPaidTierActive).mockReturnValue(false);

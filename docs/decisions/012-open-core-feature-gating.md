@@ -8,7 +8,7 @@ Accepted (2026-05-16).
 The Free + Personal launch shipped (PRs #67, #69). Auto-organize is the first feature being relocated from Free to Personal, and more will follow (filters, mute-keywords, eventually Pro features like AI Signal, search, send-to-Kindle). Every new gated feature lands in the single FOSS repo at `forcingfx/feedzero` because:
 
 - Splitting into two repos (an OSS core and a closed Personal/Pro extension) doubles the dev surface and breaks the one-checkout self-hosting story.
-- The MIT license already permits a motivated user to fork and strip any gate. A more elaborate enforcement scheme buys cosmetics, not safety.
+- The AGPL-3.0 license already permits a motivated user to fork and strip any gate. A more elaborate enforcement scheme buys cosmetics, not safety.
 - Most paid features (auto-organize, future filters) are entirely client-side. There is no server check to bypass — the gate is honor-system either way.
 
 Without a gating layer the choice is either "ship the feature to everyone" (cannibalizing the Personal SKU) or "feature is missing from self-hosters" (breaking the FOSS contract). We need a third option: one codebase, three deployment modes.
@@ -55,7 +55,7 @@ The UI gate (popover offering "Upgrade — $5/mo" instead of "Organize now") is 
 
 ## Honor-system tradeoff
 
-Anyone can fork the repo, set `VITE_SELF_HOSTED=1`, and self-host with full Personal features for free. They can. The MIT license already permits it. We accept this because:
+Anyone can fork the repo, set `VITE_SELF_HOSTED=1`, and self-host with full Personal features for free. They can. The AGPL-3.0 license already permits it. We accept this because:
 
 - Personal is $5/mo. The convenience of a managed deployment with sync, automated updates, and zero maintenance exceeds the friction of forking and self-hosting for the vast majority of users.
 - The features paid users actually pay for *include the hosted infrastructure* — cross-device sync needs a server they don't have to run. A self-hoster paying $0 already runs their own server, which is the value the hosted user is paying for.
@@ -92,7 +92,7 @@ The license server signs a feature list into the token; the client cryptographic
 Cannibalizes the Personal SKU before Personal has had time to find product-market fit. Free + Personal launched eight days ago.
 
 ### No self-hosted bypass — gates always-on
-Breaks the FOSS contract. The repo is MIT-licensed; gating features behind a check that no fork can satisfy is hostile to self-hosters.
+Breaks the FOSS contract. The repo is AGPL-3.0-licensed; gating features behind a check that no fork can satisfy is hostile to self-hosters.
 
 ## References
 

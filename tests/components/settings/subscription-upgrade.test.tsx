@@ -51,4 +51,23 @@ describe("<SubscriptionUpgrade>", () => {
     render(<SubscriptionUpgrade />);
     expect(screen.queryByRole("button", { name: /^log in$/i })).toBeNull();
   });
+
+  it("calls out Smart filters as a headline Personal feature", () => {
+    // Smart filters are visible to free users in the sidebar (honor-system
+    // open-core) — the Personal card must name them so the upgrade target
+    // is obvious to anyone routed here from a locked surface.
+    render(<SubscriptionUpgrade />);
+    expect(screen.getByText(/smart filters/i)).toBeInTheDocument();
+  });
+
+  it("describes the self-host license as AGPL, not MIT", () => {
+    // The project ships under AGPL-3.0-or-later (see /LICENSE). The old
+    // 'MIT' wording was wrong and could mislead self-hosters reading the
+    // tier card before they read the LICENSE.
+    render(<SubscriptionUpgrade />);
+    expect(screen.queryByText(/MIT/)).toBeNull();
+    // Both "$0 · AGPL" and "Open source under AGPL-3.0" surface the license
+    // — assert ≥ 1 match so the structural copy is free to evolve.
+    expect(screen.getAllByText(/AGPL/i).length).toBeGreaterThan(0);
+  });
 });

@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { upgradeToast } from "@/lib/upgrade-toast.ts";
 import type { FeedPack } from "@/lib/feed-packs.ts";
 
 interface FeedPackCardProps {
@@ -15,19 +17,29 @@ export function FeedPackCard({ pack, onComplete }: FeedPackCardProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [added, setAdded] = useState(false);
   const addFeed = useFeedStore((s) => s.addFeed);
+  const navigate = useNavigate();
 
   async function handleAdd() {
     setIsAdding(true);
     const toastId = toast.loading(`Adding ${pack.name}…`);
 
     let successCount = 0;
+    let quotaError: string | null = null;
     for (const source of pack.sources) {
-      await addFeed(source.feedUrl);
-      const error = useFeedStore.getState().error;
-      if (!error) successCount++;
+      const result = await addFeed(source.feedUrl);
+      if (result.ok) {
+        successCount++;
+      } else if (result.reason === "free-quota-exceeded") {
+        // The quota is global — every remaining source in this pack will
+        // also be refused. Stop the loop and let the user upgrade.
+        quotaError = result.error;
+        break;
+      }
     }
 
-    if (successCount === pack.sources.length) {
+    if (quotaError) {
+      upgradeToast(quotaError, navigate, { id: toastId });
+    } else if (successCount === pack.sources.length) {
       toast.success(`Added ${successCount} feeds`, { id: toastId });
     } else if (successCount > 0) {
       toast.success(
