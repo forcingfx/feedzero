@@ -95,45 +95,35 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 
 ## Self-Hosting
 
-Self-hosting is a first-class deployment. One master switch, one preflight,
-and a reverse proxy with TLS is everything you need.
-
-### Docker (recommended)
+Self-hosting is a first-class deployment. Docker + a hostname is all
+you need.
 
 ```bash
 git clone https://github.com/forcingfx/feedzero.git
 cd feedzero
-# Edit Caddyfile and change `feedzero.example.com` to your hostname
-docker compose up -d
+cp .env.example .env                              # then edit HOSTNAME
+./scripts/feedzero up
 ```
 
-That's it. `docker-compose.yml` provisions FeedZero on an internal
-network and a Caddy sidecar that terminates TLS via Let's Encrypt for
-your public hostname. Vault data persists under `./data` — back that
-directory up. For a LAN-only deployment with a self-signed cert, see
-the commented `:443 { tls internal }` block in the `Caddyfile`.
+Windows PowerShell:
 
-### Bare metal
-
-If you'd rather run Node directly:
-
-```bash
+```powershell
 git clone https://github.com/forcingfx/feedzero.git
 cd feedzero
-echo "VITE_SELF_HOSTED=1" > .env.production
-echo "SELF_HOSTED=1"      >> .env.production   # runtime mirror of the build flag
-npm install
-npm run build:all
-npm run serve                                  # binds 0.0.0.0:3000
+Copy-Item .env.example .env                       # then edit HOSTNAME
+pwsh .\scripts\feedzero.ps1 up
 ```
 
-Then put Caddy or nginx in front of `:3000` with a TLS cert pointing at a
-hostname you control. **HTTPS is non-negotiable** — browsers gate the Web
-Crypto API (which encrypts your data at rest) behind a secure context, so
-plain `http://<lan-ip>:3000` will refuse to start. The app detects this and
-shows you the fix.
+That's the full first-time install on a server with Docker installed
+and a public hostname pointing at it. The CLI wraps the day-2 ops
+too — `update`, `backup`, `restore`, `logs`, `doctor`. Run
+`./scripts/feedzero help` for the menu.
 
-**See the full guide:** [feedzero.app/docs/self-hosting](https://feedzero.app/docs/self-hosting)
+**See the full guide:** [docs/self-hosting.md](docs/self-hosting.md).
+Covers prerequisites (Docker on macOS/Linux/Windows, DNS, port
+forwarding), the public-hostname path, LAN-only with self-signed
+certs (and how to trust the Caddy root CA per OS), day-2 ops, and
+troubleshooting.
 
 ### What `VITE_SELF_HOSTED=1` does
 
