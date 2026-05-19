@@ -23,7 +23,11 @@ import {
   updateArticle,
 } from "../../src/core/storage/db.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
-import { ALL_FEEDS_ID, toFolderFeedId } from "../../src/utils/constants.ts";
+import {
+  ALL_FEEDS_ID,
+  STARRED_FEED_ID,
+  toFolderFeedId,
+} from "../../src/utils/constants.ts";
 
 const mockArticle = (id: string, read = false) => ({
   id,
@@ -484,6 +488,124 @@ describe("article-store", () => {
       // @ts-expect-error — intentionally bad input
       useArticleStore.getState().setArticleSortMode("random-nonsense");
       expect(useArticleStore.getState().articleSortMode).toBe("newest");
+    });
+  });
+
+  describe("toggleStar", () => {
+    it("flips an article from unstarred to starred and stamps starredAt", async () => {
+      const article = mockArticle("a1");
+      useArticleStore.setState({
+        articlesByFeedId: { f1: [article] },
+        articles: [article],
+      });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      const before = Date.now();
+      await useArticleStore.getState().toggleStar("a1");
+      const after = Date.now();
+
+      const updated = useArticleStore.getState().articles[0];
+      expect(updated.starred).toBe(true);
+      expect(updated.starredAt).toBeGreaterThanOrEqual(before);
+      expect(updated.starredAt).toBeLessThanOrEqual(after);
+      expect(updateArticle).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "a1", starred: true }),
+      );
+    });
+
+    it("flips an already-starred article back to unstarred and clears starredAt", async () => {
+      const article = { ...mockArticle("a1"), starred: true, starredAt: 12345 };
+      useArticleStore.setState({
+        articlesByFeedId: { f1: [article] },
+        articles: [article],
+      });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().toggleStar("a1");
+
+      const updated = useArticleStore.getState().articles[0];
+      expect(updated.starred).toBe(false);
+      expect(updated.starredAt).toBeUndefined();
+    });
+
+    it("schedules a sync push so the star state propagates to other devices", async () => {
+      const scheduleSpy = vi.spyOn(useSyncStore.getState(), "scheduleSyncPush");
+      const article = mockArticle("a1");
+      useArticleStore.setState({
+        articlesByFeedId: { f1: [article] },
+        articles: [article],
+      });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().toggleStar("a1");
+
+      expect(scheduleSpy).toHaveBeenCalled();
+    });
+
+    it("no-ops silently when the article id is unknown", async () => {
+      useArticleStore.setState({ articlesByFeedId: {}, articles: [] });
+
+      await useArticleStore.getState().toggleStar("missing");
+
+      expect(updateArticle).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("starred virtual feed (STARRED_FEED_ID)", () => {
+    it("loadArticles(STARRED_FEED_ID) returns only starred articles across every feed", async () => {
+      const a1 = { ...mockArticle("a1"), feedId: "feed-1", starred: true, starredAt: 100 };
+      const a2 = { ...mockArticle("a2"), feedId: "feed-2", starred: false };
+      const a3 = { ...mockArticle("a3"), feedId: "feed-2", starred: true, starredAt: 200 };
+      vi.mocked(getAllArticles).mockResolvedValue({
+        ok: true,
+        value: [a1, a2, a3],
+      });
+
+      await useArticleStore.getState().loadArticles(STARRED_FEED_ID);
+
+      const visible = useArticleStore.getState().articles;
+      const ids = visible.map((a) => a.id).sort();
+      expect(ids).toEqual(["a1", "a3"]);
+    });
+
+    it("starred view orders by starredAt descending (most-recently-starred first)", async () => {
+      const oldStar = {
+        ...mockArticle("old-star"),
+        starred: true,
+        starredAt: 100,
+        publishedAt: 999,
+      };
+      const newStar = {
+        ...mockArticle("new-star"),
+        starred: true,
+        starredAt: 500,
+        publishedAt: 200,
+      };
+      vi.mocked(getAllArticles).mockResolvedValue({
+        ok: true,
+        value: [oldStar, newStar],
+      });
+
+      await useArticleStore.getState().loadArticles(STARRED_FEED_ID);
+
+      const visible = useArticleStore.getState().articles;
+      expect(visible.map((a) => a.id)).toEqual(["new-star", "old-star"]);
+    });
+
+    it("selectArticle allows any feedId when selectedFeedId is STARRED_FEED_ID", async () => {
+      useFeedStore.setState({ selectedFeedId: STARRED_FEED_ID });
+      const articleFromAnyFeed = {
+        ...mockArticle("a1"),
+        feedId: "some-other-feed",
+        starred: true,
+      };
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().selectArticle(articleFromAnyFeed);
+
+      expect(useArticleStore.getState().selectedArticle?.feedId).toBe(
+        "some-other-feed",
+      );
     });
   });
 });

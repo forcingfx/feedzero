@@ -16,6 +16,15 @@ export const SCHEMA_VERSION = 1;
 export const ALL_FEEDS_ID = "all";
 
 /**
+ * Special feed ID for the cross-feed starred view. Selects every article
+ * whose `starred` flag is true, ordered by `starredAt` descending. Like
+ * ALL_FEEDS_ID and folder feeds, this is a virtual aggregated view —
+ * articles still belong to their real feed and inherit per-article
+ * provenance (favicon + feed title) in the article list.
+ */
+export const STARRED_FEED_ID = "starred";
+
+/**
  * Prefix applied to a folder id to form an aggregated "folder feed" id.
  * e.g. folder `abc-123` becomes the selected feed id `folder:abc-123`,
  * which represents the aggregated stream of every feed in that folder.
@@ -39,14 +48,23 @@ export function fromFolderFeedId(feedId: string): string | null {
     : null;
 }
 
+/** Whether the given feed id is the starred-view virtual feed. */
+export function isStarredFeedId(feedId: string): boolean {
+  return feedId === STARRED_FEED_ID;
+}
+
 /**
  * Whether the given feed id represents an aggregated view across multiple
- * feeds (global "All items" or a folder feed). Used by components that
- * must show per-article provenance (feed title + favicon) when multiple
- * feeds are displayed together.
+ * feeds (global "All items", a folder feed, or the starred view). Used by
+ * components that must show per-article provenance (feed title + favicon)
+ * when multiple feeds are displayed together.
  */
 export function isAggregatedFeedId(feedId: string): boolean {
-  return feedId === ALL_FEEDS_ID || isFolderFeedId(feedId);
+  return (
+    feedId === ALL_FEEDS_ID ||
+    isFolderFeedId(feedId) ||
+    isStarredFeedId(feedId)
+  );
 }
 
 /**

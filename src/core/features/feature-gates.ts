@@ -25,6 +25,7 @@ export type Tier = LicenseTier;
 export type Feature =
   | "cloud-sync"
   | "auto-organize"
+  | "offline-prefetch"
   | "filters"
   | "mute-keywords"
   | "search"
@@ -44,6 +45,7 @@ export interface FeatureSpec {
 export const FEATURE_MAP: Record<Feature, FeatureSpec> = {
   "cloud-sync":             { requiredTier: "personal", status: "shipped" },
   "auto-organize":          { requiredTier: "personal", status: "shipped" },
+  "offline-prefetch":       { requiredTier: "personal", status: "shipped" },
   "filters":                { requiredTier: "personal", status: "coming-soon" },
   "mute-keywords":          { requiredTier: "personal", status: "coming-soon" },
   "search":                 { requiredTier: "pro",      status: "coming-soon" },

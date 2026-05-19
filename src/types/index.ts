@@ -35,6 +35,18 @@ export interface Article {
   publishedAt: number;
   read: boolean;
   createdAt: number;
+  /** User has flagged this article as worth keeping. Drives the starred view. */
+  starred?: boolean;
+  /** Unix epoch ms of the most recent star action; used to sort the starred view. */
+  starredAt?: number;
+  /**
+   * Sanitized full-text HTML extracted from `link` and persisted for offline
+   * reading. Populated by the background prefetch service for starred
+   * articles; rides through the encrypted vault to other devices.
+   */
+  extractedContent?: string;
+  /** Unix epoch ms when extractedContent was captured. */
+  extractedAt?: number;
 }
 
 export interface CreateFeedInput {
