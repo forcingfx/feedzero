@@ -97,7 +97,7 @@ test.describe("Sync", () => {
     await page.waitForURL(/\/settings/, { timeout: 5000 });
   });
 
-  test("delete all data: confirm → resets to All items article list", async ({
+  test("delete all data: confirm → resets to Explore catalog", async ({
     feedPage: page,
   }) => {
     await addFeedForSync(page);
@@ -113,8 +113,9 @@ test.describe("Sync", () => {
     ).toBeVisible({ timeout: 5000 });
     await confirm.getByRole("button", { name: /delete everything/i }).click();
 
-    // After reset: auto-init lands the user on /feeds/all (the post-reset
-    // default).
-    await page.waitForURL(/\/feeds\/all/, { timeout: 15000 });
+    // After reset the DB is empty; feedPage's release-auto-subscribe block
+    // keeps it that way, so the redirect lands the user on /explore (the
+    // 0–1 feed default per feeds-page.tsx).
+    await page.waitForURL(/\/explore/, { timeout: 15000 });
   });
 });
