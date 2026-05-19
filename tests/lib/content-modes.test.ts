@@ -5,10 +5,10 @@ import {
   getAvailableModes,
   hasSummarySubheading,
   isExtractionMeaningful,
-} from "../../../src/lib/content-modes.ts";
+} from "../../src/lib/content-modes.ts";
 
 /** Generate a string with exactly `n` words, starting from offset `from` to avoid prefix overlap. */
-function words(n, from = 0) {
+function words(n: number, from = 0): string {
   return Array.from({ length: n }, (_, i) => `word${from + i}`).join(" ");
 }
 
@@ -21,8 +21,8 @@ describe("content-modes", () => {
     });
 
     it("should return empty string for null/undefined", () => {
-      expect(stripHtml(null)).toBe("");
-      expect(stripHtml(undefined)).toBe("");
+      expect(stripHtml(null as unknown as string)).toBe("");
+      expect(stripHtml(undefined as unknown as string)).toBe("");
       expect(stripHtml("")).toBe("");
     });
 
@@ -177,12 +177,16 @@ describe("content-modes", () => {
 
     it("should return false when summary is empty", () => {
       expect(hasSummarySubheading("<p>Some content</p>", "")).toBe(false);
-      expect(hasSummarySubheading("<p>Some content</p>", null)).toBe(false);
+      expect(
+        hasSummarySubheading("<p>Some content</p>", null as unknown as string),
+      ).toBe(false);
     });
 
     it("should return false when content is empty", () => {
       expect(hasSummarySubheading("", "A summary")).toBe(false);
-      expect(hasSummarySubheading(null, "A summary")).toBe(false);
+      expect(hasSummarySubheading(null as unknown as string, "A summary")).toBe(
+        false,
+      );
     });
   });
 

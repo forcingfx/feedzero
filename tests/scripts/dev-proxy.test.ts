@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Readable } from "node:stream";
-import { toWebRequest } from "../vite-dev-proxy.js";
+import { toWebRequest } from "../../scripts/dev-proxy.js";
 
 /**
  * Minimal IncomingMessage stand-in: a Readable stream that yields the body
