@@ -14,6 +14,34 @@ export async function skipOnboarding(page: Page) {
 }
 
 /**
+ * Block the first-launch release-notes auto-subscribe so a fresh DB stays
+ * empty by default. Must be registered BEFORE navigation so the auto-subscribe
+ * POST /api/feed (body {"url":"https://feedzero.app/releases.xml"}) is
+ * intercepted before it races past us to the dev-server proxy.
+ *
+ * Tests that explicitly mock /api/feed via `mockFeedEndpoint` add their own
+ * route that also 404s the release-notes URL — those overlay this one and
+ * still work correctly. Tests that need the auto-subscribe to succeed (e.g.
+ * release-feed.spec.ts) opt out by not using the feedPage fixture.
+ */
+export async function blockReleaseAutoSubscribe(page: Page) {
+  await page.route("**/api/feed*", async (route) => {
+    let targetUrl = "";
+    try {
+      const body = route.request().postData();
+      if (body) targetUrl = JSON.parse(body)?.url ?? "";
+    } catch {
+      /* fall through to fallback */
+    }
+    if (targetUrl.includes("releases.xml")) {
+      await route.fulfill({ status: 404, body: "release-notes blocked in test" });
+      return;
+    }
+    await route.fallback();
+  });
+}
+
+/**
  * Adds a feed via the Explore page search input.
  * Navigates to /explore, pastes the URL, and submits.
  */
@@ -64,6 +92,7 @@ export async function selectFeedInSidebar(page: Page, feedName: string) {
 export const test = base.extend<{ feedPage: Page }>({
   feedPage: async ({ page }, use) => {
     await skipOnboarding(page);
+    await blockReleaseAutoSubscribe(page);
     await page.goto("/feeds");
     await page.waitForFunction(
       () => !document.body.textContent?.includes("Loading"),
