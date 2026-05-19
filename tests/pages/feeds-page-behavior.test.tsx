@@ -2,12 +2,32 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from "react-router";
-import { FeedsPage } from "@/pages/feeds-page.tsx";
+import { lazy, Suspense } from "react";
+import { AppLayout } from "@/pages/app-layout.tsx";
+import { FeedsRoute } from "@/pages/feeds-route.tsx";
+import { StageView } from "@/pages/stage-view.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, clearArticleCache } from "@/stores/article-store.ts";
 import * as db from "@/core/storage/db.ts";
 import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
 import type { Article, Feed } from "@/types/index.ts";
+
+const ExploreCatalog = lazy(() =>
+  import("@/components/explore/explore-catalog.tsx").then((m) => ({
+    default: m.ExploreCatalog,
+  })),
+);
+
+function ExploreRoute() {
+  const navigate = useNavigate();
+  return (
+    <StageView>
+      <Suspense>
+        <ExploreCatalog onFeedAdded={(id) => navigate(`/feeds/${id}`)} />
+      </Suspense>
+    </StageView>
+  );
+}
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -93,41 +113,21 @@ function renderPage(route = "/feeds") {
     <MemoryRouter initialEntries={[route]}>
       <Routes>
         <Route
-          path="/feeds"
           element={
             <>
-              <FeedsPage />
+              <AppLayout />
               <LocationCapture />
             </>
           }
-        />
-        <Route
-          path="/feeds/:feedId"
-          element={
-            <>
-              <FeedsPage />
-              <LocationCapture />
-            </>
-          }
-        />
-        <Route
-          path="/feeds/:feedId/articles/:articleId"
-          element={
-            <>
-              <FeedsPage />
-              <LocationCapture />
-            </>
-          }
-        />
-        <Route
-          path="/explore"
-          element={
-            <>
-              <FeedsPage />
-              <LocationCapture />
-            </>
-          }
-        />
+        >
+          <Route path="/feeds" element={<FeedsRoute />} />
+          <Route path="/feeds/:feedId" element={<FeedsRoute />} />
+          <Route
+            path="/feeds/:feedId/articles/:articleId"
+            element={<FeedsRoute />}
+          />
+          <Route path="/explore" element={<ExploreRoute />} />
+        </Route>
       </Routes>
     </MemoryRouter>,
   );
@@ -501,14 +501,18 @@ describe("FeedsPage behavior — mobile", () => {
         <NavigateButton to="/feeds/feed-1/articles/art-2" label="next" />
         <Routes>
           <Route
-            path="/feeds/:feedId/articles/:articleId"
             element={
               <>
-                <FeedsPage />
+                <AppLayout />
                 <LocationCapture />
               </>
             }
-          />
+          >
+            <Route
+              path="/feeds/:feedId/articles/:articleId"
+              element={<FeedsRoute />}
+            />
+          </Route>
         </Routes>
       </MemoryRouter>,
     );
@@ -592,8 +596,10 @@ describe("FeedsPage behavior — mobile", () => {
       <MemoryRouter initialEntries={["/feeds/feed-1/articles/art-1"]}>
         <NavigateButton to="/feeds/feed-2" label="go-feed-2" />
         <Routes>
-          <Route path="/feeds/:feedId" element={<FeedsPage />} />
-          <Route path="/feeds/:feedId/articles/:articleId" element={<FeedsPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/feeds/:feedId" element={<FeedsRoute />} />
+            <Route path="/feeds/:feedId/articles/:articleId" element={<FeedsRoute />} />
+          </Route>
         </Routes>
       </MemoryRouter>
     );
