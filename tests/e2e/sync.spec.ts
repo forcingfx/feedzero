@@ -97,7 +97,7 @@ test.describe("Sync", () => {
     await page.waitForURL(/\/settings/, { timeout: 5000 });
   });
 
-  test("delete all data: confirm → resets to Explore catalog", async ({
+  test("delete all data: confirm closes the dialog and clears feeds", async ({
     feedPage: page,
   }) => {
     await addFeedForSync(page);
@@ -113,9 +113,12 @@ test.describe("Sync", () => {
     ).toBeVisible({ timeout: 5000 });
     await confirm.getByRole("button", { name: /delete everything/i }).click();
 
-    // After reset the DB is empty; feedPage's release-auto-subscribe block
-    // keeps it that way, so the redirect lands the user on /explore (the
-    // 0–1 feed default per feeds-page.tsx).
-    await page.waitForURL(/\/explore/, { timeout: 15000 });
+    // resetApp() doesn't navigate — it just clears the DB and re-onboards
+    // silently. The deterministic post-reset signal is the dialog closing,
+    // and the previously-added Test Feed no longer appearing in the sidebar.
+    await expect(confirm).toBeHidden({ timeout: 15000 });
+    await expect(
+      page.locator('[data-sidebar="menu-button"]', { hasText: "Test Feed" }),
+    ).toHaveCount(0, { timeout: 5000 });
   });
 });
