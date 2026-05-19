@@ -73,17 +73,30 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const unfiledFeeds = useMemo(() => feeds.filter((f) => !f.folderId), [feeds]);
+  const unfiledFeeds = useMemo(() => {
+    // Defensive: feeds whose folderId points at a folder that isn't on
+    // this device fall through to "unfiled" instead of disappearing.
+    // Two cases hit this in practice:
+    //   1. A v1 cloud vault (pre-ADR-019) restored on a v2 client —
+    //      feeds arrived with folderIds, folders did not.
+    //   2. Any future drift between feeds.folderId and folders[].id.
+    // See findOrphanedFeeds() for the matching Settings indicator.
+    const folderIds = new Set(folders.map((f) => f.id));
+    return feeds.filter(
+      (f) => !f.folderId || !folderIds.has(f.folderId),
+    );
+  }, [feeds, folders]);
   const feedsByFolder = useMemo(() => {
+    const folderIds = new Set(folders.map((f) => f.id));
     const map = new Map<string, Feed[]>();
     for (const feed of feeds) {
-      if (!feed.folderId) continue;
+      if (!feed.folderId || !folderIds.has(feed.folderId)) continue;
       const list = map.get(feed.folderId);
       if (list) list.push(feed);
       else map.set(feed.folderId, [feed]);
     }
     return map;
-  }, [feeds]);
+  }, [feeds, folders]);
 
   const sortedUnfiledFeeds = useMemo(() => {
     if (feedSortMode === "count") {

@@ -97,6 +97,30 @@ describe("SidebarFeedList", () => {
     expect(screen.getByText("Tech")).toBeInTheDocument();
   });
 
+  it("falls back to unfiled when a feed's folderId points at a missing folder", () => {
+    // Regression: device A organised feeds into a "Tech" folder and
+    // pushed a v1 cloud vault (feeds only, no folders — pre-ADR-019).
+    // Device B pulled — feeds arrived with folderId="folder-1" but
+    // folders[] is empty on this device. The sidebar previously dropped
+    // those feeds from the render entirely because no Folder row
+    // anchored the "Tech" section. Now they fall through to unfiled so
+    // the user never has invisible feeds, even when sync is in a
+    // half-applied state.
+    useFeedStore.setState({
+      feeds: [
+        mockFeed("f1", "Unfiled Feed"),
+        mockFeed("f2", "Orphaned Feed", "missing-folder"),
+      ],
+      folders: [], // <- missing-folder doesn't exist locally
+      selectedFeedId: null,
+    });
+
+    renderList();
+
+    expect(screen.getByText("Unfiled Feed")).toBeInTheDocument();
+    expect(screen.getByText("Orphaned Feed")).toBeInTheDocument();
+  });
+
   it("shows New folder button", () => {
     useFeedStore.setState({ feeds: [mockFeed("f1", "Feed")], folders: [], selectedFeedId: null });
 

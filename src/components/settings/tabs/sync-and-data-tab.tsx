@@ -12,11 +12,17 @@
 import { DataSyncSection } from "@/components/settings/data-sync-section";
 import { ImportView } from "@/components/settings/import-view";
 import { ExportView } from "@/components/settings/export-view";
+import { OrphanedFeedsNotice } from "@/components/settings/orphaned-feeds-notice";
 
 export function SyncAndDataTab() {
   return (
     <div className="space-y-4 py-2">
       <DataSyncSection />
+
+      {/* Only renders when feed.folderId references a missing folder.
+          Invisible on the common path; surfaces during half-applied
+          sync states so users aren't confused by "missing" feeds. */}
+      <OrphanedFeedsNotice />
 
       <div className="grid gap-4 md:grid-cols-2">
         <ImportExportCard title="Import">
