@@ -1,0 +1,56 @@
+# FeedZero — minimal self-host stack.
+#
+# Two services:
+#   feedzero — the SPA + Hono server on :3000 (no TLS)
+#   caddy    — TLS terminator on :443, forwarding to feedzero
+#
+# Why Caddy: Web Crypto requires a secure context. Loading the app over
+# plain http://<lan-ip>:3000 from another device refuses to start.
+# Caddy ships free TLS via Let's Encrypt out of the box; configure the
+# Caddyfile with your domain.
+#
+# Usage:
+#   1. Edit Caddyfile to point at your domain.
+#   2. docker compose up -d
+#   3. Visit https://<your-domain>
+#
+# Sync vaults persist under ./data/vaults. Back it up.
+
+services:
+  feedzero:
+    build:
+      context: .
+      args:
+        NODE_VERSION: 22-alpine
+    container_name: feedzero
+    restart: unless-stopped
+    environment:
+      # Self-hosting master switch (runtime mirror of the build flag).
+      SELF_HOSTED: "1"
+      # Filesystem sync adapter — vaults under /data/vaults in the container.
+      SYNC_STORAGE: filesystem
+      SYNC_FILESYSTEM_DIR: /data/vaults
+      PORT: "3000"
+    volumes:
+      - ./data:/data
+    # No host port published — Caddy reaches it on the internal network.
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: feedzero-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - feedzero
+
+volumes:
+  caddy-data:
+  caddy-config:

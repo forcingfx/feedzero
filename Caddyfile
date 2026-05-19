@@ -1,0 +1,16 @@
+# Replace `feedzero.example.com` with the hostname FeedZero will live at.
+# Caddy fetches a Let's Encrypt cert automatically on first start.
+#
+# For a LAN-only deployment with no public hostname, swap this for the
+# `:443` block at the bottom (commented out) and trust the self-signed
+# cert Caddy generates.
+
+feedzero.example.com {
+    reverse_proxy feedzero:3000
+}
+
+# --- LAN-only alternative (uncomment + comment out the block above) ---
+# :443 {
+#     tls internal
+#     reverse_proxy feedzero:3000
+# }

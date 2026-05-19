@@ -98,6 +98,25 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 Self-hosting is a first-class deployment. One master switch, one preflight,
 and a reverse proxy with TLS is everything you need.
 
+### Docker (recommended)
+
+```bash
+git clone https://github.com/forcingfx/feedzero.git
+cd feedzero
+# Edit Caddyfile and change `feedzero.example.com` to your hostname
+docker compose up -d
+```
+
+That's it. `docker-compose.yml` provisions FeedZero on an internal
+network and a Caddy sidecar that terminates TLS via Let's Encrypt for
+your public hostname. Vault data persists under `./data` — back that
+directory up. For a LAN-only deployment with a self-signed cert, see
+the commented `:443 { tls internal }` block in the `Caddyfile`.
+
+### Bare metal
+
+If you'd rather run Node directly:
+
 ```bash
 git clone https://github.com/forcingfx/feedzero.git
 cd feedzero
