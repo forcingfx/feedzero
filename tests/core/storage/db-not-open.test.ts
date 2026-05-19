@@ -190,7 +190,7 @@ describe("db functions return err when DB is not open", () => {
   });
 
   it("importAll returns err when DB not open", async () => {
-    const result = await importAll([], []);
+    const result = await importAll({ feeds: [], articles: [] });
     expect(isErr(result)).toBe(true);
     if (!result.ok) {
       expect(result.error).toMatch(/Failed to import data/);

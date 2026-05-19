@@ -192,5 +192,5 @@ export const SYNC = {
   /** Maximum vault payload size in bytes (5 MB). */
   MAX_VAULT_SIZE: 5 * 1024 * 1024,
   /** Sync data format version for forward compatibility. */
-  FORMAT_VERSION: 1,
+  FORMAT_VERSION: 2,
 } as const;

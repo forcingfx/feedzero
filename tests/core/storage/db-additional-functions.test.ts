@@ -345,7 +345,10 @@ describe("db: additional function coverage", () => {
       // Clear via empty import
       const emptyFeeds: Feed[] = [];
       const emptyArticles: Article[] = [];
-      const result = await importAll(emptyFeeds, emptyArticles);
+      const result = await importAll({
+        feeds: emptyFeeds,
+        articles: emptyArticles,
+      });
       expect(isOk(result)).toBe(true);
 
       expect(unwrap(await getFeeds())).toEqual([]);

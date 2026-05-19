@@ -427,60 +427,112 @@ export async function getArticleByGuid(
 }
 
 /**
- * Export all feeds and articles (decrypted) for vault sync.
- * Uses getAllArticles() for a single bulk query instead of per-feed queries.
+ * Export all user data (feeds, articles, folders, smartFilters) for
+ * vault sync. Single bulk query per table.
  */
 export async function exportAll(): Promise<
-  Result<{ feeds: Feed[]; articles: Article[] }>
+  Result<{
+    feeds: Feed[];
+    articles: Article[];
+    folders: Folder[];
+    smartFilters: SmartFilter[];
+  }>
 > {
   try {
-    const feedsResult = await getFeeds();
+    const [feedsResult, articlesResult, foldersResult, filtersResult] =
+      await Promise.all([
+        getFeeds(),
+        getAllArticles(),
+        getFolders(),
+        getSmartFilters(),
+      ]);
     if (!feedsResult.ok) return feedsResult;
-
-    const articlesResult = await getAllArticles();
     if (!articlesResult.ok) return articlesResult;
+    if (!foldersResult.ok) return foldersResult;
+    if (!filtersResult.ok) return filtersResult;
 
-    return ok({ feeds: feedsResult.value, articles: articlesResult.value });
+    return ok({
+      feeds: feedsResult.value,
+      articles: articlesResult.value,
+      folders: foldersResult.value,
+      smartFilters: filtersResult.value,
+    });
   } catch (e) {
     return err(`Failed to export data: ${(e as Error).message}`);
   }
 }
 
+export interface ImportAllInput {
+  feeds: Feed[];
+  articles: Article[];
+  /** Omit (undefined) to leave the folders table untouched. */
+  folders?: Folder[];
+  /** Omit (undefined) to leave the smartFilters table untouched. */
+  smartFilters?: SmartFilter[];
+}
+
 /**
- * Clear all feeds and articles, then import the provided data.
+ * Clear and replace the provided tables atomically.
+ *
+ * Each table is included in the transaction (and gets clear + bulkPut)
+ * ONLY when the corresponding field is present in `input`. An omitted
+ * field means "the source vault has no opinion on this table" — the
+ * row data is left alone. This back-compat rule keeps a pre-v2 client's
+ * push from silently wiping a v2 client's folders / smartFilters.
+ *
+ * An explicit empty array (`[]`) IS an opinion ("the source has zero
+ * rows") and clears the table; this is the distinction that makes the
+ * undefined-vs-empty contract observable.
+ *
  * Atomic: clear+bulkPut runs inside a single Dexie rw transaction so
  * concurrent callers (e.g. a strict-mode double-fired sync pull or a
  * boot-time refreshAll racing with initializeReturningUser) serialize
  * at the storage layer. Without the transaction, interleaved clear and
  * bulkPut sequences leave an observable window where the tables look
- * empty — which is the bug reproduced by tests/e2e/sync-100-feeds.spec.ts.
+ * empty — the bug reproduced by tests/e2e/sync-100-feeds.spec.ts.
  *
  * Encryption happens BEFORE the transaction: Dexie's transactional zone
  * only allows awaits on Dexie operations, so awaiting Web Crypto inside
  * would render the transaction inactive.
  */
 export async function importAll(
-  feeds: Feed[],
-  articles: Article[],
+  input: ImportAllInput,
 ): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
 
-    const [feedRecords, articleRecords] = await Promise.all([
-      encryptRecords(feeds),
-      encryptRecords(articles),
-    ]);
+    // Encrypt every batch up front; the rw transaction can only await
+    // Dexie operations, never Web Crypto.
+    const [feedRecords, articleRecords, folderRecords, filterRecords] =
+      await Promise.all([
+        encryptRecords(input.feeds),
+        encryptRecords(input.articles),
+        input.folders !== undefined
+          ? encryptRecords(input.folders)
+          : Promise.resolve(undefined),
+        input.smartFilters !== undefined
+          ? encryptRecords(input.smartFilters)
+          : Promise.resolve(undefined),
+      ]);
 
-    await ctx.db.transaction(
-      "rw",
-      [ctx.db.table("feeds"), ctx.db.table("articles")],
-      async () => {
-        await ctx.db.table("feeds").clear();
-        await ctx.db.table("articles").clear();
-        await ctx.db.table("feeds").bulkPut(feedRecords);
-        await ctx.db.table("articles").bulkPut(articleRecords);
-      },
-    );
+    const tables = [ctx.db.table("feeds"), ctx.db.table("articles")];
+    if (folderRecords !== undefined) tables.push(ctx.db.table("folders"));
+    if (filterRecords !== undefined) tables.push(ctx.db.table("smartFilters"));
+
+    await ctx.db.transaction("rw", tables, async () => {
+      await ctx.db.table("feeds").clear();
+      await ctx.db.table("articles").clear();
+      await ctx.db.table("feeds").bulkPut(feedRecords);
+      await ctx.db.table("articles").bulkPut(articleRecords);
+      if (folderRecords !== undefined) {
+        await ctx.db.table("folders").clear();
+        await ctx.db.table("folders").bulkPut(folderRecords);
+      }
+      if (filterRecords !== undefined) {
+        await ctx.db.table("smartFilters").clear();
+        await ctx.db.table("smartFilters").bulkPut(filterRecords);
+      }
+    });
 
     return ok(true);
   } catch (e) {
