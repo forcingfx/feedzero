@@ -134,18 +134,27 @@ describe("AppSidebar Filters section", () => {
     expect(state.editorTarget).toBeNull();
   });
 
-  it("hides the entire Filters section for free users (gate-locked)", () => {
+  it("shows the Filters section to free users so the feature is discoverable", () => {
+    // Honor-system open-core: gated features stay visible. Clicking routes
+    // to the upgrade page rather than hiding the section. See the
+    // 'route-to-upgrade' test below for the click behaviour.
     useLicenseStore.setState({ tier: "free", verifying: false });
-    useSmartFilterStore.setState({
-      filters: [filter("a", "Tech AI")],
-    });
 
     renderSidebar();
 
-    // Section header + rows all absent
-    expect(screen.queryByTestId("sidebar-new-filter")).toBeNull();
-    expect(screen.queryAllByTestId("sidebar-smart-filter-item")).toHaveLength(
-      0,
-    );
+    expect(screen.getByTestId("sidebar-new-filter")).toBeInTheDocument();
+  });
+
+  it("clicking 'New filter' as a free user routes to the upgrade page instead of opening the editor", async () => {
+    useLicenseStore.setState({ tier: "free", verifying: false });
+
+    renderSidebar();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("sidebar-new-filter"));
+
+    // Editor MUST NOT open for gate-locked users — that would let them
+    // build a filter they can never save, an upsell anti-pattern.
+    expect(useSmartFilterStore.getState().editorOpen).toBe(false);
   });
 });

@@ -50,17 +50,22 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
     list.some((a) => a.starred),
   );
 
-  // Filters section is gated. Free users don't see it at all — keeps
-  // the empty state honest and avoids the "upgrade to unlock"
-  // clutter pattern.
-  const showFiltersSection = filtersGate.enabled;
-
   function handleExplore() {
     onBeforeNavigate?.();
     navigate("/explore");
   }
 
+  // Honor-system open-core: the Filters section stays visible to free
+  // users so the feature is discoverable. Clicking "New filter" while
+  // gate-locked routes to the Subscription tab instead of opening an
+  // editor the user can't save from. Self-hosters and the pre-launch
+  // build relax the gate at `feature-gates.ts` and reach `openEditor`
+  // directly. See ADR 012 for the wider pattern.
   function handleCreateFilter() {
+    if (!filtersGate.enabled) {
+      filtersGate.promptUpgrade();
+      return;
+    }
     openFilterEditor(null);
   }
 
@@ -101,30 +106,30 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
-          {showFiltersSection && (
-            <>
-              <SidebarSeparator className="mx-0 my-1" />
-              <SidebarMenuItem key="filters-header">
-                <SidebarMenuButton
-                  onClick={handleCreateFilter}
-                  tooltip="New smart filter"
-                  data-testid="sidebar-new-filter"
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Plus className="size-4" />
-                  <span>New filter</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              {smartFilters.map((filter) => (
-                <SmartFilterItem
-                  key={filter.id}
-                  filter={filter}
-                  isSelected={selectedFeedId === toFilterFeedId(filter.id)}
-                  onSelect={() => onFeedSelect(toFilterFeedId(filter.id))}
-                />
-              ))}
-            </>
-          )}
+          <SidebarSeparator className="mx-0 my-1" />
+          <SidebarMenuItem key="filters-header">
+            <SidebarMenuButton
+              onClick={handleCreateFilter}
+              tooltip={
+                filtersGate.enabled
+                  ? "New smart filter"
+                  : "Smart filters — upgrade to Personal"
+              }
+              data-testid="sidebar-new-filter"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Plus className="size-4" />
+              <span>New filter</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          {smartFilters.map((filter) => (
+            <SmartFilterItem
+              key={filter.id}
+              filter={filter}
+              isSelected={selectedFeedId === toFilterFeedId(filter.id)}
+              onSelect={() => onFeedSelect(toFilterFeedId(filter.id))}
+            />
+          ))}
           <SidebarSeparator className="mx-0 my-1" />
           <SidebarFeedList onFeedSelect={onFeedSelect} />
         </>

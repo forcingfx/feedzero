@@ -1,7 +1,9 @@
 import { useState, useRef, useId } from "react";
+import { useNavigate } from "react-router";
 import { Eye, Plus, Minus } from "lucide-react";
 import { toast } from "sonner";
 import { findSubscribedFeed } from "@/lib/feed-catalog.ts";
+import { upgradeToast } from "@/lib/upgrade-toast.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { FeedPreviewSheet } from "@/components/explore/feed-preview-sheet.tsx";
@@ -45,6 +47,7 @@ export function FeedRow({
   const [previewOpen, setPreviewOpen] = useState(false);
   const addFeed = useFeedStore((s) => s.addFeed);
   const removeFeed = useFeedStore((s) => s.removeFeed);
+  const navigate = useNavigate();
   const added = subscribed || justAdded;
 
   async function handleAdd() {
@@ -54,6 +57,8 @@ export function FeedRow({
     if (result.ok) {
       setJustAdded(true);
       toast.success(`Added ${name}`);
+    } else if (result.reason === "free-quota-exceeded") {
+      upgradeToast(result.error, navigate);
     } else {
       toast.error(`Failed to add ${name}`);
     }
