@@ -7,6 +7,7 @@ import { useSyncStore } from "@/stores/sync-store.ts";
 import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
+import { SmartFilterEditorDialog } from "@/components/smart-filters/smart-filter-editor-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -263,6 +264,7 @@ export function App() {
             have router context. */}
         <SyncMigrationDialog />
         <DeviceSetupWizard />
+        <SmartFilterEditorDialog />
         <Toaster position="bottom-center" />
       </BrowserRouter>
       <SpeedInsights />
