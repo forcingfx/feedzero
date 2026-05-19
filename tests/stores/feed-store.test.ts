@@ -47,6 +47,14 @@ vi.mock("../../src/core/feeds/feed-service.ts", () => ({
   addFeedFlow: vi.fn(),
   refreshFeed: vi.fn(),
   refreshAllFeeds: vi.fn(),
+  reloadFeed: vi.fn(),
+}));
+
+vi.mock("../../src/core/extractor/prefetch-service.ts", () => ({
+  prefetchStarredArticles: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { extracted: 0, failed: 0 },
+  }),
 }));
 
 vi.mock("../../src/core/sync/sync-service", () => ({
@@ -61,6 +69,7 @@ import {
   refreshFeed,
   refreshAllFeeds,
 } from "../../src/core/feeds/feed-service.ts";
+import { prefetchStarredArticles } from "../../src/core/extractor/prefetch-service.ts";
 
 const mockFeed = (id: string, title: string) => ({
   id,
@@ -416,6 +425,32 @@ describe("feed-store", () => {
       await Promise.all([p1, p2]);
 
       expect(refreshAllFeeds).toHaveBeenCalledTimes(1);
+    });
+
+    it("kicks off background prefetch when the offline-prefetch gate is open", async () => {
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(prefetchStarredArticles).toHaveBeenCalled();
+    });
+
+    it("does not kick off background prefetch when the user is gate-locked", async () => {
+      // Free user, paid tier active → tier-locked for offline-prefetch.
+      useLicenseStore.setState({ tier: "free", verifying: false });
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(prefetchStarredArticles).not.toHaveBeenCalled();
     });
   });
 

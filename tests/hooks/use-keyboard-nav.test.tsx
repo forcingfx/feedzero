@@ -16,12 +16,23 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   updateArticle: vi.fn().mockResolvedValue({ ok: true, value: true }),
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 vi.mock("@/core/extractor/extractor.ts", () => ({
   extract: vi.fn(),
+}));
+
+// The 'r' shortcut triggers refreshAll → schedulePrefetch. Stub the
+// service so the fire-and-forget call doesn't leak network attempts into
+// other tests' time budget.
+vi.mock("@/core/extractor/prefetch-service.ts", () => ({
+  prefetchStarredArticles: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: { extracted: 0, failed: 0 } }),
 }));
 
 function createListbox(itemCount: number, selectedIndex = -1): HTMLElement {

@@ -1,7 +1,8 @@
 import { useNavigate, useLocation } from "react-router";
-import { Compass, Layers } from "lucide-react";
+import { Compass, Layers, Star } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { useArticleStore } from "@/stores/article-store.ts";
+import { ALL_FEEDS_ID, STARRED_FEED_ID } from "@/utils/constants.ts";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -28,7 +29,16 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
   const { pathname } = useLocation();
   const feeds = useFeedStore((s) => s.feeds);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
+  const articlesByFeedId = useArticleStore((s) => s.articlesByFeedId);
   const isExplorePage = pathname === "/explore";
+
+  // Show "Starred" once the user has actually starred something; before
+  // that, the entry would land on an empty view and feels like clutter.
+  // The article-store buckets are the source of truth, so the entry
+  // appears as soon as toggleStar runs — no extra plumbing required.
+  const hasStarredArticles = Object.values(articlesByFeedId).some((list) =>
+    list.some((a) => a.starred),
+  );
 
   function handleExplore() {
     onBeforeNavigate?.();
@@ -59,6 +69,19 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
               <span>All items</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {hasStarredArticles && (
+            <SidebarMenuItem key="starred">
+              <SidebarMenuButton
+                isActive={selectedFeedId === STARRED_FEED_ID}
+                onClick={() => onFeedSelect(STARRED_FEED_ID)}
+                tooltip="Starred"
+                data-testid="sidebar-starred-link"
+              >
+                <Star className="size-4 text-amber-500" />
+                <span>Starred</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarSeparator className="mx-0 my-1" />
           <SidebarFeedList onFeedSelect={onFeedSelect} />
         </>
