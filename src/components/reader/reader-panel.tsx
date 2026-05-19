@@ -280,38 +280,17 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                 </TooltipContent>
               </Tooltip>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-testid="star-toggle"
-                  type="button"
-                  onClick={() => toggleStar(article!.id)}
-                  aria-label={article.starred ? "Remove star" : "Star article"}
-                  aria-pressed={Boolean(article.starred)}
-                  className={cn(
-                    "inline-flex items-center transition-colors",
-                    article.starred
-                      ? "text-amber-500 hover:text-amber-600"
-                      : "text-muted-foreground/60 hover:text-muted-foreground",
-                  )}
-                >
-                  <Star
-                    className={cn(
-                      "size-3.5",
-                      article.starred && "fill-current",
-                    )}
-                  />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {article.starred ? "Unstar" : "Star"} <Kbd className="ml-1">s</Kbd>
-              </TooltipContent>
-            </Tooltip>
           </div>
         </header>
 
-        {/* Compact pill segmented control — own line, no ToggleGroup ARIA role */}
-        <div className="flex items-center mb-3">
+        {/* Action row: pill segmented control + star toggle.
+            Kept on one inline row (no flex-wrap) so on mobile the star
+            never drops onto a second line — the previous mobile flake.
+            Star matches pill height (h-7) for thumb-tap target parity. */}
+        <div
+          data-testid="reader-action-row"
+          className="flex items-center gap-2 mb-3"
+        >
           <div className="flex rounded-full border border-border text-xs overflow-hidden">
             <button
               onClick={() => handleModeChange("feed")}
@@ -352,6 +331,33 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
               </TooltipContent>
             </Tooltip>
           </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                data-testid="star-toggle"
+                type="button"
+                onClick={() => toggleStar(article!.id)}
+                aria-label={article.starred ? "Remove star" : "Star article"}
+                aria-pressed={Boolean(article.starred)}
+                className={cn(
+                  "inline-flex items-center justify-center h-7 w-7 rounded-full border border-border transition-colors",
+                  article.starred
+                    ? "text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+                    : "text-muted-foreground/70 hover:text-foreground hover:bg-accent",
+                )}
+              >
+                <Star
+                  className={cn(
+                    "size-3.5",
+                    article.starred && "fill-current",
+                  )}
+                />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {article.starred ? "Unstar" : "Star"} <Kbd className="ml-1">s</Kbd>
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {viewMode === "extracted" && extractionStatus === "extracting" ? (

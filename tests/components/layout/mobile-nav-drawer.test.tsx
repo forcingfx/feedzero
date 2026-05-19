@@ -137,10 +137,13 @@ describe("MobileNavDrawer", () => {
     });
     const sidebarWrapper = wrapper.querySelector("[data-slot='sidebar-wrapper']");
     expect(sidebarWrapper).not.toBeNull();
-    // SidebarProvider's default is `flex min-h-svh w-full` (row layout) — must be overridden
-    // inside the drawer so settings + feed-list stack vertically instead of side by side.
-    expect(sidebarWrapper!.className).not.toContain("flex ");
-    expect(sidebarWrapper!.className).not.toMatch(/\bflex$/);
+    // SidebarProvider's default is `flex min-h-svh w-full` (row layout) —
+    // must be overridden inside the drawer so the scroll + the pinned
+    // Settings footer stack vertically. We allow `flex` here because the
+    // drawer needs `flex flex-col` to split the height between the
+    // scrollable area and the footer; the row default is denied by the
+    // explicit `flex-col` and by clearing `min-h-svh`.
+    expect(sidebarWrapper!.className).toContain("flex-col");
     expect(sidebarWrapper!.className).not.toContain("min-h-svh");
   });
 
@@ -182,18 +185,98 @@ describe("MobileNavDrawer", () => {
     const { container } = renderDrawer();
     await user.click(screen.getByRole("button", { name: "Open feed list" }));
 
-    const scroll = await waitFor(() => {
-      const s = container.ownerDocument.querySelector("[data-testid='drawer-scroll']");
-      if (!s) throw new Error("scroll not mounted");
-      return s;
+    const drawer = await waitFor(() => {
+      const d = container.ownerDocument.querySelector(
+        "[data-testid='drawer-content']",
+      );
+      if (!d) throw new Error("drawer not mounted");
+      return d;
     });
     // Both the feed nav body and the settings list must sit inside a wrapper
-    // with horizontal padding so the rows don't touch the screen edges.
-    const paddedSections = scroll.querySelectorAll("[data-testid='drawer-section']");
+    // with horizontal padding so the rows don't touch the screen edges. The
+    // feed-nav section lives inside the scrollable area; the settings row is
+    // pinned outside the scroll (fixed footer) so it's always reachable
+    // regardless of feed count.
+    const paddedSections = drawer.querySelectorAll(
+      "[data-testid='drawer-section']",
+    );
     expect(paddedSections.length).toBeGreaterThanOrEqual(2);
     for (const section of paddedSections) {
       expect(section.className).toMatch(/\bpx-\d/);
     }
+  });
+
+  it("Settings stays pinned outside the scroll container so it's reachable with many feeds", async () => {
+    // 2026-05-19 bug report: with a long feed list, the inner scroll
+    // wasn't reaching the Settings row at the bottom — vaul's snap-point
+    // mode intercepts vertical drags before the inner scroll can run
+    // them. Fixing the scroll is one half (remove snapPoints below);
+    // pinning Settings as a fixed drawer footer is the other half — even
+    // if scroll regresses again, Settings stays accessible. Belt and
+    // suspenders for the always-reachable invariant.
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: Array.from({ length: 50 }, (_, i) =>
+        makeFeed(`f${i}`, `Feed ${i}`),
+      ),
+    });
+    const { container } = renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+
+    const drawer = await waitFor(() => {
+      const d = container.ownerDocument.querySelector(
+        "[data-testid='drawer-content']",
+      );
+      if (!d) throw new Error("drawer not mounted");
+      return d;
+    });
+    const scroll = drawer.querySelector("[data-testid='drawer-scroll']");
+    const settingsBtn = await screen.findByRole("button", { name: "Settings" });
+
+    // The Settings button must not be a descendant of the scrollable area;
+    // it lives in the drawer's pinned footer alongside (but not inside)
+    // the scroll.
+    expect(scroll).not.toBeNull();
+    expect(scroll!.contains(settingsBtn)).toBe(false);
+    expect(drawer.contains(settingsBtn)).toBe(true);
+  });
+
+  it("'New folder' affordance also stays pinned outside the scroll so it's reachable with many feeds", async () => {
+    // Same always-reachable invariant as Settings: with a 50-feed list,
+    // a power user shouldn't have to scroll past every feed to reach
+    // folder management. NewFolderInput renders inside SidebarFeedList
+    // by default; the mobile drawer suppresses that and renders its own
+    // copy in the pinned footer.
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: Array.from({ length: 50 }, (_, i) =>
+        makeFeed(`f${i}`, `Feed ${i}`),
+      ),
+    });
+    const { container } = renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+
+    const drawer = await waitFor(() => {
+      const d = container.ownerDocument.querySelector(
+        "[data-testid='drawer-content']",
+      );
+      if (!d) throw new Error("drawer not mounted");
+      return d;
+    });
+    const scroll = drawer.querySelector("[data-testid='drawer-scroll']");
+
+    // The "New folder" entry-point button (collapsed state). Exactly one
+    // instance must render inside the drawer — duplication would mean
+    // SidebarFeedList wasn't told to suppress its copy.
+    const newFolderButtons = await screen.findAllByRole("button", {
+      name: "New folder",
+    });
+    expect(newFolderButtons).toHaveLength(1);
+    const newFolderBtn = newFolderButtons[0];
+
+    expect(scroll).not.toBeNull();
+    expect(scroll!.contains(newFolderBtn)).toBe(false);
+    expect(drawer.contains(newFolderBtn)).toBe(true);
   });
 
   it("drawer scroll container prevents horizontal scrolling", async () => {

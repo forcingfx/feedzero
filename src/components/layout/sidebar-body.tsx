@@ -23,6 +23,12 @@ interface SidebarBodyProps {
   /** Optional surface-specific action to run before navigating to /explore
    * (e.g. close the mobile drawer or the offcanvas sidebar). */
   onBeforeNavigate?: () => void;
+  /**
+   * Suppress the inline "New folder" affordance at the bottom of the
+   * feed list. The mobile drawer sets this so it can render its own
+   * always-reachable copy in the pinned footer.
+   */
+  hideNewFolderInput?: boolean;
 }
 
 /**
@@ -31,7 +37,11 @@ interface SidebarBodyProps {
  * and the full feed/folder list. Owning this in one place keeps the two
  * surfaces from drifting apart.
  */
-export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps) {
+export function SidebarBody({
+  onFeedSelect,
+  onBeforeNavigate,
+  hideNewFolderInput,
+}: SidebarBodyProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const feeds = useFeedStore((s) => s.feeds);
@@ -131,7 +141,10 @@ export function SidebarBody({ onFeedSelect, onBeforeNavigate }: SidebarBodyProps
             />
           ))}
           <SidebarSeparator className="mx-0 my-1" />
-          <SidebarFeedList onFeedSelect={onFeedSelect} />
+          <SidebarFeedList
+            onFeedSelect={onFeedSelect}
+            hideNewFolderInput={hideNewFolderInput}
+          />
         </>
       )}
     </SidebarMenu>

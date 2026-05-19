@@ -38,6 +38,13 @@ export const ArticleItem = memo(function ArticleItem({
     }
   }
 
+  // Star + favicon share a dedicated right-hand column so the title stays
+  // a single horizontal flow. Star is the prime top-right slot (always
+  // tappable area visually); when a favicon also renders (global / starred
+  // views), it moves to the bottom-right under the star. Empty column
+  // shouldn't render — it would steal gap from the title.
+  const showSide = article.starred || Boolean(feedSiteUrl);
+
   return (
     <li
       role="option"
@@ -46,7 +53,7 @@ export const ArticleItem = memo(function ArticleItem({
       data-id={article.id}
       onClick={() => onSelect(article)}
       onKeyDown={handleKeyDown}
-      className="pl-2 pr-3.5 py-2 border-b border-border border-l-2 border-l-transparent cursor-pointer hover:bg-accent aria-selected:bg-accent aria-selected:border-l-primary flex gap-4 transition-colors duration-150"
+      className="pl-2 pr-3.5 py-2 border-b border-border border-l-2 border-l-transparent cursor-pointer hover:bg-accent aria-selected:bg-accent aria-selected:border-l-primary flex gap-3 transition-colors duration-150"
     >
       <div className="min-w-0 flex-1 flex gap-2 items-start">
         <span
@@ -63,13 +70,6 @@ export const ArticleItem = memo(function ArticleItem({
             }
           >
             {decodeEntities(article.title)}
-            {article.starred && (
-              <Star
-                data-testid="article-star-indicator"
-                aria-label="Starred"
-                className="inline-block align-text-bottom ml-1.5 size-3 shrink-0 text-amber-500 fill-current"
-              />
-            )}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
             {feedTitle && (
@@ -80,8 +80,22 @@ export const ArticleItem = memo(function ArticleItem({
           </div>
         </div>
       </div>
-      {feedSiteUrl && (
-        <FeedFavicon siteUrl={feedSiteUrl} className="size-4 shrink-0" />
+      {showSide && (
+        <div
+          data-testid="article-item-side"
+          className="flex flex-col items-end justify-between shrink-0 py-0.5"
+        >
+          {article.starred && (
+            <Star
+              data-testid="article-star-indicator"
+              aria-label="Starred"
+              className="size-3.5 text-amber-500 fill-current"
+            />
+          )}
+          {feedSiteUrl && (
+            <FeedFavicon siteUrl={feedSiteUrl} className="size-4" />
+          )}
+        </div>
       )}
     </li>
   );

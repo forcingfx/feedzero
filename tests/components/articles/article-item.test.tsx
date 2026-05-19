@@ -228,4 +228,76 @@ describe("ArticleItem", () => {
       expect(container.querySelector("img")).not.toBeInTheDocument();
     });
   });
+
+  describe("star + favicon alignment (mobile-friendly)", () => {
+    it("renders the starred indicator in a dedicated side column, not inline in the title", () => {
+      // The old layout dropped the Star inline after the title with
+      // `align-text-bottom`, which looked floor-aligned on multi-line
+      // titles and disappeared into the wrap. The side column gives it
+      // a deterministic anchor (top-right) and unblocks the favicon
+      // moving to the bottom-right.
+      const { container } = render(
+        <ArticleItem
+          article={mockArticle({ starred: true })}
+          isSelected={false}
+          onSelect={() => {}}
+        />,
+      );
+
+      const star = screen.getByTestId("article-star-indicator");
+      const title = screen.getByText("Test Article");
+      expect(title.contains(star)).toBe(false);
+
+      const side = container.querySelector(
+        '[data-testid="article-item-side"]',
+      );
+      expect(side).not.toBeNull();
+      expect(side!.contains(star)).toBe(true);
+    });
+
+    it("when both starred and a favicon source are present, the favicon sits below the star", () => {
+      // Star takes the prime top-right slot; favicon moves to bottom-right
+      // when both render in the same side column.
+      const { container } = render(
+        <ArticleItem
+          article={mockArticle({ starred: true })}
+          isSelected={false}
+          onSelect={() => {}}
+          feedTitle="Tech News"
+          feedSiteUrl="https://example.com"
+        />,
+      );
+
+      const side = container.querySelector(
+        '[data-testid="article-item-side"]',
+      )!;
+      const star = screen.getByTestId("article-star-indicator");
+      const favicon = container.querySelector("img")!;
+      expect(side.contains(star)).toBe(true);
+      expect(side.contains(favicon)).toBe(true);
+
+      // Star precedes favicon in DOM order (top before bottom under the
+      // column's vertical layout).
+      const cmp = star.compareDocumentPosition(favicon);
+      expect(cmp & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("renders the favicon in the side column even when the article is not starred", () => {
+      const { container } = render(
+        <ArticleItem
+          article={mockArticle()}
+          isSelected={false}
+          onSelect={() => {}}
+          feedTitle="Tech News"
+          feedSiteUrl="https://example.com"
+        />,
+      );
+
+      const side = container.querySelector(
+        '[data-testid="article-item-side"]',
+      )!;
+      const favicon = container.querySelector("img")!;
+      expect(side.contains(favicon)).toBe(true);
+    });
+  });
 });

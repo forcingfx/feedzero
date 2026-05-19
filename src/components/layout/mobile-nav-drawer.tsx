@@ -10,8 +10,10 @@ import {
   isFilterFeedId,
   fromFilterFeedId,
 } from "@/utils/constants.ts";
-import { SidebarProvider } from "@/components/ui/sidebar.tsx";
+import { SidebarMenu, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
+import { NewFolderInput } from "@/components/sidebar/new-folder-input.tsx";
+import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 
 interface MobileNavDrawerProps {
@@ -61,7 +63,14 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
           : activeFeed?.title ?? "Feeds";
 
   return (
-    <Drawer.Root open={open} onOpenChange={setOpen} snapPoints={[0.85]}>
+    // No `snapPoints` here: with a single snap point and an inline height,
+    // vaul's snap-mode adds no value but it does intercept vertical drag
+    // gestures inside scrollable content. The 2026-05-19 bug report
+    // (long feed list, Settings unreachable) was that interception — vaul
+    // ate the touch-move before the inner scroll could process it. Default
+    // mode keeps vaul's standard "scroll until top, then drag to dismiss"
+    // pattern, which is exactly what we want.
+    <Drawer.Root open={open} onOpenChange={setOpen}>
       <Drawer.Trigger asChild>
         <div
           data-testid="drawer-handle-strip"
@@ -89,40 +98,47 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
         >
           <div className="mx-auto w-10 h-1 rounded-full bg-muted-foreground/30 mt-3 mb-1 shrink-0" />
 
-          <SidebarProvider defaultOpen={false} className="block min-h-0">
+          <SidebarProvider defaultOpen={false} className="flex-1 flex flex-col min-h-0">
             <div
               data-testid="drawer-scroll"
-              // pb-[calc(env(safe-area-inset-bottom) + (100vh - 100dvh) + 2rem)]:
-              //   home-indicator inset + iOS Safari toolbar slack + breathing room.
-              //   Vaul positions the outer Drawer.Content; this inner scroll is the
-              //   only place we can reliably enforce the safe-area floor.
-              className="overflow-y-auto overflow-x-hidden pb-[calc(env(safe-area-inset-bottom)_+_(100vh_-_100dvh)_+_2rem)]"
-              style={{ height: "calc(85dvh - 1.25rem)" }}
+              // pb-[calc(env(safe-area-inset-bottom) + (100vh - 100dvh)):
+              //   home-indicator inset + iOS Safari toolbar slack. The
+              //   2rem breathing room previously lived here; now the pinned
+              //   Settings footer provides that floor instead.
+              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-[calc(env(safe-area-inset-bottom)_+_(100vh_-_100dvh))]"
             >
               <div data-testid="drawer-section" className="w-full py-1 px-3">
                 <SidebarBody
                   onFeedSelect={handleSelect}
                   onBeforeNavigate={() => setOpen(false)}
+                  hideNewFolderInput
                 />
               </div>
+            </div>
 
-              {/*
-                Single Settings entry. Tapping it closes the drawer and opens
-                the unified Settings dialog (account / reading / help / import
-                / export). The dialog is screen-centered — unlike a dropdown
-                anchored to the drawer bottom, it isn't occluded by iOS Safari
-                chrome, so we no longer need every Settings item inlined here.
-              */}
-              <div data-testid="drawer-section" className="border-t mt-2 px-3 py-1">
-                <button
-                  type="button"
-                  onClick={handleSettings}
-                  className="flex items-center gap-3 w-full px-2 py-3 text-left text-sm font-medium rounded-md hover:bg-accent"
-                >
-                  <Settings className="size-4 shrink-0 text-muted-foreground" />
-                  Settings
-                </button>
-              </div>
+            {/*
+              Always-reachable footer (outside the scroll). Holds the two
+              affordances a user with 50+ feeds shouldn't have to scroll
+              past every row to reach: "New folder" (folder management)
+              and "Settings" (app preferences). 2026-05-19 bug report
+              proved the inline-at-bottom-of-scroll placement broke under
+              long lists. `shrink-0` so the footer can't be squeezed.
+            */}
+            <div
+              data-testid="drawer-section"
+              className="shrink-0 border-t bg-background px-3 py-1 pb-[calc(env(safe-area-inset-bottom)_+_(100vh_-_100dvh)_+_0.25rem)]"
+            >
+              <SidebarMenu>
+                <NewFolderInput trailing={<AutoOrganizePill />} />
+              </SidebarMenu>
+              <button
+                type="button"
+                onClick={handleSettings}
+                className="flex items-center gap-3 w-full px-2 py-3 text-left text-sm font-medium rounded-md hover:bg-accent"
+              >
+                <Settings className="size-4 shrink-0 text-muted-foreground" />
+                Settings
+              </button>
             </div>
           </SidebarProvider>
         </Drawer.Content>

@@ -24,6 +24,12 @@ import type { Feed, Folder } from "@/types/index.ts";
 
 interface SidebarFeedListProps {
   onFeedSelect: (feedId: string) => void;
+  /**
+   * When true, suppress the inline "New folder" affordance at the bottom
+   * of the list. The mobile drawer renders its own copy in the pinned
+   * footer so it stays reachable regardless of feed-list length.
+   */
+  hideNewFolderInput?: boolean;
 }
 
 function UnfiledDropZone({ children }: { children: React.ReactNode }) {
@@ -53,7 +59,10 @@ const SORT_LABELS: Record<string, string> = {
   custom: "Custom order",
 };
 
-export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
+export function SidebarFeedList({
+  onFeedSelect,
+  hideNewFolderInput,
+}: SidebarFeedListProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const folders = useFeedStore((s) => s.folders);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
@@ -275,8 +284,12 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
         </DragOverlay>
       </DndContext>
 
-      <SidebarSeparator className="mx-0 my-1" />
-      <NewFolderInput trailing={<AutoOrganizePill />} />
+      {!hideNewFolderInput && (
+        <>
+          <SidebarSeparator className="mx-0 my-1" />
+          <NewFolderInput trailing={<AutoOrganizePill />} />
+        </>
+      )}
 
       <FeedRemoveDialog
         feedTitle={feedToRemove?.title ?? ""}
