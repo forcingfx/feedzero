@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { ArrowLeft, Eye, Plus, Loader2, Search, X, Minus, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -615,13 +615,16 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
     setSelectedFeedUrl(null);
   }, []);
 
-  // Focus search input when navigated here via N key or Plus button
+  // Focus search input when navigated here with ?focus=search (set by the
+  // N keyboard shortcut and the Plus button). URL-driven instead of a
+  // DOM CustomEvent — see ADR 003.
+  const location = useLocation();
   useEffect(() => {
-    const handler = () => searchRef.current?.focus();
-    document.addEventListener("feedzero:focus-explore-search", handler);
-    return () =>
-      document.removeEventListener("feedzero:focus-explore-search", handler);
-  }, []);
+    const params = new URLSearchParams(location.search);
+    if (params.get("focus") === "search") {
+      searchRef.current?.focus();
+    }
+  }, [location.search]);
 
   const isUrlInput = looksLikeUrl(searchQuery);
 
