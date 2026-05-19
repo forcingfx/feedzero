@@ -56,7 +56,8 @@ test.describe("Sidebar width stability across routes (ADR 013)", () => {
     const widened = await sidebarWidth(page);
     expect(widened, "drag should actually change the sidebar width").not.toBe(startingWidth);
 
-    await page.getByRole("link", { name: /explore/i }).first().click();
+    // Explore is rendered as a SidebarMenuButton (role="button"), not a link.
+    await page.getByRole("button", { name: /explore/i }).first().click();
     await page.waitForURL(/\/explore/);
     const afterExplore = await sidebarWidth(page);
     expect(afterExplore, "navigating to /explore must not reset sidebar width").toBe(widened);
