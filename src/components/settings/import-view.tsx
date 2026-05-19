@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { parseOpmlFile } from "@/core/opml/opml-service";
 import { parseUrlList, isOpmlFormat } from "@/core/opml/url-list-parser";
+import { parsePocketExport, isPocketExport } from "@/core/opml/pocket-parser";
 import {
   useImportStore,
   selectTotalCount,
@@ -64,13 +65,24 @@ export function ImportView({ onClose }: ImportViewProps) {
 
   /**
    * Parse the import content into rich entries that carry folder context.
-   * URL-list imports always have folderName=undefined; OPML imports carry
-   * the parent group name when one exists (PR E).
+   * URL-list and Pocket-export imports always have folderName=undefined;
+   * OPML imports carry the parent group name when one exists (PR E).
+   *
+   * Pocket-export detection runs first because the Pocket HTML neither
+   * looks like OPML nor like a URL list — without explicit dispatch we'd
+   * silently get garbage out of parseUrlList.
    */
   const extractEntries = useCallback(
     async (
       content: string,
     ): Promise<Array<{ xmlUrl: string; folderName?: string }>> => {
+      if (isPocketExport(content)) {
+        const result = parsePocketExport(content);
+        if (!result.ok) throw new Error(result.error);
+        // addFeedFlow runs origins through discoverFeed, so an origin like
+        // https://nytimes.com becomes a subscription to the site's RSS.
+        return result.value.map((url) => ({ xmlUrl: url }));
+      }
       if (isOpmlFormat(content)) {
         const result = parseOpmlFile(content);
         if (!result.ok) throw new Error(result.error);
@@ -269,7 +281,7 @@ export function ImportView({ onClose }: ImportViewProps) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".opml,.xml"
+            accept=".opml,.xml,.html,.htm"
             onChange={handleFileSelect}
             className="hidden"
           />
@@ -292,7 +304,7 @@ export function ImportView({ onClose }: ImportViewProps) {
             <>
               <Upload className="mb-2 size-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Drag and drop an OPML file, or
+                Drag and drop an OPML or Pocket export, or
               </p>
               <Button
                 variant="link"
@@ -301,6 +313,9 @@ export function ImportView({ onClose }: ImportViewProps) {
               >
                 browse to select
               </Button>
+              <p className="mt-2 text-xs text-muted-foreground/70">
+                .opml, .xml, .html
+              </p>
             </>
           )}
         </div>
@@ -308,7 +323,7 @@ export function ImportView({ onClose }: ImportViewProps) {
 
       {inputMode === "text" && (
         <Textarea
-          placeholder="Paste OPML XML or feed URLs (one per line)"
+          placeholder="Paste OPML XML, Pocket HTML export, or feed URLs (one per line)"
           value={textInput}
           onChange={(e) => {
             setTextInput(e.target.value);

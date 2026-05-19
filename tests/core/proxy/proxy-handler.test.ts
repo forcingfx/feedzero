@@ -113,6 +113,89 @@ describe("handleProxyRequest", () => {
   });
 });
 
+describe("upstream rate-limit + retry signalling (RFC 7231 §7.1.3)", () => {
+  // RFC 7231 §7.1.3: 429 and 503 SHOULD carry Retry-After so well-behaved
+  // clients can back off. The proxy must propagate that header verbatim so
+  // the client (feed-service) can honour it instead of hammering the source.
+  it("passes Retry-After through on upstream 429", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("Too Many Requests", {
+        status: 429,
+        headers: { "Retry-After": "120" },
+      }),
+    );
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("120");
+  });
+
+  it("passes Retry-After through on upstream 503", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("Service Unavailable", {
+        status: 503,
+        headers: { "Retry-After": "30" },
+      }),
+    );
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("30");
+  });
+
+  it("does not cache 429/503 responses", async () => {
+    // Caching a rate-limit response would hide a transient block from the
+    // user for the cache TTL and prevent retry once Retry-After elapses.
+    const setSpy = vi.fn();
+    const cache = {
+      get: vi.fn().mockReturnValue(undefined),
+      set: setSpy,
+      getStats: vi.fn().mockReturnValue([]),
+      size: 0,
+    };
+    fetchSpy.mockResolvedValue(
+      new Response("Too Many Requests", {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      }),
+    );
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    await handleProxyRequest(req, "text/xml", { cache });
+
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("works without Retry-After (header is optional in RFC)", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("Too Many Requests", { status: 429 }),
+    );
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBeNull();
+  });
+});
+
 describe("content cleaning", () => {
   it("strips tracking pixels from feed responses when cleanContent is true", async () => {
     const feedXml = `<rss><channel><item><description><![CDATA[<p>Hello</p><img src="https://pixel.quantserve.com/p.gif" width="1" height="1">]]></description></item></channel></rss>`;

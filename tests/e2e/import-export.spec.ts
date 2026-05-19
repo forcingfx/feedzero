@@ -67,7 +67,7 @@ test.describe("Import feeds", () => {
     // Switch the Import card to text-paste mode.
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML or feed URLs (one per line)")
+      .getByPlaceholder("Paste OPML XML, Pocket HTML export, or feed URLs (one per line)")
       .fill(SAMPLE_OPML);
     await page.getByRole("button", { name: "Import feeds" }).click();
 
@@ -84,7 +84,7 @@ test.describe("Import feeds", () => {
 
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML or feed URLs (one per line)")
+      .getByPlaceholder("Paste OPML XML, Pocket HTML export, or feed URLs (one per line)")
       .fill(SAMPLE_URL_LIST);
     await page.getByRole("button", { name: "Import feeds" }).click();
 
@@ -106,7 +106,7 @@ test.describe("Import feeds", () => {
     await goToImportExportTab(page);
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML or feed URLs (one per line)")
+      .getByPlaceholder("Paste OPML XML, Pocket HTML export, or feed URLs (one per line)")
       .fill("# just a comment\n\n# another comment");
     await page.getByRole("button", { name: "Import feeds" }).click();
 
@@ -119,7 +119,7 @@ test.describe("Import feeds", () => {
 
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML or feed URLs (one per line)")
+      .getByPlaceholder("Paste OPML XML, Pocket HTML export, or feed URLs (one per line)")
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Import feeds" }).click();
 

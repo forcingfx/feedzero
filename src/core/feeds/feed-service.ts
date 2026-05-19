@@ -11,6 +11,7 @@ import {
   addArticles,
   getArticleByGuid,
   updateArticles,
+  updateFeed,
   removeArticlesByFeedId,
 } from "../storage/db.ts";
 import type { Feed, Article } from "../../types/index.ts";
@@ -35,6 +36,34 @@ interface RefreshAllResult {
     updatedCount: number;
     error?: string;
   }>;
+}
+
+/**
+ * Format a non-OK proxy response into a user-facing error.
+ * For 429 / 503 we surface the upstream Retry-After hint as a delta in
+ * seconds so the message tells the user how long to wait, not just the
+ * bare HTTP code. Parsing goes through `parseRetryAfter` so both
+ * delta-seconds and HTTP-date forms work, with the same 24h clamp the
+ * rest of the codebase uses. Reads the header lowercase so the helper
+ * works against both real `Headers` (case-insensitive) and the Map-based
+ * mocks used in some refresh tests.
+ */
+function fetchErrorMessage(
+  response: { status: number; headers?: { get?: (k: string) => string | null } },
+  prefix: string,
+): string {
+  const { status } = response;
+  if (status === 429 || status === 503) {
+    const retryAt = parseRetryAfter(
+      response.headers?.get?.("retry-after") ?? null,
+      Date.now(),
+    );
+    if (retryAt !== null) {
+      const seconds = Math.ceil((retryAt - Date.now()) / 1000);
+      return `${prefix} (HTTP ${status}, retry after ${seconds}s)`;
+    }
+  }
+  return `${prefix} (HTTP ${status})`;
 }
 
 /**
@@ -112,7 +141,7 @@ export async function addFeedFlow(
       const response = await proxyFetch("/api/feed", url);
       if (!response.ok) {
         return err(
-          `The feed at this URL could not be reached (HTTP ${response.status}).`,
+          fetchErrorMessage(response, "The feed at this URL could not be reached"),
         );
       }
       text = await response.text();
@@ -194,7 +223,7 @@ export async function previewFeed(
     const response = await proxyFetch("/api/feed", url);
     if (!response.ok) {
       return err(
-        `The feed at this URL could not be reached (HTTP ${response.status}).`,
+        fetchErrorMessage(response, "The feed at this URL could not be reached"),
       );
     }
     const text = await response.text();
@@ -224,31 +253,32 @@ export async function previewFeed(
 
 /**
  * Refresh a single feed: fetch latest XML, add new articles, update changed ones.
+ * Persists freshness timestamps on every attempt — both for "we tried" (the
+ * stale-indicator floor) and for "the publisher actually responded" (the
+ * stale-indicator threshold). A failing refresh must never clobber a prior
+ * successful timestamp.
  */
 export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
+  const now = Date.now();
   try {
     const response = await proxyFetch("/api/feed", feed.url);
     if (!response.ok) {
-      // Surface Retry-After when the upstream rate-limits us so the user
-      // sees an actionable hint instead of a generic HTTP code. Per
-      // feedback #97 — self-host bulk refresh against fresh IPs trips
-      // upstream WAFs and the user needs to know when to retry.
-      if (response.status === 429) {
-        const retryAt = parseRetryAfter(
-          response.headers?.get?.("retry-after"),
-          Date.now(),
-        );
-        if (retryAt !== null) {
-          const seconds = Math.ceil((retryAt - Date.now()) / 1000);
-          return err(`Upstream rate-limited (429). Retry in ${seconds}s.`);
-        }
-        return err("Upstream rate-limited (429). Retry later.");
-      }
-      return err(`Failed to fetch feed (HTTP ${response.status})`);
+      // Always record the attempt so the stale-indicator clock keeps
+      // moving; never clobber a prior success timestamp. The user-facing
+      // error message surfaces Retry-After when the upstream sent one
+      // (feedback #97: self-host bulk refresh against fresh IPs trips
+      // upstream WAFs and the user needs to know when to retry).
+      await persistFreshness(feed, { fetchedAt: now, successfulAt: null });
+      return err(fetchErrorMessage(response, "Failed to fetch feed"));
     }
     const text = await response.text();
     const parseResult = parse(text, feed.url);
-    if (!parseResult.ok) return err(parseResult.error);
+    if (!parseResult.ok) {
+      // HTTP succeeded but content was unparseable — the publisher is alive,
+      // so this still counts as a successful reach.
+      await persistFreshness(feed, { fetchedAt: now, successfulAt: now });
+      return err(parseResult.error);
+    }
 
     const parsedArticles = parseResult.value.articles;
     const newArticles = [];
@@ -294,13 +324,32 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
       await updateArticles(updatedArticles);
     }
 
+    await persistFreshness(feed, { fetchedAt: now, successfulAt: now });
+
     return ok({
       newCount: created.length,
       updatedCount: updatedArticles.length,
     });
   } catch (e) {
+    // Network / transport-layer failure: record the attempt but keep any
+    // prior success timestamp so we don't reset the stale-indicator clock.
+    await persistFreshness(feed, { fetchedAt: now, successfulAt: null });
     return err(`Refresh failed: ${(e as Error).message}`);
   }
+}
+
+/**
+ * Mutate `feed` in place with new freshness timestamps and persist via
+ * updateFeed. Passing `successfulAt: null` keeps the prior value so a
+ * transient failure doesn't reset the stale-indicator clock.
+ */
+async function persistFreshness(
+  feed: Feed,
+  ts: { fetchedAt: number; successfulAt: number | null },
+): Promise<void> {
+  feed.lastFetchedAt = ts.fetchedAt;
+  if (ts.successfulAt !== null) feed.lastSuccessfulFetchAt = ts.successfulAt;
+  await updateFeed(feed);
 }
 
 /**
@@ -375,7 +424,7 @@ export async function reloadFeed(
     } else {
       const response = await proxyFetch("/api/feed", feed.url);
       if (!response.ok) {
-        return err(`Failed to fetch feed (HTTP ${response.status})`);
+        return err(fetchErrorMessage(response, "Failed to fetch feed"));
       }
       text = await response.text();
     }
