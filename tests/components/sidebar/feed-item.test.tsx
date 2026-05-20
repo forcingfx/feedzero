@@ -209,6 +209,26 @@ describe("FeedItem", () => {
     expect(icon?.getAttribute("class") ?? "").toContain("opacity-100");
   });
 
+  it("dropdown shows a 'Prefetch full text' toggle that calls setFeedPrefetchEnabled", async () => {
+    const setFeedPrefetchEnabled = vi.fn().mockResolvedValue(undefined);
+    useFeedStore.setState({ setFeedPrefetchEnabled });
+    const user = userEvent.setup();
+    renderFeedItem();
+    await user.click(screen.getByRole("button", { name: /more/i }));
+    const item = await screen.findByRole("menuitem", { name: /prefetch full text/i });
+    await user.click(item);
+    expect(setFeedPrefetchEnabled).toHaveBeenCalledWith("f1", true);
+  });
+
+  it("Prefetch full text menu item shows a check when the feed is opted in", async () => {
+    const user = userEvent.setup();
+    renderFeedItem({ feed: { ...mockFeed, prefetchEnabled: true } });
+    await user.click(screen.getByRole("button", { name: /more/i }));
+    const item = await screen.findByRole("menuitem", { name: /prefetch full text/i });
+    const icon = item.querySelector("svg");
+    expect(icon?.getAttribute("class") ?? "").toContain("opacity-100");
+  });
+
   it("action dots do not appear on click-focus, only on hover or keyboard focus-visible", () => {
     // Bug: clicking a feed puts the button into :focus state (click focus).
     // The shadcn SidebarMenuAction's showOnHover variant used

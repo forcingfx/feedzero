@@ -8,6 +8,7 @@ import {
   getFolders as dbGetFolders,
   updateFolder as dbUpdateFolder,
   removeFolder as dbRemoveFolder,
+  getAllArticles,
 } from "../core/storage/db.ts";
 import {
   addFeedFlow,
@@ -15,7 +16,11 @@ import {
   refreshAllFeeds,
   reloadFeed,
 } from "../core/feeds/feed-service.ts";
-import { prefetchStarredArticles } from "../core/extractor/prefetch-service.ts";
+import {
+  prefetchStarredArticles,
+  prefetchFeedArticles,
+  selectFrequentFeeds,
+} from "../core/extractor/prefetch-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { useLicenseStore } from "./license-store.ts";
@@ -75,6 +80,13 @@ interface FeedStore {
   removeFeed: (feedId: string) => Promise<void>;
   renameFeed: (feedId: string, newTitle: string) => Promise<void>;
   setFeedPreferFullText: (feedId: string, value: boolean) => Promise<void>;
+  /**
+   * Per-feed prefetch toggle. When enabled, the next refresh
+   * pre-extracts this feed's most recent articles regardless of star
+   * state. Personal+ feature; the toggle UI itself gates so this can
+   * always be called.
+   */
+  setFeedPrefetchEnabled: (feedId: string, value: boolean) => Promise<void>;
   reloadSingleFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
@@ -157,7 +169,18 @@ function schedulePush(): void {
  * new `extractedContent`, refresh the article-store cache so the UI
  * picks it up without a manual reload.
  */
-function schedulePrefetch(): void {
+/** Default cap on how many recent articles get pre-extracted per
+ *  prefetch-enabled feed. Keeps the per-refresh request burst bounded
+ *  even if the user has hundreds of feeds toggled on. */
+export const FEED_PREFETCH_LIMIT = 20;
+
+/**
+ * Run the prefetch passes for the given feeds. Returns a promise that
+ * resolves once every pass has settled, so tests can await it. Callers
+ * that don't care about completion (refreshAll) wrap with `void` so
+ * the UI doesn't block on a potentially multi-second batch.
+ */
+async function schedulePrefetch(feeds: Feed[]): Promise<void> {
   const gate = gateState(
     "offline-prefetch",
     useLicenseStore.getState().tier,
@@ -165,11 +188,47 @@ function schedulePrefetch(): void {
     isPaidTierActive(),
   );
   if (!gate.enabled) return;
-  void prefetchStarredArticles().then((result) => {
-    if (result.ok && result.value.extracted > 0) {
+
+  // Two passes — starred (always-on for prefetch-gated users) and
+  // per-feed (only feeds the user has explicitly opted in). The
+  // article-store is refreshed once at the end if any pass actually
+  // persisted new content.
+  const prefetchEnabledFeeds = feeds.filter((f) => f.prefetchEnabled);
+
+  // Prefetch is best-effort and runs on a background tick. Wrap the
+  // body in try/catch so an unexpected failure (network, mock, missing
+  // export in an older test fixture) degrades to "no prefetch this
+  // refresh" rather than an unhandled rejection that pollutes the
+  // user's session.
+  try {
+    let anyExtracted = false;
+    const starred = await prefetchStarredArticles();
+    if (starred.ok && starred.value.extracted > 0) anyExtracted = true;
+
+    // Compose the per-feed list: explicit toggle + the frequency
+    // heuristic, deduplicated. Read counts come from Article.readAt
+    // which never leaves the encrypted vault, so this stays private.
+    const idsToPrefetch = new Set<string>();
+    for (const feed of prefetchEnabledFeeds) idsToPrefetch.add(feed.id);
+
+    const articlesResult = await getAllArticles();
+    if (articlesResult.ok) {
+      for (const feedId of selectFrequentFeeds(articlesResult.value)) {
+        idsToPrefetch.add(feedId);
+      }
+    }
+
+    for (const feedId of idsToPrefetch) {
+      const result = await prefetchFeedArticles(feedId, FEED_PREFETCH_LIMIT);
+      if (result.ok && result.value.extracted > 0) anyExtracted = true;
+    }
+
+    if (anyExtracted) {
       void useArticleStore.getState().preloadAll();
     }
-  });
+  } catch {
+    // Swallow — prefetch failing is non-fatal. The next refresh tries again.
+  }
 }
 
 export const useFeedStore = create<FeedStore>((set, get) => ({
@@ -264,6 +323,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     schedulePush();
   },
 
+  setFeedPrefetchEnabled: async (feedId, value) => {
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return;
+    await dbUpdateFeed({
+      ...feedResult.value,
+      prefetchEnabled: value,
+      updatedAt: Date.now(),
+    });
+    await reloadFeeds(set);
+    schedulePush();
+  },
+
   selectFeed: (feedId) => set({ selectedFeedId: feedId }),
 
   refreshAll: async () => {
@@ -281,7 +352,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     } finally {
       set({ isRefreshingAll: false });
     }
-    schedulePrefetch();
+    // Fire-and-forget — refreshAll returns once the feeds are fresh,
+    // prefetch continues in the background.
+    void schedulePrefetch(get().feeds);
   },
 
   reloadSingleFeed: async (feedId) => {

@@ -8,6 +8,14 @@ export interface Feed {
   folderId?: string;
   /** When true, the reader opens articles from this feed in "Full text" view by default. */
   preferFullText?: boolean;
+  /**
+   * When true, the feed's most recent articles are pre-extracted into
+   * `Article.extractedContent` during background refresh — matches the
+   * starred-prefetch behaviour for every new item from this feed, not
+   * just the ones the user has starred. Storage cost: one extracted
+   * HTML body per article, encrypted at rest like everything else.
+   */
+  prefetchEnabled?: boolean;
   createdAt: number;
   updatedAt: number;
   /** Unix epoch ms of the last refresh attempt, success or failure. */
@@ -39,6 +47,14 @@ export interface Article {
   starred?: boolean;
   /** Unix epoch ms of the most recent star action; used to sort the starred view. */
   starredAt?: number;
+  /**
+   * Unix epoch ms when the user most recently opened / read this
+   * article. Drives the frequency heuristic that auto-prefetches
+   * feeds the user reads often, without requiring an explicit toggle.
+   * Set in `selectArticle` on the auto-mark-read delay; never set
+   * server-side.
+   */
+  readAt?: number;
   /**
    * Sanitized full-text HTML extracted from `link` and persisted for offline
    * reading. Populated by the background prefetch service for starred
