@@ -211,10 +211,11 @@ describe("article-store", () => {
       vi.advanceTimersByTime(1000);
       await vi.runAllTimersAsync();
 
-      expect(useArticleStore.getState().selectedArticle).toEqual({
-        ...article,
-        read: true,
-      });
+      // Article gets read: true plus a readAt timestamp (drives the
+      // frequency-prefetch heuristic). Don't pin the exact ms value.
+      const selected = useArticleStore.getState().selectedArticle!;
+      expect(selected).toMatchObject({ ...article, read: true });
+      expect(selected.readAt).toBeGreaterThan(0);
       expect(updateArticle).toHaveBeenCalled();
       vi.useRealTimers();
     });
