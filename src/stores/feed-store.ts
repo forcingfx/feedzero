@@ -195,30 +195,39 @@ async function schedulePrefetch(feeds: Feed[]): Promise<void> {
   // persisted new content.
   const prefetchEnabledFeeds = feeds.filter((f) => f.prefetchEnabled);
 
-  let anyExtracted = false;
-  const starred = await prefetchStarredArticles();
-  if (starred.ok && starred.value.extracted > 0) anyExtracted = true;
+  // Prefetch is best-effort and runs on a background tick. Wrap the
+  // body in try/catch so an unexpected failure (network, mock, missing
+  // export in an older test fixture) degrades to "no prefetch this
+  // refresh" rather than an unhandled rejection that pollutes the
+  // user's session.
+  try {
+    let anyExtracted = false;
+    const starred = await prefetchStarredArticles();
+    if (starred.ok && starred.value.extracted > 0) anyExtracted = true;
 
-  // Compose the per-feed list: explicit toggle + the frequency
-  // heuristic, deduplicated. Read counts come from Article.readAt
-  // which never leaves the encrypted vault, so this stays private.
-  const idsToPrefetch = new Set<string>();
-  for (const feed of prefetchEnabledFeeds) idsToPrefetch.add(feed.id);
+    // Compose the per-feed list: explicit toggle + the frequency
+    // heuristic, deduplicated. Read counts come from Article.readAt
+    // which never leaves the encrypted vault, so this stays private.
+    const idsToPrefetch = new Set<string>();
+    for (const feed of prefetchEnabledFeeds) idsToPrefetch.add(feed.id);
 
-  const articlesResult = await getAllArticles();
-  if (articlesResult.ok) {
-    for (const feedId of selectFrequentFeeds(articlesResult.value)) {
-      idsToPrefetch.add(feedId);
+    const articlesResult = await getAllArticles();
+    if (articlesResult.ok) {
+      for (const feedId of selectFrequentFeeds(articlesResult.value)) {
+        idsToPrefetch.add(feedId);
+      }
     }
-  }
 
-  for (const feedId of idsToPrefetch) {
-    const result = await prefetchFeedArticles(feedId, FEED_PREFETCH_LIMIT);
-    if (result.ok && result.value.extracted > 0) anyExtracted = true;
-  }
+    for (const feedId of idsToPrefetch) {
+      const result = await prefetchFeedArticles(feedId, FEED_PREFETCH_LIMIT);
+      if (result.ok && result.value.extracted > 0) anyExtracted = true;
+    }
 
-  if (anyExtracted) {
-    void useArticleStore.getState().preloadAll();
+    if (anyExtracted) {
+      void useArticleStore.getState().preloadAll();
+    }
+  } catch {
+    // Swallow — prefetch failing is non-fatal. The next refresh tries again.
   }
 }
 
