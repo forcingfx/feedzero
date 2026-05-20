@@ -66,6 +66,18 @@ function isPrefetchCandidate(article: Article, now: number): boolean {
 }
 
 /**
+ * Whether this article is a feed-prefetch candidate. Mirrors the
+ * starred predicate but drops the starred requirement — the call
+ * site already filtered to one feed's articles via the limit/sort.
+ */
+function isFeedPrefetchCandidate(article: Article, now: number): boolean {
+  if (article.extractedContent) return false;
+  if (!isFetchableLink(article.link)) return false;
+  if (now - (article.publishedAt ?? 0) > PREFETCH_AGE_LIMIT_MS) return false;
+  return true;
+}
+
+/**
  * Fetch + extract + persist a single article. Returns true on success.
  * Failures are swallowed (logged via the caller's counter) so one bad
  * URL doesn't abort the whole batch.
@@ -136,6 +148,42 @@ async function runWithConcurrency<T>(
  * Caller responsibility: gate this behind `useFeatureGate("offline-prefetch")`
  * (the React side) or `gateState(...)` (the store side).
  */
+/**
+ * Pre-extract the `limit` most recently published articles from
+ * `feedId` that lack `extractedContent`. Drives the per-feed
+ * "Prefetch full text" toggle and the frequency heuristic — anything
+ * that wants to pre-cache a specific feed's articles without
+ * requiring them to be starred goes through this function.
+ *
+ * Sort + limit happen before the concurrency cap, so we never fetch
+ * more than `limit` URLs even if the feed has hundreds of items.
+ */
+export async function prefetchFeedArticles(
+  feedId: string,
+  limit: number,
+): Promise<Result<PrefetchStats>> {
+  if (limit <= 0) return ok({ extracted: 0, failed: 0 });
+  const articlesResult = await getAllArticles();
+  if (!articlesResult.ok) return err(articlesResult.error);
+
+  const now = Date.now();
+  const candidates = articlesResult.value
+    .filter((a) => a.feedId === feedId && isFeedPrefetchCandidate(a, now))
+    .sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
+    .slice(0, limit);
+
+  if (candidates.length === 0) {
+    return ok({ extracted: 0, failed: 0 });
+  }
+
+  const { ok: extracted, failed } = await runWithConcurrency(
+    candidates,
+    PREFETCH_CONCURRENCY,
+    prefetchOne,
+  );
+  return ok({ extracted, failed });
+}
+
 export async function prefetchStarredArticles(): Promise<Result<PrefetchStats>> {
   const articlesResult = await getAllArticles();
   if (!articlesResult.ok) return err(articlesResult.error);
