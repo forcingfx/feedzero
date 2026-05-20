@@ -8,6 +8,7 @@ import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SmartFilterEditorDialog } from "@/components/smart-filters/smart-filter-editor-dialog.tsx";
+import { RulesEditorDialog } from "@/components/rules/rules-editor-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { AppLayout } from "@/pages/app-layout.tsx";
@@ -268,6 +269,7 @@ export function App() {
             have router context. */}
         <DeviceSetupWizard />
         <SmartFilterEditorDialog />
+        <RulesEditorDialog />
         <Toaster position="bottom-center" />
       </BrowserRouter>
     </>

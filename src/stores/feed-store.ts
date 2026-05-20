@@ -116,6 +116,13 @@ interface FeedStore {
   updateFeedRule: (feedId: string, rule: Rule) => Promise<Result<Rule>>;
   removeFeedRule: (feedId: string, ruleId: string) => Promise<void>;
   reorderFeedRules: (feedId: string, orderedIds: string[]) => Promise<void>;
+  /**
+   * When non-null, the rules-editor dialog is open against this feed.
+   * Dialog mounts at the app root and reads this slice.
+   */
+  rulesEditorFeedId: string | null;
+  openRulesEditor: (feedId: string) => void;
+  closeRulesEditor: () => void;
 }
 
 function readSortMode(): FeedSortMode {
@@ -244,6 +251,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   folderCustomOrder: readJsonArray(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER),
   folderOpenState: {},
   feedsLoaded: false,
+  rulesEditorFeedId: null,
+  openRulesEditor: (feedId) => set({ rulesEditorFeedId: feedId }),
+  closeRulesEditor: () => set({ rulesEditorFeedId: null }),
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
