@@ -197,7 +197,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   addFeed: async (url) => {
-    // Free hosted users are capped at 25 feed subscriptions (ADR 013).
+    // Free hosted users are capped at 50 feed subscriptions (ADR 013).
     // Personal/Pro and self-hosted bypass. Check BEFORE touching the
     // ingestion pipeline so we don't half-add a feed then fail late.
     const quota = checkFeedQuota({

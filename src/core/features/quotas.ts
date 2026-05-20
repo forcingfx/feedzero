@@ -1,5 +1,5 @@
 /**
- * Quota gating — currently the 25-feed cap on hosted Free.
+ * Quota gating — currently the 50-feed cap on hosted Free.
  *
  * Distinct from `feature-gates.ts` because quotas are continuous (a count
  * compared against a limit) rather than binary (do I have this capability).

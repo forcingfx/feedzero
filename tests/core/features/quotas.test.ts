@@ -17,7 +17,7 @@ describe("checkFeedQuota", () => {
       expect(result.ok).toBe(true);
     });
 
-    it("allows the exact boundary add (24 → 25)", () => {
+    it("allows the exact boundary add (49 → 50)", () => {
       const result = checkFeedQuota({
         currentCount: FREE_FEED_LIMIT - 1,
         tier: "free",
@@ -27,7 +27,7 @@ describe("checkFeedQuota", () => {
       expect(result.ok).toBe(true);
     });
 
-    it("blocks the add that would cross the limit (25 → 26)", () => {
+    it("blocks the add that would cross the limit (50 → 51)", () => {
       const result = checkFeedQuota({
         currentCount: FREE_FEED_LIMIT,
         tier: "free",
@@ -44,24 +44,24 @@ describe("checkFeedQuota", () => {
     });
 
     it("blocks bulk imports that would exceed the limit", () => {
-      // User has 20, importing 10 more would land at 30
+      // User has 40, importing 20 more would land at 60 — over the 50 cap.
       const result = checkFeedQuota({
-        currentCount: 20,
-        delta: 10,
+        currentCount: 40,
+        delta: 20,
         tier: "free",
         isSelfHosted: false,
         paidTierActive: true,
       });
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.delta).toBe(10);
+        expect(result.delta).toBe(20);
       }
     });
 
     it("allows bulk imports that land exactly at the limit", () => {
       const result = checkFeedQuota({
-        currentCount: 15,
-        delta: 10,
+        currentCount: 30,
+        delta: 20,
         tier: "free",
         isSelfHosted: false,
         paidTierActive: true,
@@ -188,11 +188,11 @@ describe("quotaErrorMessage", () => {
     const msg = quotaErrorMessage({
       ok: false,
       reason: "free-quota-exceeded",
-      limit: 25,
-      current: 25,
+      limit: 50,
+      current: 50,
       delta: 1,
     });
-    expect(msg).toContain("25 feeds");
+    expect(msg).toContain("50 feeds");
     expect(msg).toContain("Personal");
     expect(msg).toContain("self-host");
   });
@@ -201,11 +201,11 @@ describe("quotaErrorMessage", () => {
     const msg = quotaErrorMessage({
       ok: false,
       reason: "free-quota-exceeded",
-      limit: 25,
+      limit: 50,
       current: 10,
-      delta: 20,
+      delta: 30,
     });
-    expect(msg).toContain("Importing 20 feeds");
+    expect(msg).toContain("Importing 30 feeds");
     expect(msg).toContain("you have 10");
     expect(msg).toContain("Personal");
   });

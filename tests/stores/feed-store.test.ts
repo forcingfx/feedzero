@@ -222,7 +222,7 @@ describe("feed-store", () => {
       expect(result).toEqual({ ok: true, value: undefined });
     });
 
-    describe("Free quota gate (hard cutover at 25 feeds)", () => {
+    describe("Free quota gate (hard cutover at 50 feeds)", () => {
       function seedFeeds(n: number) {
         const feeds = Array.from({ length: n }, (_, i) =>
           mockFeed(`f${i}`, `Feed ${i}`),
@@ -230,9 +230,9 @@ describe("feed-store", () => {
         useFeedStore.setState({ feeds });
       }
 
-      it("blocks addFeed on hosted Free when already at 25 feeds", async () => {
+      it("blocks addFeed on hosted Free when already at 50 feeds", async () => {
         useLicenseStore.setState({ tier: "free", verifying: false });
-        seedFeeds(25);
+        seedFeeds(50);
 
         const result = await useFeedStore
           .getState()
@@ -240,14 +240,14 @@ describe("feed-store", () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
-          expect(result.error).toMatch(/Free limit of 25/);
+          expect(result.error).toMatch(/Free limit of 50/);
         }
         expect(addFeedFlow).not.toHaveBeenCalled();
       });
 
-      it("allows addFeed on hosted Free at 24 feeds (boundary)", async () => {
+      it("allows addFeed on hosted Free at 49 feeds (boundary)", async () => {
         useLicenseStore.setState({ tier: "free", verifying: false });
-        seedFeeds(24);
+        seedFeeds(49);
         const feed = mockFeed("new", "New Feed");
         vi.mocked(addFeedFlow).mockResolvedValue({
           ok: true,
@@ -303,11 +303,11 @@ describe("feed-store", () => {
 
       it("sets store.error so a Settings indicator can render the quota warning", async () => {
         useLicenseStore.setState({ tier: "free", verifying: false });
-        seedFeeds(25);
+        seedFeeds(50);
 
         await useFeedStore.getState().addFeed("https://new.com/feed");
 
-        expect(useFeedStore.getState().error).toMatch(/Free limit of 25/);
+        expect(useFeedStore.getState().error).toMatch(/Free limit of 50/);
       });
 
       it("tags the failure with reason='free-quota-exceeded' so callers can route the user to upgrade", async () => {
@@ -316,7 +316,7 @@ describe("feed-store", () => {
         // apart from a network/parse error. The reason discriminator is
         // the contract: every add-feed call site reads it.
         useLicenseStore.setState({ tier: "free", verifying: false });
-        seedFeeds(25);
+        seedFeeds(50);
 
         const result = await useFeedStore
           .getState()

@@ -52,15 +52,15 @@ describe("tier-matrix — canonical schema", () => {
 });
 
 describe("tier-matrix — feed-subscriptions (the headline quota)", () => {
-  it("is available on every tier but capped at 25 on free", () => {
+  it("is available on every tier but capped at 50 on free", () => {
     const entry = getEntry("feed-subscriptions");
-    expect(entry.tiers.free).toEqual({ available: true, limit: 25, limitUnit: "feeds" });
+    expect(entry.tiers.free).toEqual({ available: true, limit: 50, limitUnit: "feeds" });
     expect(entry.tiers.personal).toEqual({ available: true, limit: "unlimited" });
     expect(entry.tiers.pro).toEqual({ available: true, limit: "unlimited" });
   });
 
-  it("getLimit returns 25 on free, 'unlimited' on personal/pro", () => {
-    expect(getLimit("feed-subscriptions", "free")).toBe(25);
+  it("getLimit returns 50 on free, 'unlimited' on personal/pro", () => {
+    expect(getLimit("feed-subscriptions", "free")).toBe(50);
     expect(getLimit("feed-subscriptions", "personal")).toBe("unlimited");
     expect(getLimit("feed-subscriptions", "pro")).toBe("unlimited");
   });

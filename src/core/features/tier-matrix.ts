@@ -103,7 +103,7 @@ export const TIER_MATRIX = {
     category: "reading",
     status: "shipped",
     tiers: {
-      free: { available: true, limit: 25, limitUnit: "feeds" },
+      free: { available: true, limit: 50, limitUnit: "feeds" },
       personal: UNLIMITED,
       pro: UNLIMITED,
     },
