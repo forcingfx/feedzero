@@ -75,6 +75,13 @@ interface FeedStore {
   removeFeed: (feedId: string) => Promise<void>;
   renameFeed: (feedId: string, newTitle: string) => Promise<void>;
   setFeedPreferFullText: (feedId: string, value: boolean) => Promise<void>;
+  /**
+   * Per-feed prefetch toggle. When enabled, the next refresh
+   * pre-extracts this feed's most recent articles regardless of star
+   * state. Personal+ feature; the toggle UI itself gates so this can
+   * always be called.
+   */
+  setFeedPrefetchEnabled: (feedId: string, value: boolean) => Promise<void>;
   reloadSingleFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
@@ -260,6 +267,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const feedResult = await getFeed(feedId);
     if (!feedResult.ok) return;
     await dbUpdateFeed({ ...feedResult.value, preferFullText: value, updatedAt: Date.now() });
+    await reloadFeeds(set);
+    schedulePush();
+  },
+
+  setFeedPrefetchEnabled: async (feedId, value) => {
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return;
+    await dbUpdateFeed({
+      ...feedResult.value,
+      prefetchEnabled: value,
+      updatedAt: Date.now(),
+    });
     await reloadFeeds(set);
     schedulePush();
   },
