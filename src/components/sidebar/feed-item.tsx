@@ -39,6 +39,7 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
   const unreadCount = useArticleStore((s) => selectUnreadCount(s, feed.id));
   const renameFeed = useFeedStore((s) => s.renameFeed);
   const setFeedPreferFullText = useFeedStore((s) => s.setFeedPreferFullText);
+  const setFeedPrefetchEnabled = useFeedStore((s) => s.setFeedPrefetchEnabled);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
   const folders = useFeedStore((s) => s.folders);
@@ -124,6 +125,20 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
               )}
             />
             Prefer full text
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              setFeedPrefetchEnabled(feed.id, !feed.prefetchEnabled)
+            }
+            data-testid="feed-item-prefetch-toggle"
+          >
+            <Check
+              className={cn(
+                "size-4",
+                feed.prefetchEnabled ? "opacity-100" : "opacity-0",
+              )}
+            />
+            Prefetch full text
           </DropdownMenuItem>
           {folders.length > 0 && (
             <>
