@@ -22,9 +22,10 @@ export function SubscriptionUpgrade() {
       <TierCard
         name="Free"
         price="$0"
-        blurb="Up to 25 feeds. No account. Stays in your browser."
+        blurb="Up to 50 feeds. Optional end-to-end encrypted cloud sync. No account."
         features={[
           "1,300+ curated feeds in Explore",
+          "End-to-end encrypted cloud sync across devices",
           "OPML import / export",
           "Full-text extraction",
           "Offline support",
@@ -37,14 +38,14 @@ export function SubscriptionUpgrade() {
         name="Personal"
         price="$5/mo"
         priceSub="or $50/yr — save 17%"
-        blurb="Sync across every device. Unlimited feeds. 30 days free, cancel anytime."
+        blurb="Unlimited feeds and power-user organization. 30 days free, cancel anytime."
         featured
         features={[
           "Everything in Free",
-          "End-to-end encrypted cloud sync",
+          "Unlimited feeds",
           "Smart filters — query your feeds by keyword, tag, or source",
           "Auto-organize folders",
-          "Unlimited feeds",
+          "Offline prefetch — article bodies cached for plane mode",
         ]}
         cta="Start 30-day free trial — then $5/mo"
         ctaHref="/?subscribe=personal-monthly"

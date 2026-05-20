@@ -16,7 +16,7 @@ Legend:
 
 | Feature | Free | Personal | Pro | Status |
 |---|---|---|---|---|
-| **Feed subscriptions** — Number of RSS, Atom, or JSON feeds you can subscribe to at once. | 25 feeds | Unlimited | Unlimited | Shipped |
+| **Feed subscriptions** — Number of RSS, Atom, or JSON feeds you can subscribe to at once. | 50 feeds | Unlimited | Unlimited | Shipped |
 | **Feed discovery** — Paste a site URL and FeedZero finds the feed via well-known paths and HTML link tags. | ✓ | ✓ | ✓ | Shipped |
 | **Feed refresh** — Manual and automatic refresh of subscribed feeds. | ✓ | ✓ | ✓ | Shipped |
 | **Full-text extraction** — Fetch and clean the full article body when the feed only provides a summary. | ✓ | ✓ | ✓ | Shipped |
@@ -40,7 +40,7 @@ Legend:
 | Feature | Free | Personal | Pro | Status |
 |---|---|---|---|---|
 | **Encrypted local storage** — All feed content is AES-GCM encrypted at rest in IndexedDB; index fields are HMAC-hashed. | ✓ | ✓ | ✓ | Shipped |
-| **Cloud sync (zero-knowledge)** — Sync your subscriptions, folders, and read state across devices via an end-to-end encrypted vault. | — | ✓ | ✓ | Shipped |
+| **Cloud sync (zero-knowledge)** — Sync your subscriptions, folders, and read state across devices via an end-to-end encrypted vault. | ✓ | ✓ | ✓ | Shipped |
 | **Offline prefetch** — Background prefetch of article bodies so they're available without a network. | — | ✓ | ✓ | Shipped |
 
 ## Filtering and search

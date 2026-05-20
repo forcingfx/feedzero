@@ -750,19 +750,12 @@ function isFlagEnabled(name, env = process.env) {
 }
 
 // api/sync.ts
+// Cloud sync is a Free-tier feature — the wiring layer never sets
+// `licenseAuth`. The mechanism still lives in sync-handler.ts for any
+// future gate that needs it.
 var syncAdapter = resolveAdapter();
-var licenseStoragePromise = resolveLicenseStorage();
-async function buildOptions() {
-  if (!isFlagEnabled("LAUNCH_PAID_TIER")) return {};
-  return {
-    licenseAuth: {
-      signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
-      storage: await licenseStoragePromise
-    }
-  };
-}
 async function dispatch(req) {
-  return handleSyncRequest(req, syncAdapter, await buildOptions());
+  return handleSyncRequest(req, syncAdapter);
 }
 async function GET(req) {
   return dispatch(req);

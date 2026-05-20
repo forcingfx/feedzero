@@ -8,11 +8,10 @@
  *   - OFF → opens the keep-or-delete cloud-vault confirmation fork.
  *
  * Gating:
- *   - Hosted, free tier → blurred overlay with "Upgrade plan" CTA. The
- *     prior "try sync, fail with 401" UX (PendingMigration) is unreachable
- *     for new users — the toggle isn't operable without a license.
+ *   - Hosted → toggle is always operable (cloud sync is a Free-tier
+ *     feature; no license required).
  *   - Self-hosted → HEAD-probe /api/sync on mount; if unreachable, show
- *     the same overlay pattern with self-hosting docs link instead.
+ *     a blurred overlay with the self-hosting docs link.
  *
  * "Delete all data and reset app" sits below the sync section and is
  * always clickable regardless of tier or sync state. Paid users get a
@@ -33,7 +32,6 @@ import {
   Info,
   DownloadCloud,
 } from "lucide-react";
-import { useNavigate } from "react-router";
 import {
   Dialog,
   DialogContent,
@@ -50,7 +48,6 @@ import { useFeedStore } from "@/stores/feed-store";
 import { useAppStore } from "@/stores/app-store";
 import { useLicenseStore } from "@/stores/license-store";
 import { openPortal } from "@/lib/open-portal";
-import { goToSettings } from "@/lib/go-to-settings";
 import { isSelfHosted } from "@/core/features/self-hosted";
 import { toast } from "sonner";
 import { SetupWizard } from "@/components/sync/setup-wizard";
@@ -78,7 +75,6 @@ async function probeSyncServer(): Promise<boolean> {
 }
 
 export function DataSyncSection() {
-  const navigate = useNavigate();
   const tier = useLicenseStore((s) => s.tier);
   const status = useSyncStore((s) => s.status);
   const syncError = useSyncStore((s) => s.error);
@@ -101,8 +97,9 @@ export function DataSyncSection() {
   const isSyncing = status === "syncing";
 
   // Self-hosted probe — runs once on mount. Hosted users never trip this
-  // branch (tier is the gate). Stored as tri-state so we can render a brief
-  // "checking…" instead of flashing the overlay on the first paint.
+  // branch (sync is always available for hosted callers). Stored as tri-state
+  // so we can render a brief "checking…" instead of flashing the overlay on
+  // the first paint.
   useEffect(() => {
     if (!selfHosted) return;
     let cancelled = false;
@@ -114,9 +111,7 @@ export function DataSyncSection() {
     };
   }, [selfHosted]);
 
-  const tierGate = !selfHosted && tier === "free";
-  const serverGate = selfHosted && serverReachable === false;
-  const gated = tierGate || serverGate;
+  const gated = selfHosted && serverReachable === false;
 
   const handleStartSetup = useCallback(async () => {
     setPassphrase(await generatePassphrase());
@@ -179,9 +174,7 @@ export function DataSyncSection() {
 
   const statusDescription = (() => {
     if (gated) {
-      return selfHosted
-        ? "Cloud sync requires a reachable sync server."
-        : "Cloud sync requires an active subscription.";
+      return "Cloud sync requires a reachable sync server.";
     }
     switch (status) {
       case "local-only":
@@ -231,12 +224,7 @@ export function DataSyncSection() {
           {isOn && !gated && <LostPassphrasePanel />}
         </div>
 
-        {gated && (
-          <GateOverlay
-            variant={selfHosted ? "self-host" : "license"}
-            onUpgrade={() => goToSettings(navigate, "subscription")}
-          />
-        )}
+        {gated && <SelfHostGateOverlay />}
       </div>
 
       <DangerZone
@@ -300,16 +288,12 @@ export function DataSyncSection() {
   );
 }
 
-interface GateOverlayProps {
-  variant: "license" | "self-host";
-  onUpgrade: () => void;
-}
-
 /**
- * Locked-state overlay for the Cloud sync card. Renders inside the parent's
- * `overflow-hidden` container with `absolute inset-0` so the blurred glass
- * is exactly the size of the card it covers — never overflows above (into
- * the tab strip) or below (into the Danger zone).
+ * Locked-state overlay for the Cloud sync card (self-host server
+ * unreachable). Renders inside the parent's `overflow-hidden` container
+ * with `absolute inset-0` so the blurred glass is exactly the size of the
+ * card it covers — never overflows above (into the tab strip) or below
+ * (into the Danger zone).
  *
  * Frosted-glass surface (`GLASS_CLASSES`):
  * - `bg-card/40` — light tint so the toggle behind reads through.
@@ -321,42 +305,23 @@ interface GateOverlayProps {
  *   defines the glass surface against the card border.
  * - `supports-[backdrop-filter]:bg-card/30` — lighter tint when blur is
  *   actually doing the visual work, heavier tint when it isn't.
- *
- * Content is centred and intentionally compact: lock icon + one-line
- * message + one button. No nested card frame, which is what caused the
- * prior layout to overflow on mobile when the parent card was shorter
- * than the overlay's own content.
  */
 const GLASS_CLASSES =
   "absolute inset-0 flex items-center justify-center px-4 " +
   "bg-card/40 supports-[backdrop-filter]:bg-card/30 " +
   "backdrop-blur-lg ring-1 ring-inset ring-foreground/10";
 
-function GateOverlay({ variant, onUpgrade }: GateOverlayProps) {
-  if (variant === "self-host") {
-    return (
-      <div className={GLASS_CLASSES}>
-        <div className="text-center space-y-2 max-w-xs">
-          <Lock className="mx-auto size-5 text-foreground/70" />
-          <p className="text-sm font-medium">Sync server not configured</p>
-          <Button asChild size="sm" variant="outline">
-            <a href={SELF_HOST_DOCS_URL} target="_blank" rel="noreferrer noopener">
-              <ExternalLink className="mr-2 size-3.5" />
-              Self-hosting docs
-            </a>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
+function SelfHostGateOverlay() {
   return (
     <div className={GLASS_CLASSES}>
       <div className="text-center space-y-2 max-w-xs">
         <Lock className="mx-auto size-5 text-foreground/70" />
-        <p className="text-sm font-medium">Cloud sync requires a subscription</p>
-        <Button size="sm" onClick={onUpgrade}>
-          Upgrade plan
+        <p className="text-sm font-medium">Sync server not configured</p>
+        <Button asChild size="sm" variant="outline">
+          <a href={SELF_HOST_DOCS_URL} target="_blank" rel="noreferrer noopener">
+            <ExternalLink className="mr-2 size-3.5" />
+            Self-hosting docs
+          </a>
         </Button>
       </div>
     </div>

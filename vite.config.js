@@ -107,19 +107,11 @@ function apiProxyPlugin() {
 
       server.middlewares.use("/api/sync", async (req, res) => {
         const { syncHandler, syncAdapter } = await ensureSyncHandler();
-        const { licenseStorage } = await ensureLicenseDeps();
-        const { isFlagEnabled } = await import("./src/core/flags/flags.ts");
         const webReq = await toWebRequest(req);
-        // PR W: when LAUNCH_PAID_TIER=1, /api/sync requires a Bearer license.
-        const opts = isFlagEnabled("LAUNCH_PAID_TIER")
-          ? {
-              licenseAuth: {
-                signingKey: { secret: process.env.LICENSE_SIGNING_KEY ?? "" },
-                storage: licenseStorage,
-              },
-            }
-          : {};
-        const webRes = await syncHandler(webReq, syncAdapter, opts);
+        // Cloud sync is a Free-tier feature — handler runs without
+        // licenseAuth. The mechanism stays in sync-handler.ts for any
+        // future gate; this wiring layer never sets it.
+        const webRes = await syncHandler(webReq, syncAdapter);
         await sendWebResponse(webRes, res);
       });
 

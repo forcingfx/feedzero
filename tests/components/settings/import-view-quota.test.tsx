@@ -1,8 +1,8 @@
 /**
  * Quota refusal for OPML / URL-list import.
  *
- * The feed-store already gates addFeed per-URL — but for a 30-URL OPML on a
- * free user at 0 feeds, that means the user gets 25 successes + 5 cryptic
+ * The feed-store already gates addFeed per-URL — but for a 60-URL OPML on a
+ * free user at 0 feeds, that means the user gets 50 successes + 10 cryptic
  * "limit exceeded" failures. ImportView pre-checks the total upfront and
  * refuses with a clear error before kicking off the loop.
  */
@@ -69,20 +69,21 @@ describe("ImportView quota refusal", () => {
     // Switch to text-input mode so we can paste a URL list synchronously.
     await user.click(screen.getByLabelText(/paste text/i));
 
-    const ten = Array.from(
-      { length: 10 },
+    // 20 already-seeded + 35 pasted = 55, over the 50 cap.
+    const thirtyFive = Array.from(
+      { length: 35 },
       (_, i) => `https://example.com/import-${i}.xml`,
     ).join("\n");
     const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
-    await user.paste(ten);
+    await user.paste(thirtyFive);
 
     await user.click(screen.getByRole("button", { name: /import feeds/i }));
 
-    // Tolerant of "exceed", "limit", "25"; what matters is that the user is
+    // Tolerant of "exceed", "limit", "50"; what matters is that the user is
     // told why and no addFeed call sneaks through.
     expect(
-      await screen.findByText(/limit|exceed|25/i),
+      await screen.findByText(/limit|exceed|50/i),
     ).toBeInTheDocument();
     expect(addFeedMock).not.toHaveBeenCalled();
   });
@@ -104,7 +105,7 @@ describe("ImportView quota refusal", () => {
 
     await user.click(screen.getByRole("button", { name: /import feeds/i }));
 
-    // 20 + 4 = 24, under the 25 cap — addFeed runs for each URL.
+    // 20 + 4 = 24, under the 50 cap — addFeed runs for each URL.
     expect(addFeedMock).toHaveBeenCalledTimes(4);
   });
 
@@ -150,7 +151,7 @@ describe("ImportView quota refusal", () => {
 
     await user.click(screen.getByRole("button", { name: /import feeds/i }));
 
-    // 20 + 50 = 70, well over the 25 cap — but the paid tier hasn't launched,
+    // 20 + 50 = 70, well over the 50 cap — but the paid tier hasn't launched,
     // so there's no upgrade path to point users at. Allow the import.
     expect(addFeedMock).toHaveBeenCalledTimes(50);
   });

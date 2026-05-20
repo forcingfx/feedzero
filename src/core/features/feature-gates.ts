@@ -18,7 +18,7 @@
  * Reason codes are returned alongside `enabled` so callers can render
  * accurate UI ("Upgrade to Personal" vs "Coming soon" vs the live feature).
  *
- * Continuous limits (e.g. the 25-feed cap on Free) live in `quotas.ts`,
+ * Continuous limits (e.g. the 50-feed cap on Free) live in `quotas.ts`,
  * also derived from the same matrix.
  */
 

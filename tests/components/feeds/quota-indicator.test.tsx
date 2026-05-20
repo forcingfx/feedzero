@@ -61,24 +61,24 @@ describe("QuotaIndicator", () => {
     useLicenseStore.setState({ tier: "personal", verifying: false });
     seedFeeds(12);
     renderInRouter();
-    // The QuotaIndicator emits a "N / 25 feeds" string. Its absence is the
+    // The QuotaIndicator emits a "N / 50 feeds" string. Its absence is the
     // signal that the indicator was suppressed for this user.
-    expect(screen.queryByText(/\/\s*25\b/)).toBeNull();
+    expect(screen.queryByText(/\/\s*50\b/)).toBeNull();
   });
 
   it("renders nothing for self-hosted users (operator bypass)", () => {
     vi.mocked(isSelfHosted).mockReturnValue(true);
-    seedFeeds(40);
+    seedFeeds(70);
     renderInRouter();
-    expect(screen.queryByText(/\/\s*25\b/)).toBeNull();
+    expect(screen.queryByText(/\/\s*50\b/)).toBeNull();
   });
 
   it("shows the current count vs limit for free hosted users", () => {
     seedFeeds(7);
     renderInRouter();
-    // Tolerant of "7 / 25", "7 of 25", "7 / 25 feeds" etc.
+    // Tolerant of "7 / 50", "7 of 50", "7 / 50 feeds" etc.
     expect(screen.getByText(/\b7\b/)).toBeInTheDocument();
-    expect(screen.getByText(/25/)).toBeInTheDocument();
+    expect(screen.getByText(/50/)).toBeInTheDocument();
   });
 
   it("offers an Upgrade button when at or above the limit that navigates to Settings → Subscription", async () => {
@@ -88,7 +88,7 @@ describe("QuotaIndicator", () => {
     // subscription so the user sees the tier comparison before commitment.
     const { default: userEvent } = await import("@testing-library/user-event");
     const user = userEvent.setup();
-    seedFeeds(25);
+    seedFeeds(50);
     renderInRouter();
     const upgrade = screen.getByRole("button", { name: /upgrade/i });
     await user.click(upgrade);

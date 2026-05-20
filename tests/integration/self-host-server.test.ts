@@ -12,9 +12,6 @@
  *     the filesystem adapter's mkdir-on-first-write + read-back path.
  *   - `POST /api/feedback` without `GITHUB_FEEDBACK_TOKEN` → 503
  *     gracefully (most self-hosters won't wire feedback at all).
- *   - `LAUNCH_PAID_TIER=1` is suppressed by `SELF_HOSTED=1` → /api/sync
- *     stays free; this is the ADR 014 "master switch" invariant tested
- *     against the assembled server, not just the `isFlagEnabled` unit.
  *
  * Why this is its own file, not part of `server.test.ts`:
  *   `server.test.ts` is the routing-contract / security-headers suite
@@ -43,10 +40,6 @@ describe("self-host server integration", () => {
     // Self-hosters don't (and shouldn't) configure these.
     vi.stubEnv("GITHUB_FEEDBACK_TOKEN", "");
     vi.stubEnv("GITHUB_REPO", "");
-    // The paid-tier flags are deliberately set here to prove they're
-    // suppressed by the SELF_HOSTED=1 master switch — see ADR 014.
-    vi.stubEnv("LAUNCH_PAID_TIER", "1");
-    vi.stubEnv("VITE_PAID_TIER_VISIBLE", "1");
   });
 
   afterEach(() => {
@@ -143,21 +136,6 @@ describe("self-host server integration", () => {
       ).json();
       expect(a.vault).toBe("vault-a");
       expect(b.vault).toBe("vault-b");
-    });
-  });
-
-  describe("paid-tier master switch (ADR 014)", () => {
-    it("LAUNCH_PAID_TIER=1 is suppressed by SELF_HOSTED=1 — /api/sync stays free", async () => {
-      // Without the master switch, this configuration would gate /api/sync
-      // behind a Bearer license and return 401 for an unauthenticated
-      // GET. The self-host invariant is: that gate MUST be off, so the
-      // GET reaches the adapter and returns a normal 404 for a vault that
-      // hasn't been PUT yet. A 401 here would mean ADR 014 is broken.
-      const app = buildSelfHostApp();
-      const res = await app.request(`/api/sync?vaultId=${VAULT_ID}`);
-      expect(res.status).toBe(404);
-      const body = await res.json();
-      expect(body.error).not.toMatch(/license/i);
     });
   });
 
