@@ -15,7 +15,10 @@ import {
   refreshAllFeeds,
   reloadFeed,
 } from "../core/feeds/feed-service.ts";
-import { prefetchStarredArticles } from "../core/extractor/prefetch-service.ts";
+import {
+  prefetchStarredArticles,
+  prefetchFeedArticles,
+} from "../core/extractor/prefetch-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { useLicenseStore } from "./license-store.ts";
@@ -164,7 +167,18 @@ function schedulePush(): void {
  * new `extractedContent`, refresh the article-store cache so the UI
  * picks it up without a manual reload.
  */
-function schedulePrefetch(): void {
+/** Default cap on how many recent articles get pre-extracted per
+ *  prefetch-enabled feed. Keeps the per-refresh request burst bounded
+ *  even if the user has hundreds of feeds toggled on. */
+export const FEED_PREFETCH_LIMIT = 20;
+
+/**
+ * Run the prefetch passes for the given feeds. Returns a promise that
+ * resolves once every pass has settled, so tests can await it. Callers
+ * that don't care about completion (refreshAll) wrap with `void` so
+ * the UI doesn't block on a potentially multi-second batch.
+ */
+async function schedulePrefetch(feeds: Feed[]): Promise<void> {
   const gate = gateState(
     "offline-prefetch",
     useLicenseStore.getState().tier,
@@ -172,11 +186,25 @@ function schedulePrefetch(): void {
     isPaidTierActive(),
   );
   if (!gate.enabled) return;
-  void prefetchStarredArticles().then((result) => {
-    if (result.ok && result.value.extracted > 0) {
-      void useArticleStore.getState().preloadAll();
-    }
-  });
+
+  // Two passes — starred (always-on for prefetch-gated users) and
+  // per-feed (only feeds the user has explicitly opted in). The
+  // article-store is refreshed once at the end if any pass actually
+  // persisted new content.
+  const prefetchEnabledFeeds = feeds.filter((f) => f.prefetchEnabled);
+
+  let anyExtracted = false;
+  const starred = await prefetchStarredArticles();
+  if (starred.ok && starred.value.extracted > 0) anyExtracted = true;
+
+  for (const feed of prefetchEnabledFeeds) {
+    const result = await prefetchFeedArticles(feed.id, FEED_PREFETCH_LIMIT);
+    if (result.ok && result.value.extracted > 0) anyExtracted = true;
+  }
+
+  if (anyExtracted) {
+    void useArticleStore.getState().preloadAll();
+  }
 }
 
 export const useFeedStore = create<FeedStore>((set, get) => ({
@@ -300,7 +328,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     } finally {
       set({ isRefreshingAll: false });
     }
-    schedulePrefetch();
+    // Fire-and-forget — refreshAll returns once the feeds are fresh,
+    // prefetch continues in the background.
+    void schedulePrefetch(get().feeds);
   },
 
   reloadSingleFeed: async (feedId) => {
