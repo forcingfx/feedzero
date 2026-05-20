@@ -8,6 +8,7 @@ import {
   getFolders as dbGetFolders,
   updateFolder as dbUpdateFolder,
   removeFolder as dbRemoveFolder,
+  getAllArticles,
 } from "../core/storage/db.ts";
 import {
   addFeedFlow,
@@ -18,6 +19,7 @@ import {
 import {
   prefetchStarredArticles,
   prefetchFeedArticles,
+  selectFrequentFeeds,
 } from "../core/extractor/prefetch-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
@@ -197,8 +199,21 @@ async function schedulePrefetch(feeds: Feed[]): Promise<void> {
   const starred = await prefetchStarredArticles();
   if (starred.ok && starred.value.extracted > 0) anyExtracted = true;
 
-  for (const feed of prefetchEnabledFeeds) {
-    const result = await prefetchFeedArticles(feed.id, FEED_PREFETCH_LIMIT);
+  // Compose the per-feed list: explicit toggle + the frequency
+  // heuristic, deduplicated. Read counts come from Article.readAt
+  // which never leaves the encrypted vault, so this stays private.
+  const idsToPrefetch = new Set<string>();
+  for (const feed of prefetchEnabledFeeds) idsToPrefetch.add(feed.id);
+
+  const articlesResult = await getAllArticles();
+  if (articlesResult.ok) {
+    for (const feedId of selectFrequentFeeds(articlesResult.value)) {
+      idsToPrefetch.add(feedId);
+    }
+  }
+
+  for (const feedId of idsToPrefetch) {
+    const result = await prefetchFeedArticles(feedId, FEED_PREFETCH_LIMIT);
     if (result.ok && result.value.extracted > 0) anyExtracted = true;
   }
 

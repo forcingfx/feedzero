@@ -48,6 +48,14 @@ export interface Article {
   /** Unix epoch ms of the most recent star action; used to sort the starred view. */
   starredAt?: number;
   /**
+   * Unix epoch ms when the user most recently opened / read this
+   * article. Drives the frequency heuristic that auto-prefetches
+   * feeds the user reads often, without requiring an explicit toggle.
+   * Set in `selectArticle` on the auto-mark-read delay; never set
+   * server-side.
+   */
+  readAt?: number;
+  /**
    * Sanitized full-text HTML extracted from `link` and persisted for offline
    * reading. Populated by the background prefetch service for starred
    * articles; rides through the encrypted vault to other devices.
