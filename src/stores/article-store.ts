@@ -411,7 +411,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     if (!article.read) {
       markAsReadTimer = setTimeout(() => {
         markAsReadTimer = null;
-        const updated = { ...article, read: true };
+        const updated = { ...article, read: true, readAt: Date.now() };
         set({
           ...applyArticleUpdate(get(), updated),
           selectedArticle: updated,

@@ -35,6 +35,21 @@ import type { Article } from "../../types/index.ts";
 export const PREFETCH_CONCURRENCY = 3;
 
 /**
+ * Trailing window for the frequency heuristic (ms). Reads within this
+ * window count toward "frequently read" classification.
+ */
+export const FREQUENCY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Minimum read count within FREQUENCY_WINDOW_MS for a feed to be
+ * auto-prefetched without the explicit per-feed toggle. The value is
+ * deliberately gentle — most users read several articles from feeds
+ * they actually like; one-off reads from an article-of-the-week feed
+ * shouldn't pull a hundred extractions behind it.
+ */
+export const FREQUENCY_THRESHOLD = 10;
+
+/**
  * Articles older than this are skipped on prefetch.
  * 90 days × 24h × 60m × 60s × 1000ms = 7_776_000_000.
  * Power users may have years of pre-existing stars; we don't want to
@@ -182,6 +197,29 @@ export async function prefetchFeedArticles(
     prefetchOne,
   );
   return ok({ extracted, failed });
+}
+
+/**
+ * Pure selector over a snapshot of articles: which feed ids has the
+ * user read >= FREQUENCY_THRESHOLD articles from in the trailing
+ * FREQUENCY_WINDOW_MS? Exported for testing — the wiring imports it
+ * and passes the result into prefetchFeedArticles per match.
+ */
+export function selectFrequentFeeds(
+  articles: Article[],
+  now: number = Date.now(),
+): string[] {
+  const cutoff = now - FREQUENCY_WINDOW_MS;
+  const counts = new Map<string, number>();
+  for (const a of articles) {
+    if (!a.readAt || a.readAt < cutoff) continue;
+    counts.set(a.feedId, (counts.get(a.feedId) ?? 0) + 1);
+  }
+  const matches: string[] = [];
+  for (const [feedId, count] of counts) {
+    if (count >= FREQUENCY_THRESHOLD) matches.push(feedId);
+  }
+  return matches;
 }
 
 export async function prefetchStarredArticles(): Promise<Result<PrefetchStats>> {

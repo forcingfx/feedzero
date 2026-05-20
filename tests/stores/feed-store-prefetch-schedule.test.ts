@@ -9,29 +9,30 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { waitFor } from "@testing-library/react";
 import type { Feed } from "../../src/types/index.ts";
 
-vi.mock("../../src/core/storage/db.ts", () => {
-  const feeds = new Map<string, Feed>();
-  return {
-    getFeeds: vi.fn(async () => ({ ok: true, value: [...feeds.values()] })),
-    getFeed: vi.fn(async (id: string) => {
-      const f = feeds.get(id);
-      return f
-        ? { ok: true as const, value: f }
-        : { ok: false as const, error: "not found" };
-    }),
-    updateFeed: vi.fn(async (f: Feed) => {
-      feeds.set(f.id, f);
-      return { ok: true, value: true };
-    }),
-    addFolder: vi.fn(),
-    getFolders: vi.fn(async () => ({ ok: true, value: [] })),
-    updateFolder: vi.fn(),
-    removeFolder: vi.fn(),
-    removeFeed: vi.fn(),
-    _seed: (f: Feed) => feeds.set(f.id, f),
-    _reset: () => feeds.clear(),
-  };
-});
+const { feeds, articles } = vi.hoisted(() => ({
+  feeds: new Map<string, Feed>(),
+  articles: [] as { id: string; feedId: string; readAt?: number; [k: string]: unknown }[],
+}));
+
+vi.mock("../../src/core/storage/db.ts", () => ({
+  getFeeds: vi.fn(async () => ({ ok: true, value: [...feeds.values()] })),
+  getFeed: vi.fn(async (id: string) => {
+    const f = feeds.get(id);
+    return f
+      ? { ok: true as const, value: f }
+      : { ok: false as const, error: "not found" };
+  }),
+  updateFeed: vi.fn(async (f: Feed) => {
+    feeds.set(f.id, f);
+    return { ok: true, value: true };
+  }),
+  addFolder: vi.fn(),
+  getFolders: vi.fn(async () => ({ ok: true, value: [] })),
+  updateFolder: vi.fn(),
+  removeFolder: vi.fn(),
+  removeFeed: vi.fn(),
+  getAllArticles: vi.fn(async () => ({ ok: true, value: articles })),
+}));
 
 vi.mock("../../src/core/feeds/feed-service.ts", () => ({
   addFeedFlow: vi.fn(),
@@ -40,16 +41,25 @@ vi.mock("../../src/core/feeds/feed-service.ts", () => ({
   reloadFeed: vi.fn(),
 }));
 
-vi.mock("../../src/core/extractor/prefetch-service.ts", () => ({
-  prefetchStarredArticles: vi.fn().mockResolvedValue({
-    ok: true,
-    value: { extracted: 0, failed: 0 },
-  }),
-  prefetchFeedArticles: vi.fn().mockResolvedValue({
-    ok: true,
-    value: { extracted: 0, failed: 0 },
-  }),
-}));
+// Mock only the I/O-bound prefetch functions; keep the pure
+// selectFrequentFeeds + the THRESHOLD/WINDOW constants real so the
+// heuristic is exercised end-to-end with realistic logic.
+vi.mock("../../src/core/extractor/prefetch-service.ts", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("../../src/core/extractor/prefetch-service.ts")
+  >();
+  return {
+    ...actual,
+    prefetchStarredArticles: vi.fn().mockResolvedValue({
+      ok: true,
+      value: { extracted: 0, failed: 0 },
+    }),
+    prefetchFeedArticles: vi.fn().mockResolvedValue({
+      ok: true,
+      value: { extracted: 0, failed: 0 },
+    }),
+  };
+});
 
 vi.mock("../../src/core/sync/sync-service", () => ({
   pushVault: vi.fn(),
@@ -68,11 +78,19 @@ import {
   prefetchStarredArticles,
   prefetchFeedArticles,
 } from "../../src/core/extractor/prefetch-service.ts";
-import * as db from "../../src/core/storage/db.ts";
+import { FREQUENCY_THRESHOLD } from "../../src/core/extractor/prefetch-service.ts";
 
-const dbMock = db as unknown as {
-  _seed: (f: Feed) => void;
-  _reset: () => void;
+const dbMock = {
+  _seed: (f: Feed) => feeds.set(f.id, f),
+  _reset: () => {
+    feeds.clear();
+    articles.length = 0;
+  },
+  _seedReads: (feedId: string, count: number, readAt = Date.now()) => {
+    for (let i = 0; i < count; i++) {
+      articles.push({ id: `${feedId}-${i}`, feedId, readAt });
+    }
+  },
 };
 
 function feed(id: string, prefetchEnabled?: boolean): Feed {
@@ -135,5 +153,35 @@ describe("refreshAll triggers feed-prefetch for prefetchEnabled feeds", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(prefetchStarredArticles).not.toHaveBeenCalled();
     expect(prefetchFeedArticles).not.toHaveBeenCalled();
+  });
+
+  it("auto-prefetches frequently-read feeds via the heuristic, without the explicit toggle", async () => {
+    dbMock._seed(feed("f-hot"));
+    dbMock._seed(feed("f-quiet"));
+    dbMock._seedReads("f-hot", FREQUENCY_THRESHOLD);
+    dbMock._seedReads("f-quiet", 2);
+    await useFeedStore.getState().loadFeeds();
+
+    await useFeedStore.getState().refreshAll();
+
+    await waitFor(() =>
+      expect(prefetchFeedArticles).toHaveBeenCalledTimes(1),
+    );
+    expect(
+      (prefetchFeedArticles as unknown as { mock: { calls: [string][] } }).mock
+        .calls[0][0],
+    ).toBe("f-hot");
+  });
+
+  it("does not double-prefetch a feed that's both toggled and frequently-read", async () => {
+    dbMock._seed(feed("f-hot", true));
+    dbMock._seedReads("f-hot", FREQUENCY_THRESHOLD);
+    await useFeedStore.getState().loadFeeds();
+
+    await useFeedStore.getState().refreshAll();
+
+    await waitFor(() =>
+      expect(prefetchFeedArticles).toHaveBeenCalledTimes(1),
+    );
   });
 });
