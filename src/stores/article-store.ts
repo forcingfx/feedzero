@@ -210,16 +210,18 @@ function deriveVisibleArticles(
   }
   if (isFolderFeedId(feedId)) {
     const folderId = fromFolderFeedId(feedId)!;
-    const memberIds = new Set(
-      useFeedStore
-        .getState()
-        .feeds.filter((f) => f.folderId === folderId)
-        .map((f) => f.id),
-    );
+    const feeds = useFeedStore.getState().feeds;
+    const feedFolderById = new Map(feeds.map((f) => [f.id, f.folderId]));
     const flat: Article[] = [];
-    for (const [id, list] of Object.entries(articlesByFeedId)) {
-      if (!memberIds.has(id)) continue;
-      for (const a of list) if (dropMuted(a)) flat.push(a);
+    for (const list of Object.values(articlesByFeedId)) {
+      for (const a of list) {
+        if (!dropMuted(a)) continue;
+        // Article-level folderId override wins; otherwise inherit
+        // the article's feed folder. An article whose effective folder
+        // doesn't match the requested view is skipped.
+        const effective = a.folderId ?? feedFolderById.get(a.feedId);
+        if (effective === folderId) flat.push(a);
+      }
     }
     return sortArticles(flat, sortMode);
   }
