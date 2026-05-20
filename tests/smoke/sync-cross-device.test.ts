@@ -31,17 +31,6 @@ import { randomBytes } from "node:crypto";
 const SKIP = !process.env.SMOKE_TESTS;
 const BASE_URL = process.env.SMOKE_BASE_URL ?? "https://my.feedzero.app";
 
-// When LAUNCH_PAID_TIER=1 on the target deploy, /api/sync requires a
-// signed license bearer. SMOKE_LICENSE_TOKEN lets the smoke test pass
-// the gate; without it, the test skips because the data assertions
-// cannot run against an authenticated endpoint.
-const LICENSE_TOKEN = process.env.SMOKE_LICENSE_TOKEN;
-const SKIP_AUTH = SKIP || !LICENSE_TOKEN;
-
-const AUTH_HEADER: Record<string, string> = LICENSE_TOKEN
-  ? { Authorization: `Bearer ${LICENSE_TOKEN}` }
-  : {};
-
 // Vercel Preview Deployment Protection 401s every request at the edge
 // before our app code runs. The Protection Bypass for Automation
 // feature exempts requests carrying this header from the gate. The
@@ -84,7 +73,7 @@ function buildSyntheticVaultPayload(): {
   return { version: 1, iv, ciphertext };
 }
 
-describe.skipIf(SKIP_AUTH)(
+describe.skipIf(SKIP)(
   "production /api/sync (live) — cross-device PUT then GET",
   () => {
     it("Device A PUTs a vault; a separate Device B GET reads identical bytes", async () => {
@@ -103,7 +92,6 @@ describe.skipIf(SKIP_AUTH)(
           headers: {
             "Content-Type": "application/json",
             ...BYPASS_HEADER,
-            ...AUTH_HEADER,
           },
           body: putBody,
         });
@@ -116,7 +104,7 @@ describe.skipIf(SKIP_AUTH)(
           fetch(input, { ...init, cache: "no-store" });
         const getRes = await deviceB(
           `${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`,
-          { headers: { ...BYPASS_HEADER, ...AUTH_HEADER } },
+          { headers: { ...BYPASS_HEADER } },
         );
         expect(getRes.status).toBe(200);
         const body = (await getRes.json()) as {
@@ -134,7 +122,7 @@ describe.skipIf(SKIP_AUTH)(
       } finally {
         await fetch(`${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`, {
           method: "DELETE",
-          headers: { ...BYPASS_HEADER, ...AUTH_HEADER },
+          headers: { ...BYPASS_HEADER },
         }).catch(() => {});
       }
     }, 30_000);
@@ -147,7 +135,7 @@ describe.skipIf(SKIP_AUTH)(
       const bogusId = "e".repeat(64);
       const res = await fetch(`${BASE_URL}/api/sync?vaultId=${bogusId}`, {
         method: "HEAD",
-        headers: { ...BYPASS_HEADER, ...AUTH_HEADER },
+        headers: { ...BYPASS_HEADER },
       });
       expect(res.status).toBe(404);
     }, 15_000);
@@ -155,32 +143,35 @@ describe.skipIf(SKIP_AUTH)(
 );
 
 /**
- * Always-on assertion: when the deploy gates /api/sync behind a license
- * (LAUNCH_PAID_TIER=1) and no SMOKE_LICENSE_TOKEN is configured, an
- * unauthenticated request must return 401, not 200 (which would mean
- * the gate isn't applied) and not a server-error class. Catches the
- * regression where auth-gating gets accidentally removed.
+ * Regression sentinel: cloud sync is a Free-tier feature and the server
+ * must never gate /api/sync behind a license. If a future change re-wires
+ * `licenseAuth` (the mechanism still lives in sync-handler.ts), this
+ * assertion catches it against the deployed system. An unauthenticated
+ * PUT must succeed with 200, never 401.
  */
-describe.skipIf(SKIP || LICENSE_TOKEN !== undefined)(
-  "production /api/sync — auth gate (no license token configured)",
+describe.skipIf(SKIP)(
+  "production /api/sync — no license required (Free-tier feature)",
   () => {
-    it("rejects unauthenticated PUT with 401 when LAUNCH_PAID_TIER is on", async () => {
+    it("unauthenticated PUT succeeds with 200 (no bearer)", async () => {
       const vaultPayload = buildSyntheticVaultPayload();
-      const res = await fetch(`${BASE_URL}/api/sync`, {
-        method: "PUT",
-        // Bypass header is still required to get past Vercel Preview
-        // Protection (which 401s at the edge). The auth-gate assertion
-        // is specifically about the app's bearer check, not Vercel's
-        // platform-level protection.
-        headers: { "Content-Type": "application/json", ...BYPASS_HEADER },
-        body: JSON.stringify({
-          vaultId: SENTINEL_VAULT_ID,
-          vault: vaultPayload,
-        }),
-      });
-      // 401 = gate enforced (expected); 200 = gate missing (regression).
-      // Anything 5xx means the gate path itself is broken.
-      expect([200, 401]).toContain(res.status);
+      const sentinelId = "f".repeat(64);
+      try {
+        const res = await fetch(`${BASE_URL}/api/sync`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...BYPASS_HEADER },
+          body: JSON.stringify({
+            vaultId: sentinelId,
+            vault: vaultPayload,
+          }),
+        });
+        // 200 = sync stays free; 401 = a license gate was re-introduced.
+        expect(res.status).toBe(200);
+      } finally {
+        await fetch(`${BASE_URL}/api/sync?vaultId=${sentinelId}`, {
+          method: "DELETE",
+          headers: { ...BYPASS_HEADER },
+        }).catch(() => {});
+      }
     }, 15_000);
   },
 );

@@ -4,8 +4,8 @@
  *
  * This is the single source of truth referenced by `feature-gates.ts`
  * (binary capability gating) and `quotas.ts` (continuous limit gating).
- * Changing what a tier includes — flipping cloud-sync to Free, lifting
- * the 25-feed cap, shipping a coming-soon feature — starts here. The
+ * Changing what a tier includes — lifting the Free feed cap, shipping a
+ * coming-soon feature, moving a feature between tiers — starts here. The
  * markdown doc at `docs/tier-matrix.md` is regenerated from this module
  * via `npm run docs:tier-matrix`.
  *
@@ -229,7 +229,7 @@ export const TIER_MATRIX = {
       "Sync your subscriptions, folders, and read state across devices via an end-to-end encrypted vault.",
     category: "sync-and-storage",
     status: "shipped",
-    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
   },
   "offline-prefetch": {
     id: "offline-prefetch",
@@ -381,7 +381,6 @@ export function isGated(id: FeatureId): boolean {
  * here fails the suite.
  */
 export const GATED_FEATURE_IDS = [
-  "cloud-sync",
   "auto-organize",
   "offline-prefetch",
   "filters",

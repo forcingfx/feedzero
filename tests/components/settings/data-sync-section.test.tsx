@@ -2,9 +2,8 @@
  * <DataSyncSection> — switch-toggle cloud sync UX + always-on delete.
  *
  * Verifies user-observable behaviour:
- *   - Sync toggle is operable when the user has an active license.
- *   - Sync toggle sits behind a blurred overlay with an Upgrade CTA for
- *     free-tier hosted users.
+ *   - Sync toggle is operable for every tier (sync is a Free feature).
+ *   - Self-hosted users with no sync server reachable see a docs overlay.
  *   - Delete all data is always clickable regardless of tier.
  *   - Paid users see a non-blocking subscription-billing warning in the
  *     delete confirmation, NOT a blocking "cancel subscription first" gate.
@@ -66,15 +65,17 @@ describe("<DataSyncSection>", () => {
     expect(toggle.getAttribute("aria-checked")).toBe("true");
   });
 
-  it("free-tier hosted users see an Upgrade-plan overlay over the toggle", () => {
+  it("free-tier hosted users see an operable toggle (sync is now a Free feature)", () => {
     useLicenseStore.setState({ tier: "free", verifying: false });
     renderSection();
+    const toggle = screen.getByRole("switch", { name: /toggle cloud sync/i });
+    expect(toggle).not.toBeDisabled();
     expect(
-      screen.getByText(/cloud sync requires a subscription/i),
-    ).toBeInTheDocument();
+      screen.queryByText(/cloud sync requires a subscription/i),
+    ).toBeNull();
     expect(
-      screen.getByRole("button", { name: /upgrade plan/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /upgrade plan/i }),
+    ).toBeNull();
   });
 
   it("Delete all data and reset app is visible for free users", () => {

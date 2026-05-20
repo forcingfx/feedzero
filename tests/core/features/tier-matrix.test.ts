@@ -67,14 +67,6 @@ describe("tier-matrix — feed-subscriptions (the headline quota)", () => {
 });
 
 describe("tier-matrix — currently shipped gated features", () => {
-  it("cloud-sync is Personal+, shipped", () => {
-    const entry = getEntry("cloud-sync");
-    expect(entry.status).toBe("shipped");
-    expect(entry.tiers.free.available).toBe(false);
-    expect(entry.tiers.personal.available).toBe(true);
-    expect(entry.tiers.pro.available).toBe(true);
-  });
-
   it("auto-organize is Personal+, shipped", () => {
     expect(getEntry("auto-organize").status).toBe("shipped");
     expect(getRequiredTier("auto-organize")).toBe("personal");
@@ -121,6 +113,7 @@ describe("tier-matrix — always-free features (scope of canonical doc)", () => 
     "global-feed",
     "starred-articles",
     "encrypted-local-storage",
+    "cloud-sync",
   ] as const)("%s is available on every tier", (id) => {
     const entry = getEntry(id);
     expect(entry.tiers.free.available).toBe(true);
@@ -132,28 +125,29 @@ describe("tier-matrix — always-free features (scope of canonical doc)", () => 
 
 describe("tier-matrix — derived helpers", () => {
   it("getAvailability returns the per-tier slot", () => {
-    expect(getAvailability("cloud-sync", "free")).toEqual({ available: false });
-    expect(getAvailability("cloud-sync", "personal")).toEqual({ available: true });
+    expect(getAvailability("auto-organize", "free")).toEqual({ available: false });
+    expect(getAvailability("auto-organize", "personal")).toEqual({ available: true });
   });
 
   it("getLimit returns undefined for binary features (no limit set)", () => {
-    expect(getLimit("cloud-sync", "personal")).toBeUndefined();
     expect(getLimit("auto-organize", "personal")).toBeUndefined();
+    expect(getLimit("offline-prefetch", "personal")).toBeUndefined();
   });
 
   it("getLimit returns undefined when the feature is unavailable on that tier", () => {
-    expect(getLimit("cloud-sync", "free")).toBeUndefined();
+    expect(getLimit("auto-organize", "free")).toBeUndefined();
   });
 
   it("isGated is true for features with at least one tier denied", () => {
-    expect(isGated("cloud-sync")).toBe(true);
     expect(isGated("auto-organize")).toBe(true);
+    expect(isGated("offline-prefetch")).toBe(true);
     expect(isGated("mute-keywords")).toBe(true);
   });
 
   it("isGated is false for always-free features", () => {
     expect(isGated("feed-discovery")).toBe(false);
     expect(isGated("keyboard-navigation")).toBe(false);
+    expect(isGated("cloud-sync")).toBe(false);
   });
 
   it("GATED_FEATURE_IDS matches isGated for every matrix entry (both directions)", () => {
@@ -172,7 +166,6 @@ describe("tier-matrix — derived helpers", () => {
 describe("tier-matrix — back-compat with feature-gates.FEATURE_MAP", () => {
   it("every currently-gated id is present in the matrix", () => {
     const expected = [
-      "cloud-sync",
       "auto-organize",
       "offline-prefetch",
       "filters",

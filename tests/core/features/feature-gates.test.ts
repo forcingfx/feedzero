@@ -37,13 +37,6 @@ describe("gateState — shipped features (paid tier active)", () => {
     });
   });
 
-  it("cloud-sync is shipped Personal-tier", () => {
-    expect(FEATURE_MAP["cloud-sync"]).toEqual({
-      requiredTier: "personal",
-      status: "shipped",
-    });
-  });
-
   it("free user without self-hosted → tier-locked for auto-organize", () => {
     expect(gateState("auto-organize", "free", false, true)).toEqual({
       enabled: false,

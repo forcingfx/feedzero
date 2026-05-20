@@ -309,45 +309,12 @@ describe("sync-store", () => {
     });
   });
 
-  describe("license-required migration (existing cloud-sync user post-paywall)", () => {
-    it("sets pendingMigration='license-required' when pull returns a 401 license-required error", async () => {
-      mockPullVault.mockResolvedValue({
-        ok: false,
-        error: 'Sync pull failed (401): {"ok":false,"error":"license required","traceId":"req_be627fd1"}',
-      });
-      useSyncStore.setState({
-        credentials: mockCredentials,
-        pendingMigration: null,
-      });
-
-      await useSyncStore.getState().pull();
-
-      expect(useSyncStore.getState().pendingMigration).toBe("license-required");
-      expect(useSyncStore.getState().status).toBe("error");
-    });
-
-    it("does NOT set pendingMigration for non-license pull failures (network errors etc.)", async () => {
-      mockPullVault.mockResolvedValue({
-        ok: false,
-        error: "Sync pull failed: fetch error",
-      });
-      useSyncStore.setState({
-        credentials: mockCredentials,
-        pendingMigration: null,
-      });
-
-      await useSyncStore.getState().pull();
-
-      expect(useSyncStore.getState().pendingMigration).toBeNull();
-      expect(useSyncStore.getState().status).toBe("error");
-    });
-
-    it("disableSync (now the canonical 'keep reading locally' action) clears credentials, sets status=local-only, and resets error/pendingMigration", async () => {
+  describe("disableSync (canonical 'keep reading locally' action)", () => {
+    it("clears credentials, sets status=local-only, and resets error", async () => {
       useSyncStore.setState({
         credentials: mockCredentials,
         status: "error",
-        pendingMigration: "license-required",
-        error: "license required",
+        error: "transient pull failure",
       });
 
       await useSyncStore.getState().disableSync();
@@ -355,40 +322,18 @@ describe("sync-store", () => {
       const s = useSyncStore.getState();
       expect(s.credentials).toBeNull();
       expect(s.status).toBe("local-only");
-      expect(s.pendingMigration).toBeNull();
       expect(s.error).toBeNull();
     });
 
-    it("the 'keep reading locally' path does NOT attempt to delete the server vault (policy: 90-day retention)", async () => {
+    it("does NOT attempt to delete the server vault (preserved for recovery)", async () => {
       useSyncStore.setState({
         credentials: mockCredentials,
-        pendingMigration: "license-required",
+        status: "synced",
       });
 
       await useSyncStore.getState().disableSync();
 
-      // The server vault delete would 401 anyway (no license) — skipping it
-      // is the whole point. Privacy policy promises 90-day retention then
-      // auto-delete by our retention cron (separate ops surface).
       expect(mockDeleteVault).not.toHaveBeenCalled();
-    });
-
-    it("dismissPendingMigration clears the flag without changing sync state (user dismissed dialog without choosing)", async () => {
-      useSyncStore.setState({
-        credentials: mockCredentials,
-        status: "error",
-        pendingMigration: "license-required",
-        error: "license required",
-      });
-
-      useSyncStore.getState().dismissPendingMigration();
-
-      const s = useSyncStore.getState();
-      expect(s.pendingMigration).toBeNull();
-      // sync state untouched — user just closed the modal. The dialog can
-      // re-appear on the next pull attempt (which will still 401).
-      expect(s.credentials).toBe(mockCredentials);
-      expect(s.status).toBe("error");
     });
   });
 

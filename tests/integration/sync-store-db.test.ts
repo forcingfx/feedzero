@@ -111,7 +111,6 @@ async function resetEverything() {
     lastSyncedAt: null,
     error: null,
     credentials: null,
-    pendingMigration: null,
   });
   useFeedStore.setState({
     feeds: [],
@@ -262,29 +261,6 @@ describe("sync-store ↔ db.ts integration", () => {
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
-    it("sets pendingMigration='license-required' when the server returns the paywall 401", async () => {
-      const { addVaultKeys } = await import(
-        "../../src/core/storage/key-manager.ts"
-      );
-      const credsResult = await addVaultKeys(LOCAL_PASSPHRASE);
-      if (!credsResult.ok) throw new Error(credsResult.error);
-      useSyncStore.setState({
-        credentials: credsResult.value,
-        status: "synced",
-      });
-
-      pullVaultMock.mockResolvedValue({
-        ok: false,
-        error: 'Sync pull failed (401): {"ok":false,"error":"license required"}',
-      });
-
-      await useSyncStore.getState().pull();
-
-      // The grace-migration discriminant must fire — that's what gates
-      // the SyncMigrationDialog on the paywall launch day.
-      expect(useSyncStore.getState().pendingMigration).toBe("license-required");
-      expect(useSyncStore.getState().status).toBe("error");
-    });
   });
 
   describe("deactivateLocal", () => {
