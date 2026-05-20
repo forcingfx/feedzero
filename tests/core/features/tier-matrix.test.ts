@@ -84,9 +84,9 @@ describe("tier-matrix — currently shipped gated features", () => {
 });
 
 describe("tier-matrix — coming-soon features", () => {
-  it("mute-keywords is Personal+, coming-soon", () => {
-    expect(getEntry("mute-keywords").status).toBe("coming-soon");
-    expect(getRequiredTier("mute-keywords")).toBe("personal");
+  it("rules is Personal+, shipped (subsumed mute-keywords)", () => {
+    expect(getEntry("rules").status).toBe("shipped");
+    expect(getRequiredTier("rules")).toBe("personal");
   });
 
   it.each([
@@ -141,7 +141,7 @@ describe("tier-matrix — derived helpers", () => {
   it("isGated is true for features with at least one tier denied", () => {
     expect(isGated("auto-organize")).toBe(true);
     expect(isGated("offline-prefetch")).toBe(true);
-    expect(isGated("mute-keywords")).toBe(true);
+    expect(isGated("rules")).toBe(true);
   });
 
   it("isGated is false for always-free features", () => {
@@ -169,7 +169,7 @@ describe("tier-matrix — back-compat with feature-gates.FEATURE_MAP", () => {
       "auto-organize",
       "offline-prefetch",
       "filters",
-      "mute-keywords",
+      "rules",
       "search",
       "ai-signal",
       "authenticated-fetchers",

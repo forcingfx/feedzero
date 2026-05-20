@@ -251,12 +251,13 @@ export const TIER_MATRIX = {
     status: "shipped",
     tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
   },
-  "mute-keywords": {
-    id: "mute-keywords",
-    name: "Mute keywords",
-    description: "Hide articles whose title or body matches a muted keyword.",
+  rules: {
+    id: "rules",
+    name: "Rules",
+    description:
+      "Per-feed auto-action rules: mute, star, mark-read, or route articles by title, author, content, date, and more.",
     category: "filtering-and-search",
-    status: "coming-soon",
+    status: "shipped",
     tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
   },
   search: {
@@ -384,7 +385,7 @@ export const GATED_FEATURE_IDS = [
   "auto-organize",
   "offline-prefetch",
   "filters",
-  "mute-keywords",
+  "rules",
   "search",
   "ai-signal",
   "authenticated-fetchers",
