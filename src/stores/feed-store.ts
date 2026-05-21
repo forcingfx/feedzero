@@ -169,6 +169,16 @@ function sortFoldersByName(folders: Folder[]): Folder[] {
   return [...folders].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** True when the current session may enable offline-prefetch on a feed. */
+function isPrefetchGateOpen(): boolean {
+  return gateState(
+    "offline-prefetch",
+    useLicenseStore.getState().tier,
+    isSelfHosted(),
+    isPaidTierActive(),
+  ).enabled;
+}
+
 /** True when the current session may mutate per-feed rules. */
 function isRulesGateOpen(): boolean {
   return gateState(
@@ -411,6 +421,16 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   setFeedPrefetchEnabled: async (feedId, value) => {
+    // Defense-in-depth: the dialog UI gates this affordance too. A
+    // free user reaching the mutator via a console/keyboard binding
+    // gets the same toast + no-op as a free user clicking the
+    // (hidden) Switch. Without this, Feed.prefetchEnabled persists
+    // for a free user even though schedulePrefetch never honours
+    // it — visible state would silently contradict actual behaviour.
+    if (!isPrefetchGateOpen()) {
+      toast("Offline prefetch is a Personal feature. Subscribe to unlock.");
+      return;
+    }
     const feedResult = await getFeed(feedId);
     if (!feedResult.ok) return;
     await dbUpdateFeed({
