@@ -17,8 +17,9 @@ vi.mock("@/core/extractor/extractor.ts", () => ({
   needsExtraction: vi.fn().mockReturnValue(false),
 }));
 
+let mockIsDesktop = true;
 vi.mock("@/hooks/use-media-query.ts", () => ({
-  useIsDesktop: () => true,
+  useIsDesktop: () => mockIsDesktop,
 }));
 
 function mockArticle() {
@@ -39,6 +40,7 @@ function mockArticle() {
 
 describe("ReaderPanel paywall integration", () => {
   beforeEach(() => {
+    mockIsDesktop = true;
     useArticleStore.setState({
       articles: [],
       selectedArticle: null,
@@ -181,6 +183,47 @@ describe("ReaderPanel paywall integration", () => {
 
     const toggle = screen.getByRole("button", { name: /Full text/i });
     expect(toggle).not.toBeDisabled();
+  });
+
+  it("renders PaywallPrompt on mobile (onNavigate path) too", () => {
+    mockIsDesktop = false;
+    useExtensionStore.setState({
+      status: "installed",
+      authorizedDomains: [],
+    });
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    // Mobile path supplies onNavigate / onBack so the reader pane wraps
+    // the body in a scroll container + nav pills. The PaywallPrompt
+    // lives inside that body, so it must render on the mobile branch
+    // exactly as it does on desktop.
+    render(<ReaderPanel onNavigate={vi.fn()} onBack={vi.fn()} />);
+
+    act(() => {
+      useExtractionStore.setState({
+        cache: {},
+        statusMap: { "https://nytimes.com/article-x": "failed" },
+        paywallMap: {
+          "https://nytimes.com/article-x": {
+            paywalled: true,
+            publisher: "nytimes.com",
+            reason: "nyt-cta",
+          },
+        },
+        viewMode: "extracted",
+      });
+    });
+
+    const prompt = screen.getByRole("region", { name: /paywall prompt/i });
+    expect(prompt).toBeInTheDocument();
+    // Authorize button is reachable on mobile.
+    expect(
+      screen.getByRole("button", { name: /authorize/i }),
+    ).toBeInTheDocument();
   });
 
   it("still disables the Full text toggle when status is 'failed' with NO paywall verdict (genuine extraction failure)", () => {
