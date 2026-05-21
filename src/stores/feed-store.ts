@@ -135,6 +135,18 @@ interface FeedStore {
   rulesEditorFeedId: string | null;
   openRulesEditor: (feedId: string) => void;
   closeRulesEditor: () => void;
+  /**
+   * Open/close state for the per-feed settings dialog. Dialog mounts
+   * at the app root and reads this slice; non-null id = open against
+   * that feed. Mirrors rulesEditorFeedId for shape.
+   */
+  feedSettingsDialogId: string | null;
+  openFeedSettings: (feedId: string) => void;
+  closeFeedSettings: () => void;
+  /** Same shape, for the per-folder settings dialog (rename + color + delete). */
+  folderSettingsDialogId: string | null;
+  openFolderSettings: (folderId: string) => void;
+  closeFolderSettings: () => void;
 }
 
 function readSortMode(): FeedSortMode {
@@ -313,6 +325,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   rulesEditorFeedId: null,
   openRulesEditor: (feedId) => set({ rulesEditorFeedId: feedId }),
   closeRulesEditor: () => set({ rulesEditorFeedId: null }),
+  feedSettingsDialogId: null,
+  openFeedSettings: (feedId) => set({ feedSettingsDialogId: feedId }),
+  closeFeedSettings: () => set({ feedSettingsDialogId: null }),
+  folderSettingsDialogId: null,
+  openFolderSettings: (folderId) => set({ folderSettingsDialogId: folderId }),
+  closeFolderSettings: () => set({ folderSettingsDialogId: null }),
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
