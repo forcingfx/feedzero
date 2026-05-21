@@ -46,6 +46,12 @@ vi.mock("@/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
+vi.mock("@/core/features/paid-tier-active.ts", () => ({
+  isPaidTierActive: () => true,
+}));
+
+import { useLicenseStore } from "@/stores/license-store.ts";
+
 function feed(overrides: Partial<Feed> = {}): Feed {
   return {
     id: "f-tech",
@@ -91,6 +97,7 @@ describe("FeedSettingsDialog", () => {
     removeFeed = vi.fn().mockResolvedValue(undefined);
     openRulesEditor = vi.fn();
 
+    useLicenseStore.setState({ tier: "personal" });
     useFeedStore.setState({
       feeds: [feed()],
       folders: [],
@@ -237,5 +244,54 @@ describe("FeedSettingsDialog", () => {
     await user.click(cancel);
 
     expect(removeFeed).not.toHaveBeenCalled();
+  });
+
+  describe("free-tier gating", () => {
+    it("Prefetch full text Switch is not rendered for free users — replaced by an upgrade badge", () => {
+      useLicenseStore.setState({ tier: "free" });
+      useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+      renderDialog();
+
+      expect(screen.queryByTestId("feed-settings-prefetch")).toBeNull();
+      // A locked-state badge replaces the toggle so the user knows
+      // the feature exists but is paid-only.
+      expect(
+        screen.getByTestId("feed-settings-prefetch-locked"),
+      ).toBeInTheDocument();
+    });
+
+    it("Prefer full text Switch stays visible for free users (it's an always-free toggle)", () => {
+      useLicenseStore.setState({ tier: "free" });
+      useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+      renderDialog();
+
+      expect(
+        screen.getByTestId("feed-settings-prefer-full-text"),
+      ).toBeInTheDocument();
+    });
+
+    it("Manage rules button is not rendered for free users — replaced by an upgrade badge", () => {
+      useLicenseStore.setState({ tier: "free" });
+      useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+      renderDialog();
+
+      expect(screen.queryByTestId("feed-settings-manage-rules")).toBeNull();
+      expect(
+        screen.getByTestId("feed-settings-rules-locked"),
+      ).toBeInTheDocument();
+    });
+
+    it("Personal users see both the Prefetch Switch and the Manage rules button as normal", () => {
+      useLicenseStore.setState({ tier: "personal" });
+      useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+      renderDialog();
+
+      expect(
+        screen.getByTestId("feed-settings-prefetch"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("feed-settings-manage-rules"),
+      ).toBeInTheDocument();
+    });
   });
 });

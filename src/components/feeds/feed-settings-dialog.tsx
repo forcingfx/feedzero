@@ -44,6 +44,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import type { Feed } from "@/types/index.ts";
 
 export function FeedSettingsDialog() {
@@ -151,6 +152,7 @@ function NameSection({ feed }: { feed: Feed }) {
 function DisplaySection({ feed }: { feed: Feed }) {
   const setFeedPreferFullText = useFeedStore((s) => s.setFeedPreferFullText);
   const setFeedPrefetchEnabled = useFeedStore((s) => s.setFeedPrefetchEnabled);
+  const prefetchGate = useFeatureGate("offline-prefetch");
 
   return (
     <section className="space-y-3">
@@ -163,15 +165,57 @@ function DisplaySection({ feed }: { feed: Feed }) {
           checked={Boolean(feed.preferFullText)}
           onCheckedChange={(v) => setFeedPreferFullText(feed.id, v)}
         />
-        <ToggleRow
-          id="feed-settings-prefetch"
-          label="Prefetch full text"
-          description="Pre-extract this feed's recent articles on refresh so they read offline."
-          checked={Boolean(feed.prefetchEnabled)}
-          onCheckedChange={(v) => setFeedPrefetchEnabled(feed.id, v)}
-        />
+        {prefetchGate.enabled ? (
+          <ToggleRow
+            id="feed-settings-prefetch"
+            label="Prefetch full text"
+            description="Pre-extract this feed's recent articles on refresh so they read offline."
+            checked={Boolean(feed.prefetchEnabled)}
+            onCheckedChange={(v) => setFeedPrefetchEnabled(feed.id, v)}
+          />
+        ) : (
+          <LockedRow
+            label="Prefetch full text"
+            description="Pre-extract this feed's recent articles on refresh so they read offline."
+            dataTestId="feed-settings-prefetch-locked"
+            onUpgrade={prefetchGate.promptUpgrade}
+          />
+        )}
       </div>
     </section>
+  );
+}
+
+function LockedRow({
+  label,
+  description,
+  dataTestId,
+  onUpgrade,
+}: {
+  label: string;
+  description: string;
+  dataTestId: string;
+  onUpgrade: () => void;
+}) {
+  return (
+    <div
+      className="flex items-start justify-between gap-3"
+      data-testid={dataTestId}
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onUpgrade}
+        className="shrink-0"
+      >
+        Personal
+      </Button>
+    </div>
   );
 }
 
@@ -235,6 +279,7 @@ function FolderSection({ feed }: { feed: Feed }) {
 
 function RulesSection({ feed }: { feed: Feed }) {
   const openRulesEditor = useFeedStore((s) => s.openRulesEditor);
+  const rulesGate = useFeatureGate("rules");
   const ruleCount = feed.rules?.length ?? 0;
 
   return (
@@ -243,18 +288,31 @@ function RulesSection({ feed }: { feed: Feed }) {
       <div className="flex items-center justify-between rounded-md border bg-card p-3">
         <p className="text-sm text-muted-foreground">
           {ruleCount === 0
-            ? "No rules. Auto-mute, star, or route articles."
+            ? "Auto-mute, star, or route articles by title, author, or content."
             : `${ruleCount} rule${ruleCount === 1 ? "" : "s"} active.`}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          data-testid="feed-settings-manage-rules"
-          onClick={() => openRulesEditor(feed.id)}
-        >
-          Manage rules…
-        </Button>
+        {rulesGate.enabled ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="feed-settings-manage-rules"
+            onClick={() => openRulesEditor(feed.id)}
+          >
+            Manage rules…
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="feed-settings-rules-locked"
+            onClick={rulesGate.promptUpgrade}
+            className="shrink-0"
+          >
+            Personal
+          </Button>
+        )}
       </div>
     </section>
   );
