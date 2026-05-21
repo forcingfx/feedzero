@@ -13,8 +13,6 @@ function renderFeedItem(props: Partial<React.ComponentProps<typeof FeedItem>> = 
         feed={mockFeed}
         isSelected={false}
         onSelect={vi.fn()}
-        onRemove={vi.fn()}
-        onReload={vi.fn()}
         {...props}
       />
     </SidebarProvider>
@@ -61,18 +59,30 @@ function articleFixture(id: string, read: boolean, feedId = "f1") {
   };
 }
 
+/**
+ * FeedItem is now select-only — its dropdown was removed in favour
+ * of the floating cog above the article list, which dispatches to
+ * FeedSettingsDialog. Tests below verify the row's remaining
+ * responsibilities: title + favicon + unread badge derivation +
+ * click-to-select + drag-handle attachment.
+ *
+ * Per-feed configuration (rename / prefer / prefetch / rules /
+ * refresh / delete) is covered in:
+ *  - tests/components/feeds/feed-settings-dialog.test.tsx
+ *  - tests/components/articles/settings-pill.test.tsx
+ */
 describe("FeedItem", () => {
   beforeEach(() => {
     useArticleStore.setState({ articlesByFeedId: {}, articles: [] });
     useFeedStore.setState({ feeds: [mockFeed], folders: [], selectedFeedId: null });
   });
 
+  it("renders the feed title", () => {
+    renderFeedItem();
+    expect(screen.getByText("Example Feed")).toBeInTheDocument();
+  });
+
   it("derives unread count from articlesByFeedId, not a stored counter", () => {
-    // This is the architectural invariant: there is a single source of
-    // truth for unread-ness (the article set), and the badge reads it.
-    // Proving this at the component level prevents the regression class
-    // where a writer mutates the source and forgets to update a separate
-    // counter field.
     useArticleStore.setState({
       articlesByFeedId: {
         f1: [
@@ -84,11 +94,6 @@ describe("FeedItem", () => {
     });
     renderFeedItem();
     expect(screen.getByText("2")).toBeInTheDocument();
-  });
-
-  it("renders the feed title", () => {
-    renderFeedItem();
-    expect(screen.getByText("Example Feed")).toBeInTheDocument();
   });
 
   it("shows unread badge when count > 0", () => {
@@ -111,28 +116,7 @@ describe("FeedItem", () => {
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
-  it.skip("enters rename mode and saves on Enter — Radix dropdown portal issue in happy-dom", async () => {
-    const user = userEvent.setup();
-    const renameFeed = vi.fn();
-    useFeedStore.setState({ renameFeed });
-
-    renderFeedItem();
-
-    await user.click(screen.getByRole("button", { name: /more/i }));
-    await user.click(screen.getByText("Rename"));
-
-    // Input should appear with current title
-    const input = document.querySelector("input");
-    expect(input).not.toBeNull();
-    expect(input!.value).toBe("Example Feed");
-
-    await user.clear(input!);
-    await user.type(input!, "New Name{Enter}");
-
-    expect(renameFeed).toHaveBeenCalledWith("f1", "New Name");
-  });
-
-  it("unfiled feed renders unread count as SidebarMenuBadge that swaps with the action dots", () => {
+  it("renders unread count as SidebarMenuBadge (single-source-of-truth, not inline span)", () => {
     useArticleStore.setState({
       articlesByFeedId: {
         f1: Array.from({ length: 5 }, (_, i) => articleFixture(`a${i}`, false)),
@@ -141,27 +125,19 @@ describe("FeedItem", () => {
     renderFeedItem();
     const badge = screen.getByText("5").closest("[data-sidebar='menu-badge']");
     expect(badge).not.toBeNull();
-    // Badge should hide on group hover (when action dots appear)
-    expect(badge!.className).toContain("group-hover/menu-item:opacity-0");
-    // Badge should also hide when dropdown menu is open (data-state=open)
-    expect(badge!.className).toContain("group-has-[[data-state=open]]/menu-item:opacity-0");
   });
 
-  it("in-folder feed renders unread count as SidebarMenuBadge with identical swap behavior", () => {
+  it("in-folder feed renders the same badge component (consistency across contexts)", () => {
     useArticleStore.setState({
       articlesByFeedId: {
         f1: Array.from({ length: 5 }, (_, i) => articleFixture(`a${i}`, false)),
       },
     });
     renderFeedItem({ inFolder: true });
-    // Badge should use the shadcn SidebarMenuBadge, not an inline span inside the button
     const feedButton = screen.getByText("Example Feed").closest("[data-sidebar='menu-button']");
     expect(feedButton!.textContent).not.toContain("5");
     const badge = screen.getByText("5").closest("[data-sidebar='menu-badge']");
     expect(badge).not.toBeNull();
-    // Same swap behavior as unfiled feeds — consistency across both contexts.
-    expect(badge!.className).toContain("group-hover/menu-item:opacity-0");
-    expect(badge!.className).toContain("group-has-[[data-state=open]]/menu-item:opacity-0");
   });
 
   it("calls onSelect when clicked", async () => {
@@ -172,11 +148,7 @@ describe("FeedItem", () => {
     expect(onSelect).toHaveBeenCalled();
   });
 
-  it("unread badge is hidden on mobile (max-md:hidden) to avoid simultaneous badge + action dots", () => {
-    // On mobile, SidebarMenuAction showOnHover defaults to visible (md:opacity-0 only
-    // applies ≥768px). Without hiding the badge on mobile, both the count and the
-    // three-dots trigger are permanently visible at the same time. Since the badge
-    // is informational and the action is interactive, we hide the badge on mobile.
+  it("unread badge is hidden on mobile (max-md:hidden) to keep the row compact", () => {
     useArticleStore.setState({
       articlesByFeedId: {
         f1: Array.from({ length: 3 }, (_, i) => articleFixture(`a${i}`, false)),
@@ -188,71 +160,8 @@ describe("FeedItem", () => {
     expect(badge!.className).toContain("max-md:hidden");
   });
 
-  it("dropdown shows a 'Prefer full text' toggle that calls setFeedPreferFullText", async () => {
-    const setFeedPreferFullText = vi.fn().mockResolvedValue(undefined);
-    useFeedStore.setState({ setFeedPreferFullText });
-    const user = userEvent.setup();
+  it("no longer renders any three-dot dropdown trigger (cog at top of article list owns settings now)", () => {
     renderFeedItem();
-    await user.click(screen.getByRole("button", { name: /more/i }));
-    const item = await screen.findByRole("menuitem", { name: /prefer full text/i });
-    await user.click(item);
-    expect(setFeedPreferFullText).toHaveBeenCalledWith("f1", true);
-  });
-
-  it("Prefer full text menu item shows a check when the feed already opts in", async () => {
-    const user = userEvent.setup();
-    renderFeedItem({ feed: { ...mockFeed, preferFullText: true } });
-    await user.click(screen.getByRole("button", { name: /more/i }));
-    const item = await screen.findByRole("menuitem", { name: /prefer full text/i });
-    // The Check icon is opacity-100 when on, opacity-0 when off.
-    const icon = item.querySelector("svg");
-    expect(icon?.getAttribute("class") ?? "").toContain("opacity-100");
-  });
-
-  it("dropdown shows a 'Prefetch full text' toggle that calls setFeedPrefetchEnabled", async () => {
-    const setFeedPrefetchEnabled = vi.fn().mockResolvedValue(undefined);
-    useFeedStore.setState({ setFeedPrefetchEnabled });
-    const user = userEvent.setup();
-    renderFeedItem();
-    await user.click(screen.getByRole("button", { name: /more/i }));
-    const item = await screen.findByRole("menuitem", { name: /prefetch full text/i });
-    await user.click(item);
-    expect(setFeedPrefetchEnabled).toHaveBeenCalledWith("f1", true);
-  });
-
-  it("Prefetch full text menu item shows a check when the feed is opted in", async () => {
-    const user = userEvent.setup();
-    renderFeedItem({ feed: { ...mockFeed, prefetchEnabled: true } });
-    await user.click(screen.getByRole("button", { name: /more/i }));
-    const item = await screen.findByRole("menuitem", { name: /prefetch full text/i });
-    const icon = item.querySelector("svg");
-    expect(icon?.getAttribute("class") ?? "").toContain("opacity-100");
-  });
-
-  it("action dots do not appear on click-focus, only on hover or keyboard focus-visible", () => {
-    // Bug: clicking a feed puts the button into :focus state (click focus).
-    // The shadcn SidebarMenuAction's showOnHover variant used
-    // `group-focus-within/menu-item:opacity-100`, which matches ANY focus —
-    // including click focus — so after clicking the action dots became
-    // visible alongside the unread badge, overlapping it.
-    //
-    // The fix is to use `group-has-[:focus-visible]` instead, which only
-    // matches when the focused element has :focus-visible (keyboard focus,
-    // not mouse click). This test enforces the class substitution at the
-    // source, so a regression in the shadcn wrapper is caught immediately.
-    useArticleStore.setState({
-      articlesByFeedId: {
-        f1: Array.from({ length: 5 }, (_, i) => articleFixture(`a${i}`, false)),
-      },
-    });
-    const { container } = renderFeedItem({ isSelected: true });
-    const action = container.querySelector("[data-sidebar='menu-action']");
-    expect(action).not.toBeNull();
-    // Negative: must not reveal the action on any focus (including click).
-    expect(action!.className).not.toContain(
-      "group-focus-within/menu-item:opacity-100",
-    );
-    // Positive: hover-based reveal must still work.
-    expect(action!.className).toContain("group-hover/menu-item:opacity-100");
+    expect(screen.queryByRole("button", { name: /more/i })).toBeNull();
   });
 });

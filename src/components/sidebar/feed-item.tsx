@@ -1,25 +1,16 @@
-import { useState } from "react";
-import { AlertTriangle, Check, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Settings2, Trash2 } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { cn } from "@/lib/utils.ts";
 import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { isFeedStale } from "@/lib/stale-feed.ts";
 import {
-  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar.tsx";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu.tsx";
 import type { Feed } from "@/types/index.ts";
 
 interface FeedItemProps {
@@ -29,22 +20,24 @@ interface FeedItemProps {
   /** When true, uses @dnd-kit/sortable for reorder-in-place behavior. */
   sortable?: boolean;
   onSelect: () => void;
-  onRemove: () => void;
-  onReload: () => void;
 }
 
-export function FeedItem({ feed, isSelected, inFolder = false, sortable = false, onSelect, onRemove, onReload }: FeedItemProps) {
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [renameValue, setRenameValue] = useState("");
+/**
+ * Sidebar feed row. Select-only — every per-feed action (rename,
+ * preferences, rules, refresh, clear cache, delete) lives in
+ * FeedSettingsDialog now, opened from the floating cog above the
+ * article list. The row keeps the favicon, title, refresh/stale
+ * indicators, unread badge, and drag handle for reorder.
+ */
+export function FeedItem({
+  feed,
+  isSelected,
+  inFolder = false,
+  sortable = false,
+  onSelect,
+}: FeedItemProps) {
   const unreadCount = useArticleStore((s) => selectUnreadCount(s, feed.id));
-  const renameFeed = useFeedStore((s) => s.renameFeed);
-  const setFeedPreferFullText = useFeedStore((s) => s.setFeedPreferFullText);
-  const setFeedPrefetchEnabled = useFeedStore((s) => s.setFeedPrefetchEnabled);
-  const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
-  const folders = useFeedStore((s) => s.folders);
-  const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
-  const openRulesEditor = useFeedStore((s) => s.openRulesEditor);
   const isRefreshing = refreshingFeedIds.has(feed.id);
 
   // Both hooks are always called (hooks must not be conditional).
@@ -55,20 +48,10 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
   const dragRef = sortable ? sortableHook.setNodeRef : draggable.setNodeRef;
   const dragListeners = sortable ? sortableHook.listeners : draggable.listeners;
   const isDragging = sortable ? sortableHook.isDragging : draggable.isDragging;
-  const sortStyle: React.CSSProperties = sortable && sortableHook.transform
-    ? { transform: CSS.Transform.toString(sortableHook.transform), transition: sortableHook.transition }
-    : {};
-
-  function handleStartRename() {
-    setRenameValue(feed.title);
-    setIsRenaming(true);
-  }
-
-  function handleSubmitRename(e: React.FormEvent) {
-    e.preventDefault();
-    if (renameValue.trim()) renameFeed(feed.id, renameValue.trim());
-    setIsRenaming(false);
-  }
+  const sortStyle: React.CSSProperties =
+    sortable && sortableHook.transform
+      ? { transform: CSS.Transform.toString(sortableHook.transform), transition: sortableHook.transition }
+      : {};
 
   return (
     <SidebarMenuItem
@@ -77,100 +60,22 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
       className={inFolder ? "pl-4" : ""}
       {...dragListeners}
     >
-      {isRenaming ? (
-        <form className="flex items-center gap-2 px-2 py-1" onSubmit={handleSubmitRename}>
-          <FeedFavicon siteUrl={feed.siteUrl} />
-          <input
-            role="textbox"
-            autoFocus
-            className="flex-1 bg-transparent text-sm outline-none border-b border-primary min-w-0"
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onBlur={() => setIsRenaming(false)}
-            onKeyDown={(e) => { if (e.key === "Escape") setIsRenaming(false); }}
+      <SidebarMenuButton isActive={isSelected} onClick={onSelect}>
+        <FeedFavicon siteUrl={feed.siteUrl} />
+        <span className="truncate">{feed.title}</span>
+        {isRefreshing && (
+          <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
+        )}
+        {!isRefreshing && isFeedStale(feed) && (
+          <AlertTriangle
+            className="size-3 shrink-0 text-amber-500"
+            aria-label="This feed hasn't updated in over 14 days"
+            data-testid="stale-feed-indicator"
           />
-        </form>
-      ) : (
-        <SidebarMenuButton isActive={isSelected} onClick={onSelect}>
-          <FeedFavicon siteUrl={feed.siteUrl} />
-          <span className="truncate">{feed.title}</span>
-          {isRefreshing && <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />}
-          {!isRefreshing && isFeedStale(feed) && (
-            <AlertTriangle
-              className="size-3 shrink-0 text-amber-500"
-              aria-label="This feed hasn't updated in over 14 days"
-              data-testid="stale-feed-indicator"
-            />
-          )}
-        </SidebarMenuButton>
-      )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuAction showOnHover className="focus-visible:ring-0">
-            <MoreHorizontal />
-            <span className="sr-only">More</span>
-          </SidebarMenuAction>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="start">
-          <DropdownMenuItem onClick={handleStartRename}>
-            <Pencil className="size-4" /> Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => setFeedPreferFullText(feed.id, !feed.preferFullText)}
-          >
-            <Check
-              className={cn(
-                "size-4",
-                feed.preferFullText ? "opacity-100" : "opacity-0",
-              )}
-            />
-            Prefer full text
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() =>
-              setFeedPrefetchEnabled(feed.id, !feed.prefetchEnabled)
-            }
-            data-testid="feed-item-prefetch-toggle"
-          >
-            <Check
-              className={cn(
-                "size-4",
-                feed.prefetchEnabled ? "opacity-100" : "opacity-0",
-              )}
-            />
-            Prefetch full text
-          </DropdownMenuItem>
-          {folders.length > 0 && (
-            <>
-              <DropdownMenuItem onClick={() => moveFeedToFolder(feed.id, null)} disabled={!feed.folderId}>
-                Unfiled
-              </DropdownMenuItem>
-              {folders.map((f) => (
-                <DropdownMenuItem key={f.id} onClick={() => moveFeedToFolder(feed.id, f.id)} disabled={feed.folderId === f.id}>
-                  → {f.name}
-                </DropdownMenuItem>
-              ))}
-            </>
-          )}
-          <DropdownMenuItem
-            onClick={() => openRulesEditor(feed.id)}
-            data-testid="feed-item-rules"
-          >
-            <Settings2 className="size-4" /> Rules…
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => refreshSingleFeed(feed.id)}>
-            <RefreshCw className="size-4" /> Refresh
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onReload}>
-            <RotateCcw className="size-4" /> Clear cached articles
-          </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onRemove}>
-            <Trash2 className="size-4" /> Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        )}
+      </SidebarMenuButton>
       {!isRefreshing && unreadCount > 0 && (
-        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold group-hover/menu-item:opacity-0 group-has-[[data-state=open]]/menu-item:opacity-0 max-md:hidden">
+        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold max-md:hidden">
           {unreadCount > 99 ? "99+" : unreadCount}
         </SidebarMenuBadge>
       )}

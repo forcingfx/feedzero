@@ -84,8 +84,6 @@ function renderFolderWithFeed(folderProps: Partial<React.ComponentProps<typeof F
             isSelected={false}
             inFolder
             onSelect={vi.fn()}
-            onRemove={vi.fn()}
-            onReload={vi.fn()}
           />
         </FolderItem>
       </ul>
@@ -214,11 +212,15 @@ describe("FolderItem", () => {
     expect(badge!.textContent).toContain("24");
   });
 
-  it("shows settings action on feeds inside folders", () => {
+  it("the folder row has its own settings affordance (More menu) — feeds inside are select-only", () => {
+    // FeedItem's dropdown was removed in favour of the floating cog
+    // above the article list. The folder's own dropdown still
+    // exists in this commit (removed in a later commit).
     renderFolderWithFeed();
-    // There should be at least 2 "More" buttons: one for the folder, one for the feed
-    const moreButtons = screen.getAllByRole("button", { name: /more|folder options/i });
-    expect(moreButtons.length).toBeGreaterThanOrEqual(2);
+    const moreButtons = screen.getAllByRole("button", {
+      name: /more|folder options/i,
+    });
+    expect(moreButtons.length).toBeGreaterThanOrEqual(1);
   });
 
   it("folder's root element is a <li> so it nests validly under SidebarMenu's <ul>", () => {
