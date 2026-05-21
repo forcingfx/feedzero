@@ -260,23 +260,19 @@ describe("SidebarFeedList", () => {
     });
 
     /**
-     * Invariant 3: every feed's unread badge uses the same swap-on-hover
-     * classes (shadcn SidebarMenuBadge), so action dots replace the badge
-     * consistently for both unfiled and in-folder feeds.
+     * Invariant 3: every feed has exactly one unread badge rendered
+     * with the shadcn SidebarMenuBadge component. The "swap on hover"
+     * behaviour was tied to the now-removed per-feed dropdown — the
+     * cog above the article list owns settings now, so badges no
+     * longer need to vanish on hover.
      */
-    it("every feed's badge is a SidebarMenuBadge with hover-swap classes", () => {
+    it("every feed renders exactly one SidebarMenuBadge", () => {
       renderList();
       const badges = document.querySelectorAll(
         "[data-sidebar='menu-badge']",
       );
       // Four feeds, four badges.
       expect(badges.length).toBe(4);
-      for (const badge of Array.from(badges)) {
-        expect(badge.className).toContain("group-hover/menu-item:opacity-0");
-        expect(badge.className).toContain(
-          "group-has-[[data-state=open]]/menu-item:opacity-0",
-        );
-      }
     });
   });
 

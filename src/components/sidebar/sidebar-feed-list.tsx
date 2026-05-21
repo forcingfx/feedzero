@@ -16,11 +16,8 @@ import {
 import { FeedItem } from "./feed-item.tsx";
 import { FolderItem } from "./folder-item.tsx";
 import { NewFolderInput } from "./new-folder-input.tsx";
-import { FeedRemoveDialog } from "./feed-remove-dialog.tsx";
-import { FeedReloadDialog } from "./feed-reload-dialog.tsx";
-import { FolderDeleteDialog } from "./folder-delete-dialog.tsx";
 import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
-import type { Feed, Folder } from "@/types/index.ts";
+import type { Feed } from "@/types/index.ts";
 
 interface SidebarFeedListProps {
   onFeedSelect: (feedId: string) => void;
@@ -76,9 +73,6 @@ export function SidebarFeedList({
   const articlesByFeedId = useArticleStore((s) => s.articlesByFeedId);
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
-  const [feedToReload, setFeedToReload] = useState<Feed | null>(null);
-  const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -182,9 +176,6 @@ export function SidebarFeedList({
     }
   }
 
-  const removeFeed = useFeedStore((s) => s.removeFeed);
-  const reloadSingleFeed = useFeedStore((s) => s.reloadSingleFeed);
-  const deleteFolder = useFeedStore((s) => s.deleteFolder);
 
   const isCustomMode = feedSortMode === "custom";
   const sortableIds = isCustomMode ? sortedUnfiledFeeds.map((f) => f.id) : [];
@@ -233,8 +224,6 @@ export function SidebarFeedList({
                 isSelected={feed.id === selectedFeedId}
                 sortable={isCustomMode}
                 onSelect={() => onFeedSelect(feed.id)}
-                onRemove={() => setFeedToRemove(feed)}
-                onReload={() => setFeedToReload(feed)}
               />
             ))}
           </UnfiledDropZone>
@@ -257,7 +246,6 @@ export function SidebarFeedList({
                 sortable={isCustomMode}
                 isSelected={selectedFeedId === toFolderFeedId(folder.id)}
                 onSelect={() => onFeedSelect(toFolderFeedId(folder.id))}
-                onDelete={() => setFolderToDelete(folder)}
               >
                 {sortedFolderFeeds.map((feed) => (
                   <FeedItem
@@ -266,8 +254,6 @@ export function SidebarFeedList({
                     isSelected={feed.id === selectedFeedId}
                     inFolder
                     onSelect={() => onFeedSelect(feed.id)}
-                    onRemove={() => setFeedToRemove(feed)}
-                    onReload={() => setFeedToReload(feed)}
                   />
                 ))}
               </FolderItem>
@@ -291,24 +277,6 @@ export function SidebarFeedList({
         </>
       )}
 
-      <FeedRemoveDialog
-        feedTitle={feedToRemove?.title ?? ""}
-        open={feedToRemove !== null}
-        onOpenChange={(open) => { if (!open) setFeedToRemove(null); }}
-        onConfirm={() => { if (feedToRemove) { removeFeed(feedToRemove.id); setFeedToRemove(null); } }}
-      />
-      <FeedReloadDialog
-        feedTitle={feedToReload?.title ?? ""}
-        open={feedToReload !== null}
-        onOpenChange={(open) => { if (!open) setFeedToReload(null); }}
-        onConfirm={() => { if (feedToReload) { reloadSingleFeed(feedToReload.id); setFeedToReload(null); } }}
-      />
-      <FolderDeleteDialog
-        folderName={folderToDelete?.name ?? ""}
-        open={folderToDelete !== null}
-        onOpenChange={(open) => { if (!open) setFolderToDelete(null); }}
-        onConfirm={() => { if (folderToDelete) { deleteFolder(folderToDelete.id); setFolderToDelete(null); } }}
-      />
     </>
   );
 }

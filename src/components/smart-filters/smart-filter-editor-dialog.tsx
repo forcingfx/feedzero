@@ -47,6 +47,8 @@ export function SmartFilterEditorDialog() {
   const closeEditor = useSmartFilterStore((s) => s.closeEditor);
   const createFilter = useSmartFilterStore((s) => s.createFilter);
   const updateFilter = useSmartFilterStore((s) => s.updateFilter);
+  const duplicateFilter = useSmartFilterStore((s) => s.duplicateFilter);
+  const removeFilter = useSmartFilterStore((s) => s.removeFilter);
 
   const allArticles = useArticleStore((s) => s.articlesByFeedId);
   const feeds = useFeedStore((s) => s.feeds);
@@ -231,23 +233,58 @@ export function SmartFilterEditorDialog() {
           )}
         </div>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={closeEditor}
-            disabled={saving}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            data-testid="smart-filter-save"
-            onClick={handleSave}
-            disabled={saveDisabled}
-          >
-            {editorTarget ? "Save changes" : "Create filter"}
-          </Button>
+        <DialogFooter className="sm:justify-between">
+          <div className="flex gap-2">
+            {editorTarget && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="smart-filter-duplicate"
+                  onClick={async () => {
+                    await duplicateFilter(editorTarget.id);
+                    closeEditor();
+                  }}
+                  disabled={saving}
+                >
+                  Duplicate
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  data-testid="smart-filter-delete"
+                  onClick={async () => {
+                    await removeFilter(editorTarget.id);
+                    closeEditor();
+                  }}
+                  disabled={saving}
+                >
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeEditor}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              data-testid="smart-filter-save"
+              onClick={handleSave}
+              disabled={saveDisabled}
+            >
+              {editorTarget ? "Save changes" : "Create filter"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

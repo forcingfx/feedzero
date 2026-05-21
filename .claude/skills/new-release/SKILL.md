@@ -185,3 +185,4 @@ If the user wants a social post, draft it in builder/maker tone:
 - **The `package.json` version** was historically out of sync (stuck at 0.2.1 while the release notes were at 0.4.0). Keep it in sync going forward.
 - **The vendored fixture** (`tests/fixtures/release-feed.xml`) must be updated with every release so the parser contract test covers the latest format.
 - **Run `npm test` in the feedzero repo** after updating the fixture to verify everything passes before pushing.
+- **Docker images publish automatically** on every `v*.*.*` tag push via `.github/workflows/docker-publish.yml`. The workflow pushes to `ghcr.io/forcingfx/feedzero` always and additionally mirrors to `docker.io/forcingfx/feedzero` when the `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` repo secrets are set. No manual step during the release cut — once the tag is pushed in step 8, the workflow handles both registries.

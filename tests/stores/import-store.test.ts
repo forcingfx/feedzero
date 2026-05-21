@@ -3,6 +3,7 @@ import {
   useImportStore,
   selectTotalCount,
   selectSuccessCount,
+  selectPlaceholderCount,
   selectFailureCount,
   selectCurrentUrl,
 } from "../../src/stores/import-store.ts";
@@ -237,6 +238,40 @@ describe("import-store", () => {
       });
 
       expect(selectCurrentUrl(useImportStore.getState())).toBeNull();
+    });
+
+    it("counts placeholder results separately from fully-imported successes", () => {
+      // Three buckets: full-success (green), placeholder (amber — queued
+      // for retry on next refresh), and failure (red — rejected).
+      useImportStore.getState().startImport([
+        "https://a.com/feed",
+        "https://b.com/feed",
+        "https://c.com/feed",
+        "https://d.com/feed",
+      ]);
+      useImportStore
+        .getState()
+        .recordResult({ url: "https://a.com/feed", success: true });
+      useImportStore.getState().recordResult({
+        url: "https://b.com/feed",
+        success: true,
+        placeholder: true,
+      });
+      useImportStore.getState().recordResult({
+        url: "https://c.com/feed",
+        success: true,
+        placeholder: true,
+      });
+      useImportStore.getState().recordResult({
+        url: "https://d.com/feed",
+        success: false,
+        error: "not a feed",
+      });
+
+      const state = useImportStore.getState();
+      expect(selectSuccessCount(state)).toBe(1);
+      expect(selectPlaceholderCount(state)).toBe(2);
+      expect(selectFailureCount(state)).toBe(1);
     });
   });
 });

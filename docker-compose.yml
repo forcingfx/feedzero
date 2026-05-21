@@ -8,8 +8,15 @@
 
 services:
   feedzero:
-    # Pre-built image. To build locally instead (e.g. before the first
-    # release is published, or when developing changes), run:
+    # Pre-built image. The same image is published to both GHCR and
+    # Docker Hub on every release; swap the registry below if you'd
+    # rather pull from Docker Hub (LAN-only Portainer users often
+    # prefer that since it's the default registry in Portainer's UI):
+    #
+    #   image: docker.io/forcingfx/feedzero:${FEEDZERO_VERSION:-latest}
+    #
+    # To build locally instead (e.g. before the first release is
+    # published, or when developing changes), run:
     #
     #   docker compose build
     #   docker compose up -d

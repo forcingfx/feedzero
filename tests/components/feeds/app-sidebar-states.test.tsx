@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import userEvent from "@testing-library/user-event";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -76,55 +75,19 @@ describe("AppSidebar states", () => {
   });
 
 
-  it("delete triggers confirmation dialog", async () => {
-    const user = userEvent.setup();
+  // Delete-confirmation flow used to live in the sidebar (dropdown
+  // → AlertDialog mounted by sidebar-feed-list). It moved to
+  // FeedSettingsDialog when the per-feed dropdown was removed. The
+  // sidebar no longer renders a More button or any confirmation
+  // dialog of its own — both responsibilities now live behind the
+  // floating cog above the article list. Coverage moves to
+  // tests/components/feeds/feed-settings-dialog.test.tsx.
+  it("sidebar no longer renders a per-feed More dropdown trigger", () => {
     useFeedStore.setState({
       feeds: [mockFeed("a", "Alpha Feed")],
     });
     renderSidebar();
-
-    // Open the dropdown menu for the feed
-    const moreButton = screen.getByRole("button", { name: "More" });
-    await user.click(moreButton);
-
-    // Click Delete in dropdown
-    const deleteItem = screen.getByRole("menuitem", { name: /delete/i });
-    await user.click(deleteItem);
-
-    // Confirmation dialog should appear
-    expect(screen.getByText(/Remove.*Alpha Feed/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
-  });
-
-  it("cancel delete closes dialog", async () => {
-    const user = userEvent.setup();
-    useFeedStore.setState({
-      feeds: [mockFeed("a", "Alpha Feed")],
-    });
-    renderSidebar();
-
-    await user.click(screen.getByRole("button", { name: "More" }));
-    await user.click(screen.getByRole("menuitem", { name: /delete/i }));
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
-
-    expect(screen.queryByText(/Remove.*Alpha Feed/)).not.toBeInTheDocument();
-  });
-
-  it("confirm delete calls removeFeed", async () => {
-    const user = userEvent.setup();
-    const removeFeed = vi.fn();
-    useFeedStore.setState({
-      feeds: [mockFeed("a", "Alpha Feed")],
-      removeFeed,
-    });
-    renderSidebar();
-
-    await user.click(screen.getByRole("button", { name: "More" }));
-    await user.click(screen.getByRole("menuitem", { name: /delete/i }));
-    await user.click(screen.getByRole("button", { name: "Remove" }));
-
-    expect(removeFeed).toHaveBeenCalledWith("a");
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
   });
 
   it("active feed has accent background (sidebar defaults)", () => {

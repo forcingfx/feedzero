@@ -26,6 +26,19 @@ interface AddFeedResult {
   articles: Article[];
 }
 
+/**
+ * Discriminator on `addFeedFlow`'s err branch. `fetch-failure` marks a
+ * recoverable failure (HTTP error response or network/transport error) — the
+ * import flow uses it to create a placeholder feed the user can retry via
+ * `refreshFeed`. Parse / discovery / duplicate failures stay unflagged
+ * because retry won't help.
+ */
+export type AddFeedErrorReason = "fetch-failure";
+
+export type AddFeedFlowResult =
+  | { ok: true; value: AddFeedResult }
+  | { ok: false; error: string; reason?: AddFeedErrorReason };
+
 interface RefreshResult {
   newCount: number;
   updatedCount: number;
@@ -113,13 +126,24 @@ export function normalizeUrl(url: string): string {
 }
 
 /**
+ * Tag an err Result with `reason: "fetch-failure"` so import-side callers
+ * know the failure is recoverable (HTTP / network) and can create a
+ * placeholder feed for later retry. Permanent failures (parse, discovery,
+ * duplicate) skip this and stay as plain err Results.
+ */
+function fetchFailure(message: string): AddFeedFlowResult {
+  return { ok: false, error: message, reason: "fetch-failure" };
+}
+
+/**
  * Full add-feed flow: check duplicate → fetch → parse → store.
- * Returns Result<{feed, articles}> with user-friendly error messages.
+ * Returns AddFeedFlowResult with user-friendly error messages. On a
+ * recoverable failure the err branch carries `reason: "fetch-failure"`.
  */
 export async function addFeedFlow(
   rawUrl: string,
   options?: { prefetchedContent?: string },
-): Promise<Result<AddFeedResult>> {
+): Promise<AddFeedFlowResult> {
   const url = normalizeUrl(rawUrl);
   try {
     // Check for duplicate using the plaintext URL index (no decryption needed)
@@ -142,7 +166,7 @@ export async function addFeedFlow(
     } else {
       const response = await proxyFetch("/api/feed", url);
       if (!response.ok) {
-        return err(
+        return fetchFailure(
           fetchErrorMessage(response, "The feed at this URL could not be reached"),
         );
       }
@@ -178,7 +202,17 @@ export async function addFeedFlow(
     });
     if (!feedResult.ok) return feedResult;
 
-    const feed = feedResult.value;
+    // Mark the just-ingested feed as having had at least one successful
+    // fetch. This is what distinguishes a real feed from a placeholder
+    // (which has `lastSuccessfulFetchAt === undefined`) — and protects the
+    // user's rename of an established feed from being overwritten by the
+    // first-success metadata backfill in refreshFeed.
+    const now = Date.now();
+    const feed: Feed = {
+      ...feedResult.value,
+      lastFetchedAt: now,
+      lastSuccessfulFetchAt: now,
+    };
     const storeResult = await addFeed(feed);
     if (!storeResult.ok) return storeResult;
 
@@ -194,10 +228,64 @@ export async function addFeedFlow(
 
     return ok({ feed, articles });
   } catch {
-    return err(
+    return fetchFailure(
       "The feed at this URL could not be reached. Please check your connection and try again.",
     );
   }
+}
+
+/**
+ * Derive a recognizable sidebar title from a URL when the real feed
+ * metadata isn't yet available (placeholder created by failed import).
+ * The first successful refresh overwrites this with the real `<title>`.
+ */
+function deriveTitleFromUrl(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Persist a feed the user wanted to subscribe to but whose first fetch
+ * failed (HTTP / network error). Used by the bulk-import flow so a
+ * rate-limited URL doesn't get dropped — the sidebar shows it with a red
+ * error indicator, the user hits "r" or right-click → Refresh, and the
+ * first successful refresh upgrades the row to a normal feed in place
+ * (clears `lastError`, backfills title/description/siteUrl from the
+ * parsed payload).
+ */
+export async function addPlaceholderFeed(
+  rawUrl: string,
+  error: string,
+): Promise<Result<Feed>> {
+  const url = normalizeUrl(rawUrl);
+
+  const exists = await feedExistsByUrl(url);
+  if (exists.ok && exists.value) {
+    const allFeeds = await getFeeds();
+    const isReal = allFeeds.ok && allFeeds.value.some((f) => f.url === url);
+    if (isReal) return err("A feed with this URL already exists");
+    await removeFeedsByUrl(url);
+  }
+
+  const created = createFeed({
+    url,
+    title: deriveTitleFromUrl(url),
+  });
+  if (!created.ok) return created;
+
+  const feed: Feed = {
+    ...created.value,
+    lastError: error,
+    lastFetchedAt: Date.now(),
+  };
+
+  const store = await addFeed(feed);
+  if (!store.ok) return err(store.error);
+
+  return ok(feed);
 }
 
 interface PreviewArticle {
@@ -270,15 +358,24 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
       // error message surfaces Retry-After when the upstream sent one
       // (feedback #97: self-host bulk refresh against fresh IPs trips
       // upstream WAFs and the user needs to know when to retry).
-      await persistFreshness(feed, { fetchedAt: now, successfulAt: null });
-      return err(fetchErrorMessage(response, "Failed to fetch feed"));
+      const errorMessage = fetchErrorMessage(response, "Failed to fetch feed");
+      await persistFreshness(feed, {
+        fetchedAt: now,
+        successfulAt: null,
+        lastError: errorMessage,
+      });
+      return err(errorMessage);
     }
     const text = await response.text();
     const parseResult = parse(text, feed.url);
     if (!parseResult.ok) {
       // HTTP succeeded but content was unparseable — the publisher is alive,
       // so this still counts as a successful reach.
-      await persistFreshness(feed, { fetchedAt: now, successfulAt: now });
+      await persistFreshness(feed, {
+        fetchedAt: now,
+        successfulAt: now,
+        lastError: parseResult.error,
+      });
       return err(parseResult.error);
     }
 
@@ -338,7 +435,23 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
       await updateArticles(updatedArticles);
     }
 
-    await persistFreshness(feed, { fetchedAt: now, successfulAt: now });
+    // First-ever success on this feed (typically a placeholder added by
+    // import after a fetch failure): backfill title/description/siteUrl
+    // from the parsed payload so the sidebar gets a real label. Skipped
+    // on subsequent successes so a user's rename is never clobbered.
+    const isFirstSuccess = feed.lastSuccessfulFetchAt === undefined;
+    if (isFirstSuccess) {
+      const parsedFeed = parseResult.value.feed;
+      if (parsedFeed.title) feed.title = parsedFeed.title;
+      if (parsedFeed.description) feed.description = parsedFeed.description;
+      if (parsedFeed.siteUrl) feed.siteUrl = parsedFeed.siteUrl;
+    }
+
+    await persistFreshness(feed, {
+      fetchedAt: now,
+      successfulAt: now,
+      lastError: null,
+    });
 
     return ok({
       newCount: created.length,
@@ -347,22 +460,38 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
   } catch (e) {
     // Network / transport-layer failure: record the attempt but keep any
     // prior success timestamp so we don't reset the stale-indicator clock.
-    await persistFreshness(feed, { fetchedAt: now, successfulAt: null });
-    return err(`Refresh failed: ${(e as Error).message}`);
+    const errorMessage = `Refresh failed: ${(e as Error).message}`;
+    await persistFreshness(feed, {
+      fetchedAt: now,
+      successfulAt: null,
+      lastError: errorMessage,
+    });
+    return err(errorMessage);
   }
 }
 
 /**
- * Mutate `feed` in place with new freshness timestamps and persist via
- * updateFeed. Passing `successfulAt: null` keeps the prior value so a
+ * Mutate `feed` in place with new freshness timestamps + lastError and
+ * persist via updateFeed. `successfulAt: null` keeps the prior value so a
  * transient failure doesn't reset the stale-indicator clock.
+ * `lastError: null` explicitly clears a previous failure (success path);
+ * `lastError: string` records the new failure.
  */
 async function persistFreshness(
   feed: Feed,
-  ts: { fetchedAt: number; successfulAt: number | null },
+  ts: {
+    fetchedAt: number;
+    successfulAt: number | null;
+    lastError: string | null;
+  },
 ): Promise<void> {
   feed.lastFetchedAt = ts.fetchedAt;
   if (ts.successfulAt !== null) feed.lastSuccessfulFetchAt = ts.successfulAt;
+  if (ts.lastError === null) {
+    delete feed.lastError;
+  } else {
+    feed.lastError = ts.lastError;
+  }
   await updateFeed(feed);
 }
 

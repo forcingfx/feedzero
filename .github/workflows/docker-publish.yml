@@ -1,7 +1,11 @@
 name: Publish self-host image
 
 # Builds the FeedZero Docker image and pushes it to GHCR
-# (ghcr.io/forcingfx/feedzero) on every version tag.
+# (ghcr.io/forcingfx/feedzero) on every version tag. Optionally mirrors
+# to Docker Hub (docker.io/forcingfx/feedzero) when the secrets
+# DOCKERHUB_USERNAME + DOCKERHUB_TOKEN are present — LAN-only Portainer
+# users typically pull from Docker Hub by default. With no secrets set,
+# the workflow still publishes to GHCR as before; nothing breaks.
 #
 # Self-hosters use this image via docker-compose.yml; the published
 # multi-arch (amd64 + arm64) build means Raspberry Pi users don't
@@ -55,11 +59,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Docker Hub mirror is optional. When DOCKERHUB_TOKEN is set, we
+      # log in and the metadata + build-push steps stamp tags for both
+      # registries. When the secret is missing the step is skipped and
+      # the workflow publishes to GHCR alone — first-time setup is
+      # therefore zero-config.
+      - name: Log in to Docker Hub
+        if: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Compute the image list conditionally so the Docker Hub mirror is
+      # only included when the secret is present. metadata-action stamps
+      # every tag against every image in this list — Buildx then pushes
+      # each tag to its named registry in a single build. Conditional
+      # expression: when DOCKERHUB_TOKEN is set we add docker.io as a
+      # second line; otherwise we get GHCR alone.
       - name: Derive image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/feedzero
+          images: |
+            ghcr.io/${{ github.repository_owner }}/feedzero
+            ${{ secrets.DOCKERHUB_TOKEN != '' && format('docker.io/{0}/feedzero', github.repository_owner) || '' }}
           # Tags:
           #   * On version tag: vX.Y.Z, X.Y, latest
           #   * On manual dispatch: short SHA

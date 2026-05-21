@@ -55,7 +55,7 @@ function renderFolder(props: Partial<React.ComponentProps<typeof FolderItem>> = 
     <SidebarProvider>
       <FolderItem
         folder={mockFolder}
-        onDelete={vi.fn()}
+        
         isSelected={false}
         onSelect={vi.fn()}
         {...props}
@@ -74,7 +74,7 @@ function renderFolderWithFeed(folderProps: Partial<React.ComponentProps<typeof F
       <ul data-testid="folder-parent-list">
         <FolderItem
           folder={mockFolder}
-          onDelete={vi.fn()}
+          
           isSelected={false}
           onSelect={vi.fn()}
           {...folderProps}
@@ -84,8 +84,6 @@ function renderFolderWithFeed(folderProps: Partial<React.ComponentProps<typeof F
             isSelected={false}
             inFolder
             onSelect={vi.fn()}
-            onRemove={vi.fn()}
-            onReload={vi.fn()}
           />
         </FolderItem>
       </ul>
@@ -152,7 +150,7 @@ describe("FolderItem", () => {
     const coloredFolder = { ...mockFolder, color: "#7c3aed" };
     render(
       <SidebarProvider>
-        <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+        <FolderItem folder={coloredFolder}  isSelected={false} onSelect={vi.fn()}>
           <div />
         </FolderItem>
       </SidebarProvider>
@@ -214,11 +212,12 @@ describe("FolderItem", () => {
     expect(badge!.textContent).toContain("24");
   });
 
-  it("shows settings action on feeds inside folders", () => {
+  it("renders neither a folder dropdown nor a per-feed dropdown — cog above article list owns settings", () => {
     renderFolderWithFeed();
-    // There should be at least 2 "More" buttons: one for the folder, one for the feed
-    const moreButtons = screen.getAllByRole("button", { name: /more|folder options/i });
-    expect(moreButtons.length).toBeGreaterThanOrEqual(2);
+    const moreButtons = screen.queryAllByRole("button", {
+      name: /more|folder options/i,
+    });
+    expect(moreButtons.length).toBe(0);
   });
 
   it("folder's root element is a <li> so it nests validly under SidebarMenu's <ul>", () => {
@@ -242,7 +241,7 @@ describe("FolderItem", () => {
       const coloredFolder = { ...mockFolder, color: "#7c3aed" };
       render(
         <SidebarProvider>
-          <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+          <FolderItem folder={coloredFolder}  isSelected={false} onSelect={vi.fn()}>
             <div />
           </FolderItem>
         </SidebarProvider>
@@ -256,7 +255,7 @@ describe("FolderItem", () => {
       const coloredFolder = { ...mockFolder, color: "#7c3aed" };
       render(
         <SidebarProvider>
-          <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+          <FolderItem folder={coloredFolder}  isSelected={false} onSelect={vi.fn()}>
             <div />
           </FolderItem>
         </SidebarProvider>
@@ -266,22 +265,12 @@ describe("FolderItem", () => {
       expect(style).toContain("color");
     });
 
-    it("shows a color picker option in the dropdown", async () => {
-      const user = userEvent.setup();
-      renderFolder();
-      const moreBtn = screen.getByRole("button", { name: /folder options/i });
-      await user.click(moreBtn);
-      expect(screen.getByTestId("folder-color-picker")).toBeInTheDocument();
-    });
+    // The color picker lived in the dropdown; it now lives in
+    // FolderSettingsDialog. Coverage moves to that test file.
   });
 
-  it("feed inside folder is not a DOM descendant of folder's menu-item (hover scope isolation)", () => {
+  it("folder header and feed rows live in distinct menu-items (DOM structure invariant)", () => {
     renderFolderWithFeed();
-    // If the feed <li data-sidebar='menu-item'> is nested inside the folder's
-    // <li data-sidebar='menu-item'>, CSS `group-hover/menu-item` leaks: hovering
-    // the child feed also triggers hover on the folder's group, making the
-    // folder's action dots appear at the same time. Each menu-item must own
-    // its own hover scope.
     const folderMenuItem = screen
       .getByText("Tech News")
       .closest("[data-sidebar='menu-item']");

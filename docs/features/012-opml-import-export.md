@@ -45,9 +45,11 @@ Feature: OPML Import/Export
 
   Scenario: Import with partial failures
     Given the user imports 5 feeds
-    And 3 succeed and 2 fail (network error, invalid feed)
-    Then the results view shows "3 feeds added, 2 failed"
-    And lists the failures with error messages
+    And 3 succeed, 1 is rate-limited (HTTP 429), and 1 is not a feed
+    Then the results view shows "3 feeds added, 1 queued for retry, 1 failed"
+    And the rate-limited feed appears in the sidebar with a red error icon
+    And pressing "r" after the upstream recovers clears the error and
+    backfills the feed's title and articles in place
 ```
 
 ## Architecture
@@ -61,9 +63,21 @@ Feature: OPML Import/Export
 4. `isOpmlFormat()` detects format, routes to appropriate parser
 5. `parseOpmlFile()` or `parseUrlList()` extracts feed URLs
 6. Import store transitions to `importing` status
-7. For each URL, `addFeed()` is called sequentially
-8. Results are recorded (success/failure with error)
-9. Import store transitions to `complete`, showing results
+7. For each URL, `addFeed()` is called sequentially:
+   - **Success** → recorded as `success: true`
+   - **`reason: "fetch-failure"`** (HTTP / network error) → falls
+     through to `addPlaceholderFeed(url, error)`, which persists a
+     Feed row with the URL-derived title and `lastError` set. Recorded
+     as `success: true, placeholder: true`. The user can hit "r" or
+     right-click → Refresh later to retry; the first successful
+     refresh upgrades the row in place (clears `lastError`, backfills
+     title/description/siteUrl from the parsed payload).
+   - **Other err** (parse / discovery / duplicate / quota) → recorded
+     as `success: false`; no row created. These won't recover via
+     refresh, so a placeholder would just be sidebar noise.
+8. Results are recorded with the 3-bucket discriminator
+9. Import store transitions to `complete`, showing the breakdown:
+   "N feeds added, M queued for retry, K failed"
 10. User clicks "Done" to close or "Import more" to reset
 
 **Export Flow:**
@@ -94,7 +108,10 @@ Feature: OPML Import/Export
 | `tests/core/opml/opml-service.test.ts` | OPML parse/generate, nested folders, edge cases |
 | `tests/core/opml/url-list-parser.test.ts` | URL parsing, comments, dedup, format detection |
 | `tests/stores/import-store.test.ts` | State machine, selectors, progress tracking |
+| `tests/components/settings/import-view-placeholder.test.tsx` | Placeholder-on-fetch-failure routing into folders |
+| `tests/integration/feed-store-db.test.ts` | Placeholder lifecycle round-trip through real encrypted DB |
 | `tests/e2e/import-export.spec.ts` | Full import/export flows in browser |
+| `tests/e2e/import-recovery.spec.ts` | Placeholder → refresh → recover, browser-side |
 
 ## Design Decisions
 
@@ -111,6 +128,8 @@ Feature: OPML Import/Export
 - **Auto-detect format** — When pasting text, the app auto-detects whether it's OPML XML or a plain URL list by checking for XML markers, eliminating the need for users to specify format.
 
 - **URL normalization** — URLs without protocol are auto-prefixed with `https://`. Invalid URLs are silently filtered rather than failing the entire import.
+
+- **Recoverable failures become placeholders** — A URL that fails with an HTTP error (429/503/4xx/5xx) or a network error is persisted as a placeholder Feed with `lastError` set and `lastSuccessfulFetchAt` left undefined. The sidebar surfaces these with a red `XCircle` icon distinct from the amber "stale" indicator. Hitting "r" or right-click → Refresh retries the fetch; the first success upgrades the placeholder in place (clears `lastError`, backfills metadata). Parse / discovery / duplicate failures stay rejected because refresh can't recover them. Issue #117 follow-up — large self-host imports on fresh IPs trip upstream rate-limits, and re-typing URLs to recover broken rows was tedious. Placeholders also preserve the OPML folder structure, so a recovered feed stays in the folder the user intended.
 
 ## Limitations
 

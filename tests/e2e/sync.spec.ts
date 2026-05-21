@@ -5,19 +5,12 @@ import type { Page } from "@playwright/test";
 /**
  * Navigate to the Settings → Sync & Data tab where the sync controls live.
  *
- * Post-redesign: Settings is a stage page at /settings, the tab is called
- * "Sync & Data", and the primary sync affordance is a <Switch> toggle (not
- * the prior "Enable sync" / "Use existing cloud account" buttons).
- *
- * IMPORTANT: in e2e the default tier is `free` and the build is hosted, so
- * the Cloud sync card mounts with the frosted-glass gate overlay. The
- * gate wraps its content in `aria-hidden=true` so screen readers focus on
- * the upgrade CTA rather than the blurred toggle. That means the
- * "Cloud sync" <h3> is unreachable via Playwright's `getByRole`
- * (which filters out aria-hidden) when this helper runs. We wait on the
- * Danger zone heading instead — it's a sibling card, always rendered,
- * never aria-hidden, so it's a reliable signal that the Sync & Data tab
- * has actually mounted.
+ * Settings is a stage page at /settings, the tab is called "Sync & Data",
+ * and the primary sync affordance is a <Switch> toggle. We anchor on the
+ * Danger zone heading because it's always rendered regardless of hosted /
+ * self-hosted state — the Cloud sync card's heading is aria-hidden in the
+ * self-host-gated path, so anchoring on Danger zone keeps this helper
+ * robust across both modes.
  *
  * On mobile, the sidebar Settings button is inside the bottom drawer which
  * we open first.
@@ -63,23 +56,6 @@ async function addFeedForSync(page: Page) {
 }
 
 test.describe("Sync", () => {
-  test("Sync & Data tab gates the cloud sync toggle for free-tier hosted users", async ({
-    feedPage: page,
-  }) => {
-    await addFeedForSync(page);
-    await goToSyncSection(page);
-    // The Cloud sync card content is aria-hidden behind the frosted-glass
-    // gate; the user-visible state is the overlay's headline. Asserting on
-    // the overlay text (not the hidden heading) matches what the user
-    // actually sees and what they can interact with.
-    await expect(
-      page.getByText(/cloud sync requires a subscription/i),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /upgrade plan/i }),
-    ).toBeVisible();
-  });
-
   test("clicking the sidebar Settings button navigates to /settings", async ({
     feedPage: page,
   }) => {

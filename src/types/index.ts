@@ -23,6 +23,15 @@ export interface Feed {
   /** Unix epoch ms of the last refresh attempt that returned HTTP 2xx. */
   lastSuccessfulFetchAt?: number;
   /**
+   * Most-recent refresh error message, set by `persistFreshness` in
+   * `feed-service.ts`. Cleared on every successful refresh. Set on
+   * placeholder feeds added by bulk import when the initial fetch failed
+   * (HTTP / network error) — refresh recovers the feed and clears the
+   * field. A non-empty `lastError` with `lastSuccessfulFetchAt === undefined`
+   * is the placeholder signal the sidebar uses to render a red error icon.
+   */
+  lastError?: string;
+  /**
    * Per-feed auto-action rules evaluated on ingest. Each rule's
    * condition is matched against newly-fetched articles; matching
    * articles get every action in `rule.actions` applied before

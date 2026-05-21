@@ -13,6 +13,7 @@ import {
 import { createRule } from "../core/storage/schema.ts";
 import {
   addFeedFlow,
+  addPlaceholderFeed as addPlaceholderFeedCore,
   refreshFeed,
   refreshAllFeeds,
   reloadFeed,
@@ -44,14 +45,19 @@ import { ok, err } from "../utils/result.ts";
 
 /**
  * `addFeed` result. Result-shaped plus an optional `reason` on the err
- * branch so call sites can distinguish a quota refusal (route the user to
- * upgrade) from a generic failure (show "Failed to add"). Stays a
- * structural superset of `Result<void>` so existing readers of
- * `.ok` / `.error` continue to compile without change.
+ * branch so call sites can distinguish failure classes: quota refusal
+ * (route the user to upgrade), recoverable fetch failure (import flow
+ * can create a placeholder), or unflagged (generic). Stays a structural
+ * superset of `Result<void>` so existing readers of `.ok` / `.error`
+ * continue to compile without change.
  */
 export type AddFeedResult =
   | { ok: true; value: void }
-  | { ok: false; error: string; reason?: "free-quota-exceeded" };
+  | {
+      ok: false;
+      error: string;
+      reason?: "free-quota-exceeded" | "fetch-failure";
+    };
 
 /** Whether a feed is the official FeedZero release notes feed. */
 function isReleaseFeed(feed: Feed): boolean {
@@ -86,6 +92,13 @@ interface FeedStore {
   feedsLoaded: boolean;
   loadFeeds: () => Promise<void>;
   addFeed: (url: string) => Promise<AddFeedResult>;
+  /**
+   * Persist a placeholder feed for a URL whose initial fetch failed
+   * (HTTP / network error). Used by bulk import so rate-limited URLs
+   * aren't dropped — the user can hit refresh later to recover them.
+   * Returns Result<Feed> so callers can chain folder placement.
+   */
+  addPlaceholderFeed: (url: string, error: string) => Promise<Result<Feed>>;
   removeFeed: (feedId: string) => Promise<void>;
   renameFeed: (feedId: string, newTitle: string) => Promise<void>;
   setFeedPreferFullText: (feedId: string, value: boolean) => Promise<void>;
@@ -135,6 +148,18 @@ interface FeedStore {
   rulesEditorFeedId: string | null;
   openRulesEditor: (feedId: string) => void;
   closeRulesEditor: () => void;
+  /**
+   * Open/close state for the per-feed settings dialog. Dialog mounts
+   * at the app root and reads this slice; non-null id = open against
+   * that feed. Mirrors rulesEditorFeedId for shape.
+   */
+  feedSettingsDialogId: string | null;
+  openFeedSettings: (feedId: string) => void;
+  closeFeedSettings: () => void;
+  /** Same shape, for the per-folder settings dialog (rename + color + delete). */
+  folderSettingsDialogId: string | null;
+  openFolderSettings: (folderId: string) => void;
+  closeFolderSettings: () => void;
 }
 
 function readSortMode(): FeedSortMode {
@@ -313,6 +338,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   rulesEditorFeedId: null,
   openRulesEditor: (feedId) => set({ rulesEditorFeedId: feedId }),
   closeRulesEditor: () => set({ rulesEditorFeedId: null }),
+  feedSettingsDialogId: null,
+  openFeedSettings: (feedId) => set({ feedSettingsDialogId: feedId }),
+  closeFeedSettings: () => set({ feedSettingsDialogId: null }),
+  folderSettingsDialogId: null,
+  openFolderSettings: (folderId) => set({ folderSettingsDialogId: folderId }),
+  closeFolderSettings: () => set({ folderSettingsDialogId: null }),
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
@@ -348,7 +379,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const result = await addFeedFlow(url);
     if (!result.ok) {
       set({ isLoading: false, error: result.error });
-      return { ok: false, error: result.error } as const;
+      // Preserve the reason discriminator so import-side callers can
+      // distinguish recoverable fetch failures (placeholder candidate)
+      // from permanent ones (parse / discovery / duplicate).
+      return result.reason
+        ? ({ ok: false, error: result.error, reason: result.reason } as const)
+        : ({ ok: false, error: result.error } as const);
     }
     // Push the ingested articles into the article-store immediately so the
     // sidebar badge reflects the true unread count without waiting for the
@@ -365,6 +401,14 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     set({ selectedFeedId: result.value.feed.id, isLoading: false });
     schedulePush();
     return { ok: true, value: undefined } as const;
+  },
+
+  addPlaceholderFeed: async (url, error) => {
+    const result = await addPlaceholderFeedCore(url, error);
+    if (!result.ok) return result;
+    await reloadFeeds(set);
+    schedulePush();
+    return result;
   },
 
   removeFeed: async (feedId) => {
