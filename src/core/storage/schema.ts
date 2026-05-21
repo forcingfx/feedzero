@@ -5,9 +5,12 @@ import type {
   Feed,
   Article,
   SmartFilter,
+  Rule,
+  RuleAction,
   CreateFeedInput,
   CreateArticleInput,
   CreateSmartFilterInput,
+  CreateRuleInput,
 } from "../../types/index.ts";
 
 export { SCHEMA_VERSION };
@@ -110,4 +113,72 @@ export function createSmartFilter({
     createdAt: now,
     updatedAt: now,
   });
+}
+
+/**
+ * Create a new per-feed rule with sensible defaults. Rules without
+ * actions are rejected — that would just be a smart filter, and we
+ * keep the two concepts separate so a user editing a saved view
+ * doesn't accidentally mutate state.
+ */
+export function createRule({
+  name,
+  condition,
+  actions,
+  enabled = true,
+}: CreateRuleInput): Result<Rule> {
+  const trimmed = name?.trim() ?? "";
+  if (!trimmed) return err("Rule requires a name");
+  if (!condition) return err("Rule requires a condition");
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return err("Rule requires at least one action");
+  }
+  const now = Date.now();
+  return ok({
+    id: crypto.randomUUID(),
+    name: trimmed,
+    enabled,
+    condition,
+    actions,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+function isValidAction(action: unknown): action is RuleAction {
+  if (!action || typeof action !== "object") return false;
+  const a = action as Record<string, unknown>;
+  switch (a.kind) {
+    case "mark-read":
+    case "star":
+    case "mute":
+      return true;
+    case "route-to-folder":
+      return typeof a.folderId === "string" && a.folderId.length > 0;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Validate a rule object. Tolerant of older shapes only where defaults
+ * make sense (missing `enabled` defaults to true in callers); rejects
+ * anything that would crash the engine at runtime — e.g. a
+ * `route-to-folder` action with no `folderId` from a malformed vault.
+ */
+export function validateRule(rule: unknown): Result<Rule> {
+  if (!rule || typeof rule !== "object") return err("Rule must be an object");
+  const r = rule as Record<string, unknown>;
+  if (typeof r.id !== "string" || !r.id) return err("Rule missing id");
+  if (typeof r.name !== "string" || !r.name) return err("Rule missing name");
+  if (!r.condition || typeof r.condition !== "object") {
+    return err("Rule missing condition");
+  }
+  if (!Array.isArray(r.actions) || r.actions.length === 0) {
+    return err("Rule must have at least one action");
+  }
+  if (!r.actions.every(isValidAction)) {
+    return err("Rule contains an invalid action");
+  }
+  return ok(rule as Rule);
 }

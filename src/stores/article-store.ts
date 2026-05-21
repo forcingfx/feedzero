@@ -47,6 +47,13 @@ interface ArticleStore {
   isLoading: boolean;
   /** User-chosen sort order for the visible article list; persisted. */
   articleSortMode: ArticleSortMode;
+  /**
+   * When false (default), muted articles are hidden from default views
+   * (ALL_FEEDS, specific feed, folder). When true, they reappear in
+   * those views. Starred and smart-filter views always show muted
+   * articles regardless — those are user-explicit selections.
+   */
+  showMuted: boolean;
   /** Preload every article into the store; used on startup and on refresh. */
   preloadAll: () => Promise<void>;
   loadArticles: (feedId: string) => Promise<void>;
@@ -61,6 +68,12 @@ interface ArticleStore {
   toggleStar: (articleId: string) => Promise<void>;
   /** Switch sort order; re-derives the visible list immediately. No-op on unknown modes. */
   setArticleSortMode: (mode: ArticleSortMode) => void;
+  /**
+   * Toggle the "Show muted" affordance. Re-derives the visible list
+   * immediately so the UI reflects the change without another action.
+   * Active feed id is recovered from feed-store rather than tracked here.
+   */
+  setShowMuted: (value: boolean) => void;
 }
 
 /** Delay before an opened article is marked as read (ms). */
@@ -80,6 +93,23 @@ export function selectUnreadCount(
   if (!articles) return 0;
   let count = 0;
   for (const a of articles) if (!a.read) count++;
+  return count;
+}
+
+/**
+ * Derived count of muted articles for a single feed. Pure function over
+ * store state — drives the "Show muted (N)" affordance in the article
+ * list footer. Muted articles are hidden by default but still counted
+ * here so the user can tell when their rules have caught something.
+ */
+export function selectMutedCount(
+  state: Pick<ArticleStore, "articlesByFeedId">,
+  feedId: string,
+): number {
+  const articles = state.articlesByFeedId[feedId];
+  if (!articles) return 0;
+  let count = 0;
+  for (const a of articles) if (a.muted) count++;
   return count;
 }
 
@@ -154,10 +184,18 @@ function deriveVisibleArticles(
   articlesByFeedId: Record<string, Article[]>,
   feedId: string,
   sortMode: ArticleSortMode,
+  showMuted: boolean,
 ): Article[] {
+  // Default views (ALL_FEEDS, specific feed, folder) suppress muted
+  // unless the user has flipped showMuted. Starred and smart-filter
+  // views are user-explicit selections and always show everything.
+  const dropMuted = (a: Article) => showMuted || !a.muted;
+
   if (feedId === ALL_FEEDS_ID) {
     const flat: Article[] = [];
-    for (const list of Object.values(articlesByFeedId)) flat.push(...list);
+    for (const list of Object.values(articlesByFeedId)) {
+      for (const a of list) if (dropMuted(a)) flat.push(a);
+    }
     return sortArticles(flat, sortMode);
   }
   if (isStarredFeedId(feedId)) {
@@ -172,19 +210,23 @@ function deriveVisibleArticles(
   }
   if (isFolderFeedId(feedId)) {
     const folderId = fromFolderFeedId(feedId)!;
-    const memberIds = new Set(
-      useFeedStore
-        .getState()
-        .feeds.filter((f) => f.folderId === folderId)
-        .map((f) => f.id),
-    );
+    const feeds = useFeedStore.getState().feeds;
+    const feedFolderById = new Map(feeds.map((f) => [f.id, f.folderId]));
     const flat: Article[] = [];
-    for (const [id, list] of Object.entries(articlesByFeedId)) {
-      if (memberIds.has(id)) flat.push(...list);
+    for (const list of Object.values(articlesByFeedId)) {
+      for (const a of list) {
+        if (!dropMuted(a)) continue;
+        // Article-level folderId override wins; otherwise inherit
+        // the article's feed folder. An article whose effective folder
+        // doesn't match the requested view is skipped.
+        const effective = a.folderId ?? feedFolderById.get(a.feedId);
+        if (effective === folderId) flat.push(a);
+      }
     }
     return sortArticles(flat, sortMode);
   }
-  return sortArticles(articlesByFeedId[feedId] ?? [], sortMode);
+  const list = articlesByFeedId[feedId] ?? [];
+  return sortArticles(list.filter(dropMuted), sortMode);
 }
 
 /**
@@ -257,6 +299,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   selectedArticle: null,
   isLoading: false,
   articleSortMode: loadPersistedSortMode(),
+  showMuted: false,
 
   preloadAll: async () => {
     const result = await getAllArticles();
@@ -272,6 +315,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       get().articlesByFeedId,
       feedId,
       sortMode,
+      get().showMuted,
     );
     set({
       articles: cachedVisible,
@@ -317,7 +361,12 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     const nextByFeed = mergeFetchedArticles(get(), feedId, fetched);
     set({
       articlesByFeedId: nextByFeed,
-      articles: deriveVisibleArticles(nextByFeed, feedId, get().articleSortMode),
+      articles: deriveVisibleArticles(
+        nextByFeed,
+        feedId,
+        get().articleSortMode,
+        get().showMuted,
+      ),
       isLoading: false,
     });
   },
@@ -466,6 +515,22 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     set({
       articleSortMode: mode,
       articles: sortArticles(get().articles, mode),
+    });
+  },
+
+  setShowMuted: (value) => {
+    // Re-derive against the currently-selected feed so the change is
+    // visible in the active view immediately. ALL_FEEDS_ID is the
+    // default when no feed is selected — same path the sidebar uses.
+    const activeFeedId = useFeedStore.getState().selectedFeedId ?? ALL_FEEDS_ID;
+    set({
+      showMuted: value,
+      articles: deriveVisibleArticles(
+        get().articlesByFeedId,
+        activeFeedId,
+        get().articleSortMode,
+        value,
+      ),
     });
   },
 }));

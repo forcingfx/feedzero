@@ -18,6 +18,8 @@ import type { Feed, Article } from "../../types/index.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
 import { groupByHostForRefresh } from "./group-by-host.ts";
 import { parseRetryAfter } from "./parse-retry-after.ts";
+import { applyRules } from "../rules/engine.ts";
+import { buildContext } from "../filters/evaluator.ts";
 
 interface AddFeedResult {
   feed: Feed;
@@ -307,7 +309,12 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
       }
     }
 
-    // Store new articles
+    // Store new articles, applying any per-feed rules first so
+    // `muted` / `starred` / `read` / `folderId` ride into IndexedDB
+    // (and the encrypted vault) in their final post-rule shape. The
+    // rule engine reuses the smart-filter EvalContext; rules can't
+    // reference other rules or smart filters yet, so an empty
+    // `filters` list is fine.
     const created = newArticles
       .map((a) => {
         const r = createArticle({ feedId: feed.id, ...a });
@@ -315,8 +322,15 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
       })
       .filter((a): a is Article => a !== null);
 
-    if (created.length > 0) {
-      await addArticles(created);
+    const rulesToApply = feed.rules ?? [];
+    const ruleCtx = buildContext({ feeds: [feed], filters: [] });
+    const finalArticles =
+      rulesToApply.length > 0
+        ? created.map((a) => applyRules(a, rulesToApply, ruleCtx))
+        : created;
+
+    if (finalArticles.length > 0) {
+      await addArticles(finalArticles);
     }
 
     // Update changed articles in bulk

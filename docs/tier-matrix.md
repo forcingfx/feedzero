@@ -48,7 +48,7 @@ Legend:
 | Feature | Free | Personal | Pro | Status |
 |---|---|---|---|---|
 | **Smart filters** — Saved queries combining feeds, keywords, authors, and read state. | — | ✓ | ✓ | Shipped |
-| **Mute keywords** — Hide articles whose title or body matches a muted keyword. | — | ✓ | ✓ | Coming soon |
+| **Rules** — Per-feed auto-action rules: mute, star, mark-read, or route articles by title, author, content, date, and more. | — | ✓ | ✓ | Shipped |
 | **Full-text search** — Search across every cached article body, title, and author. | — | — | ✓ | Coming soon |
 | **AI signal** — Local LLM ranks unread articles by relevance to topics you follow. | — | — | ✓ | Coming soon |
 

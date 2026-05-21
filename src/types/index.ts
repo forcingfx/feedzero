@@ -14,6 +14,15 @@ export interface Feed {
   lastFetchedAt?: number;
   /** Unix epoch ms of the last refresh attempt that returned HTTP 2xx. */
   lastSuccessfulFetchAt?: number;
+  /**
+   * Per-feed auto-action rules evaluated on ingest. Each rule's
+   * condition is matched against newly-fetched articles; matching
+   * articles get every action in `rule.actions` applied before
+   * persistence. Rules are scoped to this feed only — global rules
+   * may be layered later by composing additional lists into the same
+   * `applyRules` call.
+   */
+  rules?: Rule[];
 }
 
 export interface Folder {
@@ -39,6 +48,19 @@ export interface Article {
   starred?: boolean;
   /** Unix epoch ms of the most recent star action; used to sort the starred view. */
   starredAt?: number;
+  /**
+   * Hidden from default article lists. Set by a rule's `mute` action on
+   * ingest, surfaceable via a "Show muted" affordance. Muted is distinct
+   * from `read`: read articles still appear in read-views, muted articles
+   * don't appear anywhere by default.
+   */
+  muted?: boolean;
+  /**
+   * Per-article folder override set by a `route-to-folder` rule action.
+   * When absent, the article inherits its feed's `folderId`. When present,
+   * the article appears under this folder regardless of its feed's folder.
+   */
+  folderId?: string;
   /**
    * Sanitized full-text HTML extracted from `link` and persisted for offline
    * reading. Populated by the background prefetch service for starred
@@ -151,4 +173,43 @@ export interface CreateSmartFilterInput {
   color?: string;
   sortMode?: ArticleSortMode;
   limit?: number;
+}
+
+/**
+ * A side-effecting action a `Rule` applies to a matching article on
+ * ingest. Discriminated on `kind` so adding a new action forces an
+ * exhaustive update to `applyRules`. Reversible state — never delete.
+ */
+export type RuleAction =
+  | { kind: "mark-read" }
+  | { kind: "star" }
+  | { kind: "mute" }
+  | { kind: "route-to-folder"; folderId: string };
+
+/**
+ * Per-feed auto-action rule. Stored nested on `Feed.rules` and synced
+ * through the same vault payload as the feed itself — no new collection
+ * required. Rules evaluate on `refreshFeed` ingest, before articles
+ * are persisted; they may also be re-applied to existing articles via
+ * an explicit "Apply to existing" action in the editor.
+ */
+export interface Rule {
+  id: string;
+  /** Human-readable label shown in the rule editor list. */
+  name: string;
+  /** Paused rules persist but do not run. Saves users from deleting + recreating. */
+  enabled: boolean;
+  /** Same boolean AST as smart filters — reuses `evaluateGroup`. */
+  condition: ConditionGroup;
+  /** Applied in order; every action in the list runs when the rule matches. */
+  actions: RuleAction[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreateRuleInput {
+  name: string;
+  condition: ConditionGroup;
+  actions: RuleAction[];
+  enabled?: boolean;
 }

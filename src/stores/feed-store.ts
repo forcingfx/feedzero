@@ -9,6 +9,7 @@ import {
   updateFolder as dbUpdateFolder,
   removeFolder as dbRemoveFolder,
 } from "../core/storage/db.ts";
+import { createRule } from "../core/storage/schema.ts";
 import {
   addFeedFlow,
   refreshFeed,
@@ -26,7 +27,15 @@ import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
 import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
 import { toast } from "sonner";
-import type { Feed, Folder, FeedSortMode } from "../types/index.ts";
+import type {
+  Feed,
+  Folder,
+  FeedSortMode,
+  Rule,
+  CreateRuleInput,
+} from "../types/index.ts";
+import type { Result } from "../utils/result.ts";
+import { ok, err } from "../utils/result.ts";
 
 /**
  * `addFeed` result. Result-shaped plus an optional `reason` on the err
@@ -94,6 +103,26 @@ interface FeedStore {
   folderOpenState: Record<string, boolean>;
   setFolderOpen: (folderId: string, open: boolean) => void;
   toggleFolderOpen: (folderId: string) => void;
+  /**
+   * Per-feed rule CRUD. Rules nest on Feed.rules and ride the existing
+   * encrypted vault payload — no new collection. Every mutator is gated
+   * on the `rules` feature (Personal+) for defense-in-depth; the UI
+   * gates again via `useFeatureGate`.
+   */
+  addFeedRule: (
+    feedId: string,
+    input: CreateRuleInput,
+  ) => Promise<Result<Rule>>;
+  updateFeedRule: (feedId: string, rule: Rule) => Promise<Result<Rule>>;
+  removeFeedRule: (feedId: string, ruleId: string) => Promise<void>;
+  reorderFeedRules: (feedId: string, orderedIds: string[]) => Promise<void>;
+  /**
+   * When non-null, the rules-editor dialog is open against this feed.
+   * Dialog mounts at the app root and reads this slice.
+   */
+  rulesEditorFeedId: string | null;
+  openRulesEditor: (feedId: string) => void;
+  closeRulesEditor: () => void;
 }
 
 function readSortMode(): FeedSortMode {
@@ -114,6 +143,43 @@ function readJsonArray(key: string): string[] {
 
 function sortFoldersByName(folders: Folder[]): Folder[] {
   return [...folders].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** True when the current session may mutate per-feed rules. */
+function isRulesGateOpen(): boolean {
+  return gateState(
+    "rules",
+    useLicenseStore.getState().tier,
+    isSelfHosted(),
+    isPaidTierActive(),
+  ).enabled;
+}
+
+/**
+ * Rewrite a feed's `rules` list, persist via dbUpdateFeed, and refresh
+ * the in-memory snapshot. Shared by every rule mutator so reload + sync
+ * push happen in exactly one place — the "extract a helper when the
+ * same multi-step dance repeats" rule from CLAUDE.md.
+ */
+async function persistFeedRules(
+  feedId: string,
+  rewrite: (current: Rule[]) => Rule[],
+  set: (
+    partial: Partial<FeedStore> | ((s: FeedStore) => Partial<FeedStore>),
+  ) => void,
+): Promise<Result<Rule[]>> {
+  const feedResult = await getFeed(feedId);
+  if (!feedResult.ok) return err(feedResult.error);
+  const current = feedResult.value.rules ?? [];
+  const next = rewrite(current);
+  await dbUpdateFeed({
+    ...feedResult.value,
+    rules: next,
+    updatedAt: Date.now(),
+  });
+  await reloadFeeds(set);
+  schedulePush();
+  return ok(next);
 }
 
 /**
@@ -185,6 +251,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   folderCustomOrder: readJsonArray(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER),
   folderOpenState: {},
   feedsLoaded: false,
+  rulesEditorFeedId: null,
+  openRulesEditor: (feedId) => set({ rulesEditorFeedId: feedId }),
+  closeRulesEditor: () => set({ rulesEditorFeedId: null }),
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
@@ -466,6 +535,70 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
 
     await reloadFeeds(set);
     schedulePush();
+  },
+
+  addFeedRule: async (feedId, input) => {
+    if (!isRulesGateOpen()) {
+      toast("Rules are a Personal feature. Subscribe to unlock.");
+      return err("Rules require the Personal tier");
+    }
+    const created = createRule(input);
+    if (!created.ok) return err(created.error);
+
+    const persisted = await persistFeedRules(
+      feedId,
+      (current) => [...current, created.value],
+      set,
+    );
+    if (!persisted.ok) return err(persisted.error);
+    return ok(created.value);
+  },
+
+  updateFeedRule: async (feedId, rule) => {
+    if (!isRulesGateOpen()) {
+      toast("Rules are a Personal feature. Subscribe to unlock.");
+      return err("Rules require the Personal tier");
+    }
+    let found = false;
+    const result = await persistFeedRules(
+      feedId,
+      (current) =>
+        current.map((r) => {
+          if (r.id !== rule.id) return r;
+          found = true;
+          return { ...rule, updatedAt: Date.now() };
+        }),
+      set,
+    );
+    if (!result.ok) return err(result.error);
+    if (!found) return err(`Rule ${rule.id} not found on feed ${feedId}`);
+    return ok({ ...rule, updatedAt: Date.now() });
+  },
+
+  removeFeedRule: async (feedId, ruleId) => {
+    if (!isRulesGateOpen()) return;
+    await persistFeedRules(
+      feedId,
+      (current) => current.filter((r) => r.id !== ruleId),
+      set,
+    );
+  },
+
+  reorderFeedRules: async (feedId, orderedIds) => {
+    if (!isRulesGateOpen()) return;
+    await persistFeedRules(
+      feedId,
+      (current) => {
+        const byId = new Map(current.map((r) => [r.id, r]));
+        const reordered: Rule[] = [];
+        for (const id of orderedIds) {
+          const r = byId.get(id);
+          if (r) reordered.push(r);
+        }
+        return reordered;
+      },
+      set,
+    );
   },
 }));
 

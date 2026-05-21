@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, Check, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Settings2, Trash2 } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -43,6 +43,7 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
   const folders = useFeedStore((s) => s.folders);
   const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
+  const openRulesEditor = useFeedStore((s) => s.openRulesEditor);
   const isRefreshing = refreshingFeedIds.has(feed.id);
 
   // Both hooks are always called (hooks must not be conditional).
@@ -136,6 +137,12 @@ export function FeedItem({ feed, isSelected, inFolder = false, sortable = false,
               ))}
             </>
           )}
+          <DropdownMenuItem
+            onClick={() => openRulesEditor(feed.id)}
+            data-testid="feed-item-rules"
+          >
+            <Settings2 className="size-4" /> Rules…
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => refreshSingleFeed(feed.id)}>
             <RefreshCw className="size-4" /> Refresh
           </DropdownMenuItem>
