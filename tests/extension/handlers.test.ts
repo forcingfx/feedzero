@@ -10,6 +10,7 @@ function baseContext(overrides: Partial<HandlerContext> = {}): HandlerContext {
       status: 200,
     })),
     hasPermission: vi.fn(async () => true),
+    requestPermission: vi.fn(async () => true),
     ...overrides,
   };
 }
@@ -164,6 +165,93 @@ describe("extension/handlers", () => {
         baseContext(),
       );
       expect(response).toBeNull();
+    });
+  });
+
+  describe("handleMessage / authorize-publisher", () => {
+    it("returns granted=true when chrome.permissions.request resolves true", async () => {
+      const requestPermission = vi.fn(async () => true);
+      const response = await handleMessage(
+        {
+          type: "feedzero/authorize-publisher",
+          requestId: "req-auth-1",
+          protocolVersion: 1,
+          domain: "nytimes.com",
+        },
+        baseContext({ requestPermission }),
+      );
+      expect(response).toEqual({
+        type: "feedzero/authorize-publisher-response",
+        requestId: "req-auth-1",
+        granted: true,
+      });
+      expect(requestPermission).toHaveBeenCalledWith("https://nytimes.com");
+    });
+
+    it("returns granted=false when chrome.permissions.request resolves false", async () => {
+      const response = await handleMessage(
+        {
+          type: "feedzero/authorize-publisher",
+          requestId: "req-auth-2",
+          protocolVersion: 1,
+          domain: "nytimes.com",
+        },
+        baseContext({ requestPermission: async () => false }),
+      );
+      expect(response).toMatchObject({
+        type: "feedzero/authorize-publisher-response",
+        granted: false,
+      });
+    });
+
+    it("returns granted=false when chrome.permissions.request throws", async () => {
+      const response = await handleMessage(
+        {
+          type: "feedzero/authorize-publisher",
+          requestId: "req-auth-3",
+          protocolVersion: 1,
+          domain: "nytimes.com",
+        },
+        baseContext({
+          requestPermission: async () => {
+            throw new Error("user gesture required");
+          },
+        }),
+      );
+      expect(response).toMatchObject({
+        type: "feedzero/authorize-publisher-response",
+        granted: false,
+      });
+    });
+
+    it("rejects an authorize-publisher message without a domain", async () => {
+      const response = await handleMessage(
+        {
+          type: "feedzero/authorize-publisher",
+          requestId: "req-auth-4",
+          protocolVersion: 1,
+        },
+        baseContext(),
+      );
+      expect(response).toBeNull();
+    });
+
+    it("rejects domains with a scheme or path (must be bare host)", async () => {
+      const requestPermission = vi.fn(async () => true);
+      const response = await handleMessage(
+        {
+          type: "feedzero/authorize-publisher",
+          requestId: "req-auth-5",
+          protocolVersion: 1,
+          domain: "https://nytimes.com/section",
+        },
+        baseContext({ requestPermission }),
+      );
+      expect(response).toMatchObject({
+        type: "feedzero/authorize-publisher-response",
+        granted: false,
+      });
+      expect(requestPermission).not.toHaveBeenCalled();
     });
   });
 });
