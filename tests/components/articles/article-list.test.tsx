@@ -364,7 +364,12 @@ describe("ArticleList", () => {
       expect(screen.getByText(/Gaming Daily/)).toBeInTheDocument();
     });
 
-    it("does not show feed title when not in global view", () => {
+    it("does not show feed title on each article when not in global view", () => {
+      // The article-list title bar shows the current feed name once at
+      // the top (introduced when the cog + sort pills moved into a
+      // proper title bar). Per-article feed labels still only appear
+      // in aggregated views — this test now scopes to the per-article
+      // labels via the title bar's exclusion.
       useFeedStore.setState({
         feeds: [mockFeed("f1", "Tech News")],
         selectedFeedId: "f1",
@@ -377,9 +382,21 @@ describe("ArticleList", () => {
         isLoading: false,
       });
 
-      render(<ArticleList />);
+      const { container } = render(<ArticleList />);
 
-      expect(screen.queryByText(/Tech News/)).not.toBeInTheDocument();
+      // Title bar should contain "Tech News" once; the article rows
+      // beneath it should not repeat the feed name.
+      const titleBar = container.querySelector(
+        "[data-testid='article-list-controls']",
+      );
+      expect(titleBar?.textContent).toContain("Tech News");
+
+      const articleRows = container.querySelectorAll(
+        "[data-testid='article-item']",
+      );
+      for (const row of Array.from(articleRows)) {
+        expect(row.textContent).not.toContain("Tech News");
+      }
     });
 
     it("shows feed favicon for each article when in global view", () => {
@@ -410,7 +427,10 @@ describe("ArticleList", () => {
       );
     });
 
-    it("does not show feed favicon when not in global view", () => {
+    it("does not show feed favicon per article when not in global view", () => {
+      // The title bar shows the current feed's favicon once at the top.
+      // The per-article favicon is only for aggregated views — this
+      // test scopes to the article rows specifically.
       useFeedStore.setState({
         feeds: [mockFeed("f1", "Tech News")],
         selectedFeedId: "f1",
@@ -425,7 +445,13 @@ describe("ArticleList", () => {
 
       const { container } = render(<ArticleList />);
 
-      expect(container.querySelector("img")).not.toBeInTheDocument();
+      // Title bar may include the favicon; article rows must not.
+      const articleRows = container.querySelectorAll(
+        "[data-testid='article-item']",
+      );
+      for (const row of Array.from(articleRows)) {
+        expect(row.querySelector("img")).toBeNull();
+      }
     });
   });
 

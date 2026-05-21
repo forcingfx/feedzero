@@ -15,6 +15,7 @@ import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer.tsx";
+import { MobileHeaderPills } from "@/components/articles/article-list-controls.tsx";
 
 /**
  * Listens for the feedzero:toggle-sidebar event and toggles the sidebar.
@@ -99,6 +100,7 @@ export function AppLayout() {
       <div className="flex flex-col h-dvh overflow-hidden bg-background">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 z-10 bg-background">
           <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
+          <MobileHeaderPills />
         </header>
         <Outlet />
         <MobileNavDrawer onFeedSelect={handleFeedSelect} />

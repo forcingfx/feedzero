@@ -6,7 +6,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { ExpandingPill } from "@/components/ui/expanding-pill.tsx";
-import { useIsMobile } from "@/hooks/use-mobile.ts";
 import type { ArticleSortMode } from "@/types/index.ts";
 import { ARTICLE_SORT_MODES } from "@/types/index.ts";
 
@@ -24,11 +23,10 @@ interface SortPillProps {
 
 /**
  * Article-list sort selector built on the ExpandingPill primitive.
- * Replaces the older compact text+icon SortMenu. Mobile always shows
- * the label (no hover semantics); desktop expands on hover.
+ * Icon-only on every viewport; expands on hover (desktop), focus
+ * (keyboard), or press (mobile tap).
  */
 export function SortPill({ mode, onChange, dataTestId }: SortPillProps) {
-  const isMobile = useIsMobile();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -36,7 +34,6 @@ export function SortPill({ mode, onChange, dataTestId }: SortPillProps) {
           icon={<ArrowUpDown />}
           label={SORT_LABELS[mode]}
           aria-label={`Sort: ${SORT_LABELS[mode]}`}
-          alwaysExpanded={isMobile}
           dataTestId={dataTestId}
         />
       </DropdownMenuTrigger>
