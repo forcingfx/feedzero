@@ -11,6 +11,8 @@ All feed parsing, article storage, and UI rendering happen in the browser. The o
 1. **CORS proxy** — Fetches feed XML/JSON and web pages on behalf of the browser (required because browsers block cross-origin requests to arbitrary domains)
 2. **Sync endpoint** (optional) — Stores an encrypted blob for cross-device sync
 
+A companion **browser extension** (`extension/`, see [Feature 019](features/019-authenticated-fetch.md) and [ADR 020](decisions/020-browser-extension-surface.md)) is an additive, opt-in surface that fetches paywalled articles using the user's existing browser session against the publisher. Credentials never touch FeedZero's servers; the extension is pure transport between the web app and the publisher's origin, authorized one domain at a time via Chrome's native host-permission prompt.
+
 See [ADR 005](decisions/005-react-migration.md) for the migration rationale.
 
 ## Data Flow
