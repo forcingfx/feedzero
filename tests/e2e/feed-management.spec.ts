@@ -44,8 +44,12 @@ test.describe("Feed management", () => {
     await page.getByTestId("feed-settings-delete").click();
 
     // Confirmation dialog should appear with the feed title in the body.
-    await expect(page.getByText("Delete this feed?")).toBeVisible();
-    await expect(page.getByText(/Test Feed.*cached article/)).toBeVisible();
+    // Scope to the AlertDialog so the regex doesn't also match the outer
+    // FeedSettingsDialog (which contains the AlertDialog's text in its subtree).
+    const confirmDialog = page.getByRole("alertdialog");
+    await expect(confirmDialog).toBeVisible();
+    await expect(confirmDialog).toContainText("Delete this feed?");
+    await expect(confirmDialog).toContainText(/Test Feed.*cached article/);
 
     // Confirm removal
     await page.getByTestId("feed-settings-delete-confirm").click();
