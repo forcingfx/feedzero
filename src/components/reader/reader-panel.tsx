@@ -203,8 +203,16 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
       : statusMap[article.link] || "idle"
     : ("idle" as const);
 
+  // A paywall verdict is NOT an extraction failure — clicking the toggle
+  // surfaces the Authorize-publisher prompt, which is exactly what the user
+  // needs to act on. Only disable for in-flight extraction or a real
+  // failure where the user has no recourse.
+  const hasPaywallVerdict = article.link
+    ? Boolean(paywallMap[article.link])
+    : false;
   const extractedDisabled =
-    extractionStatus === "extracting" || extractionStatus === "failed";
+    extractionStatus === "extracting" ||
+    (extractionStatus === "failed" && !hasPaywallVerdict);
 
   function handleModeChange(mode: ViewMode) {
     if (mode === "extracted") {
@@ -311,9 +319,11 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                   disabled={extractedDisabled}
                   onClick={() => handleModeChange("extracted")}
                   title={
-                    extractionStatus === "failed"
-                      ? "Extraction didn't find additional content"
-                      : undefined
+                    hasPaywallVerdict
+                      ? "Article is paywalled — open to authorize the publisher"
+                      : extractionStatus === "failed"
+                        ? "Extraction didn't find additional content"
+                        : undefined
                   }
                   className={cn(
                     "inline-flex items-center gap-1 px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed",

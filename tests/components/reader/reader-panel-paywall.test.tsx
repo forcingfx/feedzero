@@ -151,4 +151,57 @@ describe("ReaderPanel paywall integration", () => {
       screen.getByRole("link", { name: /sign in/i }),
     ).toBeInTheDocument();
   });
+
+  it("keeps the Full text toggle enabled when status is 'failed' but a paywall verdict exists (NYT regression)", () => {
+    // Background extraction on an NYT article hits the paywall and marks
+    // status "failed" + records the verdict. Disabling the toggle would
+    // trap the user with no way to surface the authorize prompt.
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+
+    act(() => {
+      useExtractionStore.setState({
+        cache: {},
+        statusMap: { "https://nytimes.com/article-x": "failed" },
+        paywallMap: {
+          "https://nytimes.com/article-x": {
+            paywalled: true,
+            publisher: "nytimes.com",
+            reason: "nyt-cta",
+          },
+        },
+        viewMode: "feed",
+      });
+    });
+
+    const toggle = screen.getByRole("button", { name: /Full text/i });
+    expect(toggle).not.toBeDisabled();
+  });
+
+  it("still disables the Full text toggle when status is 'failed' with NO paywall verdict (genuine extraction failure)", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+
+    act(() => {
+      useExtractionStore.setState({
+        cache: {},
+        statusMap: { "https://nytimes.com/article-x": "failed" },
+        paywallMap: {},
+        viewMode: "feed",
+      });
+    });
+
+    const toggle = screen.getByRole("button", { name: /Full text/i });
+    expect(toggle).toBeDisabled();
+  });
 });
