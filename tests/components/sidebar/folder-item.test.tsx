@@ -55,7 +55,7 @@ function renderFolder(props: Partial<React.ComponentProps<typeof FolderItem>> = 
     <SidebarProvider>
       <FolderItem
         folder={mockFolder}
-        onDelete={vi.fn()}
+        
         isSelected={false}
         onSelect={vi.fn()}
         {...props}
@@ -74,7 +74,7 @@ function renderFolderWithFeed(folderProps: Partial<React.ComponentProps<typeof F
       <ul data-testid="folder-parent-list">
         <FolderItem
           folder={mockFolder}
-          onDelete={vi.fn()}
+          
           isSelected={false}
           onSelect={vi.fn()}
           {...folderProps}
@@ -150,7 +150,7 @@ describe("FolderItem", () => {
     const coloredFolder = { ...mockFolder, color: "#7c3aed" };
     render(
       <SidebarProvider>
-        <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+        <FolderItem folder={coloredFolder}  isSelected={false} onSelect={vi.fn()}>
           <div />
         </FolderItem>
       </SidebarProvider>
@@ -212,15 +212,12 @@ describe("FolderItem", () => {
     expect(badge!.textContent).toContain("24");
   });
 
-  it("the folder row has its own settings affordance (More menu) — feeds inside are select-only", () => {
-    // FeedItem's dropdown was removed in favour of the floating cog
-    // above the article list. The folder's own dropdown still
-    // exists in this commit (removed in a later commit).
+  it("renders neither a folder dropdown nor a per-feed dropdown — cog above article list owns settings", () => {
     renderFolderWithFeed();
-    const moreButtons = screen.getAllByRole("button", {
+    const moreButtons = screen.queryAllByRole("button", {
       name: /more|folder options/i,
     });
-    expect(moreButtons.length).toBeGreaterThanOrEqual(1);
+    expect(moreButtons.length).toBe(0);
   });
 
   it("folder's root element is a <li> so it nests validly under SidebarMenu's <ul>", () => {
@@ -244,7 +241,7 @@ describe("FolderItem", () => {
       const coloredFolder = { ...mockFolder, color: "#7c3aed" };
       render(
         <SidebarProvider>
-          <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+          <FolderItem folder={coloredFolder}  isSelected={false} onSelect={vi.fn()}>
             <div />
           </FolderItem>
         </SidebarProvider>
@@ -258,7 +255,7 @@ describe("FolderItem", () => {
       const coloredFolder = { ...mockFolder, color: "#7c3aed" };
       render(
         <SidebarProvider>
-          <FolderItem folder={coloredFolder} onDelete={vi.fn()} isSelected={false} onSelect={vi.fn()}>
+          <FolderItem folder={coloredFolder}  isSelected={false} onSelect={vi.fn()}>
             <div />
           </FolderItem>
         </SidebarProvider>
@@ -268,22 +265,12 @@ describe("FolderItem", () => {
       expect(style).toContain("color");
     });
 
-    it("shows a color picker option in the dropdown", async () => {
-      const user = userEvent.setup();
-      renderFolder();
-      const moreBtn = screen.getByRole("button", { name: /folder options/i });
-      await user.click(moreBtn);
-      expect(screen.getByTestId("folder-color-picker")).toBeInTheDocument();
-    });
+    // The color picker lived in the dropdown; it now lives in
+    // FolderSettingsDialog. Coverage moves to that test file.
   });
 
-  it("feed inside folder is not a DOM descendant of folder's menu-item (hover scope isolation)", () => {
+  it("folder header and feed rows live in distinct menu-items (DOM structure invariant)", () => {
     renderFolderWithFeed();
-    // If the feed <li data-sidebar='menu-item'> is nested inside the folder's
-    // <li data-sidebar='menu-item'>, CSS `group-hover/menu-item` leaks: hovering
-    // the child feed also triggers hover on the folder's group, making the
-    // folder's action dots appear at the same time. Each menu-item must own
-    // its own hover scope.
     const folderMenuItem = screen
       .getByText("Tech News")
       .closest("[data-sidebar='menu-item']");

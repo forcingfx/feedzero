@@ -16,9 +16,8 @@ import {
 import { FeedItem } from "./feed-item.tsx";
 import { FolderItem } from "./folder-item.tsx";
 import { NewFolderInput } from "./new-folder-input.tsx";
-import { FolderDeleteDialog } from "./folder-delete-dialog.tsx";
 import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
-import type { Feed, Folder } from "@/types/index.ts";
+import type { Feed } from "@/types/index.ts";
 
 interface SidebarFeedListProps {
   onFeedSelect: (feedId: string) => void;
@@ -74,7 +73,6 @@ export function SidebarFeedList({
   const articlesByFeedId = useArticleStore((s) => s.articlesByFeedId);
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -178,7 +176,6 @@ export function SidebarFeedList({
     }
   }
 
-  const deleteFolder = useFeedStore((s) => s.deleteFolder);
 
   const isCustomMode = feedSortMode === "custom";
   const sortableIds = isCustomMode ? sortedUnfiledFeeds.map((f) => f.id) : [];
@@ -249,7 +246,6 @@ export function SidebarFeedList({
                 sortable={isCustomMode}
                 isSelected={selectedFeedId === toFolderFeedId(folder.id)}
                 onSelect={() => onFeedSelect(toFolderFeedId(folder.id))}
-                onDelete={() => setFolderToDelete(folder)}
               >
                 {sortedFolderFeeds.map((feed) => (
                   <FeedItem
@@ -281,12 +277,6 @@ export function SidebarFeedList({
         </>
       )}
 
-      <FolderDeleteDialog
-        folderName={folderToDelete?.name ?? ""}
-        open={folderToDelete !== null}
-        onOpenChange={(open) => { if (!open) setFolderToDelete(null); }}
-        onConfirm={() => { if (folderToDelete) { deleteFolder(folderToDelete.id); setFolderToDelete(null); } }}
-      />
     </>
   );
 }
