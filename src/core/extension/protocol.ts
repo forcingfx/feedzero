@@ -10,6 +10,7 @@ import { err, ok, type Result } from "../../utils/result.ts";
 export const PROTOCOL_VERSION = 1;
 
 const PING_TIMEOUT_MS = 200;
+const FETCH_TIMEOUT_MS = 30_000;
 
 type OutboundEnvelope<TType extends string> = {
   type: TType;
@@ -18,14 +19,40 @@ type OutboundEnvelope<TType extends string> = {
 };
 
 export type PingMessage = OutboundEnvelope<"feedzero/ping">;
-export type OutboundMessage = PingMessage;
+export type FetchArticleMessage = OutboundEnvelope<"feedzero/fetch-article"> & {
+  url: string;
+};
+export type OutboundMessage = PingMessage | FetchArticleMessage;
 
 export type PingResponse = {
   type: "feedzero/ping-response";
   requestId: string;
   extensionVersion: string;
 };
-export type InboundMessage = PingResponse;
+
+/**
+ * The extension's reply for a fetch-article request. `ok: true` carries the
+ * raw HTML the extension received with the user's session; the web app then
+ * runs paywall detection + Defuddle on it. `ok: false` reasons are
+ * extension-side failures only — paywall detection is the web app's job.
+ */
+export type FetchArticleResponse =
+  | {
+      type: "feedzero/fetch-article-response";
+      requestId: string;
+      ok: true;
+      html: string;
+      finalUrl: string;
+      status: number;
+    }
+  | {
+      type: "feedzero/fetch-article-response";
+      requestId: string;
+      ok: false;
+      reason: "no-permission" | "network-error" | "blocked-scheme";
+    };
+
+export type InboundMessage = PingResponse | FetchArticleResponse;
 
 function generateRequestId(): string {
   // randomUUID is part of Web Crypto in all browsers we target. happy-dom
@@ -94,4 +121,39 @@ export async function ping(
   );
   if (!result.ok) return result;
   return ok({ extensionVersion: result.value.extensionVersion });
+}
+
+/**
+ * Ask the extension to fetch the given URL using the user's existing
+ * session for that origin. The extension returns the raw HTML; paywall
+ * detection and content extraction stay on the web-app side.
+ *
+ * Caller is responsible for first ensuring the extension has been authorized
+ * for the URL's origin (Phase 3 — `authorize-publisher` flow). When that's
+ * missing, the extension returns `ok: false, reason: "no-permission"` and
+ * the reader pane should show the "Authorize <domain>" prompt.
+ */
+export async function fetchArticle(
+  url: string,
+  options: { timeoutMs?: number } = {},
+): Promise<Result<{ html: string; finalUrl: string; status: number }>> {
+  const message: FetchArticleMessage = {
+    type: "feedzero/fetch-article",
+    requestId: generateRequestId(),
+    protocolVersion: PROTOCOL_VERSION,
+    url,
+  };
+  const result = await send<FetchArticleResponse>(
+    message,
+    "feedzero/fetch-article-response",
+    options.timeoutMs ?? FETCH_TIMEOUT_MS,
+  );
+  if (!result.ok) return result;
+  const response = result.value;
+  if (!response.ok) return err(response.reason);
+  return ok({
+    html: response.html,
+    finalUrl: response.finalUrl,
+    status: response.status,
+  });
 }

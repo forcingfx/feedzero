@@ -5,8 +5,7 @@ fetching article HTML using the cookies already in your browser. Credentials
 never touch FeedZero's servers — every authenticated fetch happens locally,
 authorized per-publisher.
 
-This is Phase 1 — only the `ping` handshake with the web app is implemented.
-The authenticated fetch path lands in Phase 2 alongside paywall detection.
+Status: Phase 1 (ping handshake) and Phase 2 (authenticated `fetch-article`) are implemented. The reader-pane UI that triggers authorization and surfaces paywall verdicts is the next phase — until it lands, the web app does not yet *call* `fetchArticle()` automatically; you can drive the round-trip from the devtools console as a smoke test.
 
 ## Architecture
 
@@ -60,14 +59,24 @@ Output: `extension/dist/` (gitignored). Contains `manifest.json`,
 1. Build and load the extension.
 2. Start the FeedZero dev server: `npm run dev`.
 3. Open `http://localhost:3000`.
-4. In the page's devtools console, run:
+4. **Ping** — in the page's devtools console:
    ```js
    const { ping } = await import("/src/core/extension/protocol.ts");
    await ping();
    ```
-5. Expect `{ ok: true, value: { extensionVersion: "<pkg.json version>" } }`.
-
-Without the extension loaded, the same call resolves to `{ ok: false, error: "timeout: …" }` after 200ms — which is the production behavior when the extension is not installed.
+   Expect `{ ok: true, value: { extensionVersion: "<pkg.json version>" } }`.
+   Without the extension loaded, the call resolves to `{ ok: false, error: "timeout: …" }` after 200ms — production behavior when the extension is not installed.
+5. **Fetch (no permission)** — without authorizing any publisher:
+   ```js
+   const { fetchArticle } = await import("/src/core/extension/protocol.ts");
+   await fetchArticle("https://example.com/anything");
+   ```
+   Expect `{ ok: false, error: "no-permission" }` — the extension refuses without an explicit host grant.
+6. **Fetch (authorized)** — from the extension's popup or `chrome://extensions` → details → "Site access", grant access to a domain you have an active session for, then:
+   ```js
+   await fetchArticle("https://that-domain.example/article-url");
+   ```
+   Expect `{ ok: true, value: { html, finalUrl, status } }` with the *authenticated* HTML (not the anonymous paywall stub).
 
 ## Permissions
 

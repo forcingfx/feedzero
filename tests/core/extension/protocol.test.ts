@@ -2,9 +2,11 @@ import { describe, it, expect, afterEach } from "vitest";
 import { isOk, isErr } from "@/utils/result.ts";
 import {
   ping,
+  fetchArticle,
   PROTOCOL_VERSION,
   type OutboundMessage,
   type PingResponse,
+  type FetchArticleResponse,
 } from "@/core/extension/protocol.ts";
 
 /**
@@ -124,6 +126,85 @@ describe("protocol", () => {
 
       const result = await ping();
       expect(isOk(result)).toBe(true);
+    });
+  });
+
+  describe("fetchArticle", () => {
+    it("returns ok with html and finalUrl when the extension fetches successfully", async () => {
+      dispose = fakeExtension((msg) => {
+        if (msg.type !== "feedzero/fetch-article") return undefined;
+        const response: FetchArticleResponse = {
+          type: "feedzero/fetch-article-response",
+          requestId: msg.requestId,
+          ok: true,
+          html: "<html><body><article>Hello</article></body></html>",
+          finalUrl: "https://nytimes.com/article",
+          status: 200,
+        };
+        return response;
+      });
+
+      const result = await fetchArticle("https://nytimes.com/article");
+
+      expect(isOk(result)).toBe(true);
+      if (isOk(result)) {
+        expect(result.value.html).toContain("Hello");
+        expect(result.value.finalUrl).toBe("https://nytimes.com/article");
+        expect(result.value.status).toBe(200);
+      }
+    });
+
+    it("returns err with the extension's reason when the fetch fails", async () => {
+      dispose = fakeExtension((msg) => {
+        if (msg.type !== "feedzero/fetch-article") return undefined;
+        const response: FetchArticleResponse = {
+          type: "feedzero/fetch-article-response",
+          requestId: msg.requestId,
+          ok: false,
+          reason: "no-permission",
+        };
+        return response;
+      });
+
+      const result = await fetchArticle("https://nytimes.com/article");
+
+      expect(isErr(result)).toBe(true);
+      if (isErr(result)) {
+        expect(result.error).toMatch(/no-permission/);
+      }
+    });
+
+    it("forwards the url in the outbound message", async () => {
+      const captured: OutboundMessage[] = [];
+      dispose = fakeExtension((msg) => {
+        captured.push(msg);
+        if (msg.type !== "feedzero/fetch-article") return undefined;
+        return {
+          type: "feedzero/fetch-article-response",
+          requestId: msg.requestId,
+          ok: true,
+          html: "",
+          finalUrl: msg.url,
+          status: 200,
+        };
+      });
+
+      await fetchArticle("https://example.com/post");
+
+      expect(captured).toHaveLength(1);
+      expect(captured[0]).toMatchObject({
+        type: "feedzero/fetch-article",
+        url: "https://example.com/post",
+        protocolVersion: PROTOCOL_VERSION,
+      });
+    });
+
+    it("times out when no extension responds", async () => {
+      // No fakeExtension — no response will arrive.
+      const result = await fetchArticle("https://nytimes.com/article", {
+        timeoutMs: 50,
+      });
+      expect(isErr(result)).toBe(true);
     });
   });
 });
