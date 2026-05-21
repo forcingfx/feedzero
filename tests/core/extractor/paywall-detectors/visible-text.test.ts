@@ -28,6 +28,22 @@ describe("visibleTextLength", () => {
     expect(visibleTextLength(html)).toBe(1);
   });
 
+  it("strips <script> blocks whose closing tag contains tabs, newlines and garbage text (CodeQL example)", () => {
+    // CodeQL's exact example: </script\t\n bar>. A tolerant HTML parser
+    // accepts this; the regex must too, or the script body leaks into the
+    // length count.
+    const html = "<p>x</p><script>const y = '" + "z".repeat(1500) + "';</script\t\n bar>";
+    expect(visibleTextLength(html)).toBe(1);
+  });
+
+  it("does NOT mistake </scriptbar> for a closing tag (word-boundary guard)", () => {
+    // The body contains the literal string "</scriptbar>" — not a closing
+    // tag. The real closing tag comes next. The regex must keep matching
+    // up to the real `</script>`.
+    const html = "<p>x</p><script>var s = '</scriptbar>';</script>";
+    expect(visibleTextLength(html)).toBe(1);
+  });
+
   it("strips <style> blocks with whitespace in the closing tag", () => {
     const html =
       "<p>x</p><style>body{color:red;}" + "z".repeat(2000) + "</style\t>";
