@@ -43,6 +43,7 @@ export function SubscriptionUpgrade() {
         features={[
           "Everything in Free",
           "Unlimited feeds",
+          "Signal — topics emerging across your feeds",
           "Smart filters — query your feeds by keyword, tag, or source",
           "Auto-organize folders",
           "Offline prefetch — article bodies cached for plane mode",
@@ -60,9 +61,9 @@ export function SubscriptionUpgrade() {
         comingSoon
         features={[
           "Everything in Personal",
-          "AI Signal — summaries & briefings",
           "Full-text search across articles",
           "Send to Kindle",
+          "Authenticated fetchers",
         ]}
         cta="Coming soon"
         ctaDisabled

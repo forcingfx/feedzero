@@ -344,6 +344,7 @@ function AlternativePlans({ currentTier }: AlternativePlansProps) {
           blurb="Sync across every device. Unlimited feeds."
           features={[
             "End-to-end encrypted cloud sync",
+            "Signal — topics across your feeds",
             "Auto-organize folders",
             "Unlimited feeds",
           ]}
@@ -359,9 +360,9 @@ function AlternativePlans({ currentTier }: AlternativePlansProps) {
           comingSoon
           features={[
             "Everything in Personal",
-            "AI Signal — summaries & briefings",
             "Full-text search across articles",
             "Send to Kindle",
+            "Authenticated fetchers",
           ]}
           cta="Coming soon"
           ctaDisabled

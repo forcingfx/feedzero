@@ -50,7 +50,7 @@ Legend:
 | **Smart filters** — Saved queries combining feeds, keywords, authors, and read state. | — | ✓ | ✓ | Shipped |
 | **Rules** — Per-feed auto-action rules: mute, star, mark-read, or route articles by title, author, content, date, and more. | — | ✓ | ✓ | Shipped |
 | **Full-text search** — Search across every cached article body, title, and author. | — | — | ✓ | Coming soon |
-| **AI signal** — Local LLM ranks unread articles by relevance to topics you follow. | — | — | ✓ | Coming soon |
+| **Signal** — Topics emerging across your feeds, ranked by cross-feed term frequency. Fully local — no LLM, no third party. | — | ✓ | ✓ | Shipped |
 
 ## Delivery
 

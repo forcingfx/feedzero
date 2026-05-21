@@ -268,14 +268,14 @@ export const TIER_MATRIX = {
     status: "coming-soon",
     tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
   },
-  "ai-signal": {
-    id: "ai-signal",
-    name: "AI signal",
+  signal: {
+    id: "signal",
+    name: "Signal",
     description:
-      "Local LLM ranks unread articles by relevance to topics you follow.",
+      "Topics emerging across your feeds, ranked by cross-feed term frequency. Fully local — no LLM, no third party.",
     category: "filtering-and-search",
-    status: "coming-soon",
-    tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
+    status: "shipped",
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
   },
 
   // ── Delivery ───────────────────────────────────────────────────────────
@@ -387,7 +387,7 @@ export const GATED_FEATURE_IDS = [
   "filters",
   "rules",
   "search",
-  "ai-signal",
+  "signal",
   "authenticated-fetchers",
   "send-to-kindle",
   "bridges",

@@ -40,6 +40,11 @@ const SettingsPage = lazy(() =>
     default: m.SettingsPage,
   })),
 );
+const SignalPage = lazy(() =>
+  import("@/pages/signal-page.tsx").then((m) => ({
+    default: m.SignalPage,
+  })),
+);
 
 function ExploreRoute() {
   const navigate = useNavigate();
@@ -67,6 +72,16 @@ function SettingsRoute() {
     <StageView>
       <Suspense>
         <SettingsPage />
+      </Suspense>
+    </StageView>
+  );
+}
+
+function SignalRoute() {
+  return (
+    <StageView>
+      <Suspense>
+        <SignalPage />
       </Suspense>
     </StageView>
   );
@@ -256,6 +271,7 @@ export function App() {
                 element={<FeedsRoute />}
               />
               <Route path="/explore" element={<ExploreRoute />} />
+              <Route path="/signal" element={<SignalRoute />} />
               <Route path="/stats" element={<StatsRoute />} />
               <Route path="/settings" element={<SettingsRoute />} />
             </Route>
