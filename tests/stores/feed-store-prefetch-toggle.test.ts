@@ -53,7 +53,16 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
+// Force paid-tier active so the offline-prefetch gate actually
+// enforces tier requirements; without this, VITE_PAID_TIER_VISIBLE
+// is unset and the gate "relaxes" — all shipped Personal features
+// become available to free users with reason: "paid-tier-inactive".
+vi.mock("../../src/core/features/paid-tier-active.ts", () => ({
+  isPaidTierActive: () => true,
+}));
+
 import { useFeedStore } from "../../src/stores/feed-store.ts";
+import { useLicenseStore } from "../../src/stores/license-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 import * as db from "../../src/core/storage/db.ts";
 
@@ -83,6 +92,7 @@ describe("feed-store setFeedPrefetchEnabled", () => {
     dbMock._reset();
     vi.clearAllMocks();
     useFeedStore.setState({ feeds: [], folders: [] });
+    useLicenseStore.setState({ tier: "personal" });
     pushSpy = vi
       .spyOn(useSyncStore.getState(), "scheduleSyncPush")
       .mockImplementation(() => {});
@@ -119,5 +129,25 @@ describe("feed-store setFeedPrefetchEnabled", () => {
   it("is a no-op for unknown feed ids", async () => {
     await useFeedStore.getState().setFeedPrefetchEnabled("ghost", true);
     expect(dbMock._feeds.size).toBe(0);
+  });
+
+  describe("gate-locked for free tier", () => {
+    it("free user toggling prefetchEnabled = true leaves the feed unchanged", async () => {
+      useLicenseStore.setState({ tier: "free" });
+      dbMock._seed(feed("f1"));
+
+      await useFeedStore.getState().setFeedPrefetchEnabled("f1", true);
+
+      expect(dbMock._feeds.get("f1")?.prefetchEnabled).toBeUndefined();
+    });
+
+    it("free user does not schedule a sync push (no state change to propagate)", async () => {
+      useLicenseStore.setState({ tier: "free" });
+      dbMock._seed(feed("f1"));
+
+      await useFeedStore.getState().setFeedPrefetchEnabled("f1", true);
+
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
   });
 });
