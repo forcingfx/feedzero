@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
 import { ArticleContent } from "./article-content.tsx";
+import { PaywallPrompt } from "./paywall-prompt.tsx";
 import { cn } from "@/lib/utils.ts";
 
 type ViewMode = "feed" | "extracted";
@@ -67,6 +68,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   const extractInBackground = useExtractionStore((s) => s.extractInBackground);
   const resetForArticle = useExtractionStore((s) => s.resetForArticle);
   const statusMap = useExtractionStore((s) => s.statusMap);
+  const paywallMap = useExtractionStore((s) => s.paywallMap);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -364,6 +366,19 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           <p className="italic text-muted-foreground">
             Extracting full article…
           </p>
+        ) : viewMode === "extracted" &&
+          !cachedExtraction &&
+          article.link &&
+          paywallMap[article.link] ? (
+          <PaywallPrompt
+            publisher={paywallMap[article.link].publisher}
+            articleUrl={article.link}
+            reason={
+              paywallMap[article.link].reason === "session-expired"
+                ? "session-expired"
+                : "paywall"
+            }
+          />
         ) : (
           <ArticleContent html={getContent()} />
         )}

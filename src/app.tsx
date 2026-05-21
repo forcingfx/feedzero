@@ -22,6 +22,7 @@ import { BillingRecover } from "@/pages/billing-recover.tsx";
 import { BillingIssued } from "@/pages/billing-issued.tsx";
 import { SubscribeDeeplink } from "@/components/billing/subscribe-deeplink.tsx";
 import { useLicenseStore } from "@/stores/license-store.ts";
+import { useExtensionStore } from "@/stores/extension-store.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { InvalidKeysScreen } from "@/components/recovery/invalid-keys-screen";
 
@@ -93,6 +94,10 @@ function AppInit({ children }: { children: React.ReactNode }) {
     // Resolve the user's license tier once at startup so gated UI (Sidebar
     // status chip, feature gates) doesn't flash "Free" for paid users.
     void useLicenseStore.getState().refresh();
+    // Probe for the FeedZero browser extension. Short timeout (200ms),
+    // resolves to "installed" / "absent" so the reader pane's paywall
+    // prompts can pick the right call-to-action without ping-on-every-render.
+    void useExtensionStore.getState().detect();
   }, []);
 
   // Returning users: restore from stored keys.
