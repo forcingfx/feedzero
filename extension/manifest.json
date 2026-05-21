@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "FeedZero",
+  "short_name": "FeedZero",
+  "version": "0.1.0",
+  "description": "Read your paid subscriptions in FeedZero using your existing browser sessions. No credentials shared.",
+  "author": "FeedZero",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://my.feedzero.app/*",
+        "https://feedzero.app/*",
+        "http://localhost:3000/*"
+      ],
+      "js": ["content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "FeedZero"
+  },
+  "permissions": ["storage"],
+  "optional_host_permissions": ["https://*/*"],
+  "host_permissions": []
+}
