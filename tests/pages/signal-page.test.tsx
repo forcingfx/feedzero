@@ -71,7 +71,7 @@ describe("SignalPage", () => {
     vi.useRealTimers();
   });
 
-  it("renders the locked tile with progress when corpus < 100 articles", async () => {
+  it("renders the locked splash with a forward-looking remaining count + three CTAs", async () => {
     const feeds = [makeFeed("f1")];
     const articlesByFeedId: Record<string, Article[]> = { f1: [] };
     for (let i = 0; i < 47; i++) {
@@ -82,11 +82,17 @@ describe("SignalPage", () => {
 
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("locked"));
-    expect(screen.getByText("47 / 100")).toBeInTheDocument();
-    expect(screen.getByText(/Signal needs noise/i)).toBeInTheDocument();
+    // Forward-looking framing: "53 more articles to unlock", not "47 / 100".
+    expect(screen.getByText(/53/)).toBeInTheDocument();
+    expect(screen.getByText(/more articles to unlock/i)).toBeInTheDocument();
+    expect(screen.getByText(/47 of 100 articles in your store/i)).toBeInTheDocument();
+    // Three CTAs surfaced.
+    expect(screen.getByRole("button", { name: /Add feeds/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Browse the catalog/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Import OPML/i })).toBeInTheDocument();
   });
 
-  it("renders the empty-but-unlocked message when the corpus has no cross-feed signal", async () => {
+  it("renders the empty-but-unlocked message with an Add feeds recovery action", async () => {
     const feeds = [makeFeed("solo")];
     const articlesByFeedId: Record<string, Article[]> = { solo: [] };
     for (let i = 0; i < SIGNAL_CORPUS_GATE + 5; i++) {
@@ -98,6 +104,7 @@ describe("SignalPage", () => {
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
     expect(screen.getByText(/no clear signal/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add more feeds/i })).toBeInTheDocument();
   });
 
   it("renders topic headers and article rows when the engine produces topics", async () => {
@@ -127,11 +134,13 @@ describe("SignalPage", () => {
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
 
-    // displayTerm "OpenAI" — chip uses CSS uppercase, DOM keeps original case
-    expect(screen.getByText("OpenAI")).toBeInTheDocument();
+    // Topic title renders as a real heading in original casing — no chip.
+    expect(screen.getByRole("heading", { level: 2, name: "OpenAI" })).toBeInTheDocument();
     // At least one article row from the openai variants is shown.
     expect(screen.getByText(/OpenAI ships GPT release/)).toBeInTheDocument();
-    // Window caption visible
+    // Meta line in the topic header reads "N articles · M outlets"
+    expect(screen.getByText(/articles\s*·\s*\d+\s*outlets/i)).toBeInTheDocument();
+    // Header meta line includes the window label.
     expect(screen.getByText(/last 7 days/i)).toBeInTheDocument();
   });
 
@@ -187,6 +196,40 @@ describe("SignalPage", () => {
     await waitFor(() => expect(screen.getByText("READER")).toBeInTheDocument());
   });
 
+  it("reveals additional articles when '+ N more' is clicked", async () => {
+    const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`));
+    const articlesByFeedId: Record<string, Article[]> = { f1: [], f2: [], f3: [], f4: [] };
+    // 14 OpenAI articles spread across 4 feeds — the cluster will claim
+    // them all (cap ≈ ceil((14+90)/10)+5 = 16), exposing > 6 in articleIds.
+    for (let i = 0; i < 14; i++) {
+      const feedId = `f${(i % 4) + 1}`;
+      articlesByFeedId[feedId].push(
+        makeArticle(`o-${i}`, feedId, `OpenAI Atlas update ${i}`, i % 5),
+      );
+    }
+    for (let i = 0; i < 90; i++) {
+      const feedId = `f${(i % 4) + 1}`;
+      articlesByFeedId[feedId].push(
+        makeArticle(`n-${i}`, feedId, `Unique${i} item${i}`, i % 5),
+      );
+    }
+    useFeedStore.setState({ feeds });
+    useArticleStore.setState({ articlesByFeedId });
+
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+    // Default: 6 OpenAI rows visible.
+    const initialRows = screen.getAllByText(/OpenAI Atlas update/);
+    expect(initialRows.length).toBe(6);
+    // "+ 8 more" affordance for the remaining articles in the cluster.
+    const moreButton = screen.getByRole("button", { name: /\+ \d+ more/i });
+    const user = userEvent.setup();
+    await user.click(moreButton);
+    const expandedRows = screen.getAllByText(/OpenAI Atlas update/);
+    expect(expandedRows.length).toBe(14);
+  });
+
   it("loads from localStorage on mount without recomputing when the cache is fresh", async () => {
     const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`));
     const articlesByFeedId: Record<string, Article[]> = {};
@@ -210,6 +253,7 @@ describe("SignalPage", () => {
               term: "primed",
               displayTerm: "Primed",
               articleIds: [],
+              totalArticlesInCluster: 0,
               feedCount: 2,
             },
           ],

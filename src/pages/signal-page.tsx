@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { RefreshCw, Sparkles } from "lucide-react";
+import { Compass, FileUp, Plus, RefreshCw, Sparkles } from "lucide-react";
 import { useSignalStore } from "@/stores/signal-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -13,6 +13,9 @@ import {
 } from "@/core/signal/types.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { formatRelative } from "@/lib/format-relative.ts";
+import { goToSettings } from "@/lib/go-to-settings.ts";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
+import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
 /**
@@ -22,6 +25,8 @@ import type { Article, Feed } from "@/types/index.ts";
  * derived from cross-feed term frequency. No cards, no images, no LLM.
  * Three states: locked (corpus < gate), empty-but-ready (no cross-feed
  * signal), ready (topics + article rows).
+ *
+ * Mobile-first: stacked layouts, full-width tap targets, pull-to-refresh.
  */
 export function SignalPage() {
   const status = useSignalStore((s) => s.status);
@@ -30,8 +35,6 @@ export function SignalPage() {
   const error = useSignalStore((s) => s.error);
   const loadReport = useSignalStore((s) => s.loadReport);
 
-  // Re-run when articles change so adding feeds / new items flips the
-  // locked → ready transition without a manual refresh.
   const totalArticles = useArticleStore(
     (s) => Object.values(s.articlesByFeedId).reduce((n, list) => n + list.length, 0),
   );
@@ -41,7 +44,7 @@ export function SignalPage() {
   }, [loadReport, totalArticles]);
 
   if (status === "locked") {
-    return <LockedTile count={corpusSize} />;
+    return <LockedSplash count={corpusSize} />;
   }
 
   if (status === "error") {
@@ -63,26 +66,65 @@ export function SignalPage() {
   return <ReadyView report={report} onRefresh={() => loadReport({ force: true })} />;
 }
 
-function LockedTile({ count }: { count: number }) {
+function LockedSplash({ count }: { count: number }) {
+  const navigate = useNavigate();
+  const remaining = Math.max(0, SIGNAL_CORPUS_GATE - count);
   const pct = Math.min(100, Math.round((count / SIGNAL_CORPUS_GATE) * 100));
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-4 p-12 text-center">
-      <Sparkles className="size-8 text-muted-foreground" />
-      <h1 className="text-2xl font-semibold">Signal</h1>
-      <p className="text-3xl tabular-nums text-muted-foreground">
-        <span className="text-foreground">{`${count} / ${SIGNAL_CORPUS_GATE}`}</span>
-        {" articles"}
-      </p>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full bg-primary transition-[width]"
-          style={{ width: `${pct}%` }}
-          aria-label={`${count} of ${SIGNAL_CORPUS_GATE}`}
-        />
+    <div className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-6 px-6 py-12 text-center">
+      <Sparkles className="size-10 text-primary" />
+      <div className="space-y-2">
+        <h1 className="text-2xl font-semibold">Signal</h1>
+        <p className="text-sm text-muted-foreground">
+          What's loud across your feeds — the topics multiple outlets are
+          converging on right now.
+        </p>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Signal needs noise to filter — come back at {SIGNAL_CORPUS_GATE}.
-      </p>
+      <div className="w-full space-y-2">
+        <p className="text-4xl font-semibold tabular-nums">
+          {remaining > 0 ? remaining : 0}
+          <span className="ml-2 text-base font-normal text-muted-foreground">
+            {remaining === 1 ? "more article to unlock" : "more articles to unlock"}
+          </span>
+        </p>
+        <div
+          className="h-2 w-full overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-valuenow={count}
+          aria-valuemin={0}
+          aria-valuemax={SIGNAL_CORPUS_GATE}
+          aria-label={`${count} of ${SIGNAL_CORPUS_GATE} articles`}
+        >
+          <div className="h-full bg-primary transition-[width]" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="text-xs text-muted-foreground tabular-nums">
+          {`${count} of ${SIGNAL_CORPUS_GATE} articles in your store`}
+        </p>
+      </div>
+      <div className="flex w-full flex-col gap-2 pt-2">
+        <Button onClick={() => navigate("/explore")} className="w-full" size="lg">
+          <Plus className="size-4" />
+          Add feeds
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => navigate("/explore")}
+          className="w-full"
+          size="lg"
+        >
+          <Compass className="size-4" />
+          Browse the catalog
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => goToSettings(navigate, "sync-and-data")}
+          className="w-full"
+          size="lg"
+        >
+          <FileUp className="size-4" />
+          Import OPML
+        </Button>
+      </div>
     </div>
   );
 }
@@ -92,48 +134,76 @@ function ReadyView({
   onRefresh,
 }: {
   report: SignalReport;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
 }) {
+  const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
   const feeds = useFeedStore((s) => s.feeds);
   const feedMap = useMemo(() => indexFeeds(feeds), [feeds]);
   const articlesByFeedId = useArticleStore((s) => s.articlesByFeedId);
   const articleMap = useMemo(() => indexArticles(articlesByFeedId), [articlesByFeedId]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { pullPx, isRefreshing } = usePullToRefresh({
+    scrollRef: containerRef,
+    enabled: !isDesktop,
+    onRefresh,
+  });
+
   const hasTopics = report.topics.length > 0;
+  const generatedLabel = formatRelative(report.generatedAt);
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <header className="mb-6 flex items-baseline justify-between gap-4">
-        <div className="flex items-baseline gap-3 text-sm text-muted-foreground">
-          <h1 className="text-xl font-semibold text-foreground">Signal</h1>
-          <span>·</span>
-          <span>{windowLabel(report.window)}</span>
-          <span>·</span>
-          <span>{report.corpusInWindow} articles</span>
-          <span>·</span>
-          <span>{report.feedsInWindow} feeds</span>
+    <div ref={containerRef} className="h-full overflow-y-auto">
+      {!isDesktop && pullPx > 0 ? (
+        <div
+          className="flex items-center justify-center text-xs text-muted-foreground transition-[height]"
+          style={{ height: Math.min(pullPx, 80) }}
+        >
+          <RefreshCw
+            className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
+            style={{ transform: `rotate(${Math.min(pullPx, 80) * 4.5}deg)` }}
+          />
         </div>
-        <Button variant="ghost" size="sm" onClick={onRefresh} aria-label="Refresh">
-          <RefreshCw className="size-4" />
-          Refresh
-        </Button>
-      </header>
+      ) : null}
 
-      {!hasTopics ? (
-        <p className="text-muted-foreground">No clear signal in your feeds right now.</p>
-      ) : (
-        <div className="flex flex-col gap-8">
-          {report.topics.map((topic) => (
-            <TopicBlock
-              key={topic.term}
-              topic={topic}
-              articleMap={articleMap}
-              feedMap={feedMap}
-              now={report.generatedAt}
-            />
-          ))}
-        </div>
-      )}
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        <header className="mb-6 flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-xl font-semibold">Signal</h1>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => void onRefresh()}
+              aria-label="Refresh"
+              title="Refresh"
+            >
+              <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {`${windowLabel(report.window)} · ${report.corpusInWindow} articles · ${report.feedsInWindow} feeds${
+              generatedLabel ? ` · updated ${generatedLabel}` : ""
+            }`}
+          </p>
+        </header>
+
+        {!hasTopics ? (
+          <EmptyState onAddFeeds={() => navigate("/explore")} />
+        ) : (
+          <div className="flex flex-col gap-8">
+            {report.topics.map((topic) => (
+              <TopicBlock
+                key={topic.term}
+                topic={topic}
+                articleMap={articleMap}
+                feedMap={feedMap}
+                now={report.generatedAt}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -150,43 +220,67 @@ function TopicBlock({
   now: number;
 }) {
   const navigate = useNavigate();
-  const articles = topic.articleIds
-    .slice(0, SIGNAL_ARTICLES_PER_TOPIC)
+  const [expanded, setExpanded] = useState(false);
+  const allArticles = topic.articleIds
     .map((id) => articleMap.get(id))
     .filter((a): a is Article => a !== undefined);
+  const visible = expanded ? allArticles : allArticles.slice(0, SIGNAL_ARTICLES_PER_TOPIC);
+  const hiddenCount = topic.totalArticlesInCluster - visible.length;
 
   return (
     <section>
-      <header className="mb-2 flex items-baseline gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-          {topic.displayTerm}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {articles.length} article{articles.length === 1 ? "" : "s"} across {topic.feedCount} feed{topic.feedCount === 1 ? "" : "s"}
-        </span>
+      <header className="mb-1.5">
+        <h2 className="text-lg font-semibold leading-tight">{topic.displayTerm}</h2>
+        <p className="text-xs text-muted-foreground">
+          {`${topic.totalArticlesInCluster} article${topic.totalArticlesInCluster === 1 ? "" : "s"} · ${topic.feedCount} outlet${topic.feedCount === 1 ? "" : "s"}`}
+        </p>
       </header>
-      <ul className="flex flex-col gap-1">
-        {articles.map((article) => {
+      <ul className="divide-y divide-border">
+        {visible.map((article) => {
           const feed = feedMap.get(article.feedId);
           return (
-            <li key={article.id} className="flex items-baseline justify-between gap-4 py-1">
+            <li key={article.id}>
               <button
                 type="button"
                 onClick={() => navigate(`/feeds/${article.feedId}/articles/${article.id}`)}
-                className="text-left text-sm text-foreground hover:underline"
+                className="flex w-full flex-col gap-1 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
               >
-                {article.title}
+                <span className="text-sm text-foreground">{article.title}</span>
+                <span className="text-xs text-muted-foreground">
+                  {feed?.title ?? "Unknown feed"}
+                  {" · "}
+                  {formatRelative(article.publishedAt, now)}
+                </span>
               </button>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {feed?.title ?? ""}
-                {feed ? " · " : ""}
-                {formatRelative(article.publishedAt, now)}
-              </span>
             </li>
           );
         })}
       </ul>
+      {hiddenCount > 0 && !expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-2 text-xs font-medium text-primary hover:underline"
+        >
+          {`+ ${hiddenCount} more`}
+        </button>
+      ) : null}
     </section>
+  );
+}
+
+function EmptyState({ onAddFeeds }: { onAddFeeds: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-3 rounded-md border border-dashed p-6">
+      <p className="text-sm text-muted-foreground">
+        No clear signal in your feeds right now. Signal needs a few outlets
+        converging on the same story to surface a topic.
+      </p>
+      <Button variant="outline" onClick={onAddFeeds}>
+        <Plus className="size-4" />
+        Add more feeds
+      </Button>
+    </div>
   );
 }
 

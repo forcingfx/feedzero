@@ -24,8 +24,8 @@
 
 import { tokenize } from "./tokenize.ts";
 import {
-  SIGNAL_ARTICLES_PER_TOPIC,
   SIGNAL_MIN_PER_WINDOW,
+  SIGNAL_TOPIC_STORE_CAP,
   SIGNAL_TOPIC_TARGET,
   SIGNAL_WINDOWS,
   type SignalReport,
@@ -258,7 +258,8 @@ function clusterGreedy(
     topics.push({
       term: term.term,
       displayTerm: pickDisplayTerm(term.term, claimedHere),
-      articleIds: claimedHere.slice(0, SIGNAL_ARTICLES_PER_TOPIC).map((a) => a.id),
+      articleIds: claimedHere.slice(0, SIGNAL_TOPIC_STORE_CAP).map((a) => a.id),
+      totalArticlesInCluster: claimedHere.length,
       feedCount: feedIds.size,
     });
   }

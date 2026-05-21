@@ -147,8 +147,12 @@ describe("frequency engine — edge cases", () => {
     if (!result.ok) return;
     const openai = result.value.topics.find((t) => t.term === "openai");
     expect(openai).toBeDefined();
-    // Cap formula: ceil(N/SIGNAL_TOPIC_TARGET) + 5 with N=100 → 15. The
-    // render limit (SIGNAL_ARTICLES_PER_TOPIC = 6) bounds articleIds.
-    expect(openai!.articleIds.length).toBeLessThanOrEqual(6);
+    // Cluster cap = ceil(N/SIGNAL_TOPIC_TARGET) + 5 with N=100 → 15. So
+    // openai may claim up to 15 articles even though the corpus has 100
+    // openai-themed ones — the cap prevents page-swallow.
+    expect(openai!.totalArticlesInCluster).toBeLessThanOrEqual(15);
+    // Storage cap is generous so the page can offer an "expand" affordance,
+    // but still bounded.
+    expect(openai!.articleIds.length).toBeLessThanOrEqual(30);
   });
 });

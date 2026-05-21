@@ -19,8 +19,17 @@ export const SIGNAL_MIN_PER_WINDOW = 50;
 /** Maximum topics surfaced on the Signal page. */
 export const SIGNAL_TOPIC_TARGET = 10;
 
-/** Maximum article rows rendered per topic. */
+/** Default article rows rendered per topic before the user expands it. */
 export const SIGNAL_ARTICLES_PER_TOPIC = 6;
+
+/**
+ * Hard ceiling on articles stored per topic. The engine claims many
+ * articles for a cluster (so leftover fragments can't form near-duplicate
+ * topics — see `bleed-over guard` in frequency-engine), but the cached
+ * report shouldn't carry hundreds of ids per topic when the user only
+ * ever sees 6 by default. Bounds localStorage growth.
+ */
+export const SIGNAL_TOPIC_STORE_CAP = 30;
 
 /** Cache TTL for a generated Signal report (24 hours). */
 export const SIGNAL_REPORT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -33,8 +42,18 @@ export interface Topic {
   term: string;
   /** The term in its most common original casing across the corpus. */
   displayTerm: string;
-  /** Articles assigned to this cluster, ordered most-recent first. */
+  /**
+   * Articles assigned to this cluster, ordered most-recent first.
+   * Capped at `SIGNAL_TOPIC_STORE_CAP` — the UI shows the first
+   * `SIGNAL_ARTICLES_PER_TOPIC` by default and reveals the rest on
+   * an "expand" toggle.
+   */
   articleIds: string[];
+  /**
+   * Total articles claimed by this cluster before storage truncation.
+   * Drives the "+ N more" affordance and the topic's article count.
+   */
+  totalArticlesInCluster: number;
   /** Distinct feeds the cluster's articles came from. */
   feedCount: number;
 }
