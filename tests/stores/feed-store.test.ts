@@ -45,6 +45,7 @@ vi.mock("../../src/core/storage/db.ts", () => ({
 
 vi.mock("../../src/core/feeds/feed-service.ts", () => ({
   addFeedFlow: vi.fn(),
+  addPlaceholderFeed: vi.fn(),
   refreshFeed: vi.fn(),
   refreshAllFeeds: vi.fn(),
   reloadFeed: vi.fn(),
@@ -66,6 +67,7 @@ vi.mock("../../src/core/sync/sync-service", () => ({
 import { getFeeds, getFeed, removeFeed, updateFeed, getFolders, addFolder, updateFolder, removeFolder } from "../../src/core/storage/db.ts";
 import {
   addFeedFlow,
+  addPlaceholderFeed,
   refreshFeed,
   refreshAllFeeds,
 } from "../../src/core/feeds/feed-service.ts";
@@ -207,6 +209,26 @@ describe("feed-store", () => {
       expect(result).toEqual({ ok: false, error: "not a feed" });
     });
 
+    it("threads reason='fetch-failure' through so callers can create a placeholder", async () => {
+      // The import flow needs to distinguish recoverable failures (HTTP /
+      // network) from permanent ones (not a feed). The reason flag
+      // propagates from addFeedFlow through addFeed without modification.
+      vi.mocked(addFeedFlow).mockResolvedValue({
+        ok: false,
+        error: "HTTP 429",
+        reason: "fetch-failure",
+      });
+
+      const result = await useFeedStore
+        .getState()
+        .addFeed("https://rate-limited.example.com");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe("fetch-failure");
+      }
+    });
+
     it("returns ok result on success", async () => {
       const feed = mockFeed("new", "New Feed");
       vi.mocked(addFeedFlow).mockResolvedValue({
@@ -346,6 +368,49 @@ describe("feed-store", () => {
         expect(result.ok).toBe(true);
         expect(addFeedFlow).toHaveBeenCalledOnce();
       });
+    });
+  });
+
+  describe("addPlaceholderFeed", () => {
+    it("delegates to the core helper, reloads feeds, and schedules a sync push", async () => {
+      const placeholder = mockFeed("ph", "rate-limited.example.com");
+      vi.mocked(addPlaceholderFeed).mockResolvedValue({
+        ok: true,
+        value: placeholder,
+      });
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: true,
+        value: [placeholder],
+      });
+      const scheduleSpy = vi.spyOn(useSyncStore.getState(), "scheduleSyncPush");
+
+      const result = await useFeedStore
+        .getState()
+        .addPlaceholderFeed("https://rate-limited.example.com", "HTTP 429");
+
+      expect(addPlaceholderFeed).toHaveBeenCalledWith(
+        "https://rate-limited.example.com",
+        "HTTP 429",
+      );
+      expect(result.ok).toBe(true);
+      expect(useFeedStore.getState().feeds).toContainEqual(placeholder);
+      expect(scheduleSpy).toHaveBeenCalled();
+    });
+
+    it("returns err and skips reload when the core helper rejects (e.g. duplicate)", async () => {
+      vi.mocked(addPlaceholderFeed).mockResolvedValue({
+        ok: false,
+        error: "A feed with this URL already exists",
+      });
+
+      const result = await useFeedStore
+        .getState()
+        .addPlaceholderFeed("https://dup.example.com", "boom");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/already exists/i);
+      }
     });
   });
 

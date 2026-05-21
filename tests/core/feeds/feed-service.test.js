@@ -136,7 +136,7 @@ vi.mock("../../../src/core/storage/db.ts", () => {
   };
 });
 
-let addFeedFlow, refreshFeed, refreshAllFeeds, reloadFeed, previewFeed;
+let addFeedFlow, addPlaceholderFeed, refreshFeed, refreshAllFeeds, reloadFeed, previewFeed;
 let db;
 
 beforeEach(async () => {
@@ -147,6 +147,7 @@ beforeEach(async () => {
   // Reset module to clear any cached state
   const mod = await import("../../../src/core/feeds/feed-service.ts");
   addFeedFlow = mod.addFeedFlow;
+  addPlaceholderFeed = mod.addPlaceholderFeed;
   refreshFeed = mod.refreshFeed;
   refreshAllFeeds = mod.refreshAllFeeds;
   reloadFeed = mod.reloadFeed;
@@ -252,6 +253,43 @@ describe("feed-service", () => {
       const result = await addFeedFlow("https://example.com/feed");
       expect(isErr(result)).toBe(true);
       expect(result.error).toMatch(/could not be reached/i);
+    });
+
+    it("flags HTTP fetch failures with reason: 'fetch-failure' (import-side recovery)", async () => {
+      // Recoverable failures (429/503/5xx/4xx) are distinguished from
+      // permanent failures (parse / discovery / duplicate) via a `reason`
+      // discriminator so bulk import can create a placeholder feed and let
+      // the user retry via refresh. Mirrors the existing
+      // `reason: "free-quota-exceeded"` pattern.
+      for (const status of [429, 503, 500, 404]) {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+          ok: false,
+          status,
+          headers: new Headers(),
+        });
+        const result = await addFeedFlow(`https://example.com/${status}`);
+        expect(isErr(result)).toBe(true);
+        expect(result.reason).toBe("fetch-failure");
+      }
+    });
+
+    it("flags network/transport errors with reason: 'fetch-failure'", async () => {
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("ECONNRESET"));
+      const result = await addFeedFlow("https://example.com/network-err");
+      expect(isErr(result)).toBe(true);
+      expect(result.reason).toBe("fetch-failure");
+    });
+
+    it("does NOT flag parse / discovery failures as fetch-failure", async () => {
+      // The URL isn't a feed and never will be. No point creating a
+      // placeholder row that refresh can't recover.
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve("<html><body>Not a feed</body></html>"),
+      });
+      const result = await addFeedFlow("https://example.com/not-a-feed");
+      expect(isErr(result)).toBe(true);
+      expect(result.reason).toBeUndefined();
     });
 
     it("should return error when fetch throws (network error)", async () => {
@@ -360,6 +398,51 @@ describe("feed-service", () => {
 
       const { feed } = unwrap(result);
       expect(feed.title).toBe("Example Feed");
+    });
+  });
+
+  describe("addPlaceholderFeed", () => {
+    it("persists a placeholder feed with lastError and a URL-derived title", async () => {
+      // Import scenario: a URL fetched fine in OPML but the upstream returned
+      // 429. We persist it anyway so the user can hit `r` later to retry.
+      const result = await addPlaceholderFeed(
+        "https://news.example.com/feed.xml",
+        "The feed at this URL could not be reached (HTTP 429, retry after 60s)",
+      );
+
+      expect(isOk(result)).toBe(true);
+      const feed = unwrap(result);
+      expect(feed.url).toBe("https://news.example.com/feed.xml");
+      // Title is derived from the URL host, not "Untitled" — gives the user
+      // a recognizable sidebar label until refresh backfills the real one.
+      expect(feed.title).toBe("news.example.com");
+      expect(feed.lastError).toMatch(/HTTP 429/);
+      expect(feed.lastSuccessfulFetchAt).toBeUndefined();
+      expect(db.addFeed).toHaveBeenCalledOnce();
+    });
+
+    it("normalizes the URL the same way addFeedFlow does", async () => {
+      const result = await addPlaceholderFeed(
+        "HTTPS://Example.COM/feed/",
+        "boom",
+      );
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result).url).toBe("https://example.com/feed");
+    });
+
+    it("returns err when the URL already exists as a real feed", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      await addFeedFlow("https://example.com/feed.xml");
+
+      const result = await addPlaceholderFeed(
+        "https://example.com/feed.xml",
+        "boom",
+      );
+      expect(isErr(result)).toBe(true);
+      expect(result.error).toMatch(/already exists/i);
     });
   });
 });
@@ -613,7 +696,7 @@ describe("refreshFeed", () => {
 
     it("records only lastFetchedAt on HTTP failure (publisher unreachable)", async () => {
       const feed = await addTestFeed();
-      const baselineSuccess = feed.lastSuccessfulFetchAt; // undefined for fresh feed
+      const baselineSuccess = feed.lastSuccessfulFetchAt;
       const before = Date.now();
 
       globalThis.fetch = vi.fn().mockResolvedValue({
@@ -629,8 +712,9 @@ describe("refreshFeed", () => {
       expect(lastCall.lastSuccessfulFetchAt).toBe(baselineSuccess);
     });
 
-    it("records only lastFetchedAt when fetch throws (network error)", async () => {
+    it("preserves prior lastSuccessfulFetchAt when fetch throws (network error)", async () => {
       const feed = await addTestFeed();
+      const baselineSuccess = feed.lastSuccessfulFetchAt;
       const before = Date.now();
 
       globalThis.fetch = vi.fn().mockRejectedValue(new Error("connection reset"));
@@ -639,7 +723,7 @@ describe("refreshFeed", () => {
       expect(db.updateFeed).toHaveBeenCalled();
       const lastCall = db.updateFeed.mock.calls.at(-1)[0];
       expect(lastCall.lastFetchedAt).toBeGreaterThanOrEqual(before);
-      expect(lastCall.lastSuccessfulFetchAt).toBeUndefined();
+      expect(lastCall.lastSuccessfulFetchAt).toBe(baselineSuccess);
     });
 
     it("preserves a prior lastSuccessfulFetchAt across a failing refresh", async () => {
@@ -659,6 +743,94 @@ describe("refreshFeed", () => {
 
       const lastCall = db.updateFeed.mock.calls.at(-1)[0];
       expect(lastCall.lastSuccessfulFetchAt).toBe(yesterday);
+    });
+  });
+
+  describe("lastError lifecycle", () => {
+    // The sidebar surfaces broken feeds via Feed.lastError. Same chokepoint
+    // (`persistFreshness`) that owns the freshness timestamps owns this
+    // field so the in-memory feed and the DB row never disagree.
+    it("sets lastError on HTTP failure", async () => {
+      const feed = await addTestFeed();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        headers: new Headers(),
+      });
+      await refreshFeed(feed);
+
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.lastError).toMatch(/503/);
+    });
+
+    it("sets lastError on network/transport error", async () => {
+      const feed = await addTestFeed();
+
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("ECONNRESET"));
+      await refreshFeed(feed);
+
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.lastError).toMatch(/ECONNRESET/);
+    });
+
+    it("clears lastError on successful refresh", async () => {
+      const feed = await addTestFeed();
+      // Pretend a prior refresh failed.
+      feed.lastError = "previous failure";
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      await refreshFeed(feed);
+
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.lastError).toBeUndefined();
+    });
+  });
+
+  describe("first-success metadata backfill", () => {
+    // A placeholder feed (added by import after a fetch failure) starts with
+    // a URL-derived title and empty description/siteUrl. The first
+    // successful refresh upgrades it to a real feed — we overwrite metadata
+    // ONLY when this is the first-ever success, so a user's rename of an
+    // established feed is never clobbered.
+    it("backfills title/description/siteUrl when lastSuccessfulFetchAt is undefined", async () => {
+      const placeholderResult = await addPlaceholderFeed(
+        "https://example.com/feed.xml",
+        "transient 429",
+      );
+      const feed = unwrap(placeholderResult);
+      expect(feed.lastSuccessfulFetchAt).toBeUndefined();
+      expect(feed.title).toBe("example.com");
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      await refreshFeed(feed);
+
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.title).toBe("Example Feed");
+      expect(lastCall.description).toBe("A test feed");
+      expect(lastCall.siteUrl).toBe("https://example.com");
+      expect(lastCall.lastError).toBeUndefined();
+    });
+
+    it("does NOT overwrite title on subsequent successful refresh (user may have renamed it)", async () => {
+      const feed = await addTestFeed();
+      // Simulate a user rename.
+      feed.title = "My Favorite Feed";
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      await refreshFeed(feed);
+
+      const lastCall = db.updateFeed.mock.calls.at(-1)[0];
+      expect(lastCall.title).toBe("My Favorite Feed");
     });
   });
 });

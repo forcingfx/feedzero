@@ -239,6 +239,50 @@ describe("feed-store ↔ db.ts integration", () => {
     });
   });
 
+  describe("addPlaceholderFeed lifecycle", () => {
+    // Issue #117 follow-up: a bulk-import URL hit by a 429 should be
+    // persisted as a placeholder so the user can recover it by hitting
+    // refresh — and the sidebar must visibly surface it. This test
+    // exercises the round-trip through the real encrypted DB.
+    it("persists a placeholder with lastError and survives a reload from the DB", async () => {
+      const result = await useFeedStore
+        .getState()
+        .addPlaceholderFeed(
+          "https://rl.example.com/feed.xml",
+          "HTTP 429 (retry after 60s)",
+        );
+      expect(result.ok).toBe(true);
+
+      // Round-trip through the DB: drop the store snapshot and reload
+      // from the real persisted row. If addPlaceholderFeed silently
+      // skipped the DB, this would be empty.
+      useFeedStore.setState({ feeds: [] });
+      await useFeedStore.getState().loadFeeds();
+
+      const feeds = useFeedStore.getState().feeds;
+      expect(feeds).toHaveLength(1);
+      expect(feeds[0].url).toBe("https://rl.example.com/feed.xml");
+      expect(feeds[0].lastError).toMatch(/HTTP 429/);
+      expect(feeds[0].lastSuccessfulFetchAt).toBeUndefined();
+      // Title was derived from the URL host so the sidebar has a
+      // recognizable label until refresh backfills the real one.
+      expect(feeds[0].title).toBe("rl.example.com");
+    });
+
+    it("returns err when the URL already exists as a real feed", async () => {
+      const existing = makeFeed("a", "Feed A");
+      await dbAddFeed(existing);
+      await useFeedStore.getState().loadFeeds();
+
+      const result = await useFeedStore
+        .getState()
+        .addPlaceholderFeed(existing.url, "boom");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toMatch(/already exists/i);
+    });
+  });
+
   describe("the contract the mocked tests could not verify", () => {
     it("after a mutation, store snapshot equals what dbGetFeeds() returns", async () => {
       // This is the core invariant the 2026-05-19 incident report named.

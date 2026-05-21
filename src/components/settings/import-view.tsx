@@ -10,6 +10,7 @@ import {
   useImportStore,
   selectTotalCount,
   selectSuccessCount,
+  selectPlaceholderCount,
   selectFailureCount,
   selectCurrentUrl,
 } from "@/stores/import-store";
@@ -40,6 +41,7 @@ export function ImportView({ onClose }: ImportViewProps) {
   const reset = useImportStore((s) => s.reset);
 
   const addFeed = useFeedStore((s) => s.addFeed);
+  const addPlaceholderFeed = useFeedStore((s) => s.addPlaceholderFeed);
   const createFolder = useFeedStore((s) => s.createFolder);
   const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
 
@@ -158,29 +160,73 @@ export function ImportView({ onClose }: ImportViewProps) {
         if (folderNames.includes(f.name)) folderIdByName.set(f.name, f.id);
       }
 
+      // Best-effort folder placement for a just-added feed (real or
+      // placeholder). A missing folder or feed lookup leaves the
+      // subscription unfiled, which is the safe fallback.
+      const placeFeedIntoFolder = async (entry: {
+        xmlUrl: string;
+        folderName?: string;
+      }) => {
+        if (!entry.folderName) return;
+        const folderId = folderIdByName.get(entry.folderName);
+        const addedFeed = useFeedStore
+          .getState()
+          .feeds.find((f) => f.url === entry.xmlUrl);
+        if (folderId && addedFeed) {
+          await moveFeedToFolder(addedFeed.id, folderId);
+        }
+      };
+
       // Start import process
       startImport(urls);
 
-      // Process each entry sequentially. After a successful addFeed, look
-      // up the just-added feed by url in the store and move it into the
-      // matching folder (best-effort — a missing folder or feed leaves the
-      // subscription unfiled, which is the safe fallback).
+      // Process each entry sequentially. Three outcomes per URL:
+      //   * ok            → fully imported; move to folder, record success
+      //   * fetch-failure → persist as placeholder so refresh can retry;
+      //                     same folder placement, recorded as placeholder
+      //   * other err     → permanent (parse / discovery / duplicate /
+      //                     quota); record failure, no row created
       for (const entry of entries) {
         const result = await addFeed(entry.xmlUrl);
+
         if (result.ok) {
-          if (entry.folderName) {
-            const folderId = folderIdByName.get(entry.folderName);
-            const addedFeed = useFeedStore
-              .getState()
-              .feeds.find((f) => f.url === entry.xmlUrl);
-            if (folderId && addedFeed) {
-              await moveFeedToFolder(addedFeed.id, folderId);
-            }
-          }
+          await placeFeedIntoFolder(entry);
           recordResult({ url: entry.xmlUrl, success: true });
-        } else {
-          recordResult({ url: entry.xmlUrl, success: false, error: result.error });
+          continue;
         }
+
+        if (result.reason !== "fetch-failure") {
+          recordResult({
+            url: entry.xmlUrl,
+            success: false,
+            error: result.error,
+          });
+          continue;
+        }
+
+        // Recoverable fetch failure — persist a placeholder so the user
+        // can hit refresh later to recover the feed.
+        const placeholder = await addPlaceholderFeed(
+          entry.xmlUrl,
+          result.error,
+        );
+        if (!placeholder.ok) {
+          // Placeholder creation itself failed (e.g. duplicate URL in
+          // the database). Fall through to a hard failure.
+          recordResult({
+            url: entry.xmlUrl,
+            success: false,
+            error: placeholder.error,
+          });
+          continue;
+        }
+        await placeFeedIntoFolder(entry);
+        recordResult({
+          url: entry.xmlUrl,
+          success: true,
+          placeholder: true,
+          error: result.error,
+        });
       }
     } catch (err) {
       setParseError(
@@ -194,6 +240,7 @@ export function ImportView({ onClose }: ImportViewProps) {
     extractEntries,
     startImport,
     addFeed,
+    addPlaceholderFeed,
     createFolder,
     moveFeedToFolder,
     recordResult,
@@ -227,6 +274,7 @@ export function ImportView({ onClose }: ImportViewProps) {
     return (
       <ImportResults
         successCount={selectSuccessCount(state)}
+        placeholderCount={selectPlaceholderCount(state)}
         failureCount={selectFailureCount(state)}
         results={state.results}
         onDone={() => {

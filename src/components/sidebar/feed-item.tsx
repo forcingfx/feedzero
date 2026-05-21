@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, XCircle } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -26,8 +26,8 @@ interface FeedItemProps {
  * Sidebar feed row. Select-only — every per-feed action (rename,
  * preferences, rules, refresh, clear cache, delete) lives in
  * FeedSettingsDialog now, opened from the floating cog above the
- * article list. The row keeps the favicon, title, refresh/stale
- * indicators, unread badge, and drag handle for reorder.
+ * article list. The row keeps the favicon, title, refresh/stale/
+ * failed-fetch indicators, unread badge, and drag handle for reorder.
  */
 export function FeedItem({
   feed,
@@ -66,7 +66,18 @@ export function FeedItem({
         {isRefreshing && (
           <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
         )}
-        {!isRefreshing && isFeedStale(feed) && (
+        {/* Failed-fetch indicator: a placeholder feed that has never
+            successfully refreshed. Takes precedence over the stale
+            indicator — a feed that never loaded is more pressing than
+            a stale one. */}
+        {!isRefreshing && feed.lastError && !feed.lastSuccessfulFetchAt && (
+          <XCircle
+            className="size-3 shrink-0 text-destructive"
+            aria-label={feed.lastError}
+            data-testid="failed-feed-indicator"
+          />
+        )}
+        {!isRefreshing && !feed.lastError && isFeedStale(feed) && (
           <AlertTriangle
             className="size-3 shrink-0 text-amber-500"
             aria-label="This feed hasn't updated in over 14 days"

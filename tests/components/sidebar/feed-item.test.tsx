@@ -164,4 +164,48 @@ describe("FeedItem", () => {
     renderFeedItem();
     expect(screen.queryByRole("button", { name: /more/i })).toBeNull();
   });
+
+  it("shows a red error indicator when the feed is a placeholder (lastError set, never succeeded)", () => {
+    // Placeholder feeds from a failed bulk-import need a visible
+    // affordance so the user knows to hit refresh. The indicator is
+    // distinct from the amber 'stale' indicator (which means "we used
+    // to fetch this, now it's quiet") to avoid conflating the two states.
+    renderFeedItem({
+      feed: {
+        ...mockFeed,
+        lastError: "HTTP 429, retry after 60s",
+        // lastSuccessfulFetchAt deliberately undefined — never fetched.
+        lastFetchedAt: Date.now(),
+      },
+    });
+    const indicator = screen.getByTestId("failed-feed-indicator");
+    expect(indicator).toBeInTheDocument();
+    expect(indicator.getAttribute("aria-label")).toMatch(/HTTP 429/);
+  });
+
+  it("does NOT show the error indicator on a healthy feed", () => {
+    renderFeedItem({
+      feed: {
+        ...mockFeed,
+        lastFetchedAt: Date.now(),
+        lastSuccessfulFetchAt: Date.now(),
+      },
+    });
+    expect(screen.queryByTestId("failed-feed-indicator")).toBeNull();
+  });
+
+  it("does NOT show the error indicator on a feed that worked before but recently failed", () => {
+    // We rely on the existing stale indicator for "worked, now broken"
+    // beyond the 14-day threshold. Recently-failed-but-previously-OK
+    // feeds stay quiet to avoid noise.
+    renderFeedItem({
+      feed: {
+        ...mockFeed,
+        lastError: "transient 503",
+        lastFetchedAt: Date.now(),
+        lastSuccessfulFetchAt: Date.now() - 60 * 1000,
+      },
+    });
+    expect(screen.queryByTestId("failed-feed-indicator")).toBeNull();
+  });
 });
