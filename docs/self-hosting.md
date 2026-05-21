@@ -301,6 +301,38 @@ update.
 To pin a specific version, set `FEEDZERO_VERSION=v0.9.1` in `.env`
 and run `update`. Without a pin, the script tracks `:latest`.
 
+#### Image registry: GHCR or Docker Hub
+
+Every release is published to both registries:
+
+- **GitHub Container Registry** (default in `docker-compose.yml`):
+  `ghcr.io/forcingfx/feedzero`
+- **Docker Hub**: `docker.io/forcingfx/feedzero`
+
+If you'd rather pull from Docker Hub — common when managing the
+stack from Portainer's LAN-only UI, which lists Docker Hub by default —
+edit the `image:` line in `docker-compose.yml`:
+
+```yaml
+image: docker.io/forcingfx/feedzero:${FEEDZERO_VERSION:-latest}
+```
+
+Both registries serve the same multi-arch artefact, so the swap is
+otherwise invisible.
+
+#### Portainer (LAN-only)
+
+If you manage your homelab through Portainer:
+
+1. Go to **Stacks** → **Add stack**.
+2. Paste the contents of `docker-compose.yml` (swap the `image:` line
+   to `docker.io/...` if you'd prefer Docker Hub).
+3. In the **Environment variables** section, paste from `.env.example`
+   and edit `HOSTNAME` to your LAN address.
+4. Deploy. The encrypted vault and feed cache live in the bind-mount
+   declared by `DATA_DIR` — backups via `./scripts/feedzero backup`
+   still work the same way.
+
 ### Backup
 
 ```bash
