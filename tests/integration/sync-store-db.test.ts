@@ -37,6 +37,14 @@
  */
 import "fake-indexeddb/auto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// This file exercises the real key-manager + real db.ts + fake-indexeddb,
+// which means every test pays the cost of PBKDF2 derivations through
+// happy-dom's Web Crypto. Tests run 2.5–5.5s in isolation and can exceed
+// the 5s default under parallel load. Bump the file-level timeout to
+// match the per-test cost of real crypto. See key-manager.test.ts for the
+// matching annotation.
+vi.setConfig({ testTimeout: 15_000 });
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
 import { useLicenseStore } from "../../src/stores/license-store.ts";

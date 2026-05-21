@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "fake-indexeddb/auto";
 
+// Every test in this file does at least one real PBKDF2 derivation via
+// initFresh / restore / persistDerivedKeysFromOpenDb. happy-dom's Web Crypto
+// is CPU-bound and contended under parallel test workers, so individual
+// tests can exceed the 5s default. Bumping the file-level timeout absorbs
+// the variance without changing what we test. Issue surfaced when the
+// pre-push hook hit `key-manager > persistDerivedKeysFromOpenDb > re-derives
+// keys + vault material for a sync session` timing out at 5015ms on a
+// parallel run while passing in 3.4s in isolation.
+vi.setConfig({ testTimeout: 15_000 });
+
 vi.mock("@/core/sync/sync-service", () => ({
   deleteVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
