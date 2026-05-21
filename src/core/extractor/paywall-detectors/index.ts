@@ -1,9 +1,11 @@
 import { paywallRegistry } from "./registry.ts";
 import { defaultDetector } from "./default-detector.ts";
 import { nytimesDetector } from "./nytimes.ts";
+import { economistDetector } from "./economist.ts";
 import type { PaywallVerdict } from "./types.ts";
 
 paywallRegistry.register(nytimesDetector);
+paywallRegistry.register(economistDetector);
 paywallRegistry.register(defaultDetector);
 
 /**

@@ -94,7 +94,8 @@ The extension is pure transport. **Paywall detection, content extraction, and re
 | `host.ts` | `publisherHost(url)` — canonical publisher host with leading `www.` stripped. |
 | `visible-text.ts` | `visibleTextLength(html)` — crude tag-stripping length heuristic, sync, dep-free. |
 | `default-detector.ts` | Substring scan over industry-wide paywall phrases + body-too-short fallback (600-char threshold). |
-| `nytimes.ts` | First publisher-specific detector — matches `nytimes.com` and its subdomains (e.g. `cooking.nytimes.com`). |
+| `nytimes.ts` | Publisher-specific detector for `nytimes.com` and its subdomains (e.g. `cooking.nytimes.com`). |
+| `economist.ts` | Publisher-specific detector for `economist.com`. |
 | `registry.ts` | Ordered first-match registry. |
 | `index.ts` | Registers detectors; exports `detectPaywall(html, url): PaywallVerdict`. |
 

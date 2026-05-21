@@ -45,6 +45,24 @@ const GENERIC_PAYWALLED = `
 
 const SHORT_BODY = `<html><body><article><p>One tiny paragraph.</p></article></body></html>`;
 
+const ECONOMIST_FULL = `
+  <html><body>
+    <article>${"<p>Long economist article paragraph with substantive analysis. </p>".repeat(60)}</article>
+  </body></html>
+`;
+
+const ECONOMIST_PAYWALL_STUB = `
+  <html><body>
+    <article>
+      <p>The opening paragraph appears, giving a teaser of the story.</p>
+    </article>
+    <div class="subscribe-gate">
+      <h2>Subscribe to The Economist</h2>
+      <p>To continue reading this article you need to subscribe.</p>
+    </div>
+  </body></html>
+`;
+
 describe("detectPaywall", () => {
   describe("nytimes detector", () => {
     it("flags an NYT page that contains the subscriber CTA", () => {
@@ -66,6 +84,51 @@ describe("detectPaywall", () => {
       expect(a.publisher).toBe("nytimes.com");
       expect(b.publisher).toBe("nytimes.com");
       expect(c.publisher).toBe("nytimes.com");
+    });
+  });
+
+  describe("economist detector", () => {
+    it("flags an Economist page that contains the subscribe-to-continue CTA with reason 'economist-cta'", () => {
+      const verdict = detectPaywall(
+        ECONOMIST_PAYWALL_STUB,
+        "https://www.economist.com/finance/2026/05/21/an-article",
+      );
+      expect(verdict.paywalled).toBe(true);
+      expect(verdict.publisher).toBe("economist.com");
+      if (verdict.paywalled) expect(verdict.reason).toBe("economist-cta");
+    });
+
+    it("flags an Economist page even when the body length alone would not (publisher detector runs first)", () => {
+      // Long enough body that the default body-too-short heuristic would
+      // not trip; the only paywall signal is the Economist subscribe block.
+      const longish = `
+        <html><body>
+          <article>${"<p>Substantial paragraph of analysis. </p>".repeat(40)}</article>
+          <aside class="ec-subscribe">Get unlimited access to economist.com — subscribe now to The Economist.</aside>
+        </body></html>
+      `;
+      const verdict = detectPaywall(longish, "https://www.economist.com/x");
+      expect(verdict.paywalled).toBe(true);
+      if (verdict.paywalled) expect(verdict.reason).toBe("economist-cta");
+    });
+
+    it("does not flag a fully-readable Economist article", () => {
+      const verdict = detectPaywall(
+        ECONOMIST_FULL,
+        "https://www.economist.com/finance/2026/05/21/an-article",
+      );
+      expect(verdict.paywalled).toBe(false);
+      expect(verdict.publisher).toBe("economist.com");
+    });
+
+    it("matches economist.com and the www. subdomain", () => {
+      const a = detectPaywall(ECONOMIST_PAYWALL_STUB, "https://economist.com/x");
+      const b = detectPaywall(
+        ECONOMIST_PAYWALL_STUB,
+        "https://www.economist.com/x",
+      );
+      expect(a.publisher).toBe("economist.com");
+      expect(b.publisher).toBe("economist.com");
     });
   });
 
