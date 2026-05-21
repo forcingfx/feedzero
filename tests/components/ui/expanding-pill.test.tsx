@@ -87,7 +87,7 @@ describe("ExpandingPill", () => {
     expect(label.className).toMatch(/overflow-hidden/);
   });
 
-  it("expand-on-hover: label uses group-hover:max-w- to reveal on parent hover", () => {
+  it("expansion is wired to hover, focus-visible, AND active (mobile tap)", () => {
     render(
       <ExpandingPill
         icon={<SettingsIcon />}
@@ -96,10 +96,13 @@ describe("ExpandingPill", () => {
       />,
     );
     const label = screen.getByText("Feed settings");
-    // Group + group-hover:max-w-* is the desktop expand pattern. Don't
-    // pin the exact width — just confirm the mechanism is wired.
+    // Three expansion triggers: desktop pointer hover, keyboard
+    // focus-visible, and mobile tap (group-active while the press is
+    // held). Don't pin the exact width — just confirm each mechanism
+    // is wired.
     expect(label.className).toMatch(/group-hover:max-w-/);
     expect(label.className).toMatch(/group-focus-visible:max-w-/);
+    expect(label.className).toMatch(/group-active:max-w-/);
   });
 
   it("when alwaysExpanded is true, the label has no max-w-0 constraint (mobile-always-visible mode)", () => {

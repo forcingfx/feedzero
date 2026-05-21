@@ -3,10 +3,11 @@ import { cn } from "@/lib/utils";
 
 /**
  * Circle-to-pill button. Default state is a circular icon-only button;
- * hover (desktop) or keyboard focus-visible expands the label slot via
- * a CSS `max-width` animation, growing the pill rightward without
- * shifting the icon. Set `alwaysExpanded` for the mobile path where
- * hover doesn't apply.
+ * hover (desktop), keyboard focus-visible, or pointer press (mobile
+ * tap) expands the label slot via a CSS `max-width` animation,
+ * growing the pill rightward without shifting the icon. The
+ * `alwaysExpanded` prop forces the visible state — mostly an escape
+ * hatch for tests; the new default works on every viewport.
  *
  * Pattern is new for this codebase — see the cog/sort floating pills
  * at the top of the article list for the primary consumers. Keep the
@@ -68,9 +69,11 @@ export const ExpandingPill = React.forwardRef<
           "transition-[max-width,padding] duration-200 ease-out",
           alwaysExpanded
             ? "max-w-[160px] pl-2"
-            : // Collapsed by default; expand on group-hover (desktop) or
-              // when the button itself becomes focus-visible (keyboard).
-              "max-w-0 group-hover:max-w-[160px] group-hover:pl-2 group-focus-visible:max-w-[160px] group-focus-visible:pl-2",
+            : // Collapsed by default. Expand on:
+              //  - group-hover (desktop pointer)
+              //  - group-focus-visible (keyboard focus)
+              //  - group-active (mobile tap, while the press is held)
+              "max-w-0 group-hover:max-w-[160px] group-hover:pl-2 group-focus-visible:max-w-[160px] group-focus-visible:pl-2 group-active:max-w-[160px] group-active:pl-2",
         )}
       >
         {label}

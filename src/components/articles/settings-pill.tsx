@@ -2,7 +2,6 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { ExpandingPill } from "@/components/ui/expanding-pill.tsx";
-import { useIsMobile } from "@/hooks/use-mobile.ts";
 import {
   ALL_FEEDS_ID,
   STARRED_FEED_ID,
@@ -27,7 +26,6 @@ export function SettingsPill() {
   const openFolderSettings = useFeedStore((s) => s.openFolderSettings);
   const filters = useSmartFilterStore((s) => s.filters);
   const openEditor = useSmartFilterStore((s) => s.openEditor);
-  const isMobile = useIsMobile();
 
   const target = resolveTarget({
     selectedFeedId,
@@ -58,7 +56,6 @@ export function SettingsPill() {
       icon={<SettingsIcon />}
       label={target.label}
       aria-label={target.label}
-      alwaysExpanded={isMobile}
       dataTestId="settings-pill"
       onClick={handleClick}
     />
