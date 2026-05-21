@@ -1,4 +1,5 @@
 import { SortPill } from "./sort-pill.tsx";
+import { SettingsPill } from "./settings-pill.tsx";
 import type { ArticleSortMode } from "@/types/index.ts";
 
 /**
@@ -27,6 +28,7 @@ export function ArticleListControls({
       data-testid="article-list-controls"
       className="sticky top-0 z-10 flex justify-end items-center gap-2 px-2 py-1 bg-background/80 backdrop-blur-sm pointer-events-none"
     >
+      <SettingsPill />
       <SortPill mode={sortMode} onChange={onSortChange} />
     </div>
   );
