@@ -27,11 +27,22 @@ test.describe("Import recovery — placeholder for rate-limited URLs", () => {
     let phase: "rate-limited" | "recovered" = "rate-limited";
     await page.route("**/api/feed*", (route) => {
       const targetUrl = readTargetUrlFromBody(route.request().postData());
+      // Parse the target URL so we can match on hostname precisely.
+      // `url.includes("rate-limited.example.com")` was flagged by
+      // CodeQL's js/incomplete-url-substring-sanitization rule — and
+      // even outside the rule's intent (this is a test mock, not a
+      // security boundary), precise matching is the right shape.
+      let targetHost = "";
+      try {
+        targetHost = new URL(targetUrl).hostname;
+      } catch {
+        // Non-URL body — fall through to the catch-all 200 fixture.
+      }
       if (targetUrl.includes("releases.xml")) {
         route.fulfill({ status: 404, body: "blocked in test" });
         return;
       }
-      if (targetUrl.includes("rate-limited.example.com")) {
+      if (targetHost === "rate-limited.example.com") {
         if (phase === "rate-limited") {
           route.fulfill({
             status: 429,
