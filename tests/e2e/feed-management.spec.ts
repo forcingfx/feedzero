@@ -36,15 +36,19 @@ test.describe("Feed management", () => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
     await addFeedViaUI(page, "https://example.com/feed");
 
-    // Open the dropdown menu for the feed
-    await page.getByRole("button", { name: "More" }).click();
-    await page.getByRole("menuitem", { name: /delete/i }).click();
+    // Ensure the feed is selected so the context-aware settings pill renders.
+    await selectFeedInSidebar(page, "Test Feed");
 
-    // Confirmation dialog should appear
-    await expect(page.getByText(/Remove.*Test Feed/)).toBeVisible();
+    // Open per-feed settings via the floating cog above the article list.
+    await page.getByTestId("settings-pill").click();
+    await page.getByTestId("feed-settings-delete").click();
+
+    // Confirmation dialog should appear with the feed title in the body.
+    await expect(page.getByText("Delete this feed?")).toBeVisible();
+    await expect(page.getByText(/Test Feed.*cached article/)).toBeVisible();
 
     // Confirm removal
-    await page.getByRole("button", { name: "Remove" }).click();
+    await page.getByTestId("feed-settings-delete-confirm").click();
 
     // Feed should be gone
     await expect(
@@ -56,9 +60,14 @@ test.describe("Feed management", () => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
     await addFeedViaUI(page, "https://example.com/feed");
 
-    await page.getByRole("button", { name: "More" }).click();
-    await page.getByRole("menuitem", { name: /delete/i }).click();
-    await page.getByRole("button", { name: "Cancel" }).click();
+    await selectFeedInSidebar(page, "Test Feed");
+
+    await page.getByTestId("settings-pill").click();
+    await page.getByTestId("feed-settings-delete").click();
+    await page.getByTestId("feed-settings-delete-cancel").click();
+
+    // Close the settings dialog so the sidebar is uncovered.
+    await page.keyboard.press("Escape");
 
     // Feed should still be there
     await expect(
