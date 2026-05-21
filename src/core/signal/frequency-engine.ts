@@ -35,7 +35,12 @@ import {
 import { ok, type Result } from "../../utils/result.ts";
 import type { Article, Feed } from "../../types/index.ts";
 
-interface GenerateContext {
+/**
+ * Optional context the engine might consume in future phases (e.g. folder
+ * weighting). Currently unused but accepted at the call site so additive
+ * changes don't ripple through every caller.
+ */
+export interface GenerateContext {
   feeds: Feed[];
 }
 
@@ -84,8 +89,9 @@ interface TokenizedArticle {
 interface TermEntry {
   articleIds: Set<string>;
   feedIds: Set<string>;
-  casings: Map<string, number>;
 }
+
+const WORD_BOUNDARY = /[^\p{L}\p{N}]+/u;
 
 /**
  * Pick the smallest window with enough articles to run on. Exported so
@@ -138,30 +144,14 @@ function allTokens(article: Article): string[] {
 function buildIndex(tokenized: TokenizedArticle[]): Map<string, TermEntry> {
   const index = new Map<string, TermEntry>();
   for (const { article, tokens } of tokenized) {
-    const original = (article.title + " " + (article.content || article.summary || ""))
-      .split(/[^\p{L}\p{N}]+/u)
-      .filter((w) => w.length > 0);
-    const originalLower = original.map((w) => w.toLowerCase());
-
     for (const term of tokens) {
       let entry = index.get(term);
       if (!entry) {
-        entry = { articleIds: new Set(), feedIds: new Set(), casings: new Map() };
+        entry = { articleIds: new Set(), feedIds: new Set() };
         index.set(term, entry);
       }
       entry.articleIds.add(article.id);
       entry.feedIds.add(article.feedId);
-
-      // Best-effort casing recovery: find an original word in the article
-      // whose lowercased form starts with the stemmed term. The most
-      // common casing across the corpus wins in `restoreCasing`.
-      for (let i = 0; i < originalLower.length; i++) {
-        if (originalLower[i].startsWith(term)) {
-          const original_i = original[i];
-          entry.casings.set(original_i, (entry.casings.get(original_i) ?? 0) + 1);
-          break;
-        }
-      }
     }
   }
   return index;
@@ -170,7 +160,6 @@ function buildIndex(tokenized: TokenizedArticle[]): Map<string, TermEntry> {
 interface RankedTerm {
   term: string;
   signal: number;
-  displayTerm: string;
   articleIds: Set<string>;
   feedCount: number;
 }
@@ -184,7 +173,6 @@ function scoreTerms(index: Map<string, TermEntry>): RankedTerm[] {
     out.push({
       term,
       signal,
-      displayTerm: restoreCasing(term, entry.casings),
       articleIds: entry.articleIds,
       feedCount: entry.feedIds.size,
     });
@@ -194,10 +182,26 @@ function scoreTerms(index: Map<string, TermEntry>): RankedTerm[] {
   return out;
 }
 
-function restoreCasing(term: string, casings: Map<string, number>): string {
+/**
+ * Recover the most common original casing of a stem from the articles
+ * actually assigned to the cluster. Runs once per surfaced topic
+ * (~10 per report) rather than once per indexed term — cheaper and
+ * avoids the `ies → y` blind spot of a prefix-match on every term.
+ */
+function pickDisplayTerm(term: string, articles: Article[]): string {
+  const histogram = new Map<string, number>();
+  for (const article of articles) {
+    const text = article.title + " " + (article.content || article.summary || "");
+    for (const word of text.split(WORD_BOUNDARY)) {
+      if (!word) continue;
+      if (word.toLowerCase().startsWith(term)) {
+        histogram.set(word, (histogram.get(word) ?? 0) + 1);
+      }
+    }
+  }
   let best = term;
-  let bestCount = -1;
-  for (const [casing, count] of casings) {
+  let bestCount = 0;
+  for (const [casing, count] of histogram) {
     if (count > bestCount || (count === bestCount && casing < best)) {
       best = casing;
       bestCount = count;
@@ -253,7 +257,7 @@ function clusterGreedy(
 
     topics.push({
       term: term.term,
-      displayTerm: term.displayTerm,
+      displayTerm: pickDisplayTerm(term.term, claimedHere),
       articleIds: claimedHere.slice(0, SIGNAL_ARTICLES_PER_TOPIC).map((a) => a.id),
       feedCount: feedIds.size,
     });

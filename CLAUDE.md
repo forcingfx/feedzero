@@ -64,6 +64,8 @@ Full-text extraction (user-initiated): click "Extracted" → `/api/page` → `ex
 - **src/core/sync/sync-handler.ts** — Shared server `Request → Response` handler. GET (pull) / PUT (push) / DELETE.
 - **src/core/sync/adapters/** — `memory`, `filesystem`, `vercel-blob`, `resolve-adapter`.
 - **src/core/feeds/feed-service.ts** — `addFeedFlow(url)`, `refreshFeed`, `refreshAllFeeds` (guid-based dedup).
+- **src/core/signal/frequency-engine.ts** — `generateReport(articles, ctx, now)` + `pickWindow()`. Pure-TS cross-feed term frequency with greedy clustering and a bleed-over guard. No LLM, no Worker. Drives `/signal`.
+- **src/core/signal/tokenize.ts** — `tokenize()` + `lightStem()` with English stopwords and feed-noise lists.
 - **src/core/parser/parser.ts** — `parse(text, feedUrl)` via feedsmith (RSS 2.0, Atom 1.0, JSON Feed 1.1).
 - **src/core/parser/sanitizer.ts** — DOMPurify wrapper, allowlisted tags/attrs.
 - **src/core/opml/** — `opml-service.ts` (import/export via feedsmith), `url-list-parser.ts` (plain-text URL lists).
@@ -79,6 +81,7 @@ Full-text extraction (user-initiated): click "Extracted" → `/api/page` → `ex
 - **onboarding-store** — State machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery`). Modes: `local` (skips confirm) vs `sync` (requires confirm).
 - **sync-store** — Status: `local-only | syncing | synced | error`. Holds `credentials: SyncCredentials | null` (pre-derived vault ID + CryptoKey; never raw passphrase). Actions: `enableSync` (derives + pushes), `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce + 0–30s jitter), `disableSync` (deletes server vault + clears stored keys), `logout` (clears local data + resets onboarding; preserves cloud vault).
 - **import-store** — OPML/URL-list progress. `idle → importing → complete | error`.
+- **signal-store** — `/signal` page state. Status: `idle | locked | loading | ready | error`. `loadReport({ force? })` runs the local frequency engine if corpus ≥ `SIGNAL_CORPUS_GATE` (100). 24h localStorage cache (`feedzero:signal-report`) invalidated when the chosen window changes or corpus size shifts by ≥10%.
 
 ### React Components
 
@@ -98,6 +101,7 @@ Full-text extraction (user-initiated): click "Extracted" → `/api/page` → `ex
 /feeds                                → Feed list (mobile: full screen)
 /feeds/:feedId                        → Article list (mobile: full screen; desktop: panels 1+2)
 /feeds/:feedId/articles/:articleId    → Reader (mobile: full screen; desktop: all 3 panels)
+/signal                               → Cross-feed topic frequency surface (Personal+, gated at 100-article corpus)
 ```
 
 URL is the source of truth for navigation state. `FeedsPage` syncs URL params → Zustand.
