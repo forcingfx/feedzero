@@ -16,6 +16,7 @@ import {
   ArticleListControls,
   MobileHeaderPills,
 } from "@/components/articles/article-list-controls.tsx";
+import { getFeeds } from "@/core/storage/db.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
@@ -37,6 +38,8 @@ vi.mock("@/core/storage/db.ts", () => ({
   removeFeed: vi.fn(),
   addFolder: vi.fn(),
   getSmartFilters: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 vi.mock("@/core/sync/sync-service", () => ({
@@ -199,26 +202,46 @@ describe("MobileHeaderPills", () => {
     expect(screen.getByLabelText(/sort/i)).toBeInTheDocument();
   });
 
-  it("shows a refresh-all control when feeds exist", () => {
+  it("shows a refresh control when feeds exist", () => {
     render(
       <MemoryRouter>
         <MobileHeaderPills />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("mobile-refresh-all")).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-refresh")).toBeInTheDocument();
   });
 
-  it("hides the refresh-all control when there are no feeds", () => {
+  it("hides the refresh control when there are no feeds", () => {
     useFeedStore.setState({ feeds: [], selectedFeedId: ALL_FEEDS_ID });
     render(
       <MemoryRouter>
         <MobileHeaderPills />
       </MemoryRouter>,
     );
-    expect(screen.queryByTestId("mobile-refresh-all")).toBeNull();
+    expect(screen.queryByTestId("mobile-refresh")).toBeNull();
   });
 
-  it("tapping refresh-all refreshes every feed", async () => {
+  it("tapping refresh on a single feed view refreshes only that feed", async () => {
+    const { refreshFeed, refreshAllFeeds } = await import(
+      "@/core/feeds/feed-service.ts"
+    );
+    vi.mocked(getFeeds).mockResolvedValue({
+      ok: true,
+      value: [feed("f-tech", "Tech Crunchies")],
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <MobileHeaderPills />
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByTestId("mobile-refresh"));
+    expect(refreshFeed).toHaveBeenCalledTimes(1);
+    expect(refreshAllFeeds).not.toHaveBeenCalled();
+  });
+
+  it("tapping refresh on the All-items view refreshes every feed", async () => {
+    useFeedStore.setState({ selectedFeedId: ALL_FEEDS_ID });
     const { refreshAllFeeds } = await import("@/core/feeds/feed-service.ts");
     const user = userEvent.setup();
     render(
@@ -226,17 +249,17 @@ describe("MobileHeaderPills", () => {
         <MobileHeaderPills />
       </MemoryRouter>,
     );
-    await user.click(screen.getByTestId("mobile-refresh-all"));
+    await user.click(screen.getByTestId("mobile-refresh"));
     expect(refreshAllFeeds).toHaveBeenCalled();
   });
 
-  it("disables the refresh-all control while a refresh is in flight", () => {
+  it("disables the refresh control while a refresh is in flight", () => {
     useFeedStore.setState({ isRefreshingAll: true });
     render(
       <MemoryRouter>
         <MobileHeaderPills />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("mobile-refresh-all")).toBeDisabled();
+    expect(screen.getByTestId("mobile-refresh")).toBeDisabled();
   });
 });

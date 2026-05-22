@@ -40,6 +40,19 @@ Feature: Mobile navigation
     And the user can select a different article
     And no automatic navigation occurs
 
+  Rule: An empty stage falls back to the article list
+
+  Scenario: Viewed article disappears from cache
+    Given the user is reading an article on mobile
+    When that article is removed from the loaded set (e.g. the article cache is cleared)
+    Then the user is navigated back to the article list
+    And the reader is not left showing a blank stage
+
+  Scenario: Deeplink to an already-empty feed does not bounce
+    Given the user opens an article URL for a feed that loads no articles
+    Then the user stays on that URL (the reader shows its own empty state)
+    And no automatic back-navigation occurs
+
   Rule: Mobile layout is single-panel
 
   Scenario: Mobile shows one content panel at a time
@@ -89,7 +102,7 @@ Feature: Mobile navigation
 
 | File | Role |
 |------|------|
-| `src/pages/feeds-page.tsx` | Main page component with mobile/desktop layout switching, Back button handler, and auto-select suppression logic |
+| `src/pages/feeds-route.tsx` | Mobile/desktop layout switching, scroll-snap nav, auto-select suppression, and the empty-stage→list fallback (present→absent transition guard) |
 | `src/hooks/use-media-query.ts` | `useIsDesktop()` hook for responsive breakpoint detection |
 | `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = quick-switch favicon dock; open state = full feed list + Refresh/Settings footer |
 | `src/lib/recent-feeds.ts` | Pure `orderFeedsByRecency()` / `recordRecentFeed()` helpers + `MOBILE_DOCK_FEED_CAP` |
@@ -112,6 +125,8 @@ Feature: Mobile navigation
 - **Stack-based navigation** — Mobile navigation follows the standard iOS/Android pattern: Article → Article List → Feed List. This matches user mental models for drill-down interfaces.
 
 - **Auto-select only on feed switch** — Auto-selecting the first article when switching feeds improves UX by showing content immediately. But auto-select is suppressed after Back navigation because the user explicitly wanted to see the article list (to pick a different article).
+
+- **Empty-stage fallback is a transition, not a state** — The reader bounces back to the article list only when the viewed article goes from *present* to *absent* (tracked with `viewedArticlePresentRef`). A deeplink to a feed that simply loads empty is left alone so the reader can show its own empty state — distinguishing "the thing I was reading vanished" from "there was never anything here."
 
 - **Closed drawer is a dock, not a label** — The closed strip previously showed the selected feed's name next to a generic icon, duplicating the header. Since the drawer's job is cross-feed navigation, the closed state now previews *where you can go* — an anchored "All items" plus your most-recently-viewed feed favicons — rather than echoing *where you are*. Recency (`recentFeedIds`) is device-local and never syncs: it's a per-device interaction trail, and metering it server-side would contradict the privacy principles.
 

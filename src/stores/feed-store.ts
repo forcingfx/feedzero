@@ -31,7 +31,13 @@ import { retryFailedFavicons } from "../core/favicon/favicon-cache.ts";
 import { isPaidTierActive } from "../core/features/paid-tier-active.ts";
 import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
 import { isFeatureEnabled, enforceFeature } from "./enforce-feature.ts";
-import { CHANGELOG_FEED_URL, LOCAL_STORAGE, isAggregatedFeedId } from "../utils/constants.ts";
+import {
+  CHANGELOG_FEED_URL,
+  LOCAL_STORAGE,
+  isFolderFeedId,
+  fromFolderFeedId,
+  isAggregatedFeedId,
+} from "../utils/constants.ts";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
 import { recordRecentFeed } from "../lib/recent-feeds.ts";
 import type {
@@ -125,6 +131,15 @@ interface FeedStore {
   reloadSingleFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
+  /**
+   * Refresh only the scope currently being viewed, then reload the article
+   * list so new items appear in place. The header refresh control routes
+   * here so it never silently refreshes feeds the user isn't looking at:
+   *  - concrete feed id     → that feed only
+   *  - folder:<id>          → the folder's member feeds
+   *  - all / starred / filter → every feed (these views aggregate across all)
+   */
+  refreshView: (feedId: string) => Promise<void>;
   refreshSingleFeed: (feedId: string) => Promise<void>;
   createFolder: (name: string) => Promise<void>;
   renameFolder: (folderId: string, name: string) => Promise<void>;
@@ -252,6 +267,30 @@ async function reloadFolders(
 ): Promise<void> {
   const result = await dbGetFolders();
   if (result.ok) set({ folders: sortFoldersByName(result.value) });
+}
+
+/**
+ * Resolve which feeds a scoped refresh should touch, given the id of the
+ * currently-viewed list. `isFullRefresh` distinguishes the aggregated views
+ * (all / starred / filter) — which span every feed and so reuse the batched
+ * `refreshAllFeeds` path — from a folder or single feed, which refresh a
+ * targeted subset and must not reset the all-feeds staleness clock.
+ */
+function resolveRefreshTargets(
+  feeds: Feed[],
+  feedId: string,
+): { targets: Feed[]; isFullRefresh: boolean } {
+  if (isFolderFeedId(feedId)) {
+    const folderId = fromFolderFeedId(feedId);
+    return {
+      targets: feeds.filter((f) => f.folderId === folderId),
+      isFullRefresh: false,
+    };
+  }
+  if (isAggregatedFeedId(feedId)) {
+    return { targets: feeds, isFullRefresh: true };
+  }
+  return { targets: feeds.filter((f) => f.id === feedId), isFullRefresh: false };
 }
 
 /**
@@ -526,6 +565,45 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
     // Fire-and-forget — refreshAll returns once the feeds are fresh,
     // prefetch continues in the background.
+    void schedulePrefetch(get().feeds);
+  },
+
+  refreshView: async (feedId) => {
+    if (get().isRefreshingAll) return;
+    set({ isRefreshingAll: true });
+    retryFailedFavicons();
+    const { targets, isFullRefresh } = resolveRefreshTargets(
+      get().feeds,
+      feedId,
+    );
+    try {
+      if (isFullRefresh) {
+        const syncStore = useSyncStore.getState();
+        if (syncStore.credentials) {
+          await syncStore.pull();
+          await reloadFeeds(set);
+        }
+        await refreshAllFeeds();
+      } else {
+        await Promise.all(targets.map((feed) => refreshFeed(feed)));
+      }
+      await reloadFeeds(set);
+      // Reload the article store so the freshly-fetched items show up in the
+      // open list without the user re-navigating. preloadAll keeps the other
+      // views coherent; loadArticles re-derives the visible list for this one.
+      const articleStore = useArticleStore.getState();
+      await articleStore.preloadAll();
+      await articleStore.loadArticles(feedId);
+      schedulePush();
+    } finally {
+      // A scoped refresh leaves other feeds untouched, so it must not stamp
+      // lastRefreshAllAt — that clock gates the background full auto-refresh.
+      set(
+        isFullRefresh
+          ? { isRefreshingAll: false, lastRefreshAllAt: Date.now() }
+          : { isRefreshingAll: false },
+      );
+    }
     void schedulePrefetch(get().feeds);
   },
 
