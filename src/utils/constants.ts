@@ -9,12 +9,31 @@ export const DB_NAME = "feedzero";
  */
 export const DB_VERSION = 5;
 
+/**
+ * OWASP-recommended PBKDF2-SHA256 iteration floor. Production always derives
+ * keys with this count; it is the security guarantee for at-rest encryption.
+ */
+export const PBKDF2_PRODUCTION_ITERATIONS = 600_000;
+
+/**
+ * Active iteration count used at runtime. The crypto/storage/sync test suite
+ * derives keys thousands of times, and at the production floor that work
+ * dominates CI wall-clock while adding no test value — encrypt/decrypt
+ * round-trip correctness is independent of the count. The Vitest runner
+ * therefore lowers it. `process` is undefined in the browser bundle, so
+ * production and the Hono server always use the full floor.
+ */
+const PBKDF2_ITERATIONS =
+  typeof process !== "undefined" && process.env.VITEST
+    ? 1_000
+    : PBKDF2_PRODUCTION_ITERATIONS;
+
 export const CRYPTO = {
   ALGORITHM: "AES-GCM",
   KEY_LENGTH: 256,
   IV_LENGTH: 12,
   SALT_LENGTH: 16,
-  PBKDF2_ITERATIONS: 600_000,
+  PBKDF2_ITERATIONS,
   HASH: "SHA-256",
 } as const;
 

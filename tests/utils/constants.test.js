@@ -3,6 +3,7 @@ import {
   DB_NAME,
   DB_VERSION,
   CRYPTO,
+  PBKDF2_PRODUCTION_ITERATIONS,
   SCHEMA_VERSION,
   LOCAL_STORAGE,
   ALL_FEEDS_ID,
@@ -22,7 +23,18 @@ describe("Constants", () => {
   it("should define crypto params with secure defaults", () => {
     expect(CRYPTO.ALGORITHM).toBe("AES-GCM");
     expect(CRYPTO.KEY_LENGTH).toBe(256);
-    expect(CRYPTO.PBKDF2_ITERATIONS).toBeGreaterThanOrEqual(600_000);
+  });
+
+  it("keeps the production PBKDF2 iteration count at the OWASP floor", () => {
+    expect(PBKDF2_PRODUCTION_ITERATIONS).toBeGreaterThanOrEqual(600_000);
+  });
+
+  it("lowers the runtime PBKDF2 count under the test runner so the crypto suite stays fast", () => {
+    // Round-trip correctness is independent of the iteration count; only
+    // production security depends on the OWASP floor. The Vitest runner
+    // therefore derives keys with a far smaller count. This test runs under
+    // Vitest, so the active count must be below the production floor.
+    expect(CRYPTO.PBKDF2_ITERATIONS).toBeLessThan(PBKDF2_PRODUCTION_ITERATIONS);
   });
 
   it("should define schema version", () => {

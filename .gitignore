@@ -2,6 +2,7 @@ node_modules/
 dist/
 extension/dist/
 coverage/
+.vitest-reports/
 .env
 .env.*
 !.env.example
