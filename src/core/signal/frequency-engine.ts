@@ -2,29 +2,36 @@
  * Frequency engine for the Signal surface.
  *
  * Pure-function, deterministic, no LLM, no Worker. Given the user's
- * stored articles and feeds, produces a ranked list of topics — terms
- * appearing across multiple feeds in the chosen recency window — with
- * the articles assigned to each.
+ * stored articles and feeds, produces a ranked list of topics — proper
+ * nouns and compound nouns appearing across multiple feeds in the chosen
+ * recency window — with the stories (multi-outlet article groups) assigned
+ * to each.
  *
  * Algorithm:
  *  1. Pick the smallest window with enough articles (7d → 14d → 30d → all).
- *  2. Dedupe near-identical syndicated articles by normalized title.
- *  3. Tokenize title + body (HTML stripped) with light stemming and
- *     stopword + feed-noise filtering.
- *  4. Score each term by `distinctArticles * log(1 + distinctFeeds)`,
- *     keeping only terms that appear in ≥2 articles AND ≥2 feeds.
- *  5. Greedy-cluster: highest-scoring term claims every article that
- *     mentions it, up to a per-topic cap so a single dominant term
- *     can't swallow the whole page.
- *  6. Within each topic, order articles most-recent first.
+ *  2. Group byte-identical syndicated articles by normalized title, keeping
+ *     a representative per story plus its cross-feed members.
+ *  3. Extract named entities (proper/compound nouns) from each
+ *     representative via capitalization consensus — no common nouns.
+ *  4. Score each entity by `distinctArticles * log(1 + distinctFeeds)`,
+ *     boosted for multi-word compounds, keeping only entities in ≥2
+ *     articles AND ≥2 feeds.
+ *  5. Greedy-cluster: highest-scoring entity claims every representative
+ *     that mentions it, up to a per-topic cap so a single dominant entity
+ *     can't swallow the page.
+ *  6. Within each topic, merge representatives into stories (same/similar
+ *     headline) so the UI can show "covered by N outlets".
  *
- * All sorts use total-ordered tiebreaks so the output is deterministic
- * for a given input — the 24h cache in the store depends on this.
+ * All sorts use total-ordered tiebreaks so the output is deterministic for
+ * a given input — the 24h cache in the store depends on this.
  */
 
-import { tokenize } from "./tokenize.ts";
+import { buildLexicon, extractEntities } from "./entities.ts";
+import { groupIntoStories } from "./stories.ts";
 import {
+  PHRASE_BOOST,
   SIGNAL_MIN_PER_WINDOW,
+  SIGNAL_REPORT_SCHEMA_VERSION,
   SIGNAL_TOPIC_STORE_CAP,
   SIGNAL_TOPIC_TARGET,
   SIGNAL_WINDOWS,
@@ -58,20 +65,23 @@ export function generateReport(
 ): Result<SignalReport> {
   const corpusSize = articles.length;
   const { window, inWindow } = pickWindow(articles, now);
-  const deduped = dedupeByTitle(inWindow);
-  const tokenized = deduped.map((article) => ({
+  const { reps, members } = groupExactDuplicates(inWindow);
+
+  const lexicon = buildLexicon(reps);
+  const tokenized = reps.map((article) => ({
     article,
-    tokens: new Set(allTokens(article)),
+    occurrences: extractEntities(article, lexicon),
   }));
 
   const feedsInWindow = new Set(inWindow.map((a) => a.feedId)).size;
 
   const termIndex = buildIndex(tokenized);
   const ranked = scoreTerms(termIndex);
-  const cap = Math.max(2, Math.ceil(deduped.length / SIGNAL_TOPIC_TARGET) + 5);
-  const topics = clusterGreedy(ranked, tokenized, cap);
+  const cap = Math.max(2, Math.ceil(reps.length / SIGNAL_TOPIC_TARGET) + 5);
+  const topics = clusterGreedy(ranked, tokenized, members, cap);
 
   return ok({
+    schemaVersion: SIGNAL_REPORT_SCHEMA_VERSION,
     topics,
     window,
     corpusSize,
@@ -83,15 +93,15 @@ export function generateReport(
 
 interface TokenizedArticle {
   article: Article;
-  tokens: Set<string>;
+  occurrences: ReturnType<typeof extractEntities>;
 }
 
 interface TermEntry {
   articleIds: Set<string>;
   feedIds: Set<string>;
+  words: number;
+  casings: Map<string, number>;
 }
-
-const WORD_BOUNDARY = /[^\p{L}\p{N}]+/u;
 
 /**
  * Pick the smallest window with enough articles to run on. Exported so
@@ -115,43 +125,72 @@ export function pickWindow(
   return { window: "all", inWindow: articles };
 }
 
-function dedupeByTitle(articles: Article[]): Article[] {
-  const seen = new Map<string, Article>();
+/**
+ * Group byte-identical syndicated articles by normalized title. Returns a
+ * representative (most recent) per story for scoring/clustering, plus a
+ * map from the representative's id to every member sharing its title — so
+ * a topic can later show how many outlets ran the story.
+ */
+function groupExactDuplicates(articles: Article[]): {
+  reps: Article[];
+  members: Map<string, Article[]>;
+} {
+  const byKey = new Map<string, Article[]>();
+  const standalone: Article[] = [];
   for (const article of articles) {
     const key = normalizeTitle(article.title);
     if (!key) {
-      seen.set(article.id, article);
+      standalone.push(article);
       continue;
     }
-    const existing = seen.get(key);
-    if (!existing || article.publishedAt > existing.publishedAt) {
-      seen.set(key, article);
-    }
+    const group = byKey.get(key);
+    if (group) group.push(article);
+    else byKey.set(key, [article]);
   }
-  return Array.from(seen.values());
+
+  const reps: Article[] = [];
+  const members = new Map<string, Article[]>();
+  for (const group of byKey.values()) {
+    const rep = mostRecent(group);
+    reps.push(rep);
+    members.set(rep.id, group);
+  }
+  for (const article of standalone) {
+    reps.push(article);
+    members.set(article.id, [article]);
+  }
+  return { reps, members };
+}
+
+function mostRecent(group: Article[]): Article {
+  return group.reduce((best, a) =>
+    a.publishedAt > best.publishedAt ||
+    (a.publishedAt === best.publishedAt && a.id < best.id)
+      ? a
+      : best,
+  );
 }
 
 function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function allTokens(article: Article): string[] {
-  const titleTokens = tokenize(article.title);
-  const bodyTokens = tokenize(article.content || article.summary || "");
-  return titleTokens.concat(bodyTokens);
-}
-
 function buildIndex(tokenized: TokenizedArticle[]): Map<string, TermEntry> {
   const index = new Map<string, TermEntry>();
-  for (const { article, tokens } of tokenized) {
-    for (const term of tokens) {
-      let entry = index.get(term);
+  for (const { article, occurrences } of tokenized) {
+    const seen = new Set<string>();
+    for (const occ of occurrences) {
+      let entry = index.get(occ.key);
       if (!entry) {
-        entry = { articleIds: new Set(), feedIds: new Set() };
-        index.set(term, entry);
+        entry = { articleIds: new Set(), feedIds: new Set(), words: occ.words, casings: new Map() };
+        index.set(occ.key, entry);
       }
-      entry.articleIds.add(article.id);
-      entry.feedIds.add(article.feedId);
+      entry.casings.set(occ.display, (entry.casings.get(occ.display) ?? 0) + 1);
+      if (!seen.has(occ.key)) {
+        entry.articleIds.add(article.id);
+        entry.feedIds.add(article.feedId);
+        seen.add(occ.key);
+      }
     }
   }
   return index;
@@ -159,6 +198,7 @@ function buildIndex(tokenized: TokenizedArticle[]): Map<string, TermEntry> {
 
 interface RankedTerm {
   term: string;
+  displayTerm: string;
   signal: number;
   articleIds: Set<string>;
   feedCount: number;
@@ -169,9 +209,11 @@ function scoreTerms(index: Map<string, TermEntry>): RankedTerm[] {
   for (const [term, entry] of index) {
     if (entry.articleIds.size < 2) continue;
     if (entry.feedIds.size < 2) continue;
-    const signal = entry.articleIds.size * Math.log(1 + entry.feedIds.size);
+    const base = entry.articleIds.size * Math.log(1 + entry.feedIds.size);
+    const signal = base * (1 + PHRASE_BOOST * (entry.words - 1));
     out.push({
       term,
+      displayTerm: pickDisplay(entry.casings, term),
       signal,
       articleIds: entry.articleIds,
       feedCount: entry.feedIds.size,
@@ -182,26 +224,10 @@ function scoreTerms(index: Map<string, TermEntry>): RankedTerm[] {
   return out;
 }
 
-/**
- * Recover the most common original casing of a stem from the articles
- * actually assigned to the cluster. Runs once per surfaced topic
- * (~10 per report) rather than once per indexed term — cheaper and
- * avoids the `ies → y` blind spot of a prefix-match on every term.
- */
-function pickDisplayTerm(term: string, articles: Article[]): string {
-  const histogram = new Map<string, number>();
-  for (const article of articles) {
-    const text = article.title + " " + (article.content || article.summary || "");
-    for (const word of text.split(WORD_BOUNDARY)) {
-      if (!word) continue;
-      if (word.toLowerCase().startsWith(term)) {
-        histogram.set(word, (histogram.get(word) ?? 0) + 1);
-      }
-    }
-  }
-  let best = term;
-  let bestCount = 0;
-  for (const [casing, count] of histogram) {
+function pickDisplay(casings: Map<string, number>, fallback: string): string {
+  let best = fallback;
+  let bestCount = -1;
+  for (const [casing, count] of casings) {
     if (count > bestCount || (count === bestCount && casing < best)) {
       best = casing;
       bestCount = count;
@@ -213,9 +239,10 @@ function pickDisplayTerm(term: string, articles: Article[]): string {
 function clusterGreedy(
   ranked: RankedTerm[],
   tokenized: TokenizedArticle[],
+  members: Map<string, Article[]>,
   cap: number,
 ): Topic[] {
-  const articleById = new Map(tokenized.map((t) => [t.article.id, t]));
+  const articleById = new Map(tokenized.map((t) => [t.article.id, t.article]));
   const claimed = new Set<string>();
   const topics: Topic[] = [];
 
@@ -225,42 +252,43 @@ function clusterGreedy(
     const candidates: Article[] = [];
     for (const articleId of term.articleIds) {
       if (claimed.has(articleId)) continue;
-      const tok = articleById.get(articleId);
-      if (!tok) continue;
-      candidates.push(tok.article);
+      const article = articleById.get(articleId);
+      if (!article) continue;
+      candidates.push(article);
     }
     if (candidates.length < 2) continue;
 
-    // Bleed-over guard: if most of this term's articles were already
-    // claimed by a higher-signal cluster, this term is just a fragment
-    // of that cluster (e.g. "ship" surviving after "OpenAI" claims
-    // every "OpenAI ships X" article). Demand ≥50% of the term's
-    // original article set survive the peel-off.
+    // Bleed-over guard: if most of this entity's articles were already
+    // claimed by a higher-signal cluster (typically the compound that
+    // contains it — "Iran War" claiming the "Iran" articles), this entity
+    // is a fragment, not its own topic. Demand ≥50% survive the peel-off.
     if (candidates.length * 2 < originalSize) continue;
 
-    // Cross-feed check on remaining candidates: the cluster only counts
-    // if it still spans ≥2 feeds after greedy claiming peels off articles
-    // claimed by stronger terms.
     const feedIds = new Set(candidates.map((a) => a.feedId));
     if (feedIds.size < 2) continue;
 
-    // Most-recent first within the topic. Stable tiebreak by article id.
+    // Claim representatives most-recent first so the per-topic cap keeps
+    // the freshest stories. Stable tiebreak by id.
     candidates.sort((a, b) =>
       (b.publishedAt - a.publishedAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
     );
-    // Claim up to `cap` articles so a co-occurring term (e.g. "ship" in
-    // "OpenAI ships X") can't pick up the leftovers and form a near-
-    // duplicate cluster. Render limit is enforced separately via
-    // SIGNAL_ARTICLES_PER_TOPIC when the topic is consumed.
     const claimedHere = candidates.slice(0, cap);
     for (const article of claimedHere) claimed.add(article.id);
 
+    const stories = groupIntoStories(claimedHere, members);
+    const allMembers = stories.reduce((n, s) => n + s.articleIds.length, 0);
+    const topicFeeds = new Set<string>();
+    for (const article of claimedHere) {
+      for (const m of members.get(article.id) ?? [article]) topicFeeds.add(m.feedId);
+    }
+
     topics.push({
       term: term.term,
-      displayTerm: pickDisplayTerm(term.term, claimedHere),
-      articleIds: claimedHere.slice(0, SIGNAL_TOPIC_STORE_CAP).map((a) => a.id),
-      totalArticlesInCluster: claimedHere.length,
-      feedCount: feedIds.size,
+      displayTerm: term.displayTerm,
+      stories: stories.slice(0, SIGNAL_TOPIC_STORE_CAP),
+      totalStories: stories.length,
+      totalArticlesInCluster: allMembers,
+      feedCount: topicFeeds.size,
     });
   }
 

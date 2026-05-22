@@ -12,6 +12,7 @@ import {
   type WindowChoice,
 } from "@/core/signal/types.ts";
 import { Button } from "@/components/ui/button.tsx";
+import { StoryRow } from "@/components/signal/story-row.tsx";
 import { formatRelative } from "@/lib/format-relative.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
@@ -234,13 +235,11 @@ function TopicBlock({
   feedMap: Map<string, Feed>;
   now: number;
 }) {
-  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
-  const allArticles = topic.articleIds
-    .map((id) => articleMap.get(id))
-    .filter((a): a is Article => a !== undefined);
-  const visible = expanded ? allArticles : allArticles.slice(0, SIGNAL_ARTICLES_PER_TOPIC);
-  const hiddenCount = topic.totalArticlesInCluster - visible.length;
+  const visible = expanded
+    ? topic.stories
+    : topic.stories.slice(0, SIGNAL_ARTICLES_PER_TOPIC);
+  const hiddenCount = topic.totalStories - visible.length;
 
   return (
     <section>
@@ -251,25 +250,15 @@ function TopicBlock({
         </p>
       </header>
       <ul className="divide-y divide-border">
-        {visible.map((article) => {
-          const feed = feedMap.get(article.feedId);
-          return (
-            <li key={article.id}>
-              <button
-                type="button"
-                onClick={() => navigate(`/feeds/${article.feedId}/articles/${article.id}`)}
-                className="flex w-full flex-col gap-1 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
-              >
-                <span className="text-sm text-foreground">{article.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {feed?.title ?? "Unknown feed"}
-                  {" · "}
-                  {formatRelative(article.publishedAt, now)}
-                </span>
-              </button>
-            </li>
-          );
-        })}
+        {visible.map((story) => (
+          <StoryRow
+            key={story.id}
+            story={story}
+            articleMap={articleMap}
+            feedMap={feedMap}
+            now={now}
+          />
+        ))}
       </ul>
       {hiddenCount > 0 && !expanded ? (
         <button
