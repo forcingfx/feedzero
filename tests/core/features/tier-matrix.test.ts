@@ -77,6 +77,11 @@ describe("tier-matrix — currently shipped gated features", () => {
     expect(getRequiredTier("filters")).toBe("personal");
   });
 
+  it("bridges is Personal+, shipped", () => {
+    expect(getEntry("bridges").status).toBe("shipped");
+    expect(getRequiredTier("bridges")).toBe("personal");
+  });
+
   it("offline-prefetch is Personal+, shipped", () => {
     expect(getEntry("offline-prefetch").status).toBe("shipped");
     expect(getRequiredTier("offline-prefetch")).toBe("personal");
@@ -101,7 +106,6 @@ describe("tier-matrix — coming-soon features", () => {
     "search",
     "authenticated-fetchers",
     "send-to-kindle",
-    "bridges",
     "themes-commercial",
   ] as const)("%s is Pro-tier, coming-soon", (id) => {
     const entry = getEntry(id);

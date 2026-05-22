@@ -8,6 +8,7 @@ import {
   findFeedLinksInAnchors,
 } from "./strategies.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
+import { resolveBridgeFeedUrl } from "../bridges/index.ts";
 
 interface DiscoveryResult extends ParseResult {
   feedUrl: string;
@@ -46,14 +47,29 @@ async function tryCandidates(urls: string[]): Promise<DiscoveryResult | null> {
  * Discover a feed from a website URL using a multi-strategy cascade.
  *
  * Strategies (in order):
+ * 0. Bridges — non-RSS sources (YouTube/Reddit/Mastodon/GitHub) mapped to
+ *    their native feed URL. Only run when `options.bridges` is true (the
+ *    caller resolves the Personal-tier gate). Runs before the page fetch so
+ *    a recognised source resolves without scraping the landing page.
  * 1. HTML <link rel="alternate"> autodiscovery
  * 2. Well-known feed paths (/feed, /rss, /atom.xml, etc.)
  * 3. Anchor link scanning for feed-like URLs
  */
 export async function discoverFeed(
   url: string,
+  options?: { bridges?: boolean },
 ): Promise<Result<DiscoveryResult>> {
   try {
+    // Strategy 0: bridges. The candidate is validated by tryParseFeed, so a
+    // wrong guess falls through to the page-based strategies below.
+    if (options?.bridges) {
+      const bridged = await resolveBridgeFeedUrl(url);
+      if (bridged) {
+        const fromBridge = await tryParseFeed(bridged);
+        if (fromBridge) return ok(fromBridge);
+      }
+    }
+
     // Fetch the page HTML (reused for strategies 1 and 3)
     const pageResponse = await proxyFetch("/api/page", url);
     if (!pageResponse.ok) {

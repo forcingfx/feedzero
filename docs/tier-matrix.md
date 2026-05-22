@@ -58,7 +58,7 @@ Legend:
 |---|---|---|---|---|
 | **Authenticated fetchers** — Fetch feeds behind HTTP basic auth, cookies, or signed URLs (Patreon, paywalled newsletters). | — | — | ✓ | Coming soon |
 | **Send to Kindle** — One-click delivery of an article to your Kindle email address. | — | — | ✓ | Coming soon |
-| **Bridges** — Adapters that turn non-RSS sources (YouTube channels, Reddit, Mastodon) into feeds. | — | — | ✓ | Coming soon |
+| **Bridges** — Turn non-RSS sources (YouTube channels, Reddit, Mastodon, GitHub repos) into feeds by mapping them to the native feed URL each already publishes. | — | ✓ | ✓ | Shipped |
 
 ## Appearance
 
