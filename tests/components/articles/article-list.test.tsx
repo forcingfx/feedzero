@@ -13,6 +13,7 @@ import {
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   updateArticle: vi.fn().mockResolvedValue({ ok: true, value: true }),
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getFeed: vi.fn(),
@@ -85,6 +86,71 @@ describe("ArticleList", () => {
     expect(
       screen.getByText("Select a feed to view articles."),
     ).toBeInTheDocument();
+  });
+
+  it("offers a prominent refresh path when the selected feed has no articles", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("f1", "Feed 1")],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    render(<ArticleList />);
+
+    expect(screen.getByTestId("empty-refresh")).toBeInTheDocument();
+  });
+
+  it("does not show the refresh path while the feed is still loading", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("f1", "Feed 1")],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: true,
+    });
+
+    render(<ArticleList />);
+
+    expect(screen.queryByTestId("empty-refresh")).toBeNull();
+  });
+
+  it("tapping the empty-state refresh refreshes the current feed", async () => {
+    const { refreshFeed } = await import("@/core/feeds/feed-service.ts");
+    const { getFeed } = await import("@/core/storage/db.ts");
+    const f1 = mockFeed("f1", "Feed 1");
+    vi.mocked(getFeed).mockResolvedValue({ ok: true, value: f1 });
+    vi.mocked(refreshFeed).mockResolvedValue({
+      ok: true,
+      value: { newCount: 0, updatedCount: 0 },
+    });
+    useFeedStore.setState({
+      feeds: [f1],
+      selectedFeedId: "f1",
+      isRefreshingAll: false,
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
+    });
+    const user = userEvent.setup();
+
+    render(<ArticleList />);
+    await user.click(screen.getByTestId("empty-refresh"));
+
+    expect(refreshFeed).toHaveBeenCalledWith(f1);
   });
 
   it("never renders a Load more button — the display cap has been removed", () => {

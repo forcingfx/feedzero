@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { CheckCheck } from "lucide-react";
+import { CheckCheck, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -66,6 +67,7 @@ function isItemVisible(scrollEl: HTMLElement, articleId: string): boolean {
 
 export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
+  const isRefreshing = useFeedStore((s) => s.isRefreshingAll);
   const feeds = useFeedStore((s) => s.feeds);
   const articles = useArticleStore((s) => s.articles);
   const selectedArticle = useArticleStore((s) => s.selectedArticle);
@@ -229,13 +231,14 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   }
 
   if (articles.length === 0) {
-    return isLoading ? (
-      <div ref={scrollRef} className="h-full overflow-y-auto" />
-    ) : (
+    // Show the blank placeholder only during the initial silent load. Once a
+    // load settles with nothing — or while a user-initiated refresh runs — the
+    // empty state with its refresh affordance stays put so the user has a
+    // prominent way to pull this feed/folder/filter again.
+    const showBlank = isLoading && !isRefreshing;
+    return (
       <div ref={scrollRef} className="h-full overflow-y-auto">
-        <div className="p-2 text-muted-foreground text-sm">
-          No articles found.
-        </div>
+        {showBlank ? null : <EmptyArticleList feedId={selectedFeedId} />}
       </div>
     );
   }
@@ -307,6 +310,34 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
         })}
       </ul>
       <MarkReadPill unreadCount={unreadCount} onMarkAll={markAllAsRead} />
+    </div>
+  );
+}
+
+/**
+ * Empty-list state. An empty feed is most often a feed that just hasn't been
+ * fetched yet (or one whose cache was cleared), so the primary action is to
+ * refresh — scoped to whatever the user is viewing via `refreshView`.
+ */
+function EmptyArticleList({ feedId }: { feedId: string }) {
+  const refreshView = useFeedStore((s) => s.refreshView);
+  const isRefreshing = useFeedStore((s) => s.isRefreshingAll);
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+      <p className="text-sm text-muted-foreground">
+        No articles here yet.
+      </p>
+      <Button
+        data-testid="empty-refresh"
+        variant="secondary"
+        size="sm"
+        disabled={isRefreshing}
+        onClick={() => void refreshView(feedId)}
+      >
+        <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} />
+        {isRefreshing ? "Refreshing…" : "Refresh"}
+      </Button>
     </div>
   );
 }
