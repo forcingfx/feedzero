@@ -227,6 +227,21 @@ describe("SignalPage", () => {
     await waitFor(() => expect(screen.getByText("READER")).toBeInTheDocument());
   });
 
+  it("on mobile, the preview sheet clears the iOS home indicator and rounds its top", async () => {
+    mockViewport(false);
+    seedReadyCorpus();
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText("OpenAI ships a release"));
+    await screen.findByRole("button", { name: /open in reader/i });
+    const sheet = document.querySelector('[data-slot="sheet-content"]');
+    expect(sheet).not.toBeNull();
+    expect(sheet!.className).toContain("rounded-t-2xl");
+    expect(sheet!.className).toContain("pb-[calc(env(safe-area-inset-bottom)+1.5rem)]");
+  });
+
   it("Refresh button bypasses the cache", async () => {
     seedReadyCorpus();
     renderAt();

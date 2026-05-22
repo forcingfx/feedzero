@@ -162,7 +162,8 @@ Feature: Signal — cross-feed topic surface
 | `tests/core/signal/frequency-engine-window.test.ts` | Adaptive window picks the smallest with ≥50 articles, falls back to "all" when every window is sparse. |
 | `tests/core/signal/frequency-engine-edge.test.ts` | Common nouns never anchor a topic, syndicated story collapses to one multi-outlet story, single-feed corpus → empty, body-only entity detection, deterministic across input order, non-English does not crash, dominant-entity cap. |
 | `tests/stores/signal-store.test.ts` | Locked / loading / ready transitions, empty-ready handling, cache TTL hit, force-reload bypasses cache, window change invalidates cache, ±10% corpus drift invalidates cache, persistence across state reset. |
-| `tests/pages/signal-page.test.tsx` | Locked tile, empty-ready message, entity topic heading + story rows, multi-outlet badge + expand, desktop click → reader, mobile tap → preview → reader, Refresh re-runs, cache priming, schema-version invalidation. |
+| `tests/pages/signal-page.test.tsx` | Locked tile, empty-ready message, entity topic heading + story rows, multi-outlet badge + expand, desktop click → reader, mobile tap → preview → reader, mobile sheet safe-area clearance, Refresh re-runs, cache priming, schema-version invalidation. |
+| `tests/components/signal/article-preview.test.tsx` | Feed-content head, summary fallback, persisted/cached extraction fallback, explicit "Load preview" affordance, loading + failed states. |
 | `tests/e2e/signal.spec.ts` | Sidebar Sparkles entry navigates to `/signal`, locked tile renders with the gate copy when the corpus is empty. |
 | `tests/core/features/tier-matrix.test.ts` | `signal` is shipped, Personal+ available, Free unavailable; round-trips through `GATED_FEATURE_IDS`. |
 
@@ -210,8 +211,16 @@ Feature: Signal — cross-feed topic surface
   syndication volume doesn't distort cluster strength.
 - **Peek before read.** A topic row is a triage surface, not a destination.
   Hover (desktop) / tap (mobile) shows a teaser; the click commits to the
-  reader. Reusing `ArticleContent`, `HoverCard`, and `Sheet` keeps it to one
-  small component with no new primitives beyond the HoverCard wrapper.
+  reader. Reusing `HoverCard` and `Sheet` keeps it to one small component
+  plus the HoverCard wrapper. The mobile bottom sheet rounds its top and pads
+  `env(safe-area-inset-bottom)` so it clears the iOS home indicator.
+- **The preview degrades gracefully when the feed body is absent.** The sync
+  vault strips `content`/`summary` to stay small (`sync-service.ts`), so a
+  synced article has no feed body. The teaser falls back through
+  `content → summary → extractedContent → extraction-store cache`; when all
+  are empty it offers an explicit "Load preview" button. Fetching is never
+  automatic — a hover must not hit the network — so the network call only
+  fires on a deliberate tap, matching the privacy contract.
 - **Cross-feed diversity is the signal.** Score = `articles × log(1 + feeds)`.
   Multiplying by log-feeds means a story appearing in 10 outlets
   outranks one outlet posting 10 times, which matches the

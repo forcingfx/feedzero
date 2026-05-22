@@ -132,7 +132,10 @@ function PreviewLink({
         {children}
       </button>
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto p-4">
+        <SheetContent
+          side="bottom"
+          className="max-h-[85vh] overflow-y-auto rounded-t-2xl p-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]"
+        >
           <SheetTitle className="sr-only">Article preview</SheetTitle>
           <SheetDescription className="sr-only">
             Peek at this article and open it in the reader.
