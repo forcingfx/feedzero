@@ -1,5 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { Rss } from "lucide-react";
+import {
+  getFaviconGeneration,
+  getFaviconStrategyIndex,
+  recordFaviconFailure,
+  recordFaviconSuccess,
+  subscribeFaviconCache,
+} from "@/core/favicon/favicon-cache.ts";
 
 interface FeedFaviconProps {
   siteUrl: string;
@@ -30,103 +37,41 @@ const STRATEGIES: FaviconStrategy[] = [
   { type: "path", path: "/apple-touch-icon.png" },
 ];
 
-const STORAGE_KEY = "feedzero:favicon-cache";
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days for successful
-const FAILURE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours for failures
-
-interface CacheEntry {
-  index: number;
-  ts: number;
-}
-
-/**
- * Persistent favicon cache: origin → { index, ts }.
- * Loaded from localStorage on startup, written back on every resolution.
- * Failed entries (index === -1) expire after 24 hours to allow retry.
- */
-const resolvedCache: Map<string, CacheEntry> = (() => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return new Map();
-    const entries: [string, number | CacheEntry][] = JSON.parse(stored);
-    const now = Date.now();
-    const map = new Map<string, CacheEntry>();
-    for (const [key, val] of entries) {
-      // Migrate legacy format (plain number) to new format
-      const entry: CacheEntry =
-        typeof val === "number" ? { index: val, ts: now } : val;
-      // Skip expired entries (failures: 24h, successes: 7d)
-      const ttl = entry.index < 0 ? FAILURE_TTL_MS : CACHE_TTL_MS;
-      if (now - entry.ts > ttl) continue;
-      map.set(key, entry);
-    }
-    return map;
-  } catch {
-    // localStorage unavailable or corrupt
-    return new Map();
-  }
-})();
-
-function persistCache() {
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(Array.from(resolvedCache.entries())),
-    );
-  } catch {
-    // localStorage unavailable
-  }
-}
-
-/** Clear the favicon cache (used by tests). */
-export function clearFaviconCache() {
-  resolvedCache.clear();
-}
-
-/** Remove failed entries so they retry on next render. */
-export function retryFailedFavicons() {
-  let changed = false;
-  for (const [key, entry] of resolvedCache) {
-    if (entry.index < 0) {
-      resolvedCache.delete(key);
-      changed = true;
-    }
-  }
-  if (changed) persistCache();
-}
-
-/** Inject a cache entry directly (used by tests). */
-export function setFaviconCacheEntry(
-  origin: string,
-  index: number,
-  ts: number,
-) {
-  resolvedCache.set(origin, { index, ts });
-}
-
 /** Displays a feed's favicon with fallback chain, proxied through /api/icon. */
 export function FeedFavicon({
   siteUrl,
   className = "size-4",
   avatar = false,
 }: FeedFaviconProps) {
-  let origin: string;
-  try {
-    origin = new URL(siteUrl).origin;
-  } catch {
-    return <Rss className={`${className} text-muted-foreground shrink-0`} />;
+  const origin = useMemo(() => {
+    try {
+      return new URL(siteUrl).origin;
+    } catch {
+      return null;
+    }
+  }, [siteUrl]);
+
+  // A refresh clears failed favicons and bumps the generation; re-evaluating
+  // here lets favicons already on screen re-attempt, not just newly mounted ones.
+  const generation = useSyncExternalStore(
+    subscribeFaviconCache,
+    getFaviconGeneration,
+    getFaviconGeneration,
+  );
+
+  const [pathIndex, setPathIndex] = useState(() =>
+    origin ? getFaviconStrategyIndex(origin) : 0,
+  );
+  const [loaded, setLoaded] = useState(false);
+  const [seenGeneration, setSeenGeneration] = useState(generation);
+
+  if (seenGeneration !== generation) {
+    setSeenGeneration(generation);
+    setPathIndex(origin ? getFaviconStrategyIndex(origin) : 0);
+    setLoaded(false);
   }
 
-  const cached = resolvedCache.get(origin);
-  const isExpired =
-    cached !== undefined &&
-    Date.now() - cached.ts > (cached.index < 0 ? FAILURE_TTL_MS : CACHE_TTL_MS);
-  const initialIndex =
-    cached !== undefined && !isExpired ? cached.index : 0;
-  const [pathIndex, setPathIndex] = useState(initialIndex);
-  const [loaded, setLoaded] = useState(false);
-
-  if (!siteUrl || pathIndex < 0 || pathIndex >= STRATEGIES.length) {
+  if (!origin || pathIndex < 0 || pathIndex >= STRATEGIES.length) {
     return <Rss className={`${className} text-muted-foreground shrink-0`} />;
   }
 
@@ -150,8 +95,7 @@ export function FeedFavicon({
             : "rounded-sm ring-1 ring-border/50"
         } ${loaded ? "" : "hidden"}`}
         onLoad={() => {
-          resolvedCache.set(origin, { index: pathIndex, ts: Date.now() });
-          persistCache();
+          recordFaviconSuccess(origin, pathIndex);
           setLoaded(true);
         }}
         onError={() => {
@@ -160,8 +104,7 @@ export function FeedFavicon({
             setPathIndex(next);
             setLoaded(false);
           } else {
-            resolvedCache.set(origin, { index: -1, ts: Date.now() });
-            persistCache();
+            recordFaviconFailure(origin);
             setPathIndex(-1);
           }
         }}
