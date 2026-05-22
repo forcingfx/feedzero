@@ -63,6 +63,15 @@ Feature: Zero-knowledge cloud sync
     And then refreshes all feeds (including newly imported ones)
     And pushes the updated vault back to the server
 
+  Scenario: Unpushed local change survives a reload
+    Given a sync-enabled user who renamed a feed
+    And the 5s debounced push has not fired yet
+    When they reload the app (dropping the in-memory debounce timer)
+    Then a persisted "pending push" marker records the unsynced change
+    And the next pull() flushes that change to the server BEFORE importVault
+    And the rename is preserved instead of being reverted to the cloud copy
+    And if the flush cannot reach the server, the pull aborts (local kept)
+
   Scenario: Local-only user enables sync later
     Given a local-only user
     When they click Enable sync in the Data & Storage dialog
@@ -133,11 +142,11 @@ Same passphrase always produces same vault ID and same encryption key. No extern
 ### Flow
 
 1. **Push**: `exportAll()` from IndexedDB -> serialize to `VaultData` -> `encryptVault()` with AES-GCM-256 -> PUT `/api/sync` with vault ID + ciphertext
-2. **Pull**: GET `/api/sync?vaultId=<hex>` -> `decryptVault()` -> `importAll()` into IndexedDB. `importAll`'s clear+bulkPut runs in a single Dexie `rw` transaction so concurrent callers serialize at the storage layer and never expose the mid-clear empty state.
+2. **Pull**: GET `/api/sync?vaultId=<hex>` -> `decryptVault()` -> `importAll()` into IndexedDB. `importAll`'s clear+bulkPut runs in a single Dexie `rw` transaction so concurrent callers serialize at the storage layer and never expose the mid-clear empty state. **Flush-before-import:** if a `feedzero:sync-pending-push` marker is set (a local change whose debounced push never fired — e.g. a rename made just before a reload dropped the timer), `pull()` pushes local to the server first, then imports. Otherwise `importAll`'s replace-all would silently revert the unsynced change to the stale cloud copy. A failed flush aborts the pull (local data is kept).
 3. **Delete**: DELETE `/api/sync?vaultId=<hex>` -> removes encrypted blob from server
 4. **Startup (sync user)**: `initializeReturningUser` awaits the initial `pull()` before flipping `isDbReady=true`. This makes `AppInit`'s `isDbReady` effect run on settled state; no race between init's pull and the boot-time loadFeeds. Also: concurrent `pull()` callers share a single in-flight promise (sync-store's `inFlightPull`), and the boot effect skips `refreshAll` for sync users since init's pull already brought in cloud state.
 5. **Refresh all (sync user)**: Pull vault -> reload feeds from DB -> refresh all feeds -> reload feeds -> push
-6. **After mutations**: Debounced push (5s after last change)
+6. **After mutations**: Set the `sync-pending-push` marker, then debounced push (5s after last change). The marker outlives a reload that drops the timer; a successful push clears it.
 7. **Disable sync**: Delete server vault -> clear localStorage keys -> reset store to local-only
 8. **Logout**: Delete local DB -> clear all localStorage keys -> reset to onboarding (cloud vault preserved)
 9. **Check vault exists**: HEAD `/api/sync?vaultId=<hex>` -> returns true if 200, false if 404
@@ -210,7 +219,7 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 
 ## Limitations
 
-- No conflict resolution — last push wins
+- No conflict resolution — last push wins. The `sync-pending-push` flush makes "this device has the freshest local change" win over a stale cloud copy on pull, but a genuine cross-device conflict (both sides edited the same feed since the last sync) still resolves last-push-wins.
 - No incremental sync — full vault transferred each time
 - Vault size limited to 5MB
 - No passphrase change/rotation flow yet

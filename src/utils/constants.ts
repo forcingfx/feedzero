@@ -159,6 +159,11 @@ export const LOCAL_STORAGE = {
    *  is per-device and never syncs); drives the mobile drawer quick-switch
    *  dock. */
   RECENT_FEED_IDS: "feedzero:recent-feed-ids",
+  /** Set when a local change has been persisted but its debounced cloud
+   *  push hasn't fired yet. Survives a tab reload (which drops the
+   *  in-memory debounce timer) so the next pull() can flush the change to
+   *  the cloud before importVault would otherwise overwrite it. */
+  SYNC_PENDING_PUSH: "feedzero:sync-pending-push",
 } as const;
 
 /**
