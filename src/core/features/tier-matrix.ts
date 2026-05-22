@@ -300,10 +300,10 @@ export const TIER_MATRIX = {
     id: "bridges",
     name: "Bridges",
     description:
-      "Adapters that turn non-RSS sources (YouTube channels, Reddit, Mastodon) into feeds.",
+      "Turn non-RSS sources (YouTube channels, Reddit, Mastodon, GitHub repos) into feeds by mapping them to the native feed URL each already publishes.",
     category: "delivery",
-    status: "coming-soon",
-    tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
+    status: "shipped",
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
   },
 
   // ── Appearance ─────────────────────────────────────────────────────────

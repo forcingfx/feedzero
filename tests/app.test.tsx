@@ -214,7 +214,10 @@ describe("App sync-aware init", () => {
     });
 
     await waitFor(() => {
-      expect(addFeedFlow).toHaveBeenCalledWith(CHANGELOG_FEED_URL);
+      expect(addFeedFlow).toHaveBeenCalledWith(
+        CHANGELOG_FEED_URL,
+        expect.objectContaining({ bridgesEnabled: expect.any(Boolean) }),
+      );
     });
   });
 

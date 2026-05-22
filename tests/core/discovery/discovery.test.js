@@ -68,6 +68,66 @@ describe("discoverFeed", () => {
     expect(articles.length).toBeGreaterThan(0);
   });
 
+  it("resolves a bridge URL as strategy 0 when bridges are enabled (no page fetch needed)", async () => {
+    globalThis.fetch = vi.fn().mockImplementation((endpoint, opts) => {
+      if (
+        endpoint === "/api/feed" &&
+        targetUrlFrom(opts) === "https://www.reddit.com/r/selfhosted/.rss"
+      ) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(ATOM_XML),
+        });
+      }
+      return Promise.resolve({ ok: false, status: 404 });
+    });
+
+    const result = await discoverFeed("https://www.reddit.com/r/selfhosted", {
+      bridges: true,
+    });
+
+    expect(isOk(result)).toBe(true);
+    expect(unwrap(result).feedUrl).toBe(
+      "https://www.reddit.com/r/selfhosted/.rss",
+    );
+    const pageCalls = globalThis.fetch.mock.calls.filter(
+      ([endpoint]) => endpoint === "/api/page",
+    );
+    expect(pageCalls).toHaveLength(0);
+  });
+
+  it("does NOT run bridges when the gate is off (defaults to page strategies)", async () => {
+    globalThis.fetch = vi.fn().mockImplementation((endpoint, opts) => {
+      if (endpoint === "/api/page") {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(PAGE_WITH_NO_FEED),
+        });
+      }
+      if (
+        endpoint === "/api/feed" &&
+        targetUrlFrom(opts) === "https://www.reddit.com/r/selfhosted/.rss"
+      ) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(ATOM_XML),
+        });
+      }
+      return Promise.resolve({ ok: false, status: 404 });
+    });
+
+    const result = await discoverFeed("https://www.reddit.com/r/selfhosted");
+
+    expect(isErr(result)).toBe(true);
+    // The bridge's .rss candidate must never be requested when the gate is off.
+    const triedBridgeUrl = globalThis.fetch.mock.calls.some(
+      ([endpoint, opts]) =>
+        endpoint === "/api/feed" &&
+        targetUrlFrom(opts) === "https://www.reddit.com/r/selfhosted/.rss",
+    );
+    expect(triedBridgeUrl).toBe(false);
+  });
+
   it("should discover feed via well-known path when no HTML link exists", async () => {
     globalThis.fetch = vi.fn().mockImplementation((endpoint, opts) => {
       if (endpoint === "/api/page") {
