@@ -31,8 +31,9 @@ import { retryFailedFavicons } from "../core/favicon/favicon-cache.ts";
 import { isPaidTierActive } from "../core/features/paid-tier-active.ts";
 import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
 import { isFeatureEnabled, enforceFeature } from "./enforce-feature.ts";
-import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
+import { CHANGELOG_FEED_URL, LOCAL_STORAGE, isAggregatedFeedId } from "../utils/constants.ts";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
+import { recordRecentFeed } from "../lib/recent-feeds.ts";
 import type {
   Feed,
   Folder,
@@ -91,6 +92,13 @@ interface FeedStore {
   feedSortMode: FeedSortMode;
   feedCustomOrder: string[];
   folderCustomOrder: string[];
+  /**
+   * Concrete feed ids in most-recently-viewed order, newest first.
+   * Device-local (recency never syncs); drives the mobile drawer's
+   * quick-switch favicon dock. Aggregated views (All / Starred / folder /
+   * smart-filter) are never recorded — they have no favicon.
+   */
+  recentFeedIds: string[];
   /** True once loadFeeds() has resolved at least once. Used by the
    *  /feeds → /explore-vs-/feeds/all routing decision to avoid firing
    *  with an empty store before the DB is read. */
@@ -185,6 +193,12 @@ function readJsonArray(key: string): string[] {
 
 function sortFoldersByName(folders: Folder[]): Folder[] {
   return [...folders].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function persistRecentFeedIds(ids: string[]): void {
+  try {
+    localStorage.setItem(LOCAL_STORAGE.RECENT_FEED_IDS, JSON.stringify(ids));
+  } catch { /* localStorage unavailable */ }
 }
 
 /** True when the current session may mutate per-feed rules. */
@@ -348,6 +362,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   feedSortMode: readSortMode(),
   feedCustomOrder: readJsonArray(LOCAL_STORAGE.FEED_CUSTOM_ORDER),
   folderCustomOrder: readJsonArray(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER),
+  recentFeedIds: readJsonArray(LOCAL_STORAGE.RECENT_FEED_IDS),
   folderOpenState: {},
   feedsLoaded: false,
   rulesEditorFeedId: null,
@@ -435,6 +450,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     await reloadFeeds(set);
     const currentSelection = get().selectedFeedId;
     if (currentSelection === feedId) set({ selectedFeedId: null });
+    const recent = get().recentFeedIds.filter((id) => id !== feedId);
+    if (recent.length !== get().recentFeedIds.length) {
+      persistRecentFeedIds(recent);
+      set({ recentFeedIds: recent });
+    }
     schedulePush();
   },
 
@@ -473,7 +493,17 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     if (value) void prefetchSingleFeedNow(feedId);
   },
 
-  selectFeed: (feedId) => set({ selectedFeedId: feedId }),
+  selectFeed: (feedId) => {
+    set({ selectedFeedId: feedId });
+    // Record concrete feeds for the quick-switch dock; aggregated views
+    // have no favicon to dock. selectFeed is the single chokepoint the
+    // URL-sync effect routes every feed view through, so this captures
+    // recency without a separate tracking call site.
+    if (isAggregatedFeedId(feedId)) return;
+    const recent = recordRecentFeed(get().recentFeedIds, feedId);
+    persistRecentFeedIds(recent);
+    set({ recentFeedIds: recent });
+  },
 
   refreshAll: async () => {
     if (get().isRefreshingAll) return;

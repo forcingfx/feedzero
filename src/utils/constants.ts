@@ -125,6 +125,10 @@ export const LOCAL_STORAGE = {
   GROUP_ARTICLE_FLOODS: "feedzero:group-article-floods",
   ARTICLE_SORT_MODE: "feedzero:article-sort-mode",
   DEDUPE_MIGRATION: "feedzero:dedupe-migration-v1",
+  /** Most-recently-viewed feed ids, newest first. Device-local (recency
+   *  is per-device and never syncs); drives the mobile drawer quick-switch
+   *  dock. */
+  RECENT_FEED_IDS: "feedzero:recent-feed-ids",
 } as const;
 
 /**

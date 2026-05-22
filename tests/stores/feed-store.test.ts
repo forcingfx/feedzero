@@ -97,6 +97,7 @@ describe("feed-store", () => {
       feeds: [],
       folders: [],
       selectedFeedId: null,
+      recentFeedIds: [],
       isLoading: false,
       error: null,
     });
@@ -438,6 +439,17 @@ describe("feed-store", () => {
       expect(useFeedStore.getState().feeds).toEqual([]);
       expect(useFeedStore.getState().selectedFeedId).toBeNull();
     });
+
+    it("prunes the removed feed from the quick-switch recency list", async () => {
+      const feed = mockFeed("x", "X");
+      useFeedStore.setState({ feeds: [feed], recentFeedIds: ["x", "y"] });
+      vi.mocked(removeFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().removeFeed("x");
+
+      expect(useFeedStore.getState().recentFeedIds).toEqual(["y"]);
+    });
   });
 
   describe("renameFeed", () => {
@@ -488,6 +500,29 @@ describe("feed-store", () => {
     it("sets selectedFeedId", () => {
       useFeedStore.getState().selectFeed("abc");
       expect(useFeedStore.getState().selectedFeedId).toBe("abc");
+    });
+
+    it("records the viewed feed as most-recent for the quick-switch dock", () => {
+      useFeedStore.setState({ recentFeedIds: ["feed-2"] });
+      useFeedStore.getState().selectFeed("feed-1");
+      expect(useFeedStore.getState().recentFeedIds).toEqual(["feed-1", "feed-2"]);
+    });
+
+    it("persists the recency list so the dock survives a reload", () => {
+      useFeedStore.setState({ recentFeedIds: [] });
+      useFeedStore.getState().selectFeed("feed-1");
+      expect(localStorage.setItem).toHaveBeenCalledWith(
+        "feedzero:recent-feed-ids",
+        JSON.stringify(["feed-1"]),
+      );
+    });
+
+    it("does not record aggregated views (All / Starred / smart-filter) — they have no favicon", () => {
+      useFeedStore.setState({ recentFeedIds: [] });
+      useFeedStore.getState().selectFeed("all");
+      useFeedStore.getState().selectFeed("starred");
+      useFeedStore.getState().selectFeed("filter:abc-123");
+      expect(useFeedStore.getState().recentFeedIds).toEqual([]);
     });
   });
 
