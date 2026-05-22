@@ -15,6 +15,15 @@
  */
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { pricingBullets } from "@/core/features/tier-matrix";
+
+/** Feature bullets for a tier card: structural lead bullets (quota /
+ *  "everything in …") followed by the matrix-derived feature bullets for
+ *  that tier. Re-tiering a feature in the matrix moves its bullet here
+ *  automatically — see `pricingBullets`. */
+function bulletsFor(tier: "free" | "personal" | "pro", lead: string[]): string[] {
+  return [...lead, ...pricingBullets(tier).map((b) => b.blurb)];
+}
 
 export function SubscriptionUpgrade() {
   return (
@@ -23,13 +32,7 @@ export function SubscriptionUpgrade() {
         name="Free"
         price="$0"
         blurb="Up to 50 feeds. Optional end-to-end encrypted cloud sync. No account."
-        features={[
-          "1,300+ curated feeds in Explore",
-          "End-to-end encrypted cloud sync across devices",
-          "OPML import / export",
-          "Full-text extraction",
-          "Offline support",
-        ]}
+        features={bulletsFor("free", [])}
         cta="Current plan"
         ctaDisabled
       />
@@ -40,13 +43,7 @@ export function SubscriptionUpgrade() {
         priceSub="or $50/yr — save 17%"
         blurb="Unlimited feeds and power-user organization. 30 days free, cancel anytime."
         featured
-        features={[
-          "Everything in Free",
-          "Unlimited feeds",
-          "Smart filters — query your feeds by keyword, tag, or source",
-          "Auto-organize folders",
-          "Offline prefetch — article bodies cached for plane mode",
-        ]}
+        features={bulletsFor("personal", ["Everything in Free", "Unlimited feeds"])}
         cta="Start 30-day free trial — then $5/mo"
         ctaHref="/?subscribe=personal-monthly"
         secondaryCta="or 30 days free, then $50/yr — save 17%"
@@ -58,12 +55,7 @@ export function SubscriptionUpgrade() {
         price="Coming 2026"
         blurb="When RSS becomes your work."
         comingSoon
-        features={[
-          "Everything in Personal",
-          "AI Signal — summaries & briefings",
-          "Full-text search across articles",
-          "Send to Kindle",
-        ]}
+        features={bulletsFor("pro", ["Everything in Personal"])}
         cta="Coming soon"
         ctaDisabled
       />

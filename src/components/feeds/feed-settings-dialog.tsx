@@ -44,6 +44,9 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
+import { TierLockBadge } from "@/components/features/tier-lock-badge.tsx";
+import type { Feature } from "@/core/features/feature-gates.ts";
 import type { Feed } from "@/types/index.ts";
 
 export function FeedSettingsDialog() {
@@ -174,6 +177,7 @@ function DisplaySection({ feed }: { feed: Feed }) {
           description="Pre-extract this feed's recent articles on refresh so they read offline."
           checked={Boolean(feed.prefetchEnabled)}
           onCheckedChange={(v) => setFeedPrefetchEnabled(feed.id, v)}
+          lockFeature="offline-prefetch"
         />
       </div>
     </section>
@@ -186,13 +190,19 @@ function ToggleRow({
   description,
   checked,
   onCheckedChange,
+  lockFeature,
 }: {
   id: string;
   label: string;
   description: string;
   checked: boolean;
   onCheckedChange: (value: boolean) => void;
+  /** When set and the feature is gate-locked, the switch is disabled and a
+   *  TierLockBadge routes to the upgrade affordance. Matrix-derived. */
+  lockFeature?: Feature;
 }) {
+  const gate = useFeatureGate(lockFeature ?? "signal");
+  const locked = lockFeature !== undefined && !gate.enabled;
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
@@ -201,12 +211,16 @@ function ToggleRow({
         </Label>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <Switch
-        id={id}
-        data-testid={id}
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-      />
+      <div className="flex shrink-0 items-center gap-2">
+        {locked && lockFeature ? <TierLockBadge feature={lockFeature} /> : null}
+        <Switch
+          id={id}
+          data-testid={id}
+          checked={checked && !locked}
+          disabled={locked}
+          onCheckedChange={onCheckedChange}
+        />
+      </div>
     </div>
   );
 }
@@ -240,26 +254,37 @@ function FolderSection({ feed }: { feed: Feed }) {
 
 function RulesSection({ feed }: { feed: Feed }) {
   const openRulesEditor = useFeedStore((s) => s.openRulesEditor);
+  const gate = useFeatureGate("rules");
   const ruleCount = feed.rules?.length ?? 0;
+
+  // Gate at the entry point: a locked user gets routed to upgrade instead
+  // of building a rule they can't save. Mirrors the filters / auto-organize
+  // pattern. Self-hosters and pre-launch builds pass through via gate.enabled.
+  const handleManage = gate.enabled
+    ? () => openRulesEditor(feed.id)
+    : gate.promptUpgrade;
 
   return (
     <section className="space-y-2">
       <Label>Rules</Label>
-      <div className="flex items-center justify-between rounded-md border bg-card p-3">
+      <div className="flex items-center justify-between gap-2 rounded-md border bg-card p-3">
         <p className="text-sm text-muted-foreground">
           {ruleCount === 0
             ? "No rules. Auto-mute, star, or route articles."
             : `${ruleCount} rule${ruleCount === 1 ? "" : "s"} active.`}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          data-testid="feed-settings-manage-rules"
-          onClick={() => openRulesEditor(feed.id)}
-        >
-          Manage rules…
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <TierLockBadge feature="rules" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="feed-settings-manage-rules"
+            onClick={handleManage}
+          >
+            Manage rules…
+          </Button>
+        </div>
       </div>
     </section>
   );

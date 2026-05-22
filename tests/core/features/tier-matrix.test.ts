@@ -86,6 +86,14 @@ describe("tier-matrix — currently shipped gated features", () => {
     expect(getEntry("offline-prefetch").status).toBe("shipped");
     expect(getRequiredTier("offline-prefetch")).toBe("personal");
   });
+
+  it("signal is Personal+, shipped", () => {
+    expect(getEntry("signal").status).toBe("shipped");
+    expect(getRequiredTier("signal")).toBe("personal");
+    expect(getEntry("signal").tiers.free.available).toBe(false);
+    expect(getEntry("signal").tiers.personal.available).toBe(true);
+    expect(getEntry("signal").tiers.pro.available).toBe(true);
+  });
 });
 
 describe("tier-matrix — coming-soon features", () => {
@@ -96,7 +104,6 @@ describe("tier-matrix — coming-soon features", () => {
 
   it.each([
     "search",
-    "ai-signal",
     "authenticated-fetchers",
     "send-to-kindle",
     "themes-commercial",
@@ -175,7 +182,7 @@ describe("tier-matrix — back-compat with feature-gates.FEATURE_MAP", () => {
       "filters",
       "rules",
       "search",
-      "ai-signal",
+      "signal",
       "authenticated-fetchers",
       "send-to-kindle",
       "bridges",

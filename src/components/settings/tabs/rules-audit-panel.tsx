@@ -9,6 +9,7 @@
 import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFeedStore } from "@/stores/feed-store";
+import { useFeatureGate } from "@/hooks/use-feature-gate";
 import type { Feed, Rule, RuleAction } from "@/types/index.ts";
 
 interface FeedWithRules {
@@ -44,6 +45,11 @@ function summariseActions(actions: RuleAction[]): string {
 export function RulesAuditPanel() {
   const feeds = useFeedStore((s) => s.feeds);
   const openRulesEditor = useFeedStore((s) => s.openRulesEditor);
+  const gate = useFeatureGate("rules");
+  // Existing rules can linger after a downgrade; route Edit to upgrade
+  // when the gate is closed rather than opening an editor that can't save.
+  const editRules = (feedId: string) =>
+    gate.enabled ? openRulesEditor(feedId) : gate.promptUpgrade();
 
   const groups = flattenFeedRules(feeds);
   const totalRules = groups.reduce((sum, g) => sum + g.rules.length, 0);
@@ -89,7 +95,7 @@ export function RulesAuditPanel() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => openRulesEditor(feed.id)}
+                  onClick={() => editRules(feed.id)}
                   aria-label={`Edit rules for ${feed.title}`}
                 >
                   Edit

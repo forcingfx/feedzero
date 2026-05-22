@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router";
-import { Compass, Layers, Star, Plus } from "lucide-react";
+import { Compass, Layers, Sparkles, Star, Plus } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
@@ -51,6 +51,7 @@ export function SidebarBody({
   const openFilterEditor = useSmartFilterStore((s) => s.openEditor);
   const filtersGate = useFeatureGate("filters");
   const isExplorePage = pathname === "/explore";
+  const isSignalPage = pathname === "/signal";
 
   // Show "Starred" once the user has actually starred something; before
   // that, the entry would land on an empty view and feels like clutter.
@@ -63,6 +64,11 @@ export function SidebarBody({
   function handleExplore() {
     onBeforeNavigate?.();
     navigate("/explore");
+  }
+
+  function handleSignal() {
+    onBeforeNavigate?.();
+    navigate("/signal");
   }
 
   // Honor-system open-core: the Filters section stays visible to free
@@ -89,6 +95,17 @@ export function SidebarBody({
         >
           <Compass className="size-4" />
           <span>Explore</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          isActive={isSignalPage}
+          onClick={handleSignal}
+          tooltip="Signal"
+          data-testid="sidebar-signal-link"
+        >
+          <Sparkles className="size-4" />
+          <span>Signal</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
       {feeds.length > 0 && (

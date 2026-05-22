@@ -87,6 +87,16 @@ export interface TierMatrixEntry {
   category: FeatureCategory;
   status: FeatureStatus;
   tiers: Record<Tier, TierAvailability>;
+  /**
+   * Optional pricing-card bullet. Presence opts the feature into the
+   * pricing grid; `rank` orders bullets (ascending) across the cards.
+   * The card a bullet lands on is derived from the feature's lowest
+   * unlock tier (`getRequiredTier`), so re-tiering a feature in the
+   * matrix moves its bullet to the right card with zero edits to the
+   * pricing components. `blurb` is the full bullet text (curated, since
+   * marketing copy is punchier than the matrix `description`).
+   */
+  marketing?: { blurb: string; rank: number };
 }
 
 const AVAILABLE: TierAvailability = { available: true };
@@ -116,6 +126,7 @@ export const TIER_MATRIX = {
     category: "reading",
     status: "shipped",
     tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "1,300+ curated feeds in Explore", rank: 10 },
   },
   "feed-refresh": {
     id: "feed-refresh",
@@ -133,6 +144,7 @@ export const TIER_MATRIX = {
     category: "reading",
     status: "shipped",
     tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "Full-text extraction", rank: 13 },
   },
   "content-view-toggle": {
     id: "content-view-toggle",
@@ -192,6 +204,7 @@ export const TIER_MATRIX = {
     category: "organization",
     status: "shipped",
     tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "OPML import / export", rank: 12 },
   },
   "article-flood-grouping": {
     id: "article-flood-grouping",
@@ -210,6 +223,7 @@ export const TIER_MATRIX = {
     category: "organization",
     status: "shipped",
     tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "Auto-organize folders", rank: 22 },
   },
 
   // ── Sync and storage ───────────────────────────────────────────────────
@@ -221,6 +235,7 @@ export const TIER_MATRIX = {
     category: "sync-and-storage",
     status: "shipped",
     tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "Offline support", rank: 14 },
   },
   "cloud-sync": {
     id: "cloud-sync",
@@ -230,6 +245,7 @@ export const TIER_MATRIX = {
     category: "sync-and-storage",
     status: "shipped",
     tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "End-to-end encrypted cloud sync across devices", rank: 11 },
   },
   "offline-prefetch": {
     id: "offline-prefetch",
@@ -239,6 +255,10 @@ export const TIER_MATRIX = {
     category: "sync-and-storage",
     status: "shipped",
     tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: {
+      blurb: "Offline prefetch — article bodies cached for plane mode",
+      rank: 23,
+    },
   },
 
   // ── Filtering and search ───────────────────────────────────────────────
@@ -250,6 +270,10 @@ export const TIER_MATRIX = {
     category: "filtering-and-search",
     status: "shipped",
     tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: {
+      blurb: "Smart filters — query your feeds by keyword, tag, or source",
+      rank: 21,
+    },
   },
   rules: {
     id: "rules",
@@ -267,15 +291,17 @@ export const TIER_MATRIX = {
     category: "filtering-and-search",
     status: "coming-soon",
     tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "Full-text search across articles", rank: 30 },
   },
-  "ai-signal": {
-    id: "ai-signal",
-    name: "AI signal",
+  signal: {
+    id: "signal",
+    name: "Signal",
     description:
-      "Local LLM ranks unread articles by relevance to topics you follow.",
+      "Topics emerging across your feeds, ranked by cross-feed term frequency. Fully local — no LLM, no third party.",
     category: "filtering-and-search",
-    status: "coming-soon",
-    tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
+    status: "shipped",
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "Signal — topics emerging across your feeds", rank: 20 },
   },
 
   // ── Delivery ───────────────────────────────────────────────────────────
@@ -287,6 +313,7 @@ export const TIER_MATRIX = {
     category: "delivery",
     status: "coming-soon",
     tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "Authenticated fetchers", rank: 32 },
   },
   "send-to-kindle": {
     id: "send-to-kindle",
@@ -295,6 +322,7 @@ export const TIER_MATRIX = {
     category: "delivery",
     status: "coming-soon",
     tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
+    marketing: { blurb: "Send to Kindle", rank: 31 },
   },
   bridges: {
     id: "bridges",
@@ -369,6 +397,84 @@ export function isGated(id: FeatureId): boolean {
   return !t.free.available || !t.personal.available || !t.pro.available;
 }
 
+// ── Matrix-derived gate messaging ──────────────────────────────────────
+//
+// Every upgrade surface (toasts, splashes, inline lock badges) derives its
+// copy from these helpers, so editing a feature's `name` or moving it
+// between tiers in the matrix flows through the whole app with no string
+// edits at the call sites. Tests in `gate-messaging.test.ts` lock this.
+
+const TIER_LABEL: Record<Tier, string> = {
+  free: "Free",
+  personal: "Personal",
+  pro: "Pro",
+};
+
+/** Human-readable tier label, e.g. "Personal". */
+export function tierLabel(tier: Tier): string {
+  return TIER_LABEL[tier];
+}
+
+/** The matrix display name, e.g. "Smart filters", "Signal", "Rules". */
+export function featureName(id: FeatureId): string {
+  return TIER_MATRIX[id].name;
+}
+
+/** Capitalized label of the lowest tier that unlocks the feature. */
+export function requiredTierLabel(id: FeatureId): string {
+  return TIER_LABEL[getRequiredTier(id)];
+}
+
+/** The matrix description, reused on every upgrade surface. */
+export function gateDescription(id: FeatureId): string {
+  return TIER_MATRIX[id].description;
+}
+
+/**
+ * Canonical one-line gate copy for toasts and CTAs. Grammar-neutral so it
+ * reads correctly for singular ("Signal") and plural ("Smart filters",
+ * "Rules") feature names alike.
+ */
+export function gateToast(id: FeatureId): string {
+  return `Subscribe to ${requiredTierLabel(id)} to unlock ${featureName(id)}.`;
+}
+
+// ── Pricing-card bullets (matrix-derived) ──────────────────────────────
+
+export interface PricingBullet {
+  id: FeatureId;
+  blurb: string;
+}
+
+/**
+ * Typed accessor for an entry's optional `marketing` field. The matrix is
+ * declared `as const`, so indexing by a general `FeatureId` yields a union
+ * of literal entry types where `marketing` is absent on most members;
+ * reading it directly fails the type-checker. This view widens to the
+ * interface so callers (and tests) get `{ blurb, rank } | undefined`.
+ */
+export function getMarketing(
+  id: FeatureId,
+): { blurb: string; rank: number } | undefined {
+  return (TIER_MATRIX[id] as TierMatrixEntry).marketing;
+}
+
+/**
+ * Pricing-card bullets for `tier`: marketed features whose lowest unlock
+ * tier is exactly this tier, ordered by marketing rank. The pricing
+ * components render these after their structural lead bullets
+ * ("Everything in Free", "Unlimited feeds"). Re-tiering a feature in the
+ * matrix moves its bullet to the correct card automatically — the cards
+ * never name features directly. `pricing-bullets.test.ts` locks this.
+ */
+export function pricingBullets(tier: Tier): PricingBullet[] {
+  return (Object.keys(TIER_MATRIX) as FeatureId[])
+    .filter((id) => getMarketing(id) !== undefined)
+    .filter((id) => getRequiredTier(id) === tier)
+    .sort((a, b) => getMarketing(a)!.rank - getMarketing(b)!.rank)
+    .map((id) => ({ id, blurb: getMarketing(id)!.blurb }));
+}
+
 /**
  * Explicit literal tuple of gated feature ids.
  *
@@ -387,7 +493,7 @@ export const GATED_FEATURE_IDS = [
   "filters",
   "rules",
   "search",
-  "ai-signal",
+  "signal",
   "authenticated-fetchers",
   "send-to-kindle",
   "bridges",

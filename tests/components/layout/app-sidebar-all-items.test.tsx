@@ -65,15 +65,18 @@ describe("AppSidebar All items entry", () => {
     );
     const texts = Array.from(menuButtons).map((btn) => btn.textContent);
 
-    // Ordering invariant: Explore first, then All items. The Filters
-    // section (when the filters gate is open in pre-launch mode) and
-    // the per-feed list both come after — exact positions vary as more
-    // entries land, but Explore → All items → … is stable.
+    // Ordering invariant: Explore first, then Signal, then All items.
+    // The Filters section (when the filters gate is open in pre-launch
+    // mode) and the per-feed list both come after — exact positions
+    // vary as more entries land, but Explore → Signal → All items → …
+    // is stable.
     const exploreIdx = texts.findIndex((t) => t?.includes("Explore"));
+    const signalIdx = texts.findIndex((t) => t?.includes("Signal"));
     const allItemsIdx = texts.findIndex((t) => t?.includes("All items"));
     const techIdx = texts.findIndex((t) => t?.includes("Tech News"));
     expect(exploreIdx).toBe(0);
-    expect(allItemsIdx).toBe(1);
+    expect(signalIdx).toBe(1);
+    expect(allItemsIdx).toBe(2);
     expect(techIdx).toBeGreaterThan(allItemsIdx);
   });
 

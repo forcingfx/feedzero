@@ -11,6 +11,9 @@ import { useNavigate } from "react-router";
 import { useLicenseStore } from "@/stores/license-store";
 import {
   gateState,
+  featureName,
+  requiredTierLabel,
+  gateDescription,
   type Feature,
   type GateState,
 } from "@/core/features/feature-gates";
@@ -21,11 +24,23 @@ import { goToUpgrade } from "@/lib/go-to-settings";
 export interface UseFeatureGate extends GateState {
   /** Navigate to the Settings page's upgrade affordance. */
   promptUpgrade: () => void;
+  /** Matrix display name, e.g. "Smart filters". */
+  featureName: string;
+  /** Capitalized lowest tier that unlocks the feature, e.g. "Personal". */
+  requiredTierLabel: string;
+  /** Matrix description, reused across upgrade surfaces. */
+  description: string;
 }
 
 export function useFeatureGate(feature: Feature): UseFeatureGate {
   const tier = useLicenseStore((s) => s.tier);
   const navigate = useNavigate();
   const state = gateState(feature, tier, isSelfHosted(), isPaidTierActive());
-  return { ...state, promptUpgrade: () => goToUpgrade(navigate) };
+  return {
+    ...state,
+    promptUpgrade: () => goToUpgrade(navigate),
+    featureName: featureName(feature),
+    requiredTierLabel: requiredTierLabel(feature),
+    description: gateDescription(feature),
+  };
 }

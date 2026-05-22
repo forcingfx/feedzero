@@ -11,9 +11,20 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { ReadingTab } from "@/components/settings/tabs/reading-tab";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
+
+/** ReadingTab embeds RulesAuditPanel, which uses useFeatureGate →
+ *  useNavigate, so the component tree needs router context. */
+function renderTab() {
+  return render(
+    <MemoryRouter>
+      <ReadingTab />
+    </MemoryRouter>,
+  );
+}
 
 vi.mock("@/components/folders/auto-organize-dialog", () => ({
   AutoOrganizeDialog: ({ open }: { open: boolean }) =>
@@ -28,19 +39,19 @@ describe("<ReadingTab>", () => {
 
   it("renders a Group floods toggle reflecting useAppStore state", () => {
     useAppStore.setState({ groupArticleFloods: true });
-    render(<ReadingTab />);
+    renderTab();
     const toggle = screen.getByRole("switch", { name: /group article floods/i });
     expect(toggle).toBeChecked();
   });
 
   it("clicking the Group floods toggle flips useAppStore", () => {
-    render(<ReadingTab />);
+    renderTab();
     fireEvent.click(screen.getByRole("switch", { name: /group article floods/i }));
     expect(useAppStore.getState().groupArticleFloods).toBe(true);
   });
 
   it("Auto-organize button is hidden when there are no feeds (nothing to organize)", () => {
-    render(<ReadingTab />);
+    renderTab();
     expect(
       screen.queryByRole("button", { name: /auto-organize/i }),
     ).toBeNull();
@@ -60,7 +71,7 @@ describe("<ReadingTab>", () => {
         },
       ] as never,
     });
-    render(<ReadingTab />);
+    renderTab();
     expect(
       screen.getByRole("button", { name: /auto-organize/i }),
     ).toBeInTheDocument();
@@ -80,7 +91,7 @@ describe("<ReadingTab>", () => {
         },
       ] as never,
     });
-    render(<ReadingTab />);
+    renderTab();
     fireEvent.click(screen.getByRole("button", { name: /auto-organize/i }));
     expect(screen.getByTestId("auto-organize-dialog-open")).toBeInTheDocument();
   });

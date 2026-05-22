@@ -119,6 +119,7 @@ IndexedDB (encrypted via Dexie + Web Crypto)
 - **article-store** — Article list for selected feed, selection (auto-marks read), read state. Triggers sync push after mark-as-read.
 - **extraction-store** — Extraction cache (link → HTML), view mode toggle, fetch status
 - **sync-store** — Cloud sync state: `enableSync`, `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce + 0-30s jitter), `disableSync` (deletes server vault + clears stored keys), `logout` (clears local data, preserves cloud vault). Stores `credentials: SyncCredentials | null` (pre-derived vault ID + CryptoKey); raw passphrase is never persisted.
+- **signal-store** — Drives `/signal`. Status state machine (`locked | loading | ready | error`), 24h localStorage cache (`feedzero:signal-report`). `loadReport({ force? })` collects every article from `article-store`, checks the 100-article gate, runs `generateReport()` from `core/signal/frequency-engine` (pure-TS frequency analysis), and writes the result to cache. No network, no LLM.
 
 ## Routing
 
@@ -126,6 +127,10 @@ IndexedDB (encrypted via Dexie + Web Crypto)
 /feeds                                → Feed list
 /feeds/:feedId                        → Article list (+ feed list on desktop)
 /feeds/:feedId/articles/:articleId    → Reader (+ all panels on desktop)
+/signal                               → Cross-feed topic frequency surface (Personal+, gated at 100-article corpus)
+/explore                              → Catalog + add-feed
+/stats                                → Vault stats dashboard
+/settings                             → Settings (account, subscription, help)
 ```
 
 URL is the source of truth for navigation. `FeedsPage` syncs URL params to Zustand stores. Desktop (≥1024px) shows all 3 panels in a CSS grid. Mobile (<1024px) shows one panel at a time with back navigation.
@@ -201,6 +206,9 @@ main.tsx → app.tsx
 │       ├── defuddle (npm)
 │       ├── core/extractor/cleanup.ts
 │       └── core/parser/sanitizer.ts
+├── stores/signal-store.ts → core/signal/frequency-engine.ts
+│   ├── core/signal/tokenize.ts
+│   └── core/signal/types.ts
 ├── pages/feeds-page.tsx
 │   ├── components/feeds/ (feed-list, feed-item, add-feed-form)
 │   ├── components/articles/ (article-list, article-item)

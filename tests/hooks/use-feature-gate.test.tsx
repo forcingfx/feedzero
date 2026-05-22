@@ -25,7 +25,7 @@ function LocationProbe() {
   );
 }
 
-function GateProbe({ feature }: { feature: "auto-organize" | "ai-signal" }) {
+function GateProbe({ feature }: { feature: "auto-organize" | "search" }) {
   const gate = useFeatureGate(feature);
   return (
     <div>
@@ -84,7 +84,7 @@ describe("useFeatureGate", () => {
   it("coming-soon feature → not-built even when self-hosted + pro tier", () => {
     vi.mocked(isSelfHosted).mockReturnValue(true);
     useLicenseStore.setState({ tier: "pro" });
-    renderWithRouter(<GateProbe feature="ai-signal" />);
+    renderWithRouter(<GateProbe feature="search" />);
     expect(screen.getByTestId("enabled")).toHaveTextContent("false");
     expect(screen.getByTestId("reason")).toHaveTextContent("not-built");
   });

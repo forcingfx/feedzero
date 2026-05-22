@@ -27,8 +27,23 @@ import {
   GATED_FEATURE_IDS,
   TIER_MATRIX,
   getRequiredTier,
+  featureName,
+  requiredTierLabel,
+  gateDescription,
+  gateToast,
+  tierLabel,
   type FeatureId,
 } from "./tier-matrix";
+
+// Re-export the matrix-derived messaging helpers so gating consumers have
+// a single import surface for both the decision (`gateState`) and the copy.
+export {
+  featureName,
+  requiredTierLabel,
+  gateDescription,
+  gateToast,
+  tierLabel,
+};
 
 export type Tier = LicenseTier;
 

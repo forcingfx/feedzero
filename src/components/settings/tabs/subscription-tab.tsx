@@ -49,6 +49,7 @@ import { decodeLicensePayload } from "@/core/license/format";
 import { base64UrlDecodeToString } from "@/core/license/crypto";
 import type { LicensePayload } from "@/core/license/format";
 import { SubscriptionUpgrade, TierCard } from "@/components/settings/subscription-upgrade";
+import { pricingBullets } from "@/core/features/tier-matrix";
 import { ActivateLicenseDialog } from "@/components/settings/activate-license-dialog";
 import { openPortal } from "@/lib/open-portal";
 import { maskToken } from "@/lib/format-license";
@@ -343,9 +344,9 @@ function AlternativePlans({ currentTier }: AlternativePlansProps) {
           priceSub="or $50/yr — save 17%"
           blurb="Sync across every device. Unlimited feeds."
           features={[
-            "End-to-end encrypted cloud sync",
-            "Auto-organize folders",
+            "Everything in Free",
             "Unlimited feeds",
+            ...pricingBullets("personal").map((b) => b.blurb),
           ]}
           cta="Switch to Personal"
           ctaHref="/?subscribe=personal-monthly"
@@ -359,9 +360,7 @@ function AlternativePlans({ currentTier }: AlternativePlansProps) {
           comingSoon
           features={[
             "Everything in Personal",
-            "AI Signal — summaries & briefings",
-            "Full-text search across articles",
-            "Send to Kindle",
+            ...pricingBullets("pro").map((b) => b.blurb),
           ]}
           cta="Coming soon"
           ctaDisabled
