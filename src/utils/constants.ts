@@ -151,6 +151,18 @@ export const ARTICLE_GROUPING = {
 export const AUTO_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 
 /**
+ * How often an open tab re-verifies the license token against the server.
+ * The boot-time check (app.tsx) and cross-tab storage events catch most
+ * changes, but a tab left open for days never reboots — so a lapsed
+ * subscription would keep its paid tier for the whole session. A daily
+ * timer (and a focus-when-stale trigger for tabs whose timer was
+ * suspended by a sleeping machine) closes that gap. Once a day is enough:
+ * revocation is not time-critical, and a tighter cadence would add
+ * needless server traffic for a rare event.
+ */
+export const LICENSE_RECHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/**
  * Group ids for the desktop ResizablePanelGroup tree.
  *
  * Two-tier model:

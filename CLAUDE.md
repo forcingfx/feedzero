@@ -111,6 +111,7 @@ URL is the source of truth for navigation state. `FeedsPage` syncs URL params �
 - **use-keyboard-nav** — Article nav `j`/`k` (clicks DOM elements — same code path as mouse). Feed nav `u`/`i`. Actions: `o` open original, `e` toggle view (`toggleViewMode()`), `n` add feed (custom event), `[` toggle sidebar, `r` refresh. Disabled when focus is in input/textarea/contenteditable.
 - **use-media-query / use-mobile** — `useIsDesktop()` ≥1024px; `useIsMobile()` <768px (sidebar/sheet).
 - **use-auto-refresh** — Background `refreshAll()` on the `AUTO_REFRESH_INTERVAL_MS` (30 min) timer plus a focus-when-stale trigger (returning to a tab idle longer than the interval refreshes immediately). Reads the store via `getState()` inside its handlers so it subscribes once; mounted in `AppLayout`. Staleness is judged against `feed-store.lastRefreshAllAt`.
+- **use-license-refresh** — Same shape as `use-auto-refresh` but for license re-verification: a daily `LICENSE_RECHECK_INTERVAL_MS` (24h) timer + focus-when-stale trigger calling `license-store.refresh()`. Closes the gap where a tab left open for days never reboots, so a revoked subscription would keep its paid tier for the whole session. Staleness is judged against `license-store.lastCheckedAt`, which `refresh()` stamps only on a *definitive* resolution (no-token, 200, or 4xx) — transient 5xx/network failures leave it stale so focus retries promptly instead of waiting a full day. Mounted in `AppLayout` alongside `use-auto-refresh`.
 
 ### Styling
 
