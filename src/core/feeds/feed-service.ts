@@ -13,6 +13,7 @@ import {
   updateArticles,
   updateFeed,
   removeArticlesByFeedId,
+  dedupeArticles,
 } from "../storage/db.ts";
 import type { Feed, Article } from "../../types/index.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
@@ -438,6 +439,13 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
     if (updatedArticles.length > 0) {
       await updateArticles(updatedArticles);
     }
+
+    // Self-heal: collapse any duplicate rows for this feed left behind by a
+    // pre-fix concurrent refresh or imported from an un-migrated sync peer.
+    // No-op (zero decryption) once the feed is clean, so it's cheap to run
+    // on every refresh. Best-effort — a failure here must not fail the
+    // refresh, which already succeeded.
+    await dedupeArticles(feed.id);
 
     // First-ever success on this feed (typically a placeholder added by
     // import after a fetch failure): backfill title/description/siteUrl

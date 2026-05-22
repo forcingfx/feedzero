@@ -19,6 +19,7 @@ import {
   removeFolder,
   exportAll,
   importAll,
+  dedupeArticles,
 } from "@/core/storage/db";
 import { createFeed, createArticle } from "@/core/storage/schema";
 import { isOk, isErr, unwrap } from "@/utils/result";
@@ -353,6 +354,76 @@ describe("db: additional function coverage", () => {
 
       expect(unwrap(await getFeeds())).toEqual([]);
       expect(unwrap(await getAllArticles())).toEqual([]);
+    });
+  });
+
+  describe("dedupeArticles", () => {
+    const dupePair = (feedId: string, guid: string): Article[] => {
+      const a = unwrap(
+        createArticle({ feedId, guid, title: "Post", link: "https://x.com/p" }),
+      );
+      const b = unwrap(
+        createArticle({ feedId, guid, title: "Post", link: "https://x.com/p" }),
+      );
+      // Same feedId+guid, distinct primary-key ids — the exact shape a
+      // concurrent-refresh race produces.
+      expect(a.id).not.toBe(b.id);
+      return [a, b];
+    };
+
+    it("collapses two rows sharing a feedId+guid into one", async () => {
+      const [a, b] = dupePair("feed-1", "guid-1");
+      await addArticles([a, b]);
+      expect(unwrap(await getArticles("feed-1"))).toHaveLength(2);
+
+      const removed = unwrap(await dedupeArticles("feed-1"));
+
+      expect(removed).toBe(1);
+      expect(unwrap(await getArticles("feed-1"))).toHaveLength(1);
+    });
+
+    it("merges read/starred state so a read copy doesn't resurface", async () => {
+      const [a, b] = dupePair("feed-1", "guid-1");
+      a.read = false;
+      b.read = true;
+      b.starred = true;
+      b.starredAt = 4242;
+      await addArticles([a, b]);
+
+      unwrap(await dedupeArticles("feed-1"));
+
+      const survivors = unwrap(await getArticles("feed-1"));
+      expect(survivors).toHaveLength(1);
+      expect(survivors[0].read).toBe(true);
+      expect(survivors[0].starred).toBe(true);
+      expect(survivors[0].starredAt).toBe(4242);
+    });
+
+    it("leaves a feed with no duplicates untouched", async () => {
+      const a = unwrap(
+        createArticle({ feedId: "feed-1", guid: "g1", title: "A", link: "https://x.com/a" }),
+      );
+      const b = unwrap(
+        createArticle({ feedId: "feed-1", guid: "g2", title: "B", link: "https://x.com/b" }),
+      );
+      await addArticles([a, b]);
+
+      const removed = unwrap(await dedupeArticles("feed-1"));
+
+      expect(removed).toBe(0);
+      expect(unwrap(await getArticles("feed-1"))).toHaveLength(2);
+    });
+
+    it("sweeps every feed when no feedId is given", async () => {
+      const [a1, b1] = dupePair("feed-1", "guid-1");
+      const [a2, b2] = dupePair("feed-2", "guid-1");
+      await addArticles([a1, b1, a2, b2]);
+
+      const removed = unwrap(await dedupeArticles());
+
+      expect(removed).toBe(2);
+      expect(unwrap(await getArticles("feed-1"))).toHaveLength(1);
+      expect(unwrap(await getArticles("feed-2"))).toHaveLength(1);
     });
   });
 });

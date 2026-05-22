@@ -17,11 +17,17 @@ vi.mock("../../src/core/storage/crypto.ts", () => ({
   importCryptoKey: vi.fn().mockResolvedValue("mock-vault-key"),
 }));
 
+vi.mock("../../src/core/storage/db.ts", () => ({
+  dedupeArticles: vi.fn().mockResolvedValue({ ok: true, value: 0 }),
+}));
+
 import { initFresh, restore, destroy } from "../../src/core/storage/key-manager.ts";
 import { pullVault, importVault } from "../../src/core/sync/sync-service";
+import { dedupeArticles } from "../../src/core/storage/db.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 
 const ONBOARDING_KEY = "feedzero:onboarding-complete";
+const DEDUPE_MIGRATION_KEY = "feedzero:dedupe-migration-v1";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -171,6 +177,32 @@ describe("app-store", () => {
 
       expect(restore).toHaveBeenCalledOnce();
       expect(useAppStore.getState().isDbReady).toBe(true);
+    });
+
+    it("runs the duplicate-article cleanup once and records it", async () => {
+      vi.mocked(restore).mockResolvedValue({
+        status: "ready",
+        isSyncUser: false,
+        credentials: null,
+      });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      expect(dedupeArticles).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem(DEDUPE_MIGRATION_KEY)).toBe("done");
+    });
+
+    it("skips the duplicate-article cleanup once it has already run", async () => {
+      localStorage.setItem(DEDUPE_MIGRATION_KEY, "done");
+      vi.mocked(restore).mockResolvedValue({
+        status: "ready",
+        isSyncUser: false,
+        credentials: null,
+      });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      expect(dedupeArticles).not.toHaveBeenCalled();
     });
 
     it("forces re-onboarding when no keys exist (without destroying server vault)", async () => {
