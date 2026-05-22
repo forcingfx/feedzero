@@ -12,6 +12,7 @@ import {
   importCryptoKey,
 } from "./crypto.ts";
 import type { Feed, Article, Folder, SmartFilter } from "../../types/index.ts";
+import { mergeDuplicateArticles } from "./dedupe-articles.ts";
 
 interface DexieRecord {
   id: string;
@@ -423,6 +424,89 @@ export async function getArticleByGuid(
     return result.ok ? ok(result.value as Article) : ok(null);
   } catch (e) {
     return err(`Failed to find article by guid: ${(e as Error).message}`);
+  }
+}
+
+/** Decrypt a single raw record, preserving order (no sorting/filtering). */
+async function decryptRecord(
+  key: CryptoKey,
+  raw: DexieRecord,
+): Promise<Article | null> {
+  if (!raw.iv || !raw.ciphertext) return null;
+  const result = await decrypt(
+    key,
+    new Uint8Array(raw.iv),
+    new Uint8Array(raw.ciphertext),
+  );
+  return result.ok ? (result.value as Article) : null;
+}
+
+/**
+ * Collapse duplicate article rows that share the same feedId+guid into a
+ * single merged copy. Duplicates are a historical artifact of a
+ * concurrent-refresh race (now prevented at the source) or arrive from a
+ * sync peer that predates the fix; this removes any that already landed in
+ * storage.
+ *
+ * Grouping keys off the HMAC-hashed index fields, so feeds with no
+ * duplicates do zero decryption — only genuine duplicate groups are
+ * decrypted (to merge read/starred/muted state via `mergeDuplicateArticles`)
+ * and rewritten. A group is skipped if any copy fails to decrypt, so a row
+ * whose state we can't read is never deleted. Pass `feedId` to scope the
+ * pass to one feed (refresh self-heal); omit it to sweep every feed (boot
+ * migration). Returns the number of rows removed.
+ */
+export async function dedupeArticles(
+  feedId?: string,
+): Promise<Result<number>> {
+  try {
+    const ctx = requireOpen();
+    const table = ctx.db.table("articles");
+
+    const raws: DexieRecord[] =
+      feedId === undefined
+        ? await table.toArray()
+        : await table
+            .where("feedId")
+            .equals(await hmacIndex(ctx.hmacKey, feedId))
+            .toArray();
+
+    const groups = new Map<string, DexieRecord[]>();
+    for (const raw of raws) {
+      if (!raw.feedId || !raw.guid) continue;
+      const key = `${raw.feedId} ${raw.guid}`;
+      const existing = groups.get(key);
+      if (existing) existing.push(raw);
+      else groups.set(key, [raw]);
+    }
+
+    const keepers: Article[] = [];
+    const idsToDelete: string[] = [];
+
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      const decrypted = await Promise.all(
+        group.map((raw) => decryptRecord(ctx.cryptoKey, raw)),
+      );
+      if (decrypted.some((a) => a === null)) continue;
+      const articles = decrypted as Article[];
+      const [base, ...others] = articles;
+      keepers.push(mergeDuplicateArticles(base, others));
+      for (const raw of group) {
+        if (raw.id !== base.id) idsToDelete.push(raw.id);
+      }
+    }
+
+    if (keepers.length > 0) {
+      const records = await encryptRecords(keepers);
+      await table.bulkPut(records);
+    }
+    if (idsToDelete.length > 0) {
+      await table.bulkDelete(idsToDelete);
+    }
+    return ok(idsToDelete.length);
+  } catch (e) {
+    return err(`Failed to dedupe articles: ${(e as Error).message}`);
   }
 }
 

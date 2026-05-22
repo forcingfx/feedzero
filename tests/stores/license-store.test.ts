@@ -26,7 +26,7 @@ const personalToken = makeToken("personal");
 const proToken = makeToken("pro");
 
 function resetStore() {
-  useLicenseStore.setState({ tier: "free", verifying: false });
+  useLicenseStore.setState({ tier: "free", verifying: false, lastCheckedAt: null });
 }
 
 describe("useLicenseStore", () => {
@@ -141,6 +141,62 @@ describe("useLicenseStore", () => {
 
       await useLicenseStore.getState().refresh();
       expect(useLicenseStore.getState().tier).toBe("free");
+    });
+  });
+
+  describe("refresh — lastCheckedAt tracking", () => {
+    it("stamps lastCheckedAt when there is no token (definitive: free)", async () => {
+      const before = Date.now();
+      await useLicenseStore.getState().refresh();
+      const stamped = useLicenseStore.getState().lastCheckedAt;
+      expect(stamped).not.toBeNull();
+      expect(stamped as number).toBeGreaterThanOrEqual(before);
+    });
+
+    it("stamps lastCheckedAt when the server confirms the tier (200)", async () => {
+      setLicenseToken(personalToken);
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true, license: { tier: "personal" } }), {
+          status: 200,
+        }),
+      );
+      const before = Date.now();
+      await useLicenseStore.getState().refresh();
+      expect(useLicenseStore.getState().lastCheckedAt as number).toBeGreaterThanOrEqual(
+        before,
+      );
+    });
+
+    it("stamps lastCheckedAt when the server rejects the token (4xx)", async () => {
+      setLicenseToken(proToken);
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ ok: false, error: "revoked" }), {
+          status: 401,
+        }),
+      );
+      const before = Date.now();
+      await useLicenseStore.getState().refresh();
+      expect(useLicenseStore.getState().lastCheckedAt as number).toBeGreaterThanOrEqual(
+        before,
+      );
+    });
+
+    it("does NOT stamp lastCheckedAt on a transient 5xx (so focus retries sooner)", async () => {
+      setLicenseToken(personalToken);
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ ok: false, error: "bad gateway" }), {
+          status: 502,
+        }),
+      );
+      await useLicenseStore.getState().refresh();
+      expect(useLicenseStore.getState().lastCheckedAt).toBeNull();
+    });
+
+    it("does NOT stamp lastCheckedAt when the network fetch throws", async () => {
+      setLicenseToken(personalToken);
+      fetchMock.mockRejectedValue(new Error("offline"));
+      await useLicenseStore.getState().refresh();
+      expect(useLicenseStore.getState().lastCheckedAt).toBeNull();
     });
   });
 

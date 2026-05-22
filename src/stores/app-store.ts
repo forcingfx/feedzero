@@ -4,6 +4,7 @@ import {
   restore,
   destroy,
 } from "../core/storage/key-manager.ts";
+import { dedupeArticles } from "../core/storage/db.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { generatePassphrase } from "../core/crypto/passphrase-generator.ts";
@@ -80,6 +81,26 @@ function readGroupArticleFloods(): boolean {
     return localStorage.getItem(LOCAL_STORAGE.GROUP_ARTICLE_FLOODS) !== "false";
   } catch {
     return true;
+  }
+}
+
+/**
+ * One-time sweep that removes duplicate article rows left behind by the
+ * pre-fix concurrent-refresh race. Gated by a localStorage flag so it runs
+ * at most once per browser; the flag is only set on success, so a transient
+ * failure retries next boot. Refresh stays self-healing for future
+ * stragglers (see `dedupeArticles` in feed-service), so this is purely the
+ * immediate, network-independent cleanup of data that already landed.
+ */
+async function runDedupeMigrationOnce(): Promise<void> {
+  try {
+    if (localStorage.getItem(LOCAL_STORAGE.DEDUPE_MIGRATION) === "done") return;
+    const result = await dedupeArticles();
+    if (result.ok) {
+      localStorage.setItem(LOCAL_STORAGE.DEDUPE_MIGRATION, "done");
+    }
+  } catch {
+    // Best-effort cleanup — never block boot on it.
   }
 }
 
@@ -169,6 +190,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
         }
       }
+
+      await runDedupeMigrationOnce();
 
       set({ isDbReady: true, error: null });
     })().finally(() => {

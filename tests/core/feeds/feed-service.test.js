@@ -125,6 +125,7 @@ vi.mock("../../../src/core/storage/db.ts", () => {
       }
       return { ok: true, value: removed };
     }),
+    dedupeArticles: vi.fn(async () => ({ ok: true, value: 0 })),
     _reset: () => {
       feeds.clear();
       orphanUrls.clear();
@@ -534,6 +535,19 @@ describe("refreshFeed", () => {
 
     // Verify new article was stored
     expect(db.addArticles).toHaveBeenCalledTimes(2); // once for add, once for refresh
+  });
+
+  it("self-heals by deduping the feed's articles after a successful refresh", async () => {
+    const feed = await addTestFeed();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_XML),
+    });
+
+    await refreshFeed(feed);
+
+    expect(db.dedupeArticles).toHaveBeenCalledWith(feed.id);
   });
 
   it("should not create duplicates when refreshing with same articles", async () => {
