@@ -43,10 +43,6 @@ vi.mock("../../src/core/storage/db.ts", () => ({
   addFolder: vi.fn(),
   updateFolder: vi.fn(),
   removeFolder: vi.fn(),
-  // refreshView reloads the article store after refreshing, which queries
-  // these. Default to empty so the reload is a no-op unless a test overrides.
-  getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
-  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 vi.mock("../../src/core/feeds/feed-service.ts", () => ({
