@@ -82,6 +82,11 @@ interface FeedStore {
   isLoading: boolean;
   isRefreshingAll: boolean;
   refreshingFeedIds: Set<string>;
+  /**
+   * Epoch ms of the last completed refreshAll, or null if it hasn't run
+   * this session. Drives the focus-staleness check in useAutoRefresh.
+   */
+  lastRefreshAllAt: number | null;
   error: string | null;
   feedSortMode: FeedSortMode;
   feedCustomOrder: string[];
@@ -338,6 +343,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   isLoading: false,
   isRefreshingAll: false,
   refreshingFeedIds: new Set(),
+  lastRefreshAllAt: null,
   error: null,
   feedSortMode: readSortMode(),
   feedCustomOrder: readJsonArray(LOCAL_STORAGE.FEED_CUSTOM_ORDER),
@@ -486,7 +492,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       await reloadFeeds(set);
       schedulePush();
     } finally {
-      set({ isRefreshingAll: false });
+      set({ isRefreshingAll: false, lastRefreshAllAt: Date.now() });
     }
     // Fire-and-forget — refreshAll returns once the feeds are fresh,
     // prefetch continues in the background.

@@ -179,6 +179,29 @@ describe("MobileNavDrawer", () => {
     expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings");
   });
 
+  it("renders a 'Refresh all' row that refreshes every feed when feeds exist", async () => {
+    const { refreshAllFeeds } = await import("@/core/feeds/feed-service.ts");
+    const user = userEvent.setup();
+    useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
+    renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+
+    const refreshBtn = await screen.findByTestId("drawer-refresh-all");
+    await user.click(refreshBtn);
+
+    expect(refreshAllFeeds).toHaveBeenCalled();
+  });
+
+  it("hides the 'Refresh all' row when there are no feeds", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({ feeds: [] });
+    renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    // Settings is always present; refresh row is feed-gated.
+    await screen.findByRole("button", { name: "Settings" });
+    expect(screen.queryByTestId("drawer-refresh-all")).toBeNull();
+  });
+
   it("drawer body content has horizontal padding so feed/settings rows don't run edge-to-edge", async () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });

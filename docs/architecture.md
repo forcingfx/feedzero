@@ -213,7 +213,7 @@ main.tsx → app.tsx
 │   ├── components/feeds/ (feed-list, feed-item, add-feed-form)
 │   ├── components/articles/ (article-list, article-item)
 │   ├── components/reader/ (reader-panel, view-toggle, article-content)
-│   └── hooks/ (use-keyboard-nav, use-media-query)
+│   └── hooks/ (use-keyboard-nav, use-media-query, use-auto-refresh)
 └── index.css (Tailwind)
 ```
 

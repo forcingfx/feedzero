@@ -9,12 +9,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
+import { toast } from "sonner";
 import { FeedSettingsDialog } from "@/components/feeds/feed-settings-dialog.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import type { Feed, Folder } from "@/types/index.ts";
+
+vi.mock("sonner", () => ({ toast: vi.fn() }));
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -219,6 +222,43 @@ describe("FeedSettingsDialog", () => {
     renderDialog();
     await user.click(screen.getByTestId("feed-settings-clear-cache"));
     expect(reloadSingleFeed).toHaveBeenCalledWith("f-tech");
+  });
+
+  it("Refresh now shows a pending state and disables the actions while in flight", async () => {
+    const user = userEvent.setup();
+    let resolveRefresh!: () => void;
+    refreshSingleFeed.mockImplementation(
+      () => new Promise<void>((resolve) => { resolveRefresh = resolve; }),
+    );
+    useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+    renderDialog();
+
+    const refreshBtn = screen.getByTestId("feed-settings-refresh");
+    const clearBtn = screen.getByTestId("feed-settings-clear-cache");
+    await user.click(refreshBtn);
+
+    expect(refreshBtn).toBeDisabled();
+    expect(clearBtn).toBeDisabled();
+    expect(refreshBtn).toHaveTextContent(/Refreshing/i);
+
+    await act(async () => { resolveRefresh(); });
+    await waitFor(() => expect(refreshBtn).toBeEnabled());
+  });
+
+  it("Refresh now confirms completion with a toast", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+    renderDialog();
+    await user.click(screen.getByTestId("feed-settings-refresh"));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+  });
+
+  it("Clear cached articles confirms completion with a toast", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+    renderDialog();
+    await user.click(screen.getByTestId("feed-settings-clear-cache"));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
   });
 
   it("Delete button shows a confirmation, then calls removeFeed when confirmed", async () => {

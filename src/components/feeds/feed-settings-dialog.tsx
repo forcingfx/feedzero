@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   Settings2,
   RefreshCw,
@@ -295,6 +296,27 @@ function ActionsSection({ feed }: { feed: Feed }) {
   const reloadSingleFeed = useFeedStore((s) => s.reloadSingleFeed);
   const removeFeed = useFeedStore((s) => s.removeFeed);
   const close = useFeedStore((s) => s.closeFeedSettings);
+  const [busy, setBusy] = useState<"refresh" | "clear" | null>(null);
+
+  async function handleRefresh() {
+    setBusy("refresh");
+    try {
+      await refreshSingleFeed(feed.id);
+      toast("Feed refreshed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleClear() {
+    setBusy("clear");
+    try {
+      await reloadSingleFeed(feed.id);
+      toast("Cleared cached articles");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <section className="space-y-2">
@@ -305,18 +327,22 @@ function ActionsSection({ feed }: { feed: Feed }) {
           variant="outline"
           size="sm"
           data-testid="feed-settings-refresh"
-          onClick={() => refreshSingleFeed(feed.id)}
+          disabled={busy !== null}
+          onClick={handleRefresh}
         >
-          <RefreshCw className="size-4" /> Refresh now
+          <RefreshCw className={`size-4 ${busy === "refresh" ? "animate-spin" : ""}`} />
+          {busy === "refresh" ? "Refreshing…" : "Refresh now"}
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
           data-testid="feed-settings-clear-cache"
-          onClick={() => reloadSingleFeed(feed.id)}
+          disabled={busy !== null}
+          onClick={handleClear}
         >
-          <RotateCcw className="size-4" /> Clear cached articles
+          <RotateCcw className={`size-4 ${busy === "clear" ? "animate-spin" : ""}`} />
+          {busy === "clear" ? "Clearing…" : "Clear cached articles"}
         </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
