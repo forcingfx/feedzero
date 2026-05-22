@@ -13,10 +13,10 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Tests & type check
+  typecheck:
+    name: Type check
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -31,14 +31,79 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      # Coverage thresholds are enforced. Floors live in vitest.config.js.
-      # Current floor (post-uplift): branches 83 / functions 75 / lines 82 /
-      # statements 82. Ratchet target: 90/83/90/90, blocked on UI-component
-      # coverage. Do NOT lower these numbers — that is a regression by
-      # definition. `test:coverage` runs the full suite, so the separate
-      # `npm test` step above is no longer needed.
-      - name: Tests with coverage (thresholds enforced)
-        run: npm run test:coverage
+  # The unit suite is sharded across parallel runners to keep wall-clock low.
+  # Each shard collects coverage as a `blob` report (not a final report) and
+  # uploads it; the `coverage` job merges all shards and enforces thresholds
+  # against the *combined* result. Per-shard threshold checks are disabled
+  # here because a single shard only sees a fraction of the code and would
+  # always trip the floor — enforcement happens once, on the merge.
+  test:
+    name: Tests (shard ${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Tests with coverage (shard ${{ matrix.shard }}/3)
+        run: >-
+          npx vitest run --coverage --reporter=blob
+          --shard=${{ matrix.shard }}/3
+          --coverage.thresholds.lines=0
+          --coverage.thresholds.functions=0
+          --coverage.thresholds.statements=0
+          --coverage.thresholds.branches=0
+
+      - name: Upload coverage blob
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-blob-${{ matrix.shard }}
+          path: .vitest-reports/
+          include-hidden-files: true
+          retention-days: 1
+
+  # Merge the per-shard coverage blobs and enforce thresholds on the combined
+  # result. Floors live in vitest.config.js. Current floor (post-uplift):
+  # branches 83 / functions 75 / lines 82 / statements 82. Ratchet target:
+  # 90/83/90/90, blocked on UI-component coverage. Do NOT lower these numbers
+  # — that is a regression by definition.
+  coverage:
+    name: Coverage (merge + thresholds enforced)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: test
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download coverage blobs
+        uses: actions/download-artifact@v7
+        with:
+          pattern: coverage-blob-*
+          path: .vitest-reports/
+          merge-multiple: true
+
+      - name: Merge reports and enforce coverage thresholds
+        run: npx vitest run --merge-reports --coverage
 
       - name: Upload coverage artifact
         if: always()
@@ -55,7 +120,7 @@ jobs:
     name: Build (SPA + serverless functions)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: test
+    needs: [typecheck, coverage]
     steps:
       - uses: actions/checkout@v6
 
@@ -74,7 +139,7 @@ jobs:
     name: Build (self-hosted bundle)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: test
+    needs: [typecheck, coverage]
     # The default `build` job ships the Vercel-mode bundle (paid tier
     # visible). Self-hosters set VITE_SELF_HOSTED=1 before `npm run
     # build:all`, which flips the tier gates and hides the Subscribe UI
