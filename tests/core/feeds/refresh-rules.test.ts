@@ -40,6 +40,7 @@ vi.mock("../../../src/core/storage/db.ts", () => {
     }),
     updateArticles: vi.fn(async () => ({ ok: true, value: true })),
     updateFeed: vi.fn(async () => ({ ok: true, value: true })),
+    dedupeArticles: vi.fn(async () => ({ ok: true, value: 0 })),
     _articles: articles,
     _reset: () => articles.clear(),
   };

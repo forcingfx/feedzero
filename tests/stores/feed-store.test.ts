@@ -37,6 +37,8 @@ vi.mock("../../src/core/storage/db.ts", () => ({
   getFeed: vi.fn(),
   removeFeed: vi.fn(),
   updateFeed: vi.fn(),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   addFolder: vi.fn(),
   updateFolder: vi.fn(),
@@ -70,6 +72,7 @@ import {
   addPlaceholderFeed,
   refreshFeed,
   refreshAllFeeds,
+  reloadFeed,
 } from "../../src/core/feeds/feed-service.ts";
 import { prefetchStarredArticles } from "../../src/core/extractor/prefetch-service.ts";
 import {
@@ -576,6 +579,54 @@ describe("feed-store", () => {
 
       expect(getFeed).toHaveBeenCalledWith("f1");
       expect(refreshFeed).toHaveBeenCalledWith(feed);
+    });
+
+    it("ignores a second concurrent refresh of the same feed so articles aren't inserted twice", async () => {
+      const feed = mockFeed("f1", "Feed 1");
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
+
+      let resolveRefresh!: (value: {
+        ok: true;
+        value: { newCount: number; updatedCount: number };
+      }) => void;
+      vi.mocked(refreshFeed).mockReturnValue(
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+      );
+
+      const first = useFeedStore.getState().refreshSingleFeed("f1");
+      const second = useFeedStore.getState().refreshSingleFeed("f1");
+
+      resolveRefresh({ ok: true, value: { newCount: 2, updatedCount: 0 } });
+      await Promise.all([first, second]);
+
+      expect(refreshFeed).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("reloadSingleFeed", () => {
+    it("ignores a second concurrent reload of the same feed so articles aren't inserted twice", async () => {
+      const feed = mockFeed("f1", "Feed 1");
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
+
+      let resolveReload!: (value: {
+        ok: true;
+        value: { articleCount: number };
+      }) => void;
+      vi.mocked(reloadFeed).mockReturnValue(
+        new Promise((resolve) => {
+          resolveReload = resolve;
+        }),
+      );
+
+      const first = useFeedStore.getState().reloadSingleFeed("f1");
+      const second = useFeedStore.getState().reloadSingleFeed("f1");
+
+      resolveReload({ ok: true, value: { articleCount: 5 } });
+      await Promise.all([first, second]);
+
+      expect(reloadFeed).toHaveBeenCalledTimes(1);
     });
   });
 

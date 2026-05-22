@@ -500,6 +500,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   reloadSingleFeed: async (feedId) => {
+    if (get().refreshingFeedIds.has(feedId)) return;
     const ids = new Set(get().refreshingFeedIds);
     ids.add(feedId);
     set({ refreshingFeedIds: ids });
@@ -522,6 +523,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   refreshSingleFeed: async (feedId) => {
+    if (get().refreshingFeedIds.has(feedId)) return;
     const ids = new Set(get().refreshingFeedIds);
     ids.add(feedId);
     set({ refreshingFeedIds: ids });
