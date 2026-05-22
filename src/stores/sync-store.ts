@@ -16,7 +16,13 @@ import {
   persistDerivedKeysFromOpenDb,
   assertKeyDataCoupling,
 } from "../core/storage/key-manager.ts";
-import { close, deleteDatabase, open } from "../core/storage/db.ts";
+import {
+  close,
+  deleteDatabase,
+  open,
+  getPreferencesUpdatedAt,
+} from "../core/storage/db.ts";
+import type { VaultData } from "../core/sync/types.ts";
 import { clearLicenseToken } from "../core/license/license-token-store.ts";
 import type { Result } from "../utils/result.ts";
 import { ok, err } from "../utils/result.ts";
@@ -224,7 +230,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         return;
       }
 
-      const importResult = await importVault(pullResult.value);
+      const importResult = await importVault(
+        await gatePreferencesByTimestamp(pullResult.value),
+      );
       if (!importResult.ok) {
         set({ status: "error", error: importResult.error });
         return;
@@ -269,6 +277,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     await useFeedStore.getState().loadFeeds();
     const { useArticleStore } = await import("./article-store.ts");
     await useArticleStore.getState().preloadAll();
+    const { usePreferencesStore } = await import("./preferences-store.ts");
+    await usePreferencesStore.getState().reload();
 
     set({ status: "synced", lastSyncedAt: Date.now(), error: null });
     return ok({ feedCount: pullResult.value.feeds.length });
@@ -369,6 +379,31 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 }));
 
 /**
+ * Apply timestamp last-write-wins to the preferences carried by a pulled
+ * vault. The routine pull path (boot, refreshAll) does a pure replace via
+ * importVault, so without this guard a stale cloud copy would clobber a
+ * just-changed local preference — including the device's own debounced
+ * push not yet landed (the self-clobber-on-refresh race). When local
+ * preferences are at least as new as the cloud's, we strip them from the
+ * vault (set to undefined), which importAll reads as "no opinion — leave
+ * the local row untouched". Cloud-wins is intentionally NOT applied in
+ * forceResync / switchToExistingCloud, which are explicit cloud-authority
+ * actions.
+ */
+async function gatePreferencesByTimestamp(
+  vault: VaultData,
+): Promise<VaultData> {
+  if (vault.preferences === undefined) return vault;
+  const localTsResult = await getPreferencesUpdatedAt();
+  const localTs = localTsResult.ok ? (localTsResult.value ?? 0) : 0;
+  const cloudTs = vault.preferencesUpdatedAt ?? 0;
+  if (localTs >= cloudTs) {
+    return { ...vault, preferences: undefined, preferencesUpdatedAt: undefined };
+  }
+  return vault;
+}
+
+/**
  * Atomically replace local DB contents with a cloud-derived vault.
  *
  * **The fix for issue #117's key/data drift.** Previously the flow was
@@ -429,6 +464,8 @@ async function applyCloudVault(
   await useFeedStore.getState().loadFeeds();
   const { useArticleStore } = await import("./article-store.ts");
   await useArticleStore.getState().preloadAll();
+  const { usePreferencesStore } = await import("./preferences-store.ts");
+  await usePreferencesStore.getState().reload();
 
   return ok(true);
 }

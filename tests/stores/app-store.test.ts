@@ -21,10 +21,26 @@ vi.mock("../../src/core/storage/db.ts", () => ({
   dedupeArticles: vi.fn().mockResolvedValue({ ok: true, value: 0 }),
 }));
 
+// preferences-store hits db preference accessors not stubbed above; the
+// boot paths only need hydrate() to resolve, and resetAllStores calls
+// setState. Stub it so this file stays focused on app-store behavior.
+const hydrateMock = vi.fn().mockResolvedValue(undefined);
+vi.mock("../../src/stores/preferences-store.ts", () => ({
+  usePreferencesStore: {
+    getState: () => ({ hydrate: hydrateMock, reload: vi.fn() }),
+    setState: vi.fn(),
+  },
+}));
+
+vi.mock("../../src/stores/persist-preferences.ts", () => ({
+  persistPreferences: vi.fn(),
+}));
+
 import { initFresh, restore, destroy } from "../../src/core/storage/key-manager.ts";
 import { pullVault, importVault } from "../../src/core/sync/sync-service";
 import { dedupeArticles } from "../../src/core/storage/db.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
+import { persistPreferences } from "../../src/stores/persist-preferences.ts";
 
 const ONBOARDING_KEY = "feedzero:onboarding-complete";
 const DEDUPE_MIGRATION_KEY = "feedzero:dedupe-migration-v1";
@@ -137,22 +153,16 @@ describe("app-store", () => {
       expect(useAppStore.getState().groupArticleFloods).toBe(true);
     });
 
-    it("setGroupArticleFloods(false) updates state and writes 'false' to localStorage", () => {
+    it("setGroupArticleFloods(false) updates state and persists through the preferences store", () => {
       useAppStore.getState().setGroupArticleFloods(false);
       expect(useAppStore.getState().groupArticleFloods).toBe(false);
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:group-article-floods",
-        "false",
-      );
+      expect(persistPreferences).toHaveBeenCalledWith({ groupArticleFloods: false });
     });
 
-    it("setGroupArticleFloods(true) writes 'true' (used when user re-enables after disabling)", () => {
+    it("setGroupArticleFloods(true) persists through the preferences store (user re-enables)", () => {
       useAppStore.getState().setGroupArticleFloods(true);
       expect(useAppStore.getState().groupArticleFloods).toBe(true);
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:group-article-floods",
-        "true",
-      );
+      expect(persistPreferences).toHaveBeenCalledWith({ groupArticleFloods: true });
     });
   });
 

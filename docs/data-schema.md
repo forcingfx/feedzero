@@ -32,17 +32,35 @@ Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 | read        | boolean | Read status, default false          |
 | createdAt   | number  | Unix ms timestamp                   |
 
+### Preferences (synced user settings)
+
+A single encrypted row (`id` = `"preferences"`) holding the consolidated
+user settings that previously lived as loose localStorage keys. Synced via
+the vault with timestamp last-write-wins — see [ADR 022](decisions/022-preferences-sync-via-vault.md).
+
+| Field             | Type                                  | Description                       |
+|-------------------|---------------------------------------|-----------------------------------|
+| feedSortMode      | `"name" \| "count" \| "custom"`       | Sidebar feed ordering             |
+| feedCustomOrder   | string[]                              | Manual feed order (feed ids)      |
+| folderCustomOrder | string[]                              | Manual folder order (folder ids)  |
+| articleSortMode   | `"newest" \| "oldest" \| "unread-first"` | Article list ordering          |
+| groupArticleFloods| boolean                               | Collapse same-feed bursts         |
+| theme             | `"light" \| "dark" \| "system"`       | Reserved (wired in a follow-up)   |
+
 ### Meta (internal)
 
 | Field | Type   | Description          |
 |-------|--------|----------------------|
 | key   | string | Primary key          |
-| value | any    | Stored value (e.g., salt) |
+| value | any    | Stored value (e.g., `salt`, `preferencesUpdatedAt`) |
 
 ### IndexedDB Stores
 
 - `feeds` — keyPath: `id`, index: `url` (unique)
 - `articles` — keyPath: `id`, indexes: `feedId`, `[feedId+guid]` (compound)
+- `folders` — keyPath: `id`
+- `smartFilters` — keyPath: `id`
+- `preferences` — keyPath: `id` (single row)
 - `meta` — keyPath: `key`
 
 ### Encryption at Rest
@@ -67,12 +85,21 @@ The sync server stores encrypted vault blobs. The server never sees plaintext.
 
 #### VaultData (plaintext, client-side only)
 
-| Field      | Type      | Description                          |
-|------------|-----------|--------------------------------------|
-| version    | number    | Format version (currently 1)         |
-| exportedAt | number    | Unix ms timestamp of export          |
-| feeds      | Feed[]    | All feeds                            |
-| articles   | Article[] | All articles                         |
+| Field               | Type             | Description                                                |
+|---------------------|------------------|------------------------------------------------------------|
+| version             | number           | Format version (currently 3; informational only)          |
+| exportedAt          | number           | Unix ms timestamp of export                                |
+| feeds               | Feed[]           | All feeds                                                  |
+| articles            | Article[]        | All articles (content/summary stripped; see vault-format) |
+| folders             | Folder[]?        | Optional; omitted = "no opinion" (ADR 019)                 |
+| smartFilters        | SmartFilter[]?   | Optional; omitted = "no opinion" (ADR 019)                 |
+| preferences         | UserPreferences? | Optional; scalar record, timestamp LWW (ADR 022)           |
+| preferencesUpdatedAt| number?          | Epoch ms of last preferences write; drives the LWW merge   |
+
+Conflict resolution differs by field: id-keyed collections
+(`feeds`/`articles`/`folders`/`smartFilters`) merge by id/url with local
+winning on collision; `preferences` is a scalar record resolved by
+`preferencesUpdatedAt` (newer wins, ties favor local).
 
 #### EncryptedVault (stored on server)
 

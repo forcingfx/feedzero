@@ -50,6 +50,12 @@ vi.mock("../../src/stores/article-store", () => ({
   },
 }));
 
+vi.mock("../../src/stores/preferences-store", () => ({
+  usePreferencesStore: {
+    getState: () => ({ reload: vi.fn().mockResolvedValue(undefined) }),
+  },
+}));
+
 import {
   pushVault,
   pullVault,

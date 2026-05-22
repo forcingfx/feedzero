@@ -3,11 +3,22 @@ export const DB_NAME = "feedzero";
  * Dexie schema version. Bump when adding tables or changing indexes.
  *  4 → feeds, articles, folders, meta
  *  5 → + smartFilters (user-defined virtual feeds)
+ *  6 → + preferences (single-row synced user preferences)
  *
  * Dexie auto-creates new tables on open; no migration code needed
  * because each new table starts empty and existing tables are untouched.
  */
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
+
+/** Stable id of the single row in the `preferences` table. */
+export const PREFERENCES_ROW_ID = "preferences";
+
+/** Keys for the `meta` (key/value) table. */
+export const META_KEY = {
+  SALT: "salt",
+  /** Epoch ms of the last local preferences write; drives sync LWW. */
+  PREFERENCES_UPDATED_AT: "preferencesUpdatedAt",
+} as const;
 
 /**
  * OWASP-recommended PBKDF2-SHA256 iteration floor. Production always derives
@@ -237,5 +248,5 @@ export const SYNC = {
   /** Maximum vault payload size in bytes (5 MB). */
   MAX_VAULT_SIZE: 5 * 1024 * 1024,
   /** Sync data format version for forward compatibility. */
-  FORMAT_VERSION: 2,
+  FORMAT_VERSION: 3,
 } as const;

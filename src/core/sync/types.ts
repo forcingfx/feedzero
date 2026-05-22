@@ -1,4 +1,10 @@
-import type { Feed, Article, Folder, SmartFilter } from "../../types/index.ts";
+import type {
+  Feed,
+  Article,
+  Folder,
+  SmartFilter,
+  UserPreferences,
+} from "../../types/index.ts";
 import type { Result } from "../../utils/result.ts";
 
 /**
@@ -7,14 +13,21 @@ import type { Result } from "../../utils/result.ts";
  * Version history (the `version` field is informational; consumers must
  * tolerate older shapes — see the back-compat rule below):
  *  1 — feeds + articles only.
- *  2 — adds optional `folders` + `smartFilters` (this version).
+ *  2 — adds optional `folders` + `smartFilters`.
+ *  3 — adds optional `preferences` + `preferencesUpdatedAt` (this version).
  *
  * Back-compat rule (importVault, mergeVaults, importAll): a vault that
- * OMITS `folders` or `smartFilters` keys must NOT wipe the local rows.
- * `undefined` = "no opinion from the source"; `[]` = "the source has
- * zero rows" and is distinct from undefined. Without this the first
- * push from a pre-v2 client would silently delete a v2 client's
+ * OMITS `folders`, `smartFilters`, or `preferences` keys must NOT wipe the
+ * local rows. `undefined` = "no opinion from the source"; `[]` = "the
+ * source has zero rows" and is distinct from undefined. Without this the
+ * first push from an older client would silently delete a newer client's
  * organisational data.
+ *
+ * Conflict model: `feeds`/`articles`/`folders`/`smartFilters` are id-keyed
+ * collections merged by id/url (local wins on collision). `preferences` is
+ * a scalar record, so it CANNOT use that rule — a single object would never
+ * propagate from another device. It uses timestamp last-write-wins via
+ * `preferencesUpdatedAt` instead (newer wins; ties favor local).
  */
 export interface VaultData {
   version: number;
@@ -23,6 +36,9 @@ export interface VaultData {
   articles: Article[];
   folders?: Folder[];
   smartFilters?: SmartFilter[];
+  preferences?: UserPreferences;
+  /** Epoch ms of the last preferences write; drives the LWW merge. */
+  preferencesUpdatedAt?: number;
 }
 
 /** Encrypted vault as stored on the server. */

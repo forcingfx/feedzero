@@ -97,6 +97,8 @@ export async function exportVault(): Promise<Result<VaultData>> {
     })),
     folders: result.value.folders,
     smartFilters: result.value.smartFilters,
+    preferences: result.value.preferences ?? undefined,
+    preferencesUpdatedAt: result.value.preferencesUpdatedAt ?? undefined,
   });
 }
 
@@ -112,6 +114,8 @@ export async function importVault(vault: VaultData): Promise<Result<boolean>> {
     articles: vault.articles,
     folders: vault.folders,
     smartFilters: vault.smartFilters,
+    preferences: vault.preferences,
+    preferencesUpdatedAt: vault.preferencesUpdatedAt,
   });
 }
 
@@ -312,6 +316,14 @@ export function mergeVaults(
     cloudVault.smartFilters,
   );
 
+  // Preferences are a scalar record, not an id-keyed collection — pick the
+  // side written most recently (ties favor local). Whichever side is taken,
+  // its timestamp rides along so the result reflects the chosen state.
+  const { preferences, preferencesUpdatedAt } = mergePreferencesLatestWins(
+    localVault,
+    cloudVault,
+  );
+
   return ok({
     version: SYNC.FORMAT_VERSION,
     exportedAt: Date.now(),
@@ -319,7 +331,48 @@ export function mergeVaults(
     articles: mergedArticles,
     folders: mergedFolders,
     smartFilters: mergedSmartFilters,
+    preferences,
+    preferencesUpdatedAt,
   });
+}
+
+/**
+ * Last-write-wins selection for the scalar preferences record. The newer
+ * `preferencesUpdatedAt` wins; a tie favors local (matching the id-merge
+ * helper's local-bias). When only one side defines preferences, that side
+ * is taken regardless of its timestamp; when neither does, the result is
+ * undefined so the back-compat "no opinion" contract holds.
+ */
+function mergePreferencesLatestWins(
+  local: VaultData,
+  cloud: VaultData,
+): Pick<VaultData, "preferences" | "preferencesUpdatedAt"> {
+  if (local.preferences === undefined && cloud.preferences === undefined) {
+    return { preferences: undefined, preferencesUpdatedAt: undefined };
+  }
+  if (local.preferences === undefined) {
+    return {
+      preferences: cloud.preferences,
+      preferencesUpdatedAt: cloud.preferencesUpdatedAt,
+    };
+  }
+  if (cloud.preferences === undefined) {
+    return {
+      preferences: local.preferences,
+      preferencesUpdatedAt: local.preferencesUpdatedAt,
+    };
+  }
+  const useCloud =
+    (cloud.preferencesUpdatedAt ?? 0) > (local.preferencesUpdatedAt ?? 0);
+  return useCloud
+    ? {
+        preferences: cloud.preferences,
+        preferencesUpdatedAt: cloud.preferencesUpdatedAt,
+      }
+    : {
+        preferences: local.preferences,
+        preferencesUpdatedAt: local.preferencesUpdatedAt,
+      };
 }
 
 /**

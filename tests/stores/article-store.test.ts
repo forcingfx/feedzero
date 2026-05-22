@@ -17,11 +17,16 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
+vi.mock("../../src/stores/persist-preferences.ts", () => ({
+  persistPreferences: vi.fn(),
+}));
+
 import {
   getArticles,
   getAllArticles,
   updateArticle,
 } from "../../src/core/storage/db.ts";
+import { persistPreferences } from "../../src/stores/persist-preferences.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
 import {
   ALL_FEEDS_ID,
@@ -477,11 +482,9 @@ describe("article-store", () => {
       ]);
     });
 
-    it("persists the chosen mode to localStorage", () => {
+    it("persists the chosen mode through the preferences store", () => {
       useArticleStore.getState().setArticleSortMode("oldest");
-      expect(window.localStorage.getItem("feedzero:article-sort-mode")).toBe(
-        "oldest",
-      );
+      expect(persistPreferences).toHaveBeenCalledWith({ articleSortMode: "oldest" });
     });
 
     it("rejects unknown modes (no-op, keeps previous mode)", () => {

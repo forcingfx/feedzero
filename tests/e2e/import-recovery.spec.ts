@@ -85,7 +85,9 @@ test.describe("Import recovery — placeholder for rate-limited URLs", () => {
     await expect(
       page.getByText(/1 feed added.*1 queued for retry/i),
     ).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText(/Queued for retry/i)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Queued for retry \(\d+\)/i }),
+    ).toBeVisible();
 
     // Both feeds — the OK one and the placeholder — landed in the sidebar.
     // Navigate to /feeds and assert.

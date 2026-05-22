@@ -53,7 +53,11 @@ import {
   deleteDatabase,
   addFeed as dbAddFeed,
   getFeeds as dbGetFeeds,
+  putPreferences as dbPutPreferences,
+  getPreferences as dbGetPreferences,
+  setPreferencesUpdatedAt as dbSetPreferencesUpdatedAt,
 } from "../../src/core/storage/db.ts";
+import { DEFAULT_PREFERENCES } from "../../src/types/index.ts";
 import {
   initFresh,
   restore,
@@ -269,6 +273,61 @@ describe("sync-store ↔ db.ts integration", () => {
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
+    async function injectCredentials() {
+      const { addVaultKeys } = await import(
+        "../../src/core/storage/key-manager.ts"
+      );
+      const credsResult = await addVaultKeys(LOCAL_PASSPHRASE);
+      if (!credsResult.ok) throw new Error(credsResult.error);
+      useSyncStore.setState({ credentials: credsResult.value, status: "synced" });
+    }
+
+    it("keeps newer local preferences when the cloud copy is older (LWW)", async () => {
+      await injectCredentials();
+      const localPrefs = { ...DEFAULT_PREFERENCES, feedSortMode: "custom" as const };
+      await dbPutPreferences(localPrefs); // stamps ~now
+
+      pullVaultMock.mockResolvedValue({
+        ok: true,
+        value: {
+          version: 3,
+          exportedAt: Date.now(),
+          feeds: [],
+          articles: [],
+          preferences: { ...DEFAULT_PREFERENCES, feedSortMode: "count" as const },
+          preferencesUpdatedAt: 1000, // stale
+        },
+      });
+
+      await useSyncStore.getState().pull();
+
+      const prefs = await dbGetPreferences();
+      expect(prefs.ok && prefs.value).toEqual(localPrefs);
+    });
+
+    it("adopts cloud preferences when the cloud copy is newer (LWW)", async () => {
+      await injectCredentials();
+      await dbPutPreferences({ ...DEFAULT_PREFERENCES, feedSortMode: "custom" });
+      await dbSetPreferencesUpdatedAt(1000); // force local to be stale
+
+      const cloudPrefs = { ...DEFAULT_PREFERENCES, feedSortMode: "count" as const };
+      pullVaultMock.mockResolvedValue({
+        ok: true,
+        value: {
+          version: 3,
+          exportedAt: Date.now(),
+          feeds: [],
+          articles: [],
+          preferences: cloudPrefs,
+          preferencesUpdatedAt: 2000,
+        },
+      });
+
+      await useSyncStore.getState().pull();
+
+      const prefs = await dbGetPreferences();
+      expect(prefs.ok && prefs.value).toEqual(cloudPrefs);
+    });
   });
 
   describe("deactivateLocal", () => {

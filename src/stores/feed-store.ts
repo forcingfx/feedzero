@@ -31,6 +31,7 @@ import { retryFailedFavicons } from "../core/favicon/favicon-cache.ts";
 import { isPaidTierActive } from "../core/features/paid-tier-active.ts";
 import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
 import { isFeatureEnabled, enforceFeature } from "./enforce-feature.ts";
+import { persistPreferences } from "./persist-preferences.ts";
 import {
   CHANGELOG_FEED_URL,
   LOCAL_STORAGE,
@@ -691,18 +692,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   setFeedSortMode: (mode) => {
-    try { localStorage.setItem(LOCAL_STORAGE.FEED_SORT_MODE, mode); } catch { /* ignore */ }
     set({ feedSortMode: mode });
+    persistPreferences({ feedSortMode: mode });
   },
 
   reorderFeeds: (orderedIds) => {
-    try { localStorage.setItem(LOCAL_STORAGE.FEED_CUSTOM_ORDER, JSON.stringify(orderedIds)); } catch { /* ignore */ }
     set({ feedCustomOrder: orderedIds });
+    persistPreferences({ feedCustomOrder: orderedIds });
   },
 
   reorderFolders: (orderedIds) => {
-    try { localStorage.setItem(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER, JSON.stringify(orderedIds)); } catch { /* ignore */ }
     set({ folderCustomOrder: orderedIds });
+    persistPreferences({ folderCustomOrder: orderedIds });
   },
 
   setFolderOpen: (folderId, open) =>

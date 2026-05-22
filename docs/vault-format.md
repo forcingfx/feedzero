@@ -56,10 +56,14 @@ The **plaintext** vault, before encryption, is UTF-8 JSON conforming to this sha
 
 ```ts
 interface VaultData {
-  version: number;                 // SYNC.FORMAT_VERSION — currently 1
+  version: number;                 // SYNC.FORMAT_VERSION — currently 3 (informational)
   exportedAt: number;              // unix epoch ms when the vault was packed
   feeds: Feed[];                   // every feed in the vault
   articles: Article[];             // every article in the vault
+  folders?: Folder[];              // v2+; omitted = "no opinion" (don't wipe local)
+  smartFilters?: SmartFilter[];    // v2+; omitted = "no opinion"
+  preferences?: UserPreferences;   // v3+; scalar settings, timestamp LWW
+  preferencesUpdatedAt?: number;   // v3+; epoch ms of last preferences write
 }
 
 interface Feed {
@@ -151,7 +155,7 @@ export async function decryptVaultData(passphrase: string, blob: EncryptedVault)
 }
 ```
 
-That is sufficient to read any FeedZero vault, ours or yours, today and forever as long as `SYNC.FORMAT_VERSION === 1`.
+That is sufficient to read any FeedZero vault, ours or yours. Versions 2 and 3 only **add optional** fields (`folders`/`smartFilters`, then `preferences`/`preferencesUpdatedAt`), so this decryptor keeps working unchanged — older readers simply ignore fields they don't know.
 
 ## Local IndexedDB encryption (different format)
 
@@ -161,7 +165,7 @@ If you want to read the local Dexie database directly, see `src/core/storage/db.
 
 ## Format versioning
 
-`SYNC.FORMAT_VERSION` is incremented when the on-disk shape of `VaultData` changes incompatibly. The current version is **1**.
+`SYNC.FORMAT_VERSION` is incremented when the shape of `VaultData` changes. The current version is **3**. Bumps so far have been backward-compatible — they only add optional fields (v2: `folders`/`smartFilters`; v3: `preferences`/`preferencesUpdatedAt`) — so the field is informational and consumers must tolerate any shape rather than switching on it.
 
 When we change the format we will:
 

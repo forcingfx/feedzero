@@ -5,6 +5,7 @@ import { useSyncStore } from "../../src/stores/sync-store.ts";
 import { useLicenseStore } from "../../src/stores/license-store.ts";
 import { isSelfHosted } from "../../src/core/features/self-hosted.ts";
 import { isPaidTierActive } from "../../src/core/features/paid-tier-active.ts";
+import { persistPreferences } from "../../src/stores/persist-preferences.ts";
 import { toast } from "sonner";
 
 vi.mock("../../src/core/features/self-hosted.ts", () => ({
@@ -43,6 +44,10 @@ vi.mock("../../src/core/storage/db.ts", () => ({
   addFolder: vi.fn(),
   updateFolder: vi.fn(),
   removeFolder: vi.fn(),
+}));
+
+vi.mock("../../src/stores/persist-preferences.ts", () => ({
+  persistPreferences: vi.fn(),
 }));
 
 vi.mock("../../src/core/feeds/feed-service.ts", () => ({
@@ -1252,13 +1257,9 @@ describe("feed-store", () => {
   });
 
   describe("feed sort mode", () => {
-    const LS_SORT_MODE = "feedzero:feed-sort-mode";
-    const LS_FEED_ORDER = "feedzero:feed-custom-order";
-    const LS_FOLDER_ORDER = "feedzero:folder-custom-order";
-
     beforeEach(() => {
       localStorageMock.clear();
-      // Re-initialize sort mode from now-empty storage
+      vi.mocked(persistPreferences).mockClear();
       useFeedStore.setState({ feedSortMode: "name", feedCustomOrder: [], folderCustomOrder: [] });
     });
 
@@ -1271,9 +1272,9 @@ describe("feed-store", () => {
       expect(useFeedStore.getState().feedSortMode).toBe("count");
     });
 
-    it("setFeedSortMode persists to localStorage", () => {
+    it("setFeedSortMode persists through the preferences store", () => {
       useFeedStore.getState().setFeedSortMode("custom");
-      expect(localStorage.getItem(LS_SORT_MODE)).toBe("custom");
+      expect(persistPreferences).toHaveBeenCalledWith({ feedSortMode: "custom" });
     });
 
     it("reorderFeeds updates feedCustomOrder", () => {
@@ -1281,9 +1282,9 @@ describe("feed-store", () => {
       expect(useFeedStore.getState().feedCustomOrder).toEqual(["f3", "f1", "f2"]);
     });
 
-    it("reorderFeeds persists to localStorage as JSON", () => {
+    it("reorderFeeds persists the order through the preferences store", () => {
       useFeedStore.getState().reorderFeeds(["f2", "f1"]);
-      expect(localStorage.getItem(LS_FEED_ORDER)).toBe(JSON.stringify(["f2", "f1"]));
+      expect(persistPreferences).toHaveBeenCalledWith({ feedCustomOrder: ["f2", "f1"] });
     });
 
     it("reorderFolders updates folderCustomOrder", () => {
@@ -1291,9 +1292,9 @@ describe("feed-store", () => {
       expect(useFeedStore.getState().folderCustomOrder).toEqual(["folder-b", "folder-a"]);
     });
 
-    it("reorderFolders persists to localStorage as JSON", () => {
+    it("reorderFolders persists the order through the preferences store", () => {
       useFeedStore.getState().reorderFolders(["folder-b", "folder-a"]);
-      expect(localStorage.getItem(LS_FOLDER_ORDER)).toBe(JSON.stringify(["folder-b", "folder-a"]));
+      expect(persistPreferences).toHaveBeenCalledWith({ folderCustomOrder: ["folder-b", "folder-a"] });
     });
   });
 });
