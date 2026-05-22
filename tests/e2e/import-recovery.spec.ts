@@ -103,6 +103,19 @@ test.describe("Import recovery — placeholder for rate-limited URLs", () => {
     const failedIndicator = page.getByTestId("failed-feed-indicator");
     await expect(failedIndicator).toHaveCount(1);
 
+    // The local-user boot path fires a refreshAll() (app.tsx) the moment the
+    // DB is ready, and navigating to /feeds above re-triggered it. That boot
+    // refresh runs while the mock is still in the "rate-limited" phase, so it
+    // legitimately leaves the placeholder failed. But refreshAll() no-ops
+    // while another refresh is in flight (feed-store guard), so pressing "r"
+    // before the boot refresh settles would have our keypress swallowed — the
+    // feed would never get re-fetched in the recovered phase. Wait for the
+    // in-flight refresh to finish (the sidebar Refresh button re-enables)
+    // before flipping the phase, so the keypress drives a real refresh.
+    await expect(
+      page.getByRole("button", { name: "Refresh", exact: true }),
+    ).toBeEnabled({ timeout: 15000 });
+
     // Phase 2: flip the mock so rate-limited.* now returns 200. Hit "r"
     // to refresh all feeds. The placeholder upgrades in place: indicator
     // clears, title backfills.
