@@ -71,7 +71,8 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
-import { getFeeds, getFeed, removeFeed, updateFeed, getFolders, addFolder, updateFolder, removeFolder } from "../../src/core/storage/db.ts";
+import { getFeeds, getFeed, removeFeed, updateFeed, getFolders, addFolder, updateFolder, removeFolder, getArticles } from "../../src/core/storage/db.ts";
+import { ALL_FEEDS_ID, toFolderFeedId } from "../../src/utils/constants.ts";
 import {
   addFeedFlow,
   addPlaceholderFeed,
@@ -102,7 +103,11 @@ describe("feed-store", () => {
       feeds: [],
       folders: [],
       selectedFeedId: null,
+      recentFeedIds: [],
       isLoading: false,
+      isRefreshingAll: false,
+      refreshingFeedIds: new Set(),
+      lastRefreshAllAt: null,
       error: null,
     });
     vi.clearAllMocks();
@@ -443,6 +448,17 @@ describe("feed-store", () => {
       expect(useFeedStore.getState().feeds).toEqual([]);
       expect(useFeedStore.getState().selectedFeedId).toBeNull();
     });
+
+    it("prunes the removed feed from the quick-switch recency list", async () => {
+      const feed = mockFeed("x", "X");
+      useFeedStore.setState({ feeds: [feed], recentFeedIds: ["x", "y"] });
+      vi.mocked(removeFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().removeFeed("x");
+
+      expect(useFeedStore.getState().recentFeedIds).toEqual(["y"]);
+    });
   });
 
   describe("renameFeed", () => {
@@ -493,6 +509,29 @@ describe("feed-store", () => {
     it("sets selectedFeedId", () => {
       useFeedStore.getState().selectFeed("abc");
       expect(useFeedStore.getState().selectedFeedId).toBe("abc");
+    });
+
+    it("records the viewed feed as most-recent for the quick-switch dock", () => {
+      useFeedStore.setState({ recentFeedIds: ["feed-2"] });
+      useFeedStore.getState().selectFeed("feed-1");
+      expect(useFeedStore.getState().recentFeedIds).toEqual(["feed-1", "feed-2"]);
+    });
+
+    it("persists the recency list so the dock survives a reload", () => {
+      useFeedStore.setState({ recentFeedIds: [] });
+      useFeedStore.getState().selectFeed("feed-1");
+      expect(localStorage.setItem).toHaveBeenCalledWith(
+        "feedzero:recent-feed-ids",
+        JSON.stringify(["feed-1"]),
+      );
+    });
+
+    it("does not record aggregated views (All / Starred / smart-filter) — they have no favicon", () => {
+      useFeedStore.setState({ recentFeedIds: [] });
+      useFeedStore.getState().selectFeed("all");
+      useFeedStore.getState().selectFeed("starred");
+      useFeedStore.getState().selectFeed("filter:abc-123");
+      expect(useFeedStore.getState().recentFeedIds).toEqual([]);
     });
   });
 
@@ -632,6 +671,102 @@ describe("feed-store", () => {
       await Promise.all([first, second]);
 
       expect(reloadFeed).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("refreshView", () => {
+    it("refreshes only the viewed feed when a concrete feed is selected", async () => {
+      const f1 = mockFeed("f1", "Feed 1");
+      const f2 = mockFeed("f2", "Feed 2");
+      useFeedStore.setState({ feeds: [f1, f2] });
+      vi.mocked(refreshFeed).mockResolvedValue({
+        ok: true,
+        value: { newCount: 1, updatedCount: 0 },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1, f2] });
+
+      await useFeedStore.getState().refreshView("f1");
+
+      expect(refreshFeed).toHaveBeenCalledTimes(1);
+      expect(refreshFeed).toHaveBeenCalledWith(f1);
+      expect(refreshAllFeeds).not.toHaveBeenCalled();
+    });
+
+    it("refreshes only the folder's member feeds when a folder is viewed", async () => {
+      const f1 = { ...mockFeed("f1", "Feed 1"), folderId: "tech" };
+      const f2 = { ...mockFeed("f2", "Feed 2"), folderId: "tech" };
+      const f3 = mockFeed("f3", "Feed 3");
+      useFeedStore.setState({ feeds: [f1, f2, f3] });
+      vi.mocked(refreshFeed).mockResolvedValue({
+        ok: true,
+        value: { newCount: 0, updatedCount: 0 },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1, f2, f3] });
+
+      await useFeedStore.getState().refreshView(toFolderFeedId("tech"));
+
+      expect(refreshFeed).toHaveBeenCalledTimes(2);
+      expect(refreshFeed).toHaveBeenCalledWith(f1);
+      expect(refreshFeed).toHaveBeenCalledWith(f2);
+      expect(refreshFeed).not.toHaveBeenCalledWith(f3);
+      expect(refreshAllFeeds).not.toHaveBeenCalled();
+    });
+
+    it("refreshes every feed when an aggregated view (all items) is selected", async () => {
+      const f1 = mockFeed("f1", "Feed 1");
+      useFeedStore.setState({ feeds: [f1] });
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1] });
+
+      await useFeedStore.getState().refreshView(ALL_FEEDS_ID);
+
+      expect(refreshAllFeeds).toHaveBeenCalled();
+      expect(refreshFeed).not.toHaveBeenCalled();
+    });
+
+    it("reloads the viewed feed's articles so new items appear in place", async () => {
+      const f1 = mockFeed("f1", "Feed 1");
+      useFeedStore.setState({ feeds: [f1] });
+      vi.mocked(refreshFeed).mockResolvedValue({
+        ok: true,
+        value: { newCount: 1, updatedCount: 0 },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1] });
+
+      await useFeedStore.getState().refreshView("f1");
+
+      expect(getArticles).toHaveBeenCalledWith("f1");
+    });
+
+    it("only stamps lastRefreshAllAt on a full refresh, not a scoped one", async () => {
+      const f1 = mockFeed("f1", "Feed 1");
+      useFeedStore.setState({ feeds: [f1], lastRefreshAllAt: null });
+      vi.mocked(refreshFeed).mockResolvedValue({
+        ok: true,
+        value: { newCount: 0, updatedCount: 0 },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [f1] });
+
+      await useFeedStore.getState().refreshView("f1");
+
+      // A single-feed refresh must not reset the all-feeds staleness clock,
+      // otherwise the background auto-refresh would skip a needed full pass.
+      expect(useFeedStore.getState().lastRefreshAllAt).toBeNull();
+    });
+
+    it("no-ops while a refresh is already in flight", async () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Feed 1")],
+        isRefreshingAll: true,
+      });
+
+      await useFeedStore.getState().refreshView("f1");
+
+      expect(refreshFeed).not.toHaveBeenCalled();
+      expect(refreshAllFeeds).not.toHaveBeenCalled();
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer.tsx";
@@ -60,6 +60,7 @@ describe("MobileNavDrawer", () => {
     useFeedStore.setState({
       feeds: [],
       selectedFeedId: null,
+      recentFeedIds: [],
       isLoading: false,
       error: null,
       isRefreshingAll: false,
@@ -76,6 +77,100 @@ describe("MobileNavDrawer", () => {
   it("renders a handle strip that is always present in the DOM", () => {
     const { container } = renderDrawer();
     expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
+  });
+
+  describe("closed-state quick-switch dock", () => {
+    it("shows the selected feed's favicons in the closed strip (no drawer open needed)", () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("f1", "Hacker News"), makeFeed("f2", "The Verge")],
+        recentFeedIds: ["f1", "f2"],
+      });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      // Favicon buttons are labelled by feed title and present while closed.
+      expect(within(strip).getByRole("button", { name: "Hacker News" })).toBeInTheDocument();
+      expect(within(strip).getByRole("button", { name: "The Verge" })).toBeInTheDocument();
+    });
+
+    it("anchors an All-items quick button in the closed strip", () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      expect(within(strip).getByRole("button", { name: "All items" })).toBeInTheDocument();
+    });
+
+    it("switches feed when a dock favicon is tapped, without opening the drawer", async () => {
+      const user = userEvent.setup();
+      const onFeedSelect = vi.fn();
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")], recentFeedIds: ["f1"] });
+      renderDrawer({ onFeedSelect });
+
+      const strip = screen.getByTestId("drawer-handle-strip");
+      await user.click(within(strip).getByRole("button", { name: "Hacker News" }));
+
+      expect(onFeedSelect).toHaveBeenCalledWith("f1");
+      // Drawer stays closed: the open-chevron must not be rotated.
+      expect(screen.getByTestId("drawer-open-chevron").className).not.toContain("rotate-180");
+    });
+
+    it("switches to All items when the anchored dock button is tapped", async () => {
+      const user = userEvent.setup();
+      const onFeedSelect = vi.fn();
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
+      renderDrawer({ onFeedSelect });
+
+      const strip = screen.getByTestId("drawer-handle-strip");
+      await user.click(within(strip).getByRole("button", { name: "All items" }));
+
+      expect(onFeedSelect).toHaveBeenCalledWith("all");
+    });
+
+    it("orders dock favicons most-recently-viewed first", () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("f1", "Alpha"), makeFeed("f2", "Bravo"), makeFeed("f3", "Charlie")],
+        recentFeedIds: ["f3", "f1"],
+      });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      const labels = within(strip)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label"));
+      // After the anchored "All items", recency order wins: f3, f1, then the
+      // never-viewed f2; the open-list chevron trails.
+      expect(labels).toEqual([
+        "All items",
+        "Charlie",
+        "Alpha",
+        "Bravo",
+        "Open feed list",
+      ]);
+    });
+
+    it("caps the number of dock favicons and leaves the rest behind the full list", () => {
+      useFeedStore.setState({
+        feeds: Array.from({ length: 20 }, (_, i) => makeFeed(`f${i}`, `Feed ${i}`)),
+      });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      const faviconButtons = within(strip)
+        .getAllByRole("button")
+        .filter((b) => /^Feed \d+$/.test(b.getAttribute("aria-label") ?? ""));
+      expect(faviconButtons.length).toBeLessThanOrEqual(6);
+      expect(faviconButtons.length).toBeGreaterThan(0);
+    });
+
+    it("marks the active feed's dock button as pressed", () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("f1", "Hacker News")],
+        recentFeedIds: ["f1"],
+        selectedFeedId: "f1",
+      });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      expect(
+        within(strip).getByRole("button", { name: "Hacker News" }),
+      ).toHaveAttribute("aria-pressed", "true");
+    });
   });
 
   it("renders 'All items' entry when drawer is open and there are feeds", async () => {
@@ -337,7 +432,7 @@ describe("MobileNavDrawer", () => {
 
     async function getDrawerScroll(): Promise<HTMLElement> {
       const { container } = renderDrawer();
-      await userEvent.click(screen.getByTestId("drawer-handle-strip"));
+      await userEvent.click(screen.getByRole("button", { name: "Open feed list" }));
       const scroll = await waitFor(() => {
         const s = container.ownerDocument.querySelector(
           "[data-testid='drawer-scroll']",
@@ -386,7 +481,7 @@ describe("MobileNavDrawer", () => {
     const doc = container.ownerDocument;
 
     // Starts collapsed — chevron points up (no rotate-180)
-    const chevronBefore = doc.querySelector("[data-testid='drawer-handle-strip'] svg:last-child");
+    const chevronBefore = doc.querySelector("[data-testid='drawer-open-chevron']");
     expect(chevronBefore?.getAttribute("class")).not.toContain("rotate-180");
 
     // Dispatch the toggle event
@@ -394,7 +489,7 @@ describe("MobileNavDrawer", () => {
 
     // Drawer should now be open — chevron rotates 180°
     await waitFor(() => {
-      const chevron = doc.querySelector("[data-testid='drawer-handle-strip'] svg:last-child");
+      const chevron = doc.querySelector("[data-testid='drawer-open-chevron']");
       expect(chevron?.getAttribute("class")).toContain("rotate-180");
     });
   });

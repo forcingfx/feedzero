@@ -151,13 +151,17 @@ export function MobileHeaderPills() {
 }
 
 /**
- * Refresh-every-feed control for the mobile header. The desktop refresh
- * lives in the sidebar header, which mobile never renders — without this
- * the only way to refresh on mobile was the (also-hidden) keyboard `r`.
+ * Refresh control for the mobile header. The desktop refresh lives in the
+ * sidebar header, which mobile never renders — without this the only way to
+ * refresh on mobile was the (also-hidden) keyboard `r`. Scoped to the current
+ * view via `refreshView`: a single feed refreshes only that feed, a folder
+ * only its members, an aggregated view (All / Starred / filter) every feed.
  * Hidden when there are no feeds, mirroring the desktop button.
  */
 function RefreshPill() {
   const feeds = useFeedStore((s) => s.feeds);
+  const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
+  const refreshView = useFeedStore((s) => s.refreshView);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
 
@@ -166,11 +170,13 @@ function RefreshPill() {
   return (
     <ExpandingPill
       icon={<RefreshCw className={isRefreshingAll ? "animate-spin" : ""} />}
-      label={isRefreshingAll ? "Refreshing…" : "Refresh all"}
-      aria-label="Refresh all feeds"
-      dataTestId="mobile-refresh-all"
+      label={isRefreshingAll ? "Refreshing…" : "Refresh"}
+      aria-label="Refresh"
+      dataTestId="mobile-refresh"
       disabled={isRefreshingAll}
-      onClick={() => void refreshAll()}
+      onClick={() =>
+        void (selectedFeedId ? refreshView(selectedFeedId) : refreshAll())
+      }
     />
   );
 }

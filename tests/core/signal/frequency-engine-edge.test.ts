@@ -44,10 +44,31 @@ function makeArticle(
 const FEEDS: Feed[] = Array.from({ length: 6 }, (_, i) => makeFeed(`f${i + 1}`));
 
 describe("frequency engine — edge cases", () => {
-  it("dedupes near-identical syndicated articles by normalized title", () => {
+  it("never anchors a topic on a bare common noun", () => {
     const articles: Article[] = [];
-    // 60 distinct headlines mostly, but one story syndicated across 6 feeds
-    // with slight punctuation variation. After dedupe, only one should survive.
+    // 60 headlines whose only shared word is the common noun "tariffs",
+    // which appears lowercase in bodies — so it must NOT form a topic.
+    for (let i = 0; i < 60; i++) {
+      articles.push(
+        makeArticle(
+          `a-${i}`,
+          `f${(i % 6) + 1}`,
+          `Tariffs shift trade number ${i}`,
+          i % 6,
+          `Analysts said tariffs would ripple as tariffs rose again number ${i}.`,
+        ),
+      );
+    }
+    const result = generateReport(articles, { feeds: FEEDS }, NOW);
+    expect(isOk(result)).toBe(true);
+    if (!result.ok) return;
+    const terms = result.value.topics.map((t) => t.term);
+    expect(terms).not.toContain("tariff");
+    expect(terms).not.toContain("tariffs");
+  });
+
+  it("collapses a syndicated story into one multi-outlet story, not a fake cluster", () => {
+    const articles: Article[] = [];
     for (let i = 0; i < 54; i++) {
       articles.push(makeArticle(`a-${i}`, `f${(i % 6) + 1}`, `Unique headline number ${i}`, i % 6));
     }
@@ -65,17 +86,16 @@ describe("frequency engine — edge cases", () => {
     const result = generateReport(articles, { feeds: FEEDS }, NOW);
     expect(isOk(result)).toBe(true);
     if (!result.ok) return;
-    // After dedupe, "mayor" / "resign" / "breaking" should NOT form a
-    // cross-feed cluster — they only survive on one article.
+    // "mayor" alone is a single deduped story across one normalized title —
+    // it must not masquerade as a cross-feed topic.
     const mayorTopic = result.value.topics.find((t) => t.term === "mayor");
     expect(mayorTopic).toBeUndefined();
   });
 
-  it("produces no topics when corpus is ≥ 100 articles but every term lives in one feed", () => {
+  it("produces no topics when every entity lives in one feed", () => {
     const articles: Article[] = [];
-    // 60 articles, all on f1, all distinct words.
     for (let i = 0; i < 60; i++) {
-      articles.push(makeArticle(`a-${i}`, "f1", `Singleton subject ${i}`, i % 6));
+      articles.push(makeArticle(`a-${i}`, "f1", `Solo Subject ${i}`, i % 6));
     }
     const result = generateReport(articles, { feeds: FEEDS }, NOW);
     expect(isOk(result)).toBe(true);
@@ -83,43 +103,44 @@ describe("frequency engine — edge cases", () => {
     expect(result.value.topics).toEqual([]);
   });
 
-  it("falls back to body tokens when the title yields nothing useful", () => {
+  it("detects an entity that only appears in the article body", () => {
     const articles: Article[] = [];
     for (let i = 0; i < 60; i++) {
-      // Title is just punctuation/numbers — nothing tokenizable.
       articles.push(
         makeArticle(
           `a-${i}`,
           `f${(i % 6) + 1}`,
           `... ${i}`,
           i % 6,
-          `OpenAI shipped quarterly results outpacing analyst forecasts ${i}`,
+          `Reports said OpenAI outpaced rivals as OpenAI expanded number ${i}.`,
         ),
       );
     }
     const result = generateReport(articles, { feeds: FEEDS }, NOW);
     expect(isOk(result)).toBe(true);
     if (!result.ok) return;
-    const terms = result.value.topics.map((t) => t.term);
-    expect(terms).toContain("openai");
+    expect(result.value.topics.map((t) => t.term)).toContain("openai");
   });
 
   it("is deterministic across two runs on the same input", () => {
     const articles: Article[] = [];
     for (let i = 0; i < 60; i++) {
       const cluster = i % 3;
-      const word = cluster === 0 ? "OpenAI" : cluster === 1 ? "Tariffs" : "Election";
+      const word = cluster === 0 ? "OpenAI" : cluster === 1 ? "Tesla" : "Reuters";
       articles.push(makeArticle(`a-${i}`, `f${(i % 6) + 1}`, `${word} update number ${i}`, i % 6));
     }
     const first = generateReport(articles, { feeds: FEEDS }, NOW);
     const second = generateReport([...articles].reverse(), { feeds: FEEDS }, NOW);
     expect(isOk(first) && isOk(second)).toBe(true);
     if (!first.ok || !second.ok) return;
-    // Ignore corpus stats (they're equal anyway); compare topic order +
-    // article ids strictly.
-    const firstShape = first.value.topics.map((t) => ({ term: t.term, ids: [...t.articleIds] }));
-    const secondShape = second.value.topics.map((t) => ({ term: t.term, ids: [...t.articleIds] }));
-    expect(secondShape).toEqual(firstShape);
+    const shape = (r: typeof first) =>
+      r.ok
+        ? r.value.topics.map((t) => ({
+            term: t.term,
+            stories: t.stories.map((s) => [...s.articleIds]),
+          }))
+        : null;
+    expect(shape(second)).toEqual(shape(first));
   });
 
   it("does not throw on non-English content; just produces fewer topics", () => {
@@ -132,14 +153,11 @@ describe("frequency engine — edge cases", () => {
     expect(isOk(result)).toBe(true);
   });
 
-  it("respects the per-topic claim cap so a dominant term cannot swallow the corpus", () => {
+  it("respects the per-topic claim cap so a dominant entity cannot swallow the corpus", () => {
     const articles: Article[] = [];
-    // 100 articles, all about openai, but tokens vary so other terms could
-    // still form clusters if the cap didn't apply. Each article also
-    // contains a distinct second proper noun to seed a smaller cluster.
     for (let i = 0; i < 100; i++) {
       articles.push(
-        makeArticle(`a-${i}`, `f${(i % 6) + 1}`, `OpenAI partners with Acme Corp ${i}`, i % 5),
+        makeArticle(`a-${i}`, `f${(i % 6) + 1}`, `OpenAI ships product number ${i}`, i % 5),
       );
     }
     const result = generateReport(articles, { feeds: FEEDS }, NOW);
@@ -147,12 +165,8 @@ describe("frequency engine — edge cases", () => {
     if (!result.ok) return;
     const openai = result.value.topics.find((t) => t.term === "openai");
     expect(openai).toBeDefined();
-    // Cluster cap = ceil(N/SIGNAL_TOPIC_TARGET) + 5 with N=100 → 15. So
-    // openai may claim up to 15 articles even though the corpus has 100
-    // openai-themed ones — the cap prevents page-swallow.
-    expect(openai!.totalArticlesInCluster).toBeLessThanOrEqual(15);
-    // Storage cap is generous so the page can offer an "expand" affordance,
-    // but still bounded.
-    expect(openai!.articleIds.length).toBeLessThanOrEqual(30);
+    // Cap = ceil(N/SIGNAL_TOPIC_TARGET) + 5 with N=100 → 15 representatives.
+    expect(openai!.totalStories).toBeLessThanOrEqual(15);
+    expect(openai!.stories.length).toBeLessThanOrEqual(30);
   });
 });

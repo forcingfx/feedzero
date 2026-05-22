@@ -9,7 +9,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useLicenseStore } from "@/stores/license-store.ts";
 import { isSelfHosted } from "@/core/features/self-hosted.ts";
 import { isPaidTierActive } from "@/core/features/paid-tier-active.ts";
-import { SIGNAL_CORPUS_GATE } from "@/core/signal/types.ts";
+import { SIGNAL_CORPUS_GATE, SIGNAL_REPORT_SCHEMA_VERSION } from "@/core/signal/types.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
 vi.mock("@/core/features/self-hosted.ts", () => ({ isSelfHosted: vi.fn(() => false) }));
@@ -17,6 +17,23 @@ vi.mock("@/core/features/paid-tier-active.ts", () => ({ isPaidTierActive: vi.fn(
 
 const NOW = new Date("2026-05-21T12:00:00Z").getTime();
 const DAY = 24 * 60 * 60 * 1000;
+
+// 12 distinct OpenAI headlines — each becomes its own story (low mutual
+// title overlap), so the cluster has many stories to page through.
+const OPENAI_HEADLINES = [
+  "OpenAI ships a release",
+  "OpenAI hires a team",
+  "OpenAI cuts prices",
+  "OpenAI faces a lawsuit",
+  "OpenAI updates safety policy",
+  "OpenAI hosts a developer event",
+  "OpenAI buys a startup",
+  "OpenAI rolls back a feature",
+  "OpenAI funds a grant",
+  "OpenAI beats revenue forecast",
+  "OpenAI expands cloud capacity",
+  "OpenAI opens an office",
+];
 
 function makeFeed(id: string, title?: string): Feed {
   return {
@@ -47,6 +64,45 @@ function makeArticle(id: string, feedId: string, title: string, ageDays: number)
   };
 }
 
+/**
+ * A corpus with one OpenAI topic: 12 distinct stories, one of them
+ * syndicated verbatim across three outlets, plus entity-free noise so the
+ * total clears the gate.
+ */
+function seedReadyCorpus() {
+  const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`, `Outlet ${i + 1}`));
+  const articlesByFeedId: Record<string, Article[]> = { f1: [], f2: [], f3: [], f4: [] };
+  let id = 0;
+  OPENAI_HEADLINES.forEach((title, i) => {
+    const feedId = `f${(i % 4) + 1}`;
+    articlesByFeedId[feedId].push(makeArticle(`o-${id++}`, feedId, title, i % 4));
+  });
+  // Same story across three outlets → a multi-outlet story.
+  ["f1", "f2", "f3"].forEach((feedId) => {
+    articlesByFeedId[feedId].push(makeArticle(`s-${id++}`, feedId, "OpenAI launches atlas browser", 1));
+  });
+  // Entity-free noise (all lowercase, no proper nouns).
+  for (let i = 0; i < 95; i++) {
+    const feedId = `f${(i % 4) + 1}`;
+    articlesByFeedId[feedId].push(makeArticle(`n-${id++}`, feedId, `memo${i} note${i} item${i}`, i % 4));
+  }
+  useFeedStore.setState({ feeds });
+  useArticleStore.setState({ articlesByFeedId });
+}
+
+function mockViewport(isDesktop: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: isDesktop && query.includes("1024"),
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
 function LocationProbe() {
   const location = useLocation();
   return (
@@ -75,17 +131,10 @@ describe("SignalPage", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(NOW);
     localStorage.clear();
-    useSignalStore.setState({
-      status: "idle",
-      report: null,
-      corpusSize: 0,
-      error: null,
-    });
+    mockViewport(false); // mobile by default
+    useSignalStore.setState({ status: "idle", report: null, corpusSize: 0, error: null });
     useFeedStore.setState({ feeds: [] });
     useArticleStore.setState({ articlesByFeedId: {} });
-    // Default gate environment: paid tier dormant (so the gate is open
-    // for everyone) and not self-hosted. The tier-gate suite below flips
-    // these to exercise the locked path.
     useLicenseStore.setState({ tier: "free", verifying: false });
     vi.mocked(isSelfHosted).mockReturnValue(false);
     vi.mocked(isPaidTierActive).mockReturnValue(false);
@@ -106,11 +155,9 @@ describe("SignalPage", () => {
 
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("locked"));
-    // Forward-looking framing: "53 more articles to unlock", not "47 / 100".
     expect(screen.getByText(/53/)).toBeInTheDocument();
     expect(screen.getByText(/more articles to unlock/i)).toBeInTheDocument();
     expect(screen.getByText(/47 of 100 articles in your store/i)).toBeInTheDocument();
-    // Three CTAs surfaced.
     expect(screen.getByRole("button", { name: /Add feeds/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Browse the catalog/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Import OPML/i })).toBeInTheDocument();
@@ -120,7 +167,7 @@ describe("SignalPage", () => {
     const feeds = [makeFeed("solo")];
     const articlesByFeedId: Record<string, Article[]> = { solo: [] };
     for (let i = 0; i < SIGNAL_CORPUS_GATE + 5; i++) {
-      articlesByFeedId.solo.push(makeArticle(`a-${i}`, "solo", `Unique title ${i}`, i % 5));
+      articlesByFeedId.solo.push(makeArticle(`a-${i}`, "solo", `unique title ${i}`, i % 5));
     }
     useFeedStore.setState({ feeds });
     useArticleStore.setState({ articlesByFeedId });
@@ -131,56 +178,57 @@ describe("SignalPage", () => {
     expect(screen.getByRole("button", { name: /Add more feeds/i })).toBeInTheDocument();
   });
 
-  it("renders topic headers and article rows when the engine produces topics", async () => {
-    const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`, `Outlet ${i + 1}`));
-    const articlesByFeedId: Record<string, Article[]> = {};
-    const variants = [
-      "OpenAI ships GPT release",
-      "OpenAI hires research team",
-      "OpenAI partners Microsoft",
-      "OpenAI cuts API prices",
-      "OpenAI opens Tokyo office",
-      "OpenAI updates safety policy",
-      "OpenAI hosts developer event",
-      "OpenAI launches Atlas browser",
-    ];
-    let id = 0;
-    for (let i = 0; i < SIGNAL_CORPUS_GATE + 20; i++) {
-      const feedId = `f${(i % 4) + 1}`;
-      const title =
-        i % 5 === 0 ? variants[i % variants.length] : `Unique${i} subject${i} item${i}`;
-      if (!articlesByFeedId[feedId]) articlesByFeedId[feedId] = [];
-      articlesByFeedId[feedId].push(makeArticle(`a-${id++}`, feedId, title, i % 5));
-    }
-    useFeedStore.setState({ feeds });
-    useArticleStore.setState({ articlesByFeedId });
-
+  it("renders an entity topic heading, story rows, and the window label", async () => {
+    seedReadyCorpus();
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
 
-    // Topic title renders as a real heading in original casing — no chip.
     expect(screen.getByRole("heading", { level: 2, name: "OpenAI" })).toBeInTheDocument();
-    // At least one article row from the openai variants is shown.
-    expect(screen.getByText(/OpenAI ships GPT release/)).toBeInTheDocument();
-    // Meta line in the topic header reads "N articles · M outlets"
+    expect(screen.getByText("OpenAI ships a release")).toBeInTheDocument();
     expect(screen.getByText(/articles\s*·\s*\d+\s*outlets/i)).toBeInTheDocument();
-    // Header meta line includes the window label.
     expect(screen.getByText(/last 7 days/i)).toBeInTheDocument();
   });
 
-  it("Refresh button bypasses the cache", async () => {
-    const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`));
-    const articlesByFeedId: Record<string, Article[]> = {};
-    for (let i = 0; i < SIGNAL_CORPUS_GATE + 20; i++) {
-      const feedId = `f${(i % 4) + 1}`;
-      if (!articlesByFeedId[feedId]) articlesByFeedId[feedId] = [];
-      articlesByFeedId[feedId].push(
-        makeArticle(`a-${i}`, feedId, `OpenAI Atlas note ${i}`, i % 5),
-      );
-    }
-    useFeedStore.setState({ feeds });
-    useArticleStore.setState({ articlesByFeedId });
+  it("badges a story covered by multiple outlets and expands to list them", async () => {
+    seedReadyCorpus();
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
 
+    expect(screen.getByText(/covered by 3 outlets/i)).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /show all 3 outlets/i }));
+    // Each outlet's name appears in the expanded list.
+    expect(screen.getByText("Outlet 1")).toBeInTheDocument();
+    expect(screen.getByText("Outlet 2")).toBeInTheDocument();
+    expect(screen.getByText("Outlet 3")).toBeInTheDocument();
+  });
+
+  it("on desktop, clicking a story opens the reader directly", async () => {
+    mockViewport(true);
+    seedReadyCorpus();
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText("OpenAI ships a release"));
+    await waitFor(() => expect(screen.getByText("READER")).toBeInTheDocument());
+  });
+
+  it("on mobile, tapping a story opens a preview then 'Open in reader' navigates", async () => {
+    mockViewport(false);
+    seedReadyCorpus();
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText("OpenAI ships a release"));
+    const open = await screen.findByRole("button", { name: /open in reader/i });
+    await user.click(open);
+    await waitFor(() => expect(screen.getByText("READER")).toBeInTheDocument());
+  });
+
+  it("Refresh button bypasses the cache", async () => {
+    seedReadyCorpus();
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
     const first = useSignalStore.getState().report?.generatedAt;
@@ -191,98 +239,42 @@ describe("SignalPage", () => {
     await waitFor(() => expect(useSignalStore.getState().report?.generatedAt).not.toBe(first));
   });
 
-  it("clicking an article navigates to its reader route", async () => {
-    const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`));
-    const articlesByFeedId: Record<string, Article[]> = { f1: [], f2: [], f3: [], f4: [] };
-    let id = 0;
-    // 30 OpenAI articles spread across all 4 feeds.
-    for (let i = 0; i < 30; i++) {
-      const feedId = `f${(i % 4) + 1}`;
-      articlesByFeedId[feedId].push(
-        makeArticle(`o-${id++}`, feedId, `OpenAI Atlas update ${i}`, i % 5),
-      );
-    }
-    // 90 unique-noise articles so total >= gate.
-    for (let i = 0; i < 90; i++) {
-      const feedId = `f${(i % 4) + 1}`;
-      articlesByFeedId[feedId].push(
-        makeArticle(`n-${id++}`, feedId, `Unique${i} item${i}`, i % 5),
-      );
-    }
-    useFeedStore.setState({ feeds });
-    useArticleStore.setState({ articlesByFeedId });
-
-    renderAt();
-    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
-    const link = screen.getAllByText(/OpenAI Atlas update/)[0];
-    const user = userEvent.setup();
-    await user.click(link);
-    await waitFor(() => expect(screen.getByText("READER")).toBeInTheDocument());
-  });
-
-  it("reveals additional articles when '+ N more' is clicked", async () => {
-    const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`));
-    const articlesByFeedId: Record<string, Article[]> = { f1: [], f2: [], f3: [], f4: [] };
-    // 14 OpenAI articles spread across 4 feeds — the cluster will claim
-    // them all (cap ≈ ceil((14+90)/10)+5 = 16), exposing > 6 in articleIds.
-    for (let i = 0; i < 14; i++) {
-      const feedId = `f${(i % 4) + 1}`;
-      articlesByFeedId[feedId].push(
-        makeArticle(`o-${i}`, feedId, `OpenAI Atlas update ${i}`, i % 5),
-      );
-    }
-    for (let i = 0; i < 90; i++) {
-      const feedId = `f${(i % 4) + 1}`;
-      articlesByFeedId[feedId].push(
-        makeArticle(`n-${i}`, feedId, `Unique${i} item${i}`, i % 5),
-      );
-    }
-    useFeedStore.setState({ feeds });
-    useArticleStore.setState({ articlesByFeedId });
-
+  it("reveals additional stories when '+ N more' is clicked", async () => {
+    seedReadyCorpus();
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
 
-    // Default: 6 OpenAI rows visible.
-    const initialRows = screen.getAllByText(/OpenAI Atlas update/);
-    expect(initialRows.length).toBe(6);
-    // "+ 8 more" affordance for the remaining articles in the cluster.
+    // Default shows the first 6 story heads (each headline starts "OpenAI ...").
+    const headRegex = /OpenAI\s+\S/;
+    expect(screen.getAllByText(headRegex).length).toBe(6);
     const moreButton = screen.getByRole("button", { name: /\+ \d+ more/i });
     const user = userEvent.setup();
     await user.click(moreButton);
-    const expandedRows = screen.getAllByText(/OpenAI Atlas update/);
-    expect(expandedRows.length).toBe(14);
+    // 12 distinct + 1 syndicated = 13 stories in the cluster.
+    expect(screen.getAllByText(headRegex).length).toBe(13);
   });
 
   it("loads from localStorage on mount without recomputing when the cache is fresh", async () => {
-    const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`));
-    const articlesByFeedId: Record<string, Article[]> = {};
-    for (let i = 0; i < SIGNAL_CORPUS_GATE + 20; i++) {
-      const feedId = `f${(i % 4) + 1}`;
-      if (!articlesByFeedId[feedId]) articlesByFeedId[feedId] = [];
-      articlesByFeedId[feedId].push(
-        makeArticle(`a-${i}`, feedId, `OpenAI Atlas note ${i}`, i % 5),
-      );
-    }
-    useFeedStore.setState({ feeds });
-    useArticleStore.setState({ articlesByFeedId });
-
-    // Prime the cache directly.
+    seedReadyCorpus();
     localStorage.setItem(
       SIGNAL_REPORT_CACHE_KEY,
       JSON.stringify({
         report: {
+          schemaVersion: SIGNAL_REPORT_SCHEMA_VERSION,
           topics: [
             {
               term: "primed",
               displayTerm: "Primed",
-              articleIds: [],
+              stories: [],
+              totalStories: 0,
               totalArticlesInCluster: 0,
               feedCount: 2,
             },
           ],
           window: "7d",
-          corpusSize: SIGNAL_CORPUS_GATE + 20,
+          corpusSize: useArticleStore.getState().articlesByFeedId
+            ? Object.values(useArticleStore.getState().articlesByFeedId).reduce((n, l) => n + l.length, 0)
+            : 0,
           corpusInWindow: SIGNAL_CORPUS_GATE,
           feedsInWindow: 4,
           generatedAt: NOW - 60 * 1000,
@@ -295,40 +287,45 @@ describe("SignalPage", () => {
     expect(useSignalStore.getState().report?.topics[0]?.term).toBe("primed");
   });
 
-  describe("tier gating", () => {
-    function seedUnlockedCorpus() {
-      const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`));
-      const articlesByFeedId: Record<string, Article[]> = {};
-      for (let i = 0; i < SIGNAL_CORPUS_GATE + 20; i++) {
-        const feedId = `f${(i % 4) + 1}`;
-        if (!articlesByFeedId[feedId]) articlesByFeedId[feedId] = [];
-        articlesByFeedId[feedId].push(
-          makeArticle(`a-${i}`, feedId, `OpenAI Atlas note ${i}`, i % 5),
-        );
-      }
-      useFeedStore.setState({ feeds });
-      useArticleStore.setState({ articlesByFeedId });
-    }
+  it("discards a cached report written by an incompatible schema version", async () => {
+    seedReadyCorpus();
+    localStorage.setItem(
+      SIGNAL_REPORT_CACHE_KEY,
+      JSON.stringify({
+        report: {
+          schemaVersion: SIGNAL_REPORT_SCHEMA_VERSION - 1,
+          topics: [{ term: "stale", displayTerm: "Stale", stories: [], totalStories: 0, totalArticlesInCluster: 0, feedCount: 2 }],
+          window: "7d",
+          corpusSize: 120,
+          corpusInWindow: 120,
+          feedsInWindow: 4,
+          generatedAt: NOW - 60 * 1000,
+        },
+      }),
+    );
 
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+    // The stale topic must NOT be served; a fresh report replaces it.
+    expect(useSignalStore.getState().report?.topics[0]?.term).not.toBe("stale");
+  });
+
+  describe("tier gating", () => {
     it("shows the upgrade prompt for a Free user once the paid tier is live", async () => {
       vi.mocked(isPaidTierActive).mockReturnValue(true);
       useLicenseStore.setState({ tier: "free" });
-      seedUnlockedCorpus();
+      seedReadyCorpus();
 
       renderAt();
-      // Gate short-circuits before any report computation.
-      await waitFor(() =>
-        expect(screen.getByText(/Unlock Signal/i)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/Unlock Signal/i)).toBeInTheDocument());
       expect(screen.getByRole("button", { name: /Upgrade to Personal/i })).toBeInTheDocument();
-      // The report UI must NOT render.
-      expect(screen.queryByText(/OpenAI Atlas note/)).not.toBeInTheDocument();
+      expect(screen.queryByText("OpenAI ships a release")).not.toBeInTheDocument();
     });
 
     it("does NOT gate a Personal user — the report renders", async () => {
       vi.mocked(isPaidTierActive).mockReturnValue(true);
       useLicenseStore.setState({ tier: "personal" });
-      seedUnlockedCorpus();
+      seedReadyCorpus();
 
       renderAt();
       await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
@@ -339,17 +336,7 @@ describe("SignalPage", () => {
       vi.mocked(isPaidTierActive).mockReturnValue(true);
       vi.mocked(isSelfHosted).mockReturnValue(true);
       useLicenseStore.setState({ tier: "free" });
-      seedUnlockedCorpus();
-
-      renderAt();
-      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
-      expect(screen.queryByText(/Unlock Signal/i)).not.toBeInTheDocument();
-    });
-
-    it("does NOT gate when the paid tier is dormant (pre-launch)", async () => {
-      vi.mocked(isPaidTierActive).mockReturnValue(false);
-      useLicenseStore.setState({ tier: "free" });
-      seedUnlockedCorpus();
+      seedReadyCorpus();
 
       renderAt();
       await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
@@ -359,7 +346,7 @@ describe("SignalPage", () => {
     it("Upgrade button routes to the subscription settings tab", async () => {
       vi.mocked(isPaidTierActive).mockReturnValue(true);
       useLicenseStore.setState({ tier: "free" });
-      seedUnlockedCorpus();
+      seedReadyCorpus();
 
       renderAt();
       await waitFor(() =>

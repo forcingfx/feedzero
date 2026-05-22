@@ -3,13 +3,9 @@ import { useNavigate } from "react-router";
 import { ChevronUp, Layers, RefreshCw, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
-import {
-  ALL_FEEDS_ID,
-  STARRED_FEED_ID,
-  isFilterFeedId,
-  fromFilterFeedId,
-} from "@/utils/constants.ts";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { orderFeedsByRecency, MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
+import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { SidebarMenu, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { NewFolderInput } from "@/components/sidebar/new-folder-input.tsx";
@@ -46,23 +42,16 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     goToSettings(navigate);
   }
 
-  const smartFilters = useSmartFilterStore((s) => s.filters);
-  const activeFeed = feeds.find((f) => f.id === selectedFeedId);
-  const activeFilterId =
-    selectedFeedId && isFilterFeedId(selectedFeedId)
-      ? fromFilterFeedId(selectedFeedId)
-      : null;
-  const activeFilter = activeFilterId
-    ? smartFilters.find((f) => f.id === activeFilterId)
-    : null;
-  const handleLabel =
-    selectedFeedId === ALL_FEEDS_ID
-      ? "All items"
-      : selectedFeedId === STARRED_FEED_ID
-        ? "Starred"
-        : activeFilter
-          ? activeFilter.name
-          : activeFeed?.title ?? "Feeds";
+  const recentFeedIds = useFeedStore((s) => s.recentFeedIds);
+  // The closed strip is a quick-switch dock, not a status line: showing the
+  // current feed name here just echoed the header. Instead, surface the
+  // feeds the user actually hops between — All-items plus their most
+  // recently viewed feeds, capped so the open-list chevron stays reachable.
+  const dockFeeds = orderFeedsByRecency(feeds, recentFeedIds).slice(
+    0,
+    MOBILE_DOCK_FEED_CAP,
+  );
+  const allActive = selectedFeedId === ALL_FEEDS_ID;
 
   return (
     // No `snapPoints` here: with a single snap point and an inline height,
@@ -73,23 +62,63 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     // mode keeps vaul's standard "scroll until top, then drag to dismiss"
     // pattern, which is exactly what we want.
     <Drawer.Root open={open} onOpenChange={setOpen}>
-      <Drawer.Trigger asChild>
-        <div
-          data-testid="drawer-handle-strip"
-          role="button"
-          tabIndex={0}
-          aria-label="Open feed list"
-          className="flex items-center gap-2 px-4 h-[60px] shrink-0 border-t bg-background cursor-pointer"
-          onKeyDown={(e) => e.key === "Enter" && setOpen(true)}
-        >
-          <div className="absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-muted-foreground/30" />
-          <Layers className="size-4 shrink-0 text-muted-foreground" />
-          <span className="flex-1 text-sm font-medium truncate">{handleLabel}</span>
-          <ChevronUp
-            className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
-          />
+      <div
+        data-testid="drawer-handle-strip"
+        className="relative flex items-center gap-1 px-2 h-[60px] shrink-0 border-t bg-background"
+      >
+        <div className="absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-muted-foreground/30" />
+
+        {/* Quick-switch dock: All-items + most-recently-viewed feed
+            favicons. Tapping switches feeds directly (the drawer is
+            already closed); the chevron opens the full list. */}
+        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+          <button
+            type="button"
+            aria-label="All items"
+            aria-pressed={allActive}
+            onClick={() => onFeedSelect(ALL_FEEDS_ID)}
+            className={`flex items-center justify-center size-10 shrink-0 rounded-md ${
+              allActive
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:bg-accent/50"
+            }`}
+          >
+            <Layers className="size-5" />
+          </button>
+          {dockFeeds.map((feed) => {
+            const active = feed.id === selectedFeedId;
+            return (
+              <button
+                key={feed.id}
+                type="button"
+                aria-label={feed.title}
+                aria-pressed={active}
+                onClick={() => onFeedSelect(feed.id)}
+                className={`flex items-center justify-center size-10 shrink-0 rounded-md hover:bg-accent/50 ${
+                  active
+                    ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                    : ""
+                }`}
+              >
+                <FeedFavicon siteUrl={feed.siteUrl} className="size-6" />
+              </button>
+            );
+          })}
         </div>
-      </Drawer.Trigger>
+
+        <Drawer.Trigger asChild>
+          <button
+            type="button"
+            aria-label="Open feed list"
+            className="flex items-center justify-center size-10 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
+          >
+            <ChevronUp
+              data-testid="drawer-open-chevron"
+              className={`size-5 transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </button>
+        </Drawer.Trigger>
+      </div>
 
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />

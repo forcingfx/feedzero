@@ -131,6 +131,27 @@ export function FeedsRoute() {
     }
   }, [articleId]);
 
+  // Mobile: when the article being read disappears from the loaded set (e.g.
+  // the user clears the article cache), the reader stage goes empty. Send them
+  // back to the article list rather than stranding them on a blank reader.
+  //
+  // Tracked as a present→absent transition so a deeplink to an already-empty
+  // feed still shows the reader's own empty state instead of bouncing — the
+  // bounce only fires for an article that *was* on screen and then vanished.
+  const viewedArticlePresentRef = useRef(false);
+  useEffect(() => {
+    if (isDesktop || !feedId || !articleId || isLoadingArticles) return;
+    if (articles.some((a) => a.id === articleId)) {
+      viewedArticlePresentRef.current = true;
+      return;
+    }
+    if (!viewedArticlePresentRef.current) return;
+    viewedArticlePresentRef.current = false;
+    skipAutoSelectRef.current = true;
+    scrollToList();
+    navigate(`/feeds/${feedId}`, { replace: true });
+  }, [isDesktop, feedId, articleId, articles, isLoadingArticles, navigate, scrollToList]);
+
   // Scroll to the reader panel when the user explicitly navigates to an article.
   // snapScrollMountedRef skips the initial render so loading the app with an
   // articleId already in the URL lands on the article list, not the reader.

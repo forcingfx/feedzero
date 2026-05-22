@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense } from "react";
@@ -395,6 +395,49 @@ describe("FeedsPage behavior — mobile", () => {
     renderPage("/feeds/feed-1/articles/art-1");
     // With breadcrumbs, mobile header shows fallback "Articles" when feed isn't in store
     expect(screen.getByText("Articles")).toBeInTheDocument();
+  });
+
+  it("navigates back to the article list when the viewed article's stage goes empty (mobile)", async () => {
+    // The user is reading an article when its cache is cleared (e.g. "delete
+    // all articles from cache"). The reader stage goes empty — on mobile the
+    // user should land back on the article list, not a blank reader.
+    const article = makeArticle("art-1", "feed-1");
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [article] });
+    useFeedStore.setState({
+      feeds: [makeFeed("feed-1")],
+      selectedFeedId: "feed-1",
+    });
+
+    renderPage("/feeds/feed-1/articles/art-1");
+
+    // Start on the reader with the article selected.
+    await vi.waitFor(() => {
+      expect(useArticleStore.getState().selectedArticle?.id).toBe("art-1");
+    });
+
+    // Clearing the cache empties the stage.
+    act(() => {
+      clearArticleCache();
+    });
+
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe("/feeds/feed-1");
+    });
+  });
+
+  it("stays on a deeplinked article URL when the feed simply loads empty (no bounce)", async () => {
+    // A deeplink to a feed that fetches no articles must NOT bounce — there
+    // was never an article to leave. Only a present→absent transition (cache
+    // cleared mid-read) sends the user back. Guards the empty-feed deeplink.
+    useFeedStore.setState({
+      feeds: [makeFeed("feed-1")],
+      selectedFeedId: "feed-1",
+    });
+
+    renderPage("/feeds/feed-1/articles/art-1");
+
+    await new Promise((r) => setTimeout(r, 30));
+    expect(currentUrl).toBe("/feeds/feed-1/articles/art-1");
   });
 
   it("redirects /feeds to /explore on mobile when feed count is minimal", async () => {
