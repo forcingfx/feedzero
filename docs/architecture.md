@@ -419,7 +419,7 @@ All claims in this document can be verified by reading the source code:
 | Passphrase generation | `src/core/crypto/passphrase-generator.ts` |
 | DOMPurify sanitization | `src/core/parser/sanitizer.ts` |
 | CSP headers | `vercel.json`, `server.ts` |
-| Favicon proxying | `src/components/feeds/feed-favicon.tsx` |
+| Favicon proxying | `src/components/feeds/feed-favicon.tsx` (render + fallback chain), `src/core/favicon/favicon-cache.ts` (per-origin resolution cache; failures retried on refresh) |
 | Sync timing jitter | `src/stores/sync-store.ts` (`scheduleSyncPush`) |
 | Payload padding | `src/core/sync/sync-service.ts` |
 | Normalized User-Agent | `src/core/proxy/proxy-handler.ts` |

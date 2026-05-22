@@ -27,6 +27,7 @@ import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { useLicenseStore } from "./license-store.ts";
 import { isSelfHosted } from "../core/features/self-hosted.ts";
+import { retryFailedFavicons } from "../core/favicon/favicon-cache.ts";
 import { isPaidTierActive } from "../core/features/paid-tier-active.ts";
 import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
 import { isFeatureEnabled, enforceFeature } from "./enforce-feature.ts";
@@ -471,6 +472,10 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   refreshAll: async () => {
     if (get().isRefreshingAll) return;
     set({ isRefreshingAll: true });
+    // A refresh is the user's "try again" — give favicons that failed during a
+    // transient outage (e.g. a self-hosted server overwhelmed by a bulk import)
+    // another chance instead of waiting out the 24h failure TTL. See issue #117.
+    retryFailedFavicons();
     try {
       const syncStore = useSyncStore.getState();
       if (syncStore.credentials) {

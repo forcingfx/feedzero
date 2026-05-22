@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render, fireEvent, act } from "@testing-library/react";
+import { FeedFavicon } from "@/components/feeds/feed-favicon";
 import {
-  FeedFavicon,
   clearFaviconCache,
+  retryFailedFavicons,
   setFaviconCacheEntry,
-} from "@/components/feeds/feed-favicon";
+} from "@/core/favicon/favicon-cache.ts";
 
 describe("FeedFavicon", () => {
   beforeEach(() => {
@@ -102,5 +103,20 @@ describe("FeedFavicon", () => {
       <FeedFavicon siteUrl="https://stale.example.com" />,
     );
     expect(container.querySelector("img")).toBeTruthy();
+  });
+
+  it("re-attempts an on-screen failed favicon after retryFailedFavicons", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    fireEvent.error(container.querySelector("img")!); // smart endpoint
+    fireEvent.error(container.querySelector("img")!); // favicon.ico
+    fireEvent.error(container.querySelector("img")!); // favicon.png
+    fireEvent.error(container.querySelector("img")!); // apple-touch-icon.png
+    expect(container.querySelector("img")).toBeNull(); // exhausted → RSS fallback
+
+    act(() => retryFailedFavicons());
+
+    const img = container.querySelector("img");
+    expect(img).toBeTruthy();
+    expect(img!.getAttribute("src")).toBe("/api/favicon?domain=example.com");
   });
 });

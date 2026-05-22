@@ -72,6 +72,11 @@ import {
   refreshAllFeeds,
 } from "../../src/core/feeds/feed-service.ts";
 import { prefetchStarredArticles } from "../../src/core/extractor/prefetch-service.ts";
+import {
+  clearFaviconCache,
+  getFaviconStrategyIndex,
+  setFaviconCacheEntry,
+} from "../../src/core/favicon/favicon-cache.ts";
 
 const mockFeed = (id: string, title: string) => ({
   id,
@@ -511,6 +516,24 @@ describe("feed-store", () => {
       await Promise.all([p1, p2]);
 
       expect(refreshAllFeeds).toHaveBeenCalledTimes(1);
+    });
+
+    it("clears failed favicons so a refresh re-attempts them", async () => {
+      clearFaviconCache();
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+      setFaviconCacheEntry("https://failed.example.com", -1, Date.now());
+      setFaviconCacheEntry("https://ok.example.com", 1, Date.now());
+
+      await useFeedStore.getState().refreshAll();
+
+      // Failed entry dropped → next render restarts from the first strategy.
+      expect(getFaviconStrategyIndex("https://failed.example.com")).toBe(0);
+      // A working favicon is left untouched.
+      expect(getFaviconStrategyIndex("https://ok.example.com")).toBe(1);
     });
 
     it("kicks off background prefetch when the offline-prefetch gate is open", async () => {
