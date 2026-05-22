@@ -102,6 +102,10 @@ export function tokenize(input: string): string[] {
   return out;
 }
 
-function stripHtml(input: string): string {
+/**
+ * Strip HTML tags and entities, preserving original case. Shared with the
+ * entity extractor, which needs casing intact to detect proper nouns.
+ */
+export function stripHtml(input: string): string {
   return input.replace(/<[^>]*>/g, " ").replace(/&[a-z0-9#]+;/gi, " ");
 }

@@ -42,80 +42,72 @@ function makeArticle(
 }
 
 describe("generateReport — happy path", () => {
-  // 8 feeds, 60 articles across two dominant topics ("openai" and "tariffs"),
-  // plus a third smaller topic ("election") and a long tail of single-feed
-  // chatter that should be discarded.
   const feeds: Feed[] = Array.from({ length: 8 }, (_, i) => makeFeed(`f${i + 1}`));
 
-  // Each headline carries one distinctive proper noun plus filler so the
-  // cluster anchor is unambiguous. Real headlines vary more than this, but
-  // the fixture's job is to assert ordering, not realism.
+  // "OpenAI" is a proper noun (only ever capitalized). The objects are
+  // lowercase so no competing entity forms within the cluster.
   const OPENAI_VARIANTS = [
-    "OpenAI ships GPT release",
-    "OpenAI hires research team",
-    "OpenAI partners with Microsoft",
-    "OpenAI cuts API prices",
-    "OpenAI faces lawsuit",
-    "OpenAI opens Tokyo office",
+    "OpenAI ships a release",
+    "OpenAI hires a team",
+    "OpenAI cuts api prices",
+    "OpenAI faces a lawsuit",
     "OpenAI updates safety policy",
-    "OpenAI hosts developer event",
-    "OpenAI buys hardware startup",
-    "OpenAI launches Atlas browser",
-    "OpenAI rolls back feature",
-    "OpenAI funds research grant",
+    "OpenAI hosts a developer event",
+    "OpenAI buys a hardware startup",
+    "OpenAI rolls back a feature",
+    "OpenAI funds a research grant",
     "OpenAI revenue beats forecast",
     "OpenAI faces regulatory scrutiny",
+    "OpenAI expands cloud capacity",
   ];
-  const TARIFF_VARIANTS = [
-    "Tariffs jolt global markets",
-    "Tariffs spark trade debate",
-    "Tariffs hit consumer prices",
-    "Tariffs reshape supply chains",
-    "Tariffs draw EU response",
-    "Tariffs prompt factory closures",
-    "Tariffs target electric vehicles",
-    "Tariffs squeeze farm exports",
-    "Tariffs raise inflation worry",
-    "Tariffs trigger retaliation threat",
-    "Tariffs dent corporate guidance",
-    "Tariffs widen budget gap",
-  ];
-  const ELECTION_VARIANTS = [
-    "Election polls swing late",
-    "Election ground game intensifies",
-    "Election fundraising sets record",
-    "Election turnout exceeds forecast",
-    "Election results delayed by recount",
-    "Election security upgraded statewide",
-    "Election debate reshuffles race",
-    "Election ad spending surges",
-    "Election workers report calm day",
+  // "Supreme Court" is a compound (Court recurs capitalized mid-headline).
+  const COURT_VARIANTS = [
+    "Supreme Court rules on a case",
+    "Supreme Court hears arguments",
+    "Supreme Court weighs a challenge",
+    "Supreme Court issues an opinion",
+    "Supreme Court delays a decision",
+    "Supreme Court reviews a petition",
+    "Supreme Court splits on a ruling",
+    "Supreme Court declines a case",
   ];
 
   const articles: Article[] = [];
   OPENAI_VARIANTS.forEach((title, i) => {
     articles.push(makeArticle(`a-openai-${i}`, `f${(i % 6) + 1}`, title, 1 + (i % 5)));
   });
-  TARIFF_VARIANTS.forEach((title, i) => {
-    articles.push(makeArticle(`a-tariff-${i}`, `f${(i % 5) + 1}`, title, 1 + (i % 4)));
+  // One OpenAI story syndicated verbatim across three outlets.
+  ["f1", "f2", "f3"].forEach((feedId, i) => {
+    articles.push(makeArticle(`a-openai-syn-${i}`, feedId, "OpenAI launches atlas browser", 2));
   });
-  ELECTION_VARIANTS.forEach((title, i) => {
-    articles.push(makeArticle(`a-elect-${i}`, `f${(i % 4) + 1}`, title, 2 + (i % 3)));
+  COURT_VARIANTS.forEach((title, i) => {
+    articles.push(makeArticle(`a-court-${i}`, `f${(i % 5) + 1}`, title, 1 + (i % 4)));
   });
   // Long tail: single-feed chatter that shouldn't form cross-feed clusters.
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < 30; i++) {
     articles.push(makeArticle(`a-noise-${i}`, "f8", `Singleton subject ${i}`, 2));
   }
 
   const result = generateReport(articles, { feeds }, NOW);
 
-  it("returns ok with topics ordered by signal strength", () => {
+  it("anchors topics on proper nouns and compound nouns", () => {
     expect(isOk(result)).toBe(true);
     if (!result.ok) return;
     const terms = result.value.topics.map((t) => t.term);
-    expect(terms[0]).toBe("openai");
-    expect(terms[1]).toBe("tariff");
-    expect(terms[2]).toBe("election");
+    expect(terms).toContain("openai");
+    expect(terms).toContain("supreme court");
+  });
+
+  it("orders topics by signal strength (OpenAI is loudest)", () => {
+    if (!result.ok) return;
+    expect(result.value.topics[0].term).toBe("openai");
+  });
+
+  it("prefers the compound over its constituents", () => {
+    if (!result.ok) return;
+    const terms = result.value.topics.map((t) => t.term);
+    expect(terms).not.toContain("supreme");
+    expect(terms).not.toContain("court");
   });
 
   it("produces at most SIGNAL_TOPIC_TARGET topics", () => {
@@ -130,24 +122,23 @@ describe("generateReport — happy path", () => {
     }
   });
 
+  it("surfaces a multi-outlet story with its outlet count", () => {
+    if (!result.ok) return;
+    const openai = result.value.topics.find((t) => t.term === "openai");
+    const multi = openai?.stories.find((s) => s.feedCount >= 2);
+    expect(multi).toBeDefined();
+    expect(multi!.articleIds.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("topics are disjoint — no article appears in two topics", () => {
     if (!result.ok) return;
     const seen = new Set<string>();
     for (const topic of result.value.topics) {
-      for (const id of topic.articleIds) {
-        expect(seen.has(id)).toBe(false);
-        seen.add(id);
-      }
-    }
-  });
-
-  it("intra-topic article order is most-recent first", () => {
-    if (!result.ok) return;
-    const byId = new Map(articles.map((a) => [a.id, a]));
-    for (const topic of result.value.topics) {
-      const times = topic.articleIds.map((id) => byId.get(id)!.publishedAt);
-      for (let i = 1; i < times.length; i++) {
-        expect(times[i - 1]).toBeGreaterThanOrEqual(times[i]);
+      for (const story of topic.stories) {
+        for (const id of story.articleIds) {
+          expect(seen.has(id)).toBe(false);
+          seen.add(id);
+        }
       }
     }
   });
@@ -156,10 +147,13 @@ describe("generateReport — happy path", () => {
     if (!result.ok) return;
     const openai = result.value.topics.find((t) => t.term === "openai");
     expect(openai?.displayTerm).toBe("OpenAI");
+    const court = result.value.topics.find((t) => t.term === "supreme court");
+    expect(court?.displayTerm).toBe("Supreme Court");
   });
 
-  it("reports corpus stats and chosen window", () => {
+  it("reports schema version, corpus stats and chosen window", () => {
     if (!result.ok) return;
+    expect(result.value.schemaVersion).toBe(2);
     expect(result.value.corpusSize).toBe(articles.length);
     expect(result.value.corpusInWindow).toBeGreaterThan(0);
     expect(result.value.window).toBe("7d");
