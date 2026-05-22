@@ -62,6 +62,11 @@ export function FeedSettingsDialog() {
       <DialogContent
         data-testid="feed-settings-dialog"
         className="max-w-lg max-h-[85vh] overflow-y-auto"
+        // Don't yank focus into the Name field on open. Radix autofocuses
+        // the first focusable element by default, which pops the mobile
+        // keyboard and frames the dialog as a rename form. Let focus rest
+        // on the dialog container instead.
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {feed ? <Body feed={feed} onClose={close} /> : null}
       </DialogContent>

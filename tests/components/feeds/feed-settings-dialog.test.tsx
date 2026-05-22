@@ -118,6 +118,13 @@ describe("FeedSettingsDialog", () => {
     expect(screen.getByText(/Tech Crunchies/)).toBeInTheDocument();
   });
 
+  it("does not autofocus the Name field on open", () => {
+    useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+    renderDialog();
+    const input = screen.getByTestId("feed-settings-name-input");
+    expect(input).not.toHaveFocus();
+  });
+
   it("Name field saves via renameFeed when Save is clicked", async () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
