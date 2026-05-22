@@ -45,6 +45,11 @@ vi.mock("../../src/core/extractor/prefetch-service.ts", () => ({
     ok: true,
     value: { extracted: 0, failed: 0 },
   }),
+  prefetchFeedArticles: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { extracted: 0, failed: 0 },
+  }),
+  selectFrequentFeeds: vi.fn(() => []),
 }));
 
 vi.mock("../../src/core/sync/sync-service", () => ({
@@ -53,8 +58,10 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
-import { useFeedStore } from "../../src/stores/feed-store.ts";
+import { useFeedStore, FEED_PREFETCH_LIMIT } from "../../src/stores/feed-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
+import { useArticleStore } from "../../src/stores/article-store.ts";
+import { prefetchFeedArticles } from "../../src/core/extractor/prefetch-service.ts";
 import * as db from "../../src/core/storage/db.ts";
 
 const dbMock = db as unknown as {
@@ -119,5 +126,36 @@ describe("feed-store setFeedPrefetchEnabled", () => {
   it("is a no-op for unknown feed ids", async () => {
     await useFeedStore.getState().setFeedPrefetchEnabled("ghost", true);
     expect(dbMock._feeds.size).toBe(0);
+  });
+
+  it("kicks off an immediate prefetch for the feed when enabling (so the benefit is instant, not deferred to the next refresh)", async () => {
+    dbMock._seed(feed("f1"));
+    await useFeedStore.getState().setFeedPrefetchEnabled("f1", true);
+    expect(prefetchFeedArticles).toHaveBeenCalledWith("f1", FEED_PREFETCH_LIMIT);
+  });
+
+  it("does NOT prefetch when disabling", async () => {
+    dbMock._seed(feed("f1", { prefetchEnabled: true }));
+    await useFeedStore.getState().setFeedPrefetchEnabled("f1", false);
+    expect(prefetchFeedArticles).not.toHaveBeenCalled();
+  });
+
+  it("refreshes the article-store cache after a successful immediate prefetch (so the reader sees extractedContent without a manual reload)", async () => {
+    dbMock._seed(feed("f1"));
+    const preloadSpy = vi
+      .spyOn(useArticleStore.getState(), "preloadAll")
+      .mockResolvedValue(undefined);
+    vi.mocked(prefetchFeedArticles).mockResolvedValueOnce({
+      ok: true,
+      value: { extracted: 3, failed: 0 },
+    });
+
+    await useFeedStore.getState().setFeedPrefetchEnabled("f1", true);
+    // Let the fire-and-forget prefetch promise settle.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(preloadSpy).toHaveBeenCalled();
+    preloadSpy.mockRestore();
   });
 });
