@@ -142,7 +142,7 @@ function fetchFailure(message: string): AddFeedFlowResult {
  */
 export async function addFeedFlow(
   rawUrl: string,
-  options?: { prefetchedContent?: string },
+  options?: { prefetchedContent?: string; bridgesEnabled?: boolean },
 ): Promise<AddFeedFlowResult> {
   const url = normalizeUrl(rawUrl);
   try {
@@ -184,8 +184,12 @@ export async function addFeedFlow(
       feedData = parseResult.value.feed;
       parsedArticles = parseResult.value.articles;
     } else {
-      // Not a feed — try discovering a feed from this URL
-      const discovery = await discoverFeed(url);
+      // Not a feed — try discovering a feed from this URL. Bridges
+      // (strategy 0) only run when the caller resolved the Personal-tier
+      // gate; the boolean is threaded down so core stays store-agnostic.
+      const discovery = await discoverFeed(url, {
+        bridges: options?.bridgesEnabled ?? false,
+      });
       if (!discovery.ok) return err(friendlyError(discovery.error));
 
       feedData = discovery.value.feed;

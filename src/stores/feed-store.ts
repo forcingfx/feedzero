@@ -399,7 +399,15 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
 
     set({ isLoading: true, error: null });
-    const result = await addFeedFlow(url);
+    // Resolve the bridges gate here (store layer owns license/self-host
+    // state) and pass it down as a plain boolean — core stays store-agnostic.
+    const bridgesEnabled = gateState(
+      "bridges",
+      useLicenseStore.getState().tier,
+      isSelfHosted(),
+      isPaidTierActive(),
+    ).enabled;
+    const result = await addFeedFlow(url, { bridgesEnabled });
     if (!result.ok) {
       set({ isLoading: false, error: result.error });
       // Preserve the reason discriminator so import-side callers can
