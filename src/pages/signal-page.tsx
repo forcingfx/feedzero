@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { formatRelative } from "@/lib/format-relative.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
+import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
@@ -34,14 +35,27 @@ export function SignalPage() {
   const corpusSize = useSignalStore((s) => s.corpusSize);
   const error = useSignalStore((s) => s.error);
   const loadReport = useSignalStore((s) => s.loadReport);
+  const gate = useFeatureGate("signal");
 
   const totalArticles = useArticleStore(
     (s) => Object.values(s.articlesByFeedId).reduce((n, list) => n + list.length, 0),
   );
 
+  // Honor-system open-core gate. The sidebar entry stays visible for
+  // discoverability; the page surfaces the upgrade affordance when the
+  // user's tier doesn't include Signal. Self-hosters and pre-launch
+  // builds (paid tier dormant) pass through via gate.enabled. See ADR 012.
+  const tierLocked = !gate.enabled && gate.reason === "tier-locked";
+
+  // Skip the (cheap, but pointless) engine run while gate-locked.
   useEffect(() => {
+    if (tierLocked) return;
     void loadReport();
-  }, [loadReport, totalArticles]);
+  }, [loadReport, totalArticles, tierLocked]);
+
+  if (tierLocked) {
+    return <UpgradeSplash onUpgrade={gate.promptUpgrade} />;
+  }
 
   if (status === "locked") {
     return <LockedSplash count={corpusSize} />;
@@ -64,6 +78,24 @@ export function SignalPage() {
   }
 
   return <ReadyView report={report} onRefresh={() => loadReport({ force: true })} />;
+}
+
+function UpgradeSplash({ onUpgrade }: { onUpgrade: () => void }) {
+  return (
+    <div className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-6 px-6 py-12 text-center">
+      <Sparkles className="size-10 text-primary" />
+      <div className="space-y-2">
+        <h1 className="text-2xl font-semibold">Signal is a Personal feature</h1>
+        <p className="text-sm text-muted-foreground">
+          Signal surfaces the topics multiple outlets are converging on across
+          your feeds — computed entirely on your device, no AI, no tracking.
+        </p>
+      </div>
+      <Button onClick={onUpgrade} className="w-full" size="lg">
+        Upgrade to Personal
+      </Button>
+    </div>
+  );
 }
 
 function LockedSplash({ count }: { count: number }) {

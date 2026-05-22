@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { SignalPage } from "@/pages/signal-page.tsx";
 import { useSignalStore, SIGNAL_REPORT_CACHE_KEY } from "@/stores/signal-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { useLicenseStore } from "@/stores/license-store.ts";
+import { isSelfHosted } from "@/core/features/self-hosted.ts";
+import { isPaidTierActive } from "@/core/features/paid-tier-active.ts";
 import { SIGNAL_CORPUS_GATE } from "@/core/signal/types.ts";
 import type { Article, Feed } from "@/types/index.ts";
+
+vi.mock("@/core/features/self-hosted.ts", () => ({ isSelfHosted: vi.fn(() => false) }));
+vi.mock("@/core/features/paid-tier-active.ts", () => ({ isPaidTierActive: vi.fn(() => false) }));
 
 const NOW = new Date("2026-05-21T12:00:00Z").getTime();
 const DAY = 24 * 60 * 60 * 1000;
@@ -41,12 +47,24 @@ function makeArticle(id: string, feedId: string, title: string, ageDays: number)
   };
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <div data-testid="location">
+      {location.pathname}
+      {location.search}
+    </div>
+  );
+}
+
 function renderAt(path = "/signal") {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/signal" element={<SignalPage />} />
+        <Route path="/signal" element={<><SignalPage /><LocationProbe /></>} />
         <Route path="/feeds/:feedId/articles/:articleId" element={<div>READER</div>} />
+        <Route path="/settings" element={<LocationProbe />} />
+        <Route path="/explore" element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -65,6 +83,12 @@ describe("SignalPage", () => {
     });
     useFeedStore.setState({ feeds: [] });
     useArticleStore.setState({ articlesByFeedId: {} });
+    // Default gate environment: paid tier dormant (so the gate is open
+    // for everyone) and not self-hosted. The tier-gate suite below flips
+    // these to exercise the locked path.
+    useLicenseStore.setState({ tier: "free", verifying: false });
+    vi.mocked(isSelfHosted).mockReturnValue(false);
+    vi.mocked(isPaidTierActive).mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -269,5 +293,82 @@ describe("SignalPage", () => {
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
     expect(useSignalStore.getState().report?.topics[0]?.term).toBe("primed");
+  });
+
+  describe("tier gating", () => {
+    function seedUnlockedCorpus() {
+      const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`));
+      const articlesByFeedId: Record<string, Article[]> = {};
+      for (let i = 0; i < SIGNAL_CORPUS_GATE + 20; i++) {
+        const feedId = `f${(i % 4) + 1}`;
+        if (!articlesByFeedId[feedId]) articlesByFeedId[feedId] = [];
+        articlesByFeedId[feedId].push(
+          makeArticle(`a-${i}`, feedId, `OpenAI Atlas note ${i}`, i % 5),
+        );
+      }
+      useFeedStore.setState({ feeds });
+      useArticleStore.setState({ articlesByFeedId });
+    }
+
+    it("shows the upgrade prompt for a Free user once the paid tier is live", async () => {
+      vi.mocked(isPaidTierActive).mockReturnValue(true);
+      useLicenseStore.setState({ tier: "free" });
+      seedUnlockedCorpus();
+
+      renderAt();
+      // Gate short-circuits before any report computation.
+      await waitFor(() =>
+        expect(screen.getByText(/Signal is a Personal feature/i)).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: /Upgrade to Personal/i })).toBeInTheDocument();
+      // The report UI must NOT render.
+      expect(screen.queryByText(/OpenAI Atlas note/)).not.toBeInTheDocument();
+    });
+
+    it("does NOT gate a Personal user — the report renders", async () => {
+      vi.mocked(isPaidTierActive).mockReturnValue(true);
+      useLicenseStore.setState({ tier: "personal" });
+      seedUnlockedCorpus();
+
+      renderAt();
+      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+      expect(screen.queryByText(/Signal is a Personal feature/i)).not.toBeInTheDocument();
+    });
+
+    it("does NOT gate a self-hosted Free user", async () => {
+      vi.mocked(isPaidTierActive).mockReturnValue(true);
+      vi.mocked(isSelfHosted).mockReturnValue(true);
+      useLicenseStore.setState({ tier: "free" });
+      seedUnlockedCorpus();
+
+      renderAt();
+      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+      expect(screen.queryByText(/Signal is a Personal feature/i)).not.toBeInTheDocument();
+    });
+
+    it("does NOT gate when the paid tier is dormant (pre-launch)", async () => {
+      vi.mocked(isPaidTierActive).mockReturnValue(false);
+      useLicenseStore.setState({ tier: "free" });
+      seedUnlockedCorpus();
+
+      renderAt();
+      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+      expect(screen.queryByText(/Signal is a Personal feature/i)).not.toBeInTheDocument();
+    });
+
+    it("Upgrade button routes to the subscription settings tab", async () => {
+      vi.mocked(isPaidTierActive).mockReturnValue(true);
+      useLicenseStore.setState({ tier: "free" });
+      seedUnlockedCorpus();
+
+      renderAt();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: /Upgrade to Personal/i })).toBeInTheDocument(),
+      );
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: /Upgrade to Personal/i }));
+      await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/settings"));
+      expect(screen.getByTestId("location")).toHaveTextContent("tab=subscription");
+    });
   });
 });

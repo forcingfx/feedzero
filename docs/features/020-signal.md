@@ -141,7 +141,16 @@ Feature: Signal — cross-feed topic surface
   has no per-user cost, so there is no operational reason to reserve it
   for Pro. Personal is the right tier — it differentiates the paid
   product without metering anything. Self-hosters bypass via
-  `VITE_SELF_HOSTED=1`. See ADR 012.
+  `VITE_SELF_HOSTED=1`. See ADR 012. The gate is enforced on the page:
+  `SignalPage` calls `useFeatureGate("signal")` and renders an
+  `UpgradeSplash` (with a "Upgrade to Personal" CTA → the subscription
+  settings tab) when `!gate.enabled && gate.reason === "tier-locked"`.
+  The engine is skipped entirely while gate-locked. The gate passes
+  through for `paid-tier-inactive` (pre-launch builds) and
+  `self-hosted-bypass`, so today — before the paid tier launches —
+  every user reaches the feature; the gate only bites once
+  `VITE_PAID_TIER_VISIBLE=1`. The sidebar entry stays visible
+  regardless (discoverability).
 - **Cross-feed diversity is the signal.** Score = `articles × log(1 + feeds)`.
   Multiplying by log-feeds means a story appearing in 10 outlets
   outranks one outlet posting 10 times, which matches the
@@ -184,10 +193,6 @@ Feature: Signal — cross-feed topic surface
   summarizer (opt-in due to the model download cost).
 - **No RSS export of a topic.** Power users may want to subscribe to
   "everything in the OpenAI topic"; not built.
-- **Sidebar entry is always visible.** A Free user can navigate to
-  `/signal` and see the locked tile (since corpus < 100 is the same
-  copy as a free user with content). When paid tier launches and a
-  Free user *does* hit 100 articles, they currently see the ready view
-  rather than an upgrade prompt — acceptable open-core posture but a
-  follow-up could add a tier-aware locked-overlay for free users above
-  the gate.
+- **Sidebar entry is always visible** — by design, for discoverability
+  (matches the `filters` / `auto-organize` pattern). The tier gate lives
+  on the page, not the sidebar.
