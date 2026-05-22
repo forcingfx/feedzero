@@ -136,7 +136,6 @@ export const LOCAL_STORAGE = {
   GROUP_ARTICLE_FLOODS: "feedzero:group-article-floods",
   ARTICLE_SORT_MODE: "feedzero:article-sort-mode",
   DEDUPE_MIGRATION: "feedzero:dedupe-migration-v1",
-  PREFERENCES_MIGRATED: "feedzero:preferences-migrated-v1",
 } as const;
 
 /**

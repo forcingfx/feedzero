@@ -277,6 +277,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     await useFeedStore.getState().loadFeeds();
     const { useArticleStore } = await import("./article-store.ts");
     await useArticleStore.getState().preloadAll();
+    const { usePreferencesStore } = await import("./preferences-store.ts");
+    await usePreferencesStore.getState().reload();
 
     set({ status: "synced", lastSyncedAt: Date.now(), error: null });
     return ok({ feedCount: pullResult.value.feeds.length });
@@ -462,6 +464,8 @@ async function applyCloudVault(
   await useFeedStore.getState().loadFeeds();
   const { useArticleStore } = await import("./article-store.ts");
   await useArticleStore.getState().preloadAll();
+  const { usePreferencesStore } = await import("./preferences-store.ts");
+  await usePreferencesStore.getState().reload();
 
   return ok(true);
 }

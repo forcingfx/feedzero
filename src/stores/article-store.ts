@@ -19,6 +19,7 @@ import {
 import type { Article, ArticleSortMode } from "../types/index.ts";
 import { ARTICLE_SORT_MODES } from "../types/index.ts";
 import { useSmartFilterStore } from "./smart-filter-store.ts";
+import { persistPreferences } from "./persist-preferences.ts";
 import {
   buildContext,
   evaluateFilter,
@@ -503,12 +504,6 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     // Guard so a typo or stale persisted value (after we drop a mode in a
     // future version) doesn't corrupt the store with an unknown literal.
     if (!(ARTICLE_SORT_MODES as readonly string[]).includes(mode)) return;
-    try {
-      globalThis.localStorage?.setItem(LOCAL_STORAGE.ARTICLE_SORT_MODE, mode);
-    } catch {
-      // localStorage write failed (private mode / quota) — keep the in-memory
-      // change anyway so the current session reflects the user's choice.
-    }
     // Re-sort the visible list in place. The set of visible articles doesn't
     // change with sort mode — only their order — so we don't need to know
     // the active feed id to do this correctly.
@@ -516,6 +511,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       articleSortMode: mode,
       articles: sortArticles(get().articles, mode),
     });
+    persistPreferences({ articleSortMode: mode });
   },
 
   setShowMuted: (value) => {

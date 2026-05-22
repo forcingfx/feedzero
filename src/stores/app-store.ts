@@ -7,6 +7,9 @@ import {
 import { dedupeArticles } from "../core/storage/db.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
 import { useSyncStore } from "./sync-store.ts";
+import { usePreferencesStore } from "./preferences-store.ts";
+import { persistPreferences } from "./persist-preferences.ts";
+import { DEFAULT_PREFERENCES } from "../types/index.ts";
 import { generatePassphrase } from "../core/crypto/passphrase-generator.ts";
 import {
   checkSecureContext,
@@ -133,6 +136,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       useSyncStore.setState({ credentials: result.value.credentials });
     }
 
+    // Fresh DB: seeds the default preferences row (no legacy keys to
+    // migrate) so the first push carries a preferences payload.
+    await usePreferencesStore.getState().hydrate();
+
     set({ isDbReady: true, error: null });
   },
 
@@ -193,6 +200,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
       await runDedupeMigrationOnce();
 
+      // Load synced preferences (or migrate legacy localStorage keys) and
+      // push them into the consumer stores BEFORE the UI mounts on
+      // isDbReady — otherwise the sidebar flashes default ordering/sort.
+      await usePreferencesStore.getState().hydrate();
+
       set({ isDbReady: true, error: null });
     })().finally(() => {
       initReturningUserInFlight = null;
@@ -247,12 +259,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   setGroupArticleFloods: (next) => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE.GROUP_ARTICLE_FLOODS, String(next));
-    } catch {
-      /* ignore — fall back to in-memory state only */
-    }
     set({ groupArticleFloods: next });
+    persistPreferences({ groupArticleFloods: next });
   },
 
   resetApp: async () => {
@@ -282,5 +290,11 @@ export async function resetAllStores(): Promise<void> {
   useAppStore.setState({ isDbReady: false, hasCompletedOnboarding: false });
   useFeedStore.setState({ feeds: [], selectedFeedId: null });
   useArticleStore.setState({ articles: [], selectedArticle: null });
+  // Clear the hydrate guard so a re-onboarded user re-loads preferences
+  // from their fresh DB rather than keeping the previous session's values.
+  usePreferencesStore.setState({
+    preferences: { ...DEFAULT_PREFERENCES },
+    hydrated: false,
+  });
   useOnboardingStore.getState().reset();
 }

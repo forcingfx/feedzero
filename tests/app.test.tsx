@@ -48,6 +48,18 @@ vi.mock("@/core/storage/db.ts", () => ({
   getSmartFilters: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
+// Boot calls usePreferencesStore.hydrate(); stub the store so this file
+// stays focused on app init wiring rather than preferences persistence.
+vi.mock("@/stores/preferences-store", () => ({
+  usePreferencesStore: {
+    getState: () => ({
+      hydrate: vi.fn().mockResolvedValue(undefined),
+      reload: vi.fn().mockResolvedValue(undefined),
+    }),
+    setState: vi.fn(),
+  },
+}));
+
 import { addFeedFlow, refreshAllFeeds } from "@/core/feeds/feed-service";
 import { restore } from "@/core/storage/key-manager";
 import { CHANGELOG_FEED_URL } from "@/utils/constants";

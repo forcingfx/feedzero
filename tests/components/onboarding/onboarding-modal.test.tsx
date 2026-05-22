@@ -45,6 +45,18 @@ vi.mock("@/core/sync/vault-crypto", () => ({
     .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
 }));
 
+// Onboarding completion runs initialize() -> usePreferencesStore.hydrate();
+// stub the store so this file stays focused on onboarding behavior.
+vi.mock("@/stores/preferences-store", () => ({
+  usePreferencesStore: {
+    getState: () => ({
+      hydrate: vi.fn().mockResolvedValue(undefined),
+      reload: vi.fn().mockResolvedValue(undefined),
+    }),
+    setState: vi.fn(),
+  },
+}));
+
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
