@@ -1,8 +1,32 @@
 import { create } from "zustand";
 import { proxyFetch } from "../core/proxy/proxy-fetch.ts";
 import { detectPaywall, type PaywallVerdict } from "../core/extractor/paywall-detectors/index.ts";
+import { publisherHost } from "../core/extractor/paywall-detectors/host.ts";
 import { fetchArticle as extensionFetchArticle } from "../core/extension/protocol.ts";
 import { useExtensionStore } from "./extension-store.ts";
+
+/**
+ * HTTP status codes a publisher returns to an *anonymous* fetch when the
+ * content is gated: 401 Unauthorized, 402 Payment Required, 403 Forbidden
+ * (NYT/WSJ commonly return this to datacenter IPs), 451 Unavailable For
+ * Legal Reasons. We treat these as a paywall verdict so the reader pane
+ * shows the authorize/install prompt instead of a dead "Full text" button.
+ * Transient/missing codes (404, 429, 5xx) are NOT in this set — those are
+ * genuine failures with no authenticated-fetch recourse.
+ */
+const GATED_STATUS_CODES = new Set([401, 402, 403, 451]);
+
+function paywallVerdictFromStatus(
+  url: string,
+  status: number,
+): (PaywallVerdict & { paywalled: true }) | null {
+  if (!GATED_STATUS_CODES.has(status)) return null;
+  return {
+    paywalled: true,
+    publisher: publisherHost(url),
+    reason: `http-${status}`,
+  };
+}
 
 /**
  * Defuddle is the bulk of the production bundle's "ready to extract"
@@ -112,9 +136,17 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
 
       const response = await proxyFetch("/api/page", sourceUrl);
       if (!response.ok) {
-        set({
-          statusMap: { ...get().statusMap, [url]: "failed" },
-        });
+        // A gated status code (403/401/…) IS the paywall signal — the
+        // publisher refused the anonymous fetch outright rather than
+        // serving a stub. Route it through the same gate handler so an
+        // authorized extension can still retry with cookies, and an
+        // unauthorized user gets the prompt (not a disabled button).
+        const gatedVerdict = paywallVerdictFromStatus(url, response.status);
+        if (gatedVerdict) {
+          await handlePaywalledFetch(url, gatedVerdict, extract, set, get);
+        } else {
+          set({ statusMap: { ...get().statusMap, [url]: "failed" } });
+        }
         return;
       }
       const anonymousHtml = await response.text();

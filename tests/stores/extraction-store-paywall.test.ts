@@ -207,6 +207,108 @@ describe("extraction-store paywall handling", () => {
     });
   });
 
+  describe("non-ok proxy responses (publisher refuses anonymous fetch)", () => {
+    it("records a paywall verdict when the proxy returns 403 for a known publisher", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: () => Promise.resolve(""),
+      }) as unknown as typeof fetch;
+      useExtensionStore.setState({ status: "absent" });
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://nytimes.com/forbidden");
+
+      const state = useExtractionStore.getState();
+      expect(state.paywallMap["https://nytimes.com/forbidden"]).toMatchObject({
+        paywalled: true,
+        publisher: "nytimes.com",
+      });
+      expect(state.statusMap["https://nytimes.com/forbidden"]).toBe("failed");
+      expect(fetchArticle).not.toHaveBeenCalled();
+    });
+
+    it("records a paywall verdict on a 401 too", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve(""),
+      }) as unknown as typeof fetch;
+      useExtensionStore.setState({ status: "absent" });
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://www.economist.com/unauth");
+
+      expect(
+        useExtractionStore.getState().paywallMap["https://www.economist.com/unauth"]
+          ?.paywalled,
+      ).toBe(true);
+    });
+
+    it("does NOT record a verdict on a 404 (genuine missing page) — stays a plain failure", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: () => Promise.resolve(""),
+      }) as unknown as typeof fetch;
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://example.com/gone");
+
+      const state = useExtractionStore.getState();
+      expect(state.paywallMap["https://example.com/gone"]).toBeUndefined();
+      expect(state.statusMap["https://example.com/gone"]).toBe("failed");
+    });
+
+    it("does NOT record a verdict on a 503 (transient server error)", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: () => Promise.resolve(""),
+      }) as unknown as typeof fetch;
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://example.com/down");
+
+      expect(
+        useExtractionStore.getState().paywallMap["https://example.com/down"],
+      ).toBeUndefined();
+    });
+
+    it("retries via the extension on a 403 when the publisher is authorized", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: () => Promise.resolve(""),
+      }) as unknown as typeof fetch;
+      vi.mocked(fetchArticle).mockResolvedValue(
+        ok({ html: FULL_HTML, finalUrl: "https://nytimes.com/auth", status: 200 }),
+      );
+      vi.mocked(extract).mockReturnValue({
+        ok: true,
+        value: { content: "<p>Authenticated body</p>", title: "", author: "", excerpt: "" },
+      });
+      useExtensionStore.setState({
+        status: "installed",
+        authorizedDomains: ["nytimes.com"],
+      });
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://nytimes.com/auth");
+
+      await waitFor(() => expect(fetchArticle).toHaveBeenCalledWith("https://nytimes.com/auth"));
+
+      const state = useExtractionStore.getState();
+      expect(state.cache["https://nytimes.com/auth"]).toBe("<p>Authenticated body</p>");
+      expect(state.statusMap["https://nytimes.com/auth"]).toBe("available");
+    });
+  });
+
   describe("getPaywallVerdict selector", () => {
     it("returns null when the URL has no recorded verdict", () => {
       expect(
