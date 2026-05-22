@@ -12,6 +12,22 @@
 | 4 | Settings tab listing authorized publishers; session-expired auto-refresh; Firefox parity | ⏳ Next |
 | 5 | Chrome Web Store + Firefox AMO distribution; Safari path | ⏳ |
 
+### Shipping gate — `VITE_EXTENSION_ENABLED`
+
+Paywall **detection** and the **"Open original"** fallback ship now: hitting a
+paywalled article shows a clean "Paywalled article → Open original" card
+instead of a broken extraction. The **extension CTAs** (Install the FeedZero
+extension, Authorize `<publisher>`, session-expired sign-in) are gated behind
+`isExtensionEnabled()` (`src/core/extension/extension-enabled.ts`), which reads
+`VITE_EXTENSION_ENABLED` and **defaults off**. The boot-time `detect()` ping is
+gated by the same flag.
+
+Rationale: the extension is built + unit-tested but not yet distributed (no
+Chrome Web Store / AMO listing, no install page). Advertising an Install button
+that 404s is worse than no button. When the extension is published, set
+`VITE_EXTENSION_ENABLED=1` in the deploy environment before `npm run build:all`
+to reveal the full authorize flow — no code change required.
+
 ## Summary
 
 FeedZero users who pay for sites like NYT / WSJ / FT / Economist can't read paywalled articles inside FeedZero today — the anonymous `/api/page` proxy gets the "Subscribe to read" stub. This feature ships a companion browser extension that fetches the article HTML using the user's existing browser session against the publisher, then posts the HTML back to FeedZero via `window.postMessage`. **Credentials never touch FeedZero's servers**; per-publisher access is authorized one domain at a time via Chrome's native host-permission prompt.

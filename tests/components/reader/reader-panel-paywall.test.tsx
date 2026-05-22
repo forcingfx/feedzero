@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
@@ -58,6 +58,14 @@ describe("ReaderPanel paywall integration", () => {
       authorizedDomains: [],
       authorizationInFlight: null,
     });
+    // These tests assert on the extension CTAs (install / authorize /
+    // session-expired), which are gated behind VITE_EXTENSION_ENABLED.
+    // Enable it so the extension-shipped behaviour is exercised.
+    vi.stubEnv("VITE_EXTENSION_ENABLED", "1");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("renders PaywallPrompt when in extracted view with a recorded paywall verdict", () => {

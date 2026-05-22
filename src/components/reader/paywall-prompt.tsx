@@ -2,6 +2,7 @@ import { ExternalLink, LockKeyhole, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { useExtensionStore } from "@/stores/extension-store.ts";
+import { isExtensionEnabled } from "@/core/extension/extension-enabled.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -55,13 +56,20 @@ export function PaywallPrompt({
     publisher ? s.authorizedDomains.includes(publisher) : false,
   );
 
-  const showSessionExpired = reason === "session-expired" && Boolean(publisher);
+  // The extension surface is hidden until it's actually distributed (see
+  // extension-enabled.ts). Until then the prompt is purely informational +
+  // "Open original" — no install/authorize buttons that lead nowhere.
+  const extensionEnabled = isExtensionEnabled();
+  const showSessionExpired =
+    extensionEnabled && reason === "session-expired" && Boolean(publisher);
   const showAuthorize =
+    extensionEnabled &&
     !showSessionExpired &&
     status === "installed" &&
     Boolean(publisher) &&
     !isAuthorized;
-  const showInstall = !showSessionExpired && status === "absent";
+  const showInstall =
+    extensionEnabled && !showSessionExpired && status === "absent";
 
   function handleAuthorize() {
     if (publisher) void requestPublisherAccess(publisher);
