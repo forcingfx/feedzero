@@ -25,6 +25,13 @@ type FetchArticleMessage = {
   url: string;
 };
 
+type AuthorizePublisherMessage = {
+  type: "feedzero/authorize-publisher";
+  requestId: string;
+  protocolVersion: typeof PROTOCOL_VERSION;
+  domain: string;
+};
+
 type PingResponse = {
   type: "feedzero/ping-response";
   requestId: string;
@@ -47,8 +54,20 @@ type FetchArticleResponse =
       reason: "no-permission" | "network-error" | "blocked-scheme";
     };
 
-export type InboundFromPage = PingMessage | FetchArticleMessage;
-export type OutboundToPage = PingResponse | FetchArticleResponse;
+type AuthorizePublisherResponse = {
+  type: "feedzero/authorize-publisher-response";
+  requestId: string;
+  granted: boolean;
+};
+
+export type InboundFromPage =
+  | PingMessage
+  | FetchArticleMessage
+  | AuthorizePublisherMessage;
+export type OutboundToPage =
+  | PingResponse
+  | FetchArticleResponse
+  | AuthorizePublisherResponse;
 
 export type HandlerContext = {
   extensionVersion: string;
@@ -68,6 +87,14 @@ export type HandlerContext = {
    * of an opaque network failure.
    */
   hasPermission: (origin: string) => Promise<boolean>;
+  /**
+   * Request a runtime host permission for `origin`. Backed by
+   * chrome.permissions.request, which surfaces Chrome's native host-permission
+   * dialog. Resolves true on Allow, false on Deny / dismissal / runtime error.
+   * MV3 requires this to be called in response to a user gesture; the page
+   * sends the authorize-publisher message in direct response to a click.
+   */
+  requestPermission: (origin: string) => Promise<boolean>;
 };
 
 /**
@@ -89,6 +116,8 @@ export async function handleMessage(
       };
     case "feedzero/fetch-article":
       return await handleFetchArticle(message, context);
+    case "feedzero/authorize-publisher":
+      return await handleAuthorizePublisher(message, context);
   }
 }
 
@@ -134,6 +163,45 @@ async function handleFetchArticle(
   }
 }
 
+async function handleAuthorizePublisher(
+  message: AuthorizePublisherMessage,
+  context: HandlerContext,
+): Promise<AuthorizePublisherResponse> {
+  const denied: AuthorizePublisherResponse = {
+    type: "feedzero/authorize-publisher-response",
+    requestId: message.requestId,
+    granted: false,
+  };
+  if (!isBareHost(message.domain)) return denied;
+  const origin = `https://${message.domain}`;
+  try {
+    const granted = await context.requestPermission(origin);
+    return {
+      type: "feedzero/authorize-publisher-response",
+      requestId: message.requestId,
+      granted,
+    };
+  } catch {
+    return denied;
+  }
+}
+
+/**
+ * A bare host has no scheme, no path, no query — just `nytimes.com` or
+ * `cooking.nytimes.com`. We refuse anything else so the permission scope
+ * stays explicit and predictable when chrome.permissions.request expands
+ * `https://${host}/*`.
+ */
+function isBareHost(value: string): boolean {
+  if (!value) return false;
+  if (value.includes("/")) return false;
+  if (value.includes(":")) return false;
+  if (value.includes("?")) return false;
+  if (value.includes("#")) return false;
+  if (value.includes(" ")) return false;
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(value);
+}
+
 function parseOriginOrNull(rawUrl: string): string | null {
   let url: URL;
   try {
@@ -155,6 +223,12 @@ function isInboundFromPage(value: unknown): value is InboundFromPage {
   if (typeof v.protocolVersion !== "number") return false;
   // Message-type-specific shape checks.
   if (v.type === "feedzero/fetch-article" && typeof v.url !== "string") {
+    return false;
+  }
+  if (
+    v.type === "feedzero/authorize-publisher" &&
+    typeof v.domain !== "string"
+  ) {
     return false;
   }
   return true;

@@ -265,6 +265,26 @@ export const FEED_PREFETCH_LIMIT = 20;
  * that don't care about completion (refreshAll) wrap with `void` so
  * the UI doesn't block on a potentially multi-second batch.
  */
+/**
+ * Immediately prefetch one feed's recent articles. Fired when the user
+ * toggles "Prefetch full text" ON so the payoff is instant — they don't
+ * have to wait for the next full refresh for `extractedContent` to
+ * populate and the reader to render Full text without a fetch. Best-effort
+ * and gated, identical to the refresh-time pass.
+ */
+async function prefetchSingleFeedNow(feedId: string): Promise<void> {
+  if (!isFeatureEnabled("offline-prefetch")) return;
+  try {
+    const result = await prefetchFeedArticles(feedId, FEED_PREFETCH_LIMIT);
+    if (result.ok && result.value.extracted > 0) {
+      void useArticleStore.getState().preloadAll();
+    }
+  } catch {
+    // Best-effort: a failed immediate prefetch just means the next
+    // refresh (or on-demand extraction) handles it.
+  }
+}
+
 async function schedulePrefetch(feeds: Feed[]): Promise<void> {
   if (!isFeatureEnabled("offline-prefetch")) return;
 
@@ -439,6 +459,8 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     });
     await reloadFeeds(set);
     schedulePush();
+    // Enabling should pay off now, not on the next refresh.
+    if (value) void prefetchSingleFeedNow(feedId);
   },
 
   selectFeed: (feedId) => set({ selectedFeedId: feedId }),

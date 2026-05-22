@@ -36,10 +36,26 @@ async function hasPermission(origin: string): Promise<boolean> {
   return chrome.permissions.contains({ origins: [`${origin}/*`] });
 }
 
+/**
+ * Prompt the user to grant host permission for `origin`. Chrome shows its
+ * native confirmation dialog; resolves true on Allow, false on Deny or
+ * dismissal. MV3 requires the call to happen inside a user-gesture stack —
+ * the page sends the authorize-publisher message in direct response to a
+ * click on the "Authorize <domain>" button.
+ */
+async function requestPermission(origin: string): Promise<boolean> {
+  return chrome.permissions.request({ origins: [`${origin}/*`] });
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   // Async response pattern: returning true keeps the message channel open
   // until sendResponse is called.
-  handleMessage(message, { extensionVersion, fetchUrl, hasPermission })
+  handleMessage(message, {
+    extensionVersion,
+    fetchUrl,
+    hasPermission,
+    requestPermission,
+  })
     .then((response) => sendResponse(response))
     .catch(() => sendResponse(null));
   return true;

@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
 import { ArticleContent } from "./article-content.tsx";
+import { PaywallPrompt } from "./paywall-prompt.tsx";
 import { cn } from "@/lib/utils.ts";
 
 type ViewMode = "feed" | "extracted";
@@ -67,6 +68,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   const extractInBackground = useExtractionStore((s) => s.extractInBackground);
   const resetForArticle = useExtractionStore((s) => s.resetForArticle);
   const statusMap = useExtractionStore((s) => s.statusMap);
+  const paywallMap = useExtractionStore((s) => s.paywallMap);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -201,8 +203,16 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
       : statusMap[article.link] || "idle"
     : ("idle" as const);
 
+  // A paywall verdict is NOT an extraction failure — clicking the toggle
+  // surfaces the Authorize-publisher prompt, which is exactly what the user
+  // needs to act on. Only disable for in-flight extraction or a real
+  // failure where the user has no recourse.
+  const hasPaywallVerdict = article.link
+    ? Boolean(paywallMap[article.link])
+    : false;
   const extractedDisabled =
-    extractionStatus === "extracting" || extractionStatus === "failed";
+    extractionStatus === "extracting" ||
+    (extractionStatus === "failed" && !hasPaywallVerdict);
 
   function handleModeChange(mode: ViewMode) {
     if (mode === "extracted") {
@@ -309,9 +319,11 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                   disabled={extractedDisabled}
                   onClick={() => handleModeChange("extracted")}
                   title={
-                    extractionStatus === "failed"
-                      ? "Extraction didn't find additional content"
-                      : undefined
+                    hasPaywallVerdict
+                      ? "Article is paywalled — open to authorize the publisher"
+                      : extractionStatus === "failed"
+                        ? "Extraction didn't find additional content"
+                        : undefined
                   }
                   className={cn(
                     "inline-flex items-center gap-1 px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
@@ -364,6 +376,19 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           <p className="italic text-muted-foreground">
             Extracting full article…
           </p>
+        ) : viewMode === "extracted" &&
+          !cachedExtraction &&
+          article.link &&
+          paywallMap[article.link] ? (
+          <PaywallPrompt
+            publisher={paywallMap[article.link].publisher}
+            articleUrl={article.link}
+            reason={
+              paywallMap[article.link].reason === "session-expired"
+                ? "session-expired"
+                : "paywall"
+            }
+          />
         ) : (
           <ArticleContent html={getContent()} />
         )}

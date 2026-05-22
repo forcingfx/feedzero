@@ -11,6 +11,10 @@ export const PROTOCOL_VERSION = 1;
 
 const PING_TIMEOUT_MS = 200;
 const FETCH_TIMEOUT_MS = 30_000;
+// chrome.permissions.request blocks on a native browser confirmation dialog
+// — give the user as long as the fetch path before assuming the prompt was
+// dismissed by the runtime.
+const AUTHORIZE_TIMEOUT_MS = 30_000;
 
 type OutboundEnvelope<TType extends string> = {
   type: TType;
@@ -22,7 +26,13 @@ export type PingMessage = OutboundEnvelope<"feedzero/ping">;
 export type FetchArticleMessage = OutboundEnvelope<"feedzero/fetch-article"> & {
   url: string;
 };
-export type OutboundMessage = PingMessage | FetchArticleMessage;
+export type AuthorizePublisherMessage = OutboundEnvelope<"feedzero/authorize-publisher"> & {
+  domain: string;
+};
+export type OutboundMessage =
+  | PingMessage
+  | FetchArticleMessage
+  | AuthorizePublisherMessage;
 
 export type PingResponse = {
   type: "feedzero/ping-response";
@@ -52,7 +62,22 @@ export type FetchArticleResponse =
       reason: "no-permission" | "network-error" | "blocked-scheme";
     };
 
-export type InboundMessage = PingResponse | FetchArticleResponse;
+/**
+ * Reply to authorize-publisher. `granted: true` means the user accepted the
+ * Chrome host-permission prompt and the extension can now fetch from
+ * `https://<domain>/*` with credentials. `granted: false` covers both an
+ * explicit decline and a runtime failure (no active tab, dismissed dialog).
+ */
+export type AuthorizePublisherResponse = {
+  type: "feedzero/authorize-publisher-response";
+  requestId: string;
+  granted: boolean;
+};
+
+export type InboundMessage =
+  | PingResponse
+  | FetchArticleResponse
+  | AuthorizePublisherResponse;
 
 function generateRequestId(): string {
   // randomUUID is part of Web Crypto in all browsers we target. happy-dom
@@ -156,4 +181,34 @@ export async function fetchArticle(
     finalUrl: response.finalUrl,
     status: response.status,
   });
+}
+
+/**
+ * Ask the extension to prompt the user for host-permission on `domain`. The
+ * extension translates the bare host into `https://<domain>/*` and calls
+ * `chrome.permissions.request`, which surfaces Chrome's native confirmation
+ * dialog. Resolves ok({ granted: boolean }) once the user answers; err on
+ * timeout (the extension never replied) — distinct from `granted: false`,
+ * which means the extension *did* reply and the user declined.
+ *
+ * `domain` MUST be a bare host (e.g. "nytimes.com"); the extension rejects
+ * anything with a scheme or path to keep the permission scope explicit.
+ */
+export async function authorizePublisher(
+  domain: string,
+  options: { timeoutMs?: number } = {},
+): Promise<Result<{ granted: boolean }>> {
+  const message: AuthorizePublisherMessage = {
+    type: "feedzero/authorize-publisher",
+    requestId: generateRequestId(),
+    protocolVersion: PROTOCOL_VERSION,
+    domain,
+  };
+  const result = await send<AuthorizePublisherResponse>(
+    message,
+    "feedzero/authorize-publisher-response",
+    options.timeoutMs ?? AUTHORIZE_TIMEOUT_MS,
+  );
+  if (!result.ok) return result;
+  return ok({ granted: result.value.granted });
 }

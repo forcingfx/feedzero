@@ -2,15 +2,31 @@
 
 ## Status
 
-**In Progress** — Phase 1 + 2 complete and on `main` once this branch merges. Phase 3+ are picked up by future sessions. Branch: `claude/find-x-account-fallback-85esB` (branch name is historical from an earlier abandoned exploration; the actual content is this feature).
+**In Progress** — Phases 1, 2, and 3 complete on `main` once branch `claude/paywall-extension-feature-hR15P` merges. Phase 4+ picked up by future sessions.
 
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Web-app `protocol.ts` + MV3 extension scaffold + `ping` handshake | ✅ Shipped (`ade8970`, `9688f2d`) |
 | 2 | `fetch-article` round-trip with cookies, permission gate, scheme guard | ✅ Shipped (`f6ff5eb`) |
-| 3 | Reader-pane prompt UI, paywall detectors, `chrome.permissions.request` flow from the page | ⏳ Next |
-| 4 | Settings tab listing authorized publishers; session-expired auto-refresh; Firefox parity | ⏳ |
+| 3 | Paywall detectors, `authorize-publisher` protocol message, extension store, reader-pane prompt, extraction-store wiring | ✅ Shipped (slices on `claude/paywall-extension-feature-hR15P`) |
+| 4 | Settings tab listing authorized publishers; session-expired auto-refresh; Firefox parity | ⏳ Next |
 | 5 | Chrome Web Store + Firefox AMO distribution; Safari path | ⏳ |
+
+### Shipping gate — `VITE_EXTENSION_ENABLED`
+
+Paywall **detection** and the **"Open original"** fallback ship now: hitting a
+paywalled article shows a clean "Paywalled article → Open original" card
+instead of a broken extraction. The **extension CTAs** (Install the FeedZero
+extension, Authorize `<publisher>`, session-expired sign-in) are gated behind
+`isExtensionEnabled()` (`src/core/extension/extension-enabled.ts`), which reads
+`VITE_EXTENSION_ENABLED` and **defaults off**. The boot-time `detect()` ping is
+gated by the same flag.
+
+Rationale: the extension is built + unit-tested but not yet distributed (no
+Chrome Web Store / AMO listing, no install page). Advertising an Install button
+that 404s is worse than no button. When the extension is published, set
+`VITE_EXTENSION_ENABLED=1` in the deploy environment before `npm run build:all`
+to reveal the full authorize flow — no code change required.
 
 ## Summary
 
@@ -84,7 +100,29 @@ The extension is pure transport. **Paywall detection, content extraction, and re
 
 | File | Role |
 |------|------|
-| `src/core/extension/protocol.ts` | Message envelope types (`OutboundMessage`, `InboundMessage`), `ping()` for detection, `fetchArticle(url)` for the authenticated fetch. Origin-pinned `window.postMessage` transport with `requestId` correlation and timeout. |
+| `src/core/extension/protocol.ts` | Message envelope types (`OutboundMessage`, `InboundMessage`), `ping()` for detection, `fetchArticle(url)` for the authenticated fetch, `authorizePublisher(domain)` for the runtime host-permission grant. Origin-pinned `window.postMessage` transport with `requestId` correlation and timeout. |
+
+#### Web app — `src/core/extractor/paywall-detectors/`
+
+| File | Role |
+|------|------|
+| `types.ts` | `PaywallVerdict` discriminated union + `PaywallDetector` interface. |
+| `host.ts` | `publisherHost(url)` — canonical publisher host with leading `www.` stripped. |
+| `visible-text.ts` | `visibleTextLength(html)` — crude tag-stripping length heuristic, sync, dep-free. |
+| `default-detector.ts` | Substring scan over industry-wide paywall phrases + body-too-short fallback (600-char threshold). |
+| `nytimes.ts` | Publisher-specific detector for `nytimes.com` and its subdomains (e.g. `cooking.nytimes.com`). |
+| `economist.ts` | Publisher-specific detector for `economist.com`. |
+| `registry.ts` | Ordered first-match registry. |
+| `index.ts` | Registers detectors; exports `detectPaywall(html, url): PaywallVerdict`. |
+
+#### Web app — stores + UI
+
+| File | Role |
+|------|------|
+| `src/stores/extension-store.ts` | Zustand mirror of extension presence + per-publisher grants. `status: "unknown" \| "installed" \| "absent"`, `authorizedDomains[]`, `detect()`, `requestPublisherAccess(domain)`, `isAuthorized(domain)`. |
+| `src/stores/extraction-store.ts` | On every `/api/page` response, runs `detectPaywall`. If gated + authorized for the publisher, retries via `fetchArticle()`; if still gated marks `session-expired`. Surfaces `paywallMap` for the reader pane. |
+| `src/components/reader/paywall-prompt.tsx` | Four-state reader-pane affordance: install-extension, authorize-`<publisher>`, session-expired, fallback "Open original". |
+| `src/app.tsx` (`AppInit`) | Calls `useExtensionStore.getState().detect()` once at boot so the prompt picks the right CTA without per-render pings. |
 
 #### Extension — `extension/`
 
@@ -107,10 +145,15 @@ The extension is pure transport. **Paywall detection, content extraction, and re
 
 | File | Coverage |
 |------|----------|
-| `tests/core/extension/protocol.test.ts` | 9 cases: ping round-trip, ping timeout, ping requestId mismatch, ping protocol-version envelope, ping origin filter, fetchArticle success, fetchArticle failure reason forwarding, fetchArticle URL forwarded in envelope, fetchArticle timeout. Uses a `fakeExtension` helper that stands in for the content script. |
-| `tests/extension/handlers.test.ts` | 10 cases: ping happy path, malformed/non-FeedZero messages rejected, response-typed messages rejected (echo-loop guard), wrong protocol version rejected, fetch happy path, no-permission short-circuit, `blocked-scheme` for `javascript:` / `data:`, network-error wraps fetch throws, malformed fetch message (no url) rejected. All IO mocked via `HandlerContext`. |
+| `tests/core/extension/protocol.test.ts` | 13 cases: ping round-trip / timeout / requestId mismatch / protocol-version envelope / origin filter, fetchArticle success / failure-reason forwarding / URL forwarded / timeout, authorizePublisher grant / decline / domain forwarded / timeout. Uses a `fakeExtension` helper that stands in for the content script. |
+| `tests/extension/handlers.test.ts` | 15 cases: ping happy path, malformed/non-FeedZero messages rejected, response-typed messages rejected (echo-loop guard), wrong protocol version rejected, fetch happy path / no-permission short-circuit / blocked-scheme / network-error wraps throws / malformed fetch (no url), authorize-publisher grant / decline / runtime throw / missing-domain / scheme-or-path domain rejected. All IO mocked via `HandlerContext`. |
+| `tests/core/extractor/paywall-detectors/detect-paywall.test.ts` | 10 cases: NYT phrase-match across www / cooking subdomain, NYT false-negative on long body, default phrase-match, default body-too-short, null publisher for unparseable URL, verdict shape. |
+| `tests/stores/extension-store.test.ts` | 8 cases: detect installed / absent / repeated calls, requestPublisherAccess grant / decline / timeout, dedupe on re-grant, isAuthorized reflection. |
+| `tests/stores/extraction-store-paywall.test.ts` | 8 cases: paywall verdict on absent extension, skip extension fetch when unauthorized, no-op for clean articles, authenticated retry success, session-expired on still-gated retry, fallback verdict on extension network-error, `getPaywallVerdict` selector. |
+| `tests/components/reader/paywall-prompt.test.tsx` | 8 cases: install affordance, open-original fallback, authorize-button shown / disabled in-flight / clicking calls store, quiet stub during unknown probe, session-expired sign-in link, null-publisher collapse. |
+| `tests/components/reader/reader-panel-paywall.test.tsx` | 3 cases: prompt renders only in extracted view with a verdict, session-expired copy surfaces correctly. |
 
-End-to-end manual smoke test in `extension/README.md`. Real-extension Playwright test (`tests/e2e/extension.spec.ts`) is Phase 3 work.
+End-to-end manual smoke test in `extension/README.md`. Real-extension Playwright test (`tests/e2e/extension.spec.ts`) is Phase 4 work.
 
 ## Design decisions
 
@@ -128,32 +171,32 @@ End-to-end manual smoke test in `extension/README.md`. Real-extension Playwright
 
 - **Async handler with injected IO.** `handleMessage` is `async` and takes a `HandlerContext` with `fetchUrl` / `hasPermission` / `extensionVersion`. The pure handler is unit-tested without faking the entire `chrome.*` surface; the background SW provides the real implementations.
 
-## Continuation guide (Phase 3 pickup)
+## Continuation guide (Phase 4 pickup)
 
 A fresh session continuing this work should read:
 
 1. This doc (`docs/features/019-authenticated-fetch.md`).
 2. `docs/decisions/020-browser-extension-surface.md` for the why.
-3. `src/core/extension/protocol.ts` and `extension/src/handlers.ts` — the two files that contain all the logic.
-4. `extension/README.md` for the smoke-test procedure.
+3. `src/core/extension/protocol.ts` and `extension/src/handlers.ts` — page <-> extension wire format.
+4. `src/core/extractor/paywall-detectors/index.ts` — where to add a new publisher.
+5. `src/stores/extension-store.ts` and `src/stores/extraction-store.ts` — orchestration.
+6. `src/components/reader/paywall-prompt.tsx` — the four-state UI.
+7. `extension/README.md` for the smoke-test procedure.
 
-### Phase 3 — UX integration
+### Phase 4 — polish + settings + Firefox
 
-Goal: the user never has to open devtools to use the feature. The reader pane detects paywalls, prompts for authorization, and re-renders the authenticated content.
+- **Settings tab listing authorized publishers** — read from `useExtensionStore.authorizedDomains` + a per-domain "Revoke" button that calls a new `feedzero/revoke-publisher` protocol message routing to `chrome.permissions.remove`. Mirror in chrome.storage so the popup can render the same list when the page is not open.
+- **Session-expired auto-refresh** — when the user clicks "Open `<publisher>` to sign in", the reader pane could subscribe to `visibilitychange` and auto-retry the fetch on tab return. Today the user must manually toggle "Full text" off and on again.
+- **Firefox parity** — Firefox's MV3 differs from Chrome's in `optional_host_permissions` semantics. Verify the install / authorize flow on Firefox Beta; document any divergence in `extension/README.md`.
+- **Additional publishers** — at minimum WSJ, FT, Economist, Bloomberg, Atlantic, New Yorker. Each is a new file in `src/core/extractor/paywall-detectors/` registered in `index.ts`. Take care with Bloomberg (anti-bot CAPTCHA) — may need per-publisher header overrides on the extension's `fetchUrl`.
+- **Real-extension Playwright test** — `tests/e2e/extension.spec.ts`. Boot Chromium with `--load-extension=extension/dist`, open the reader on a fixture NYT page, click "Authorize", assert the prompt disappears and Defuddle output renders. Will need a stub HTTP endpoint that serves both the paywalled and authenticated variants based on a cookie.
 
-Concrete deliverables:
+### Open questions for Phase 4
 
-- **`src/core/extractor/paywall-detectors/`** — new directory, mirrors `adapters/`. Exports `detectPaywall(html, url): PaywallVerdict`. First detector: `nytimes.ts`. Default detector: substring scan (`"Subscribe to read"`, `"Already a subscriber?"`, etc.) plus extracted-body-length threshold.
-- **`src/stores/extension-store.ts`** — Zustand store. Holds `extensionInstalled: boolean`, `extensionVersion: string | null`, `authorizedDomains: string[]`. Action `requestPublisherAccess(domain)` calls a new protocol message `feedzero/authorize-publisher` that the extension routes to `chrome.permissions.request`.
-- **`src/components/reader/paywall-prompt.tsx`** — the reader-pane UI for the four states (no-extension, authorize-publisher, session-expired, tier-not-subscribed). See Moments 1/3/6/7 in the plan file (`/root/.claude/plans/i-want-to-discuss-shimmering-peach.md`).
-- **`src/stores/extraction-store.ts`** modification — `fetchExtracted(url)` runs `/api/page` first, runs paywall detection, and on `paywall` / `session-expired` either triggers `fetchArticle()` via the extension or shows the prompt.
-- **New protocol message** `feedzero/authorize-publisher` — round-trips a permission grant request. Extension calls `chrome.permissions.request({ origins: [...] })` and returns the result.
-
-### Open questions to resolve before Phase 3 starts
-
-- **Detector copy** — exact strings for each prompt state. Should reference the 11-moment walkthrough.
-- **Should the extension surface its own per-domain allowlist?** Currently `chrome.permissions.getAll()` is the source of truth; do we mirror it in `chrome.storage` for the popup display?
+- **Where should the install link point?** Currently `https://feedzero.app/extension` (placeholder). Needs a real marketing/install page (or direct Chrome Web Store link once published).
+- **Should the popup mirror per-domain state?** Currently `chrome.permissions.getAll()` is the source of truth; we mirror in `useExtensionStore.authorizedDomains` for the page but not in `chrome.storage` for the popup. Decide before shipping Phase 4 settings UI.
 - **Bot-detection avoidance** — some publishers (Bloomberg, Reuters) block requests that look bot-y even with valid cookies. May need per-publisher header overrides in `fetchUrl`. Defer until we see it fail in real testing.
+- **Honor-system extension trust** — anything in the extension can read all the user's cookies for granted publishers. Document the implicit trust boundary in `extension/README.md` so users understand they are choosing to run our code in a high-trust context, even though it never leaves the browser.
 
 ## Limitations
 

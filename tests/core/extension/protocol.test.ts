@@ -3,10 +3,12 @@ import { isOk, isErr } from "@/utils/result.ts";
 import {
   ping,
   fetchArticle,
+  authorizePublisher,
   PROTOCOL_VERSION,
   type OutboundMessage,
   type PingResponse,
   type FetchArticleResponse,
+  type AuthorizePublisherResponse,
 } from "@/core/extension/protocol.ts";
 
 /**
@@ -204,6 +206,73 @@ describe("protocol", () => {
       const result = await fetchArticle("https://nytimes.com/article", {
         timeoutMs: 50,
       });
+      expect(isErr(result)).toBe(true);
+    });
+  });
+
+  describe("authorizePublisher", () => {
+    it("returns ok with granted=true when the user accepts the prompt", async () => {
+      dispose = fakeExtension((msg) => {
+        if (msg.type !== "feedzero/authorize-publisher") return undefined;
+        const response: AuthorizePublisherResponse = {
+          type: "feedzero/authorize-publisher-response",
+          requestId: msg.requestId,
+          granted: true,
+        };
+        return response;
+      });
+
+      const result = await authorizePublisher("nytimes.com");
+
+      expect(isOk(result)).toBe(true);
+      if (isOk(result)) {
+        expect(result.value.granted).toBe(true);
+      }
+    });
+
+    it("returns ok with granted=false when the user declines the prompt", async () => {
+      dispose = fakeExtension((msg) => {
+        if (msg.type !== "feedzero/authorize-publisher") return undefined;
+        const response: AuthorizePublisherResponse = {
+          type: "feedzero/authorize-publisher-response",
+          requestId: msg.requestId,
+          granted: false,
+        };
+        return response;
+      });
+
+      const result = await authorizePublisher("nytimes.com");
+
+      expect(isOk(result)).toBe(true);
+      if (isOk(result)) {
+        expect(result.value.granted).toBe(false);
+      }
+    });
+
+    it("forwards the domain in the outbound message", async () => {
+      const captured: OutboundMessage[] = [];
+      dispose = fakeExtension((msg) => {
+        captured.push(msg);
+        if (msg.type !== "feedzero/authorize-publisher") return undefined;
+        return {
+          type: "feedzero/authorize-publisher-response",
+          requestId: msg.requestId,
+          granted: true,
+        };
+      });
+
+      await authorizePublisher("nytimes.com");
+
+      expect(captured).toHaveLength(1);
+      expect(captured[0]).toMatchObject({
+        type: "feedzero/authorize-publisher",
+        domain: "nytimes.com",
+        protocolVersion: PROTOCOL_VERSION,
+      });
+    });
+
+    it("times out when no extension responds", async () => {
+      const result = await authorizePublisher("nytimes.com", { timeoutMs: 50 });
       expect(isErr(result)).toBe(true);
     });
   });

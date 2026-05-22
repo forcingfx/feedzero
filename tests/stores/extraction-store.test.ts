@@ -34,10 +34,12 @@ describe("extraction-store", () => {
 
   describe("fetchExtracted", () => {
     it("fetches and caches extracted content", async () => {
+      // Long body so the default paywall detector's body-too-short
+      // heuristic does not flag this as gated.
+      const fullHtml = `<html><body><article>${"<p>Full readable article paragraph. </p>".repeat(40)}</article></body></html>`;
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        text: () =>
-          Promise.resolve("<html><body><p>Full article</p></body></html>"),
+        text: () => Promise.resolve(fullHtml),
       }) as unknown as typeof fetch;
       vi.mocked(extract).mockReturnValue({
         ok: true,
@@ -225,9 +227,11 @@ describe("extraction-store", () => {
       }
       useExtractionStore.setState({ cache });
 
-      // Mock a successful extraction for one more
+      // Mock a successful extraction for one more. Long body so the
+      // default paywall detector does not flag this as a stub.
+      const longHtml = `<article>${"<p>Long readable paragraph. </p>".repeat(40)}</article>`;
       vi.mocked(fetch).mockResolvedValueOnce(
-        new Response("<p>hello</p>", { status: 200 }),
+        new Response(longHtml, { status: 200 }),
       );
       vi.mocked(extract).mockReturnValue({
         ok: true,
