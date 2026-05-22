@@ -10,6 +10,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import {
   ArticleListControls,
@@ -42,6 +43,13 @@ vi.mock("@/core/sync/sync-service", () => ({
   pushVault: vi.fn(),
   pullVault: vi.fn(),
   importVault: vi.fn(),
+}));
+
+vi.mock("@/core/feeds/feed-service.ts", () => ({
+  addFeedFlow: vi.fn(),
+  refreshFeed: vi.fn(),
+  refreshAllFeeds: vi.fn().mockResolvedValue(undefined),
+  reloadFeed: vi.fn(),
 }));
 
 const { useIsMobileSpy } = vi.hoisted(() => ({
@@ -159,6 +167,7 @@ describe("MobileHeaderPills", () => {
       feeds: [feed("f-tech", "Tech Crunchies")],
       folders: [],
       selectedFeedId: "f-tech",
+      isRefreshingAll: false,
     });
     useSmartFilterStore.setState({ filters: [] });
     useArticleStore.setState({ articleSortMode: "newest" });
@@ -188,5 +197,46 @@ describe("MobileHeaderPills", () => {
     );
     expect(screen.queryByTestId("settings-pill")).toBeNull();
     expect(screen.getByLabelText(/sort/i)).toBeInTheDocument();
+  });
+
+  it("shows a refresh-all control when feeds exist", () => {
+    render(
+      <MemoryRouter>
+        <MobileHeaderPills />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("mobile-refresh-all")).toBeInTheDocument();
+  });
+
+  it("hides the refresh-all control when there are no feeds", () => {
+    useFeedStore.setState({ feeds: [], selectedFeedId: ALL_FEEDS_ID });
+    render(
+      <MemoryRouter>
+        <MobileHeaderPills />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("mobile-refresh-all")).toBeNull();
+  });
+
+  it("tapping refresh-all refreshes every feed", async () => {
+    const { refreshAllFeeds } = await import("@/core/feeds/feed-service.ts");
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <MobileHeaderPills />
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByTestId("mobile-refresh-all"));
+    expect(refreshAllFeeds).toHaveBeenCalled();
+  });
+
+  it("disables the refresh-all control while a refresh is in flight", () => {
+    useFeedStore.setState({ isRefreshingAll: true });
+    render(
+      <MemoryRouter>
+        <MobileHeaderPills />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("mobile-refresh-all")).toBeDisabled();
   });
 });

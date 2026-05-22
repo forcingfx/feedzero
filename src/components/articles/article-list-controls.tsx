@@ -1,9 +1,10 @@
-import { Layers, Star, Filter, Folder as FolderIcon } from "lucide-react";
+import { Layers, Star, Filter, Folder as FolderIcon, RefreshCw } from "lucide-react";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { useIsMobile } from "@/hooks/use-mobile.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
+import { ExpandingPill } from "@/components/ui/expanding-pill.tsx";
 import { SortPill } from "./sort-pill.tsx";
 import { SettingsPill } from "./settings-pill.tsx";
 import {
@@ -142,8 +143,34 @@ export function MobileHeaderPills() {
       data-testid="mobile-header-pills"
       className="flex items-center gap-2"
     >
+      <RefreshPill />
       <SettingsPill />
       <SortPill mode={articleSortMode} onChange={setArticleSortMode} />
     </div>
+  );
+}
+
+/**
+ * Refresh-every-feed control for the mobile header. The desktop refresh
+ * lives in the sidebar header, which mobile never renders — without this
+ * the only way to refresh on mobile was the (also-hidden) keyboard `r`.
+ * Hidden when there are no feeds, mirroring the desktop button.
+ */
+function RefreshPill() {
+  const feeds = useFeedStore((s) => s.feeds);
+  const refreshAll = useFeedStore((s) => s.refreshAll);
+  const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
+
+  if (feeds.length === 0) return null;
+
+  return (
+    <ExpandingPill
+      icon={<RefreshCw className={isRefreshingAll ? "animate-spin" : ""} />}
+      label={isRefreshingAll ? "Refreshing…" : "Refresh all"}
+      aria-label="Refresh all feeds"
+      dataTestId="mobile-refresh-all"
+      disabled={isRefreshingAll}
+      onClick={() => void refreshAll()}
+    />
   );
 }

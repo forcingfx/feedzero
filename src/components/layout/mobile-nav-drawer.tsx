@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { ChevronUp, Layers, Settings } from "lucide-react";
+import { ChevronUp, Layers, RefreshCw, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
@@ -25,6 +25,8 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const navigate = useNavigate();
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
+  const refreshAll = useFeedStore((s) => s.refreshAll);
+  const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
 
   useEffect(() => {
     function handleToggle() {
@@ -131,6 +133,20 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
               <SidebarMenu>
                 <NewFolderInput trailing={<AutoOrganizePill />} />
               </SidebarMenu>
+              {feeds.length > 0 && (
+                <button
+                  type="button"
+                  data-testid="drawer-refresh-all"
+                  onClick={() => void refreshAll()}
+                  disabled={isRefreshingAll}
+                  className="flex items-center gap-3 w-full px-2 py-3 text-left text-sm font-medium rounded-md hover:bg-accent disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`size-4 shrink-0 text-muted-foreground ${isRefreshingAll ? "animate-spin" : ""}`}
+                  />
+                  {isRefreshingAll ? "Refreshing…" : "Refresh all"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleSettings}

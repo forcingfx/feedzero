@@ -33,6 +33,13 @@ import type { Tier } from "@/core/features/feature-gates";
 interface LicenseState {
   tier: Tier;
   verifying: boolean;
+  /**
+   * Epoch ms of the last *definitive* tier resolution — a no-token check,
+   * a server confirmation (200), or an explicit server rejection (4xx).
+   * Transient failures (5xx, network) deliberately leave this untouched so
+   * the focus-when-stale trigger in useLicenseRefresh retries them sooner.
+   */
+  lastCheckedAt: number | null;
   refresh: () => Promise<void>;
   /** Direct setter used by tests and explicit overrides. */
   setTier: (tier: Tier) => void;
@@ -53,13 +60,14 @@ function decodeTierFromToken(token: string): Tier {
 export const useLicenseStore = create<LicenseState>((set) => ({
   tier: "free",
   verifying: false,
+  lastCheckedAt: null,
 
   setTier: (tier) => set({ tier }),
 
   refresh: async () => {
     const token = getLicenseToken();
     if (!token) {
-      set({ tier: "free", verifying: false });
+      set({ tier: "free", verifying: false, lastCheckedAt: Date.now() });
       return;
     }
 
@@ -77,7 +85,8 @@ export const useLicenseStore = create<LicenseState>((set) => ({
         // 5xx = transient (Vercel hiccup, Upstash blip). DO NOT clear the
         // token — a paying customer would see their tier silently flip to
         // Free and panic. Keep the locally-decoded tier; the next refresh
-        // (page load, cross-tab event) will retry.
+        // (page load, cross-tab event) will retry. Leave lastCheckedAt
+        // stale so the focus-when-stale trigger retries promptly.
         // 4xx = the server explicitly rejected this token (revoked,
         // expired, forged). Clear so we don't keep sending an invalid
         // Bearer on every sync request.
@@ -86,18 +95,19 @@ export const useLicenseStore = create<LicenseState>((set) => ({
           return;
         }
         clearLicenseToken();
-        set({ tier: "free", verifying: false });
+        set({ tier: "free", verifying: false, lastCheckedAt: Date.now() });
         return;
       }
       const serverTier = body.license?.tier;
       if (isTier(serverTier)) {
-        set({ tier: serverTier, verifying: false });
+        set({ tier: serverTier, verifying: false, lastCheckedAt: Date.now() });
       } else {
-        set({ verifying: false });
+        set({ verifying: false, lastCheckedAt: Date.now() });
       }
     } catch {
       // Network failure: keep the locally-decoded tier. An offline user
-      // should not lose paid status mid-session.
+      // should not lose paid status mid-session. Leave lastCheckedAt stale
+      // so the next focus retries instead of waiting out the full day.
       set({ verifying: false });
     }
   },
