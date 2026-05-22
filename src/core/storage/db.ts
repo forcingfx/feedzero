@@ -1,7 +1,13 @@
 import Dexie from "dexie";
 import { ok, err } from "../../utils/result.ts";
 import type { Result } from "../../utils/result.ts";
-import { DB_NAME, DB_VERSION, CRYPTO } from "../../utils/constants.ts";
+import {
+  DB_NAME,
+  DB_VERSION,
+  CRYPTO,
+  PREFERENCES_ROW_ID,
+  META_KEY,
+} from "../../utils/constants.ts";
 import {
   deriveKey,
   deriveHmacKey,
@@ -11,7 +17,13 @@ import {
   decrypt,
   importCryptoKey,
 } from "./crypto.ts";
-import type { Feed, Article, Folder, SmartFilter } from "../../types/index.ts";
+import type {
+  Feed,
+  Article,
+  Folder,
+  SmartFilter,
+  UserPreferences,
+} from "../../types/index.ts";
 import { mergeDuplicateArticles } from "./dedupe-articles.ts";
 
 interface DexieRecord {
@@ -51,13 +63,14 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
       articles: "id, feedId, [feedId+guid]",
       folders: "id",
       smartFilters: "id",
+      preferences: "id",
       meta: "key",
     });
 
     await db.open();
 
     // Reuse existing salt or generate a new one for first-time setup
-    const existing = await db.table("meta").get("salt");
+    const existing = await db.table("meta").get(META_KEY.SALT);
     const salt = existing ? new Uint8Array(existing.value) : generateSalt();
 
     const keyResult = await deriveKey(passphrase, salt);
@@ -69,7 +82,7 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
     hmacKey = hmacResult.value;
 
     if (!existing) {
-      await db.table("meta").put({ key: "salt", value: Array.from(salt) });
+      await db.table("meta").put({ key: META_KEY.SALT, value: Array.from(salt) });
     }
 
     return ok(true);
@@ -94,6 +107,7 @@ export async function openWithKeys(
       articles: "id, feedId, [feedId+guid]",
       folders: "id",
       smartFilters: "id",
+      preferences: "id",
       meta: "key",
     });
 
@@ -121,7 +135,7 @@ export async function openWithKeys(
 export async function getSalt(): Promise<Result<Uint8Array>> {
   try {
     if (!db) return err("Database not open");
-    const record = await db.table("meta").get("salt");
+    const record = await db.table("meta").get(META_KEY.SALT);
     if (!record) return err("No salt found");
     return ok(new Uint8Array(record.value));
   } catch (e) {
@@ -520,26 +534,40 @@ export async function exportAll(): Promise<
     articles: Article[];
     folders: Folder[];
     smartFilters: SmartFilter[];
+    preferences: UserPreferences | null;
+    preferencesUpdatedAt: number | null;
   }>
 > {
   try {
-    const [feedsResult, articlesResult, foldersResult, filtersResult] =
-      await Promise.all([
-        getFeeds(),
-        getAllArticles(),
-        getFolders(),
-        getSmartFilters(),
-      ]);
+    const [
+      feedsResult,
+      articlesResult,
+      foldersResult,
+      filtersResult,
+      prefsResult,
+      prefsTsResult,
+    ] = await Promise.all([
+      getFeeds(),
+      getAllArticles(),
+      getFolders(),
+      getSmartFilters(),
+      getPreferences(),
+      getPreferencesUpdatedAt(),
+    ]);
     if (!feedsResult.ok) return feedsResult;
     if (!articlesResult.ok) return articlesResult;
     if (!foldersResult.ok) return foldersResult;
     if (!filtersResult.ok) return filtersResult;
+    if (!prefsResult.ok) return prefsResult;
+    if (!prefsTsResult.ok) return prefsTsResult;
 
     return ok({
       feeds: feedsResult.value,
       articles: articlesResult.value,
       folders: foldersResult.value,
       smartFilters: filtersResult.value,
+      preferences: prefsResult.value,
+      preferencesUpdatedAt: prefsTsResult.value,
     });
   } catch (e) {
     return err(`Failed to export data: ${(e as Error).message}`);
@@ -553,6 +581,10 @@ export interface ImportAllInput {
   folders?: Folder[];
   /** Omit (undefined) to leave the smartFilters table untouched. */
   smartFilters?: SmartFilter[];
+  /** Omit (undefined) to leave the preferences row untouched. */
+  preferences?: UserPreferences;
+  /** Timestamp to stamp alongside an imported preferences row. */
+  preferencesUpdatedAt?: number;
 }
 
 /**
@@ -587,7 +619,7 @@ export async function importAll(
 
     // Encrypt every batch up front; the rw transaction can only await
     // Dexie operations, never Web Crypto.
-    const [feedRecords, articleRecords, folderRecords, filterRecords] =
+    const [feedRecords, articleRecords, folderRecords, filterRecords, prefRecords] =
       await Promise.all([
         encryptRecords(input.feeds),
         encryptRecords(input.articles),
@@ -597,11 +629,19 @@ export async function importAll(
         input.smartFilters !== undefined
           ? encryptRecords(input.smartFilters)
           : Promise.resolve(undefined),
+        input.preferences !== undefined
+          ? encryptSingleRow(ctx.cryptoKey, PREFERENCES_ROW_ID, input.preferences)
+          : Promise.resolve(undefined),
       ]);
 
     const tables = [ctx.db.table("feeds"), ctx.db.table("articles")];
     if (folderRecords !== undefined) tables.push(ctx.db.table("folders"));
     if (filterRecords !== undefined) tables.push(ctx.db.table("smartFilters"));
+    if (prefRecords !== undefined) {
+      tables.push(ctx.db.table("preferences"), ctx.db.table("meta"));
+    }
+
+    const prefsTs = input.preferencesUpdatedAt ?? Date.now();
 
     await ctx.db.transaction("rw", tables, async () => {
       await ctx.db.table("feeds").clear();
@@ -615,6 +655,13 @@ export async function importAll(
       if (filterRecords !== undefined) {
         await ctx.db.table("smartFilters").clear();
         await ctx.db.table("smartFilters").bulkPut(filterRecords);
+      }
+      if (prefRecords !== undefined) {
+        await ctx.db.table("preferences").clear();
+        await ctx.db.table("preferences").put(prefRecords);
+        await ctx.db
+          .table("meta")
+          .put({ key: META_KEY.PREFERENCES_UPDATED_AT, value: prefsTs });
       }
     });
 
@@ -678,6 +725,72 @@ export async function removeSmartFilter(
   }
 }
 
+// --- Preferences (single-row, synced) ---
+
+/**
+ * Read the user preferences row, decrypted. Returns `ok(null)` when no row
+ * exists yet (first run / pre-migration) rather than an error — callers
+ * fall back to DEFAULT_PREFERENCES.
+ */
+export async function getPreferences(): Promise<Result<UserPreferences | null>> {
+  try {
+    const ctx = requireOpen();
+    const raw: DexieRecord | undefined = await ctx.db
+      .table("preferences")
+      .get(PREFERENCES_ROW_ID);
+    if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
+    const result = await decrypt(
+      ctx.cryptoKey,
+      new Uint8Array(raw.iv),
+      new Uint8Array(raw.ciphertext),
+    );
+    if (!result.ok) return result;
+    return ok(result.value as UserPreferences);
+  } catch (e) {
+    return err(`Failed to read preferences: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Persist the user preferences row (encrypted) and stamp the meta
+ * timestamp that drives sync last-write-wins.
+ */
+export async function putPreferences(
+  prefs: UserPreferences,
+): Promise<Result<boolean>> {
+  const stored = await putEncrypted("preferences", PREFERENCES_ROW_ID, prefs);
+  if (!stored.ok) return stored;
+  return setPreferencesUpdatedAt(Date.now());
+}
+
+/** Epoch ms of the last local preferences write, or null if never written. */
+export async function getPreferencesUpdatedAt(): Promise<Result<number | null>> {
+  try {
+    const ctx = requireOpen();
+    const record = await ctx.db
+      .table("meta")
+      .get(META_KEY.PREFERENCES_UPDATED_AT);
+    return ok(record ? (record.value as number) : null);
+  } catch (e) {
+    return err(`Failed to read preferences timestamp: ${(e as Error).message}`);
+  }
+}
+
+/** Write the preferences last-modified timestamp into the meta table. */
+export async function setPreferencesUpdatedAt(
+  ts: number,
+): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    await ctx.db
+      .table("meta")
+      .put({ key: META_KEY.PREFERENCES_UPDATED_AT, value: ts });
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to write preferences timestamp: ${(e as Error).message}`);
+  }
+}
+
 // --- Internal helpers ---
 
 /** Encrypt an array of records into Dexie-ready objects with HMAC-hashed indexes. */
@@ -707,6 +820,24 @@ async function encryptRecords(
     records.push(record);
   }
   return records;
+}
+
+/**
+ * Encrypt a single object into a Dexie-ready record under a fixed id,
+ * WITHOUT embedding the id in the ciphertext. Used for the preferences
+ * row so both write paths (putPreferences and importAll) store an
+ * identical, id-free payload. Returns undefined if encryption fails, which
+ * the caller treats as "leave the row untouched".
+ */
+async function encryptSingleRow(
+  key: CryptoKey,
+  id: string,
+  data: unknown,
+): Promise<DexieRecord | undefined> {
+  const encResult = await encrypt(key, data);
+  if (!encResult.ok) return undefined;
+  const { iv, ciphertext } = encResult.value;
+  return { id, iv: Array.from(iv), ciphertext: Array.from(ciphertext) };
 }
 
 async function putEncrypted(
