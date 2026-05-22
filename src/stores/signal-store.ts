@@ -4,6 +4,7 @@ import { useFeedStore } from "./feed-store.ts";
 import { generateReport, pickWindow } from "../core/signal/frequency-engine.ts";
 import {
   SIGNAL_CORPUS_GATE,
+  SIGNAL_REPORT_SCHEMA_VERSION,
   SIGNAL_REPORT_TTL_MS,
   type SignalReport,
 } from "../core/signal/types.ts";
@@ -106,6 +107,10 @@ function readCache(): CachedReport | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.report || typeof parsed.report.generatedAt !== "number") {
+      return null;
+    }
+    // Discard a report written by a build with an incompatible shape.
+    if (parsed.report.schemaVersion !== SIGNAL_REPORT_SCHEMA_VERSION) {
       return null;
     }
     return { report: parsed.report as SignalReport };

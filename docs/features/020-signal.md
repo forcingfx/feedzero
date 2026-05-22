@@ -7,9 +7,17 @@ Implemented
 
 Signal surfaces the topics emerging across the user's feeds — "what's loud
 right now" — derived entirely from local cross-feed term frequency. No
-LLM, no model download, no third-party call. Phase 1 is a plain-text
-ranked list (no cards, no images, no magazine layout) accessible at
-`/signal` from a Sparkles entry in the sidebar. Tier: Personal+.
+LLM, no model download, no third-party call. It is a plain-text ranked list
+(no cards, no images, no magazine layout) accessible at `/signal` from a
+Sparkles entry in the sidebar. Tier: Personal+.
+
+Topics anchor **only on proper nouns and compound nouns** ("OpenAI",
+"Iran War", "Supreme Court") — never bare common nouns — detected by
+capitalization consensus across the corpus (no ML). Within a topic, articles
+covering the same/similar story collapse into one **story** row badged
+"Covered by N outlets", expandable to each outlet's version. Each row peeks
+on hover (desktop) or tap (mobile) before opening the full item in the
+reader, so triage doesn't require leaving the page.
 
 Gating: the feature unlocks once the user has ≥100 articles in their
 local store. Below the gate, the page renders a progress tile ("X / 100
@@ -26,19 +34,31 @@ Feature: Signal — cross-feed topic surface
     Given my local article store contains 47 articles
     When I navigate to /signal
     Then I see a locked tile titled "Signal"
-    And the tile shows "47 / 100" with a progress bar
-    And the copy reads "Signal needs noise to filter — come back at 100."
+    And the tile shows "53 more articles to unlock" with a progress bar
+    And the copy reads "47 of 100 articles in your store"
 
   Scenario: Unlocked, with cross-feed signal
     Given my local article store contains ≥100 articles
-    And the engine finds terms appearing in ≥2 articles across ≥2 feeds
+    And the engine finds a proper/compound noun in ≥2 articles across ≥2 feeds
     When I navigate to /signal
     Then I see a header "Signal · <window> · N articles · M feeds"
     And up to 10 topic blocks ranked by cross-feed signal strength
-    And each block shows a muted-uppercase term chip plus a count line
-    And under it up to 6 article rows (title — feed · relative time)
-    When I click an article
+    And each block shows the entity in original casing plus a count line
+    And under it up to 6 story rows (headline — feed · relative time)
+    And a story carried by multiple feeds reads "Covered by N outlets"
+
+  Scenario: A common noun never anchors a topic
+    Given the only term shared across feeds is the common noun "tariffs"
+    When I navigate to /signal
+    Then no topic is anchored on "tariffs"
+
+  Scenario: Peek then read
+    Given a topic with story rows
+    When I hover a row on desktop (or tap it on mobile)
+    Then a preview shows the headline, source, and a teaser
+    When I click the row (desktop) or "Open in reader" (mobile)
     Then I am navigated to /feeds/:feedId/articles/:articleId
+    And the browser back button returns me to /signal
 
   Scenario: Unlocked, no cross-feed signal
     Given my local article store contains ≥100 articles
@@ -75,42 +95,57 @@ Feature: Signal — cross-feed topic surface
    `generateReport()`:
    1. **Window pick:** try 7d → 14d → 30d → all; stop at first window
       with ≥ `SIGNAL_MIN_PER_WINDOW` (50) articles.
-   2. **Dedupe** by normalized title hash (lowercase, strip punctuation)
-      — syndicated copies of the same story would otherwise inflate
-      every term equally.
-   3. **Tokenize** title + plain-text body with `tokenize.ts`: HTML
-      stripped, lowercased, English stopwords + feed-noise terms
-      dropped, numeric-only and <3-char tokens dropped, light suffix
-      stripping with double-consonant collapse for `-ing`/`-ed`.
-   4. **Index** per term: distinct article ids (DF) and distinct feed
-      ids (FF).
-   5. **Score** `signal(t) = distinctArticles(t) * log(1 + distinctFeeds(t))`.
-      Drop terms with <2 articles OR <2 feeds.
-   6. **Greedy cluster:** sort by signal desc, term asc. For each term,
-      claim unclaimed articles containing it, capped at
-      `ceil(corpus / 10) + 5`. **Bleed-over guard:** if <50% of the
-      term's original articles survive prior claims, skip — it's just a
-      fragment of a stronger cluster (e.g. "ship" after "openai" eats
-      every "OpenAI ships X" headline).
-   7. Order articles within each topic by recency desc.
-   8. `pickDisplayTerm` recovers the most common original casing from
-      the articles actually assigned to the cluster (`openai` → `OpenAI`).
-5. The store writes the report to localStorage and sets status
-   `"ready"`. The page renders topic blocks. Topic terms missing from
-   the result render as `topics: []` and the empty-but-ready caption.
-6. Article click navigates to the existing reader route. The article is
-   already in `useArticleStore`, so the reader page renders without an
-   additional DB read.
+   2. **Group exact duplicates** by normalized title (lowercase, strip
+      punctuation): keep a representative (most recent) per story plus a
+      map of every member sharing its title, so a syndicated story is one
+      representative for scoring but still knows every outlet that ran it.
+   3. **Extract entities** from each representative with `entities.ts`.
+      `buildLexicon` tallies corpus-wide casing to confirm proper nouns
+      (capitalized in ≥70% of non-initial occurrences, or only ever seen
+      capitalized and never lowercase); Title-Cased headlines are excluded
+      from the casing tally. `extractEntities` then emits confirmed proper
+      nouns as unigram keys and contiguous capitalized runs as compound
+      keys (e.g. `iran war`). No common nouns enter the index.
+   4. **Index** per entity key: distinct article ids (DF), distinct feed
+      ids (FF), word count, and a casing histogram for display.
+   5. **Score** `signal(t) = distinctArticles(t) * log(1 + distinctFeeds(t))
+      * (1 + 0.5·(words−1))`. The phrase boost makes a compound outrank its
+      constituent. Drop entities with <2 articles OR <2 feeds.
+   6. **Greedy cluster:** sort by signal desc, key asc. For each entity,
+      claim unclaimed representatives containing it, capped at
+      `ceil(reps / 10) + 5`. **Bleed-over guard:** if <50% of the entity's
+      original articles survive prior claims, skip — it's a fragment of a
+      stronger cluster (e.g. `iran` after `iran war` claims its articles).
+   7. **Group into stories:** within each topic, `stories.ts` merges
+      representatives whose significant title tokens overlap ≥60% (Jaccard)
+      and absorbs each representative's exact-duplicate members. Stories are
+      ordered by outlet count desc, then recency. Member ids run most-recent
+      first.
+5. The store writes the report to localStorage (tagged with
+   `SIGNAL_REPORT_SCHEMA_VERSION`) and sets status `"ready"`. The page
+   renders topic blocks. No topics → `topics: []` and the empty-but-ready
+   caption. A cached report tagged with a different schema version is
+   discarded on read.
+6. Each story renders via `<StoryRow>`. On desktop the headline is wrapped
+   in a `HoverCard` (peek) and clicking it navigates to the reader; on
+   mobile a tap opens a bottom `Sheet` preview whose "Open in reader" button
+   navigates. Navigation passes `state: { from: "/signal" }`; the article is
+   already in `useArticleStore`, so the reader renders without a DB read.
 
 ### Files
 
 | File | Role |
 |------|------|
-| `src/pages/signal-page.tsx` | The page. Three render branches (locked / empty / ready), Refresh button, topic blocks, article rows. |
-| `src/stores/signal-store.ts` | Zustand store. `loadReport({ force? })`, status state machine, 24h localStorage cache with window + corpus-drift invalidation. |
-| `src/core/signal/types.ts` | `Topic`, `SignalReport`, `WindowChoice` plus the gate / target / TTL constants. |
-| `src/core/signal/tokenize.ts` | `tokenize()`, `lightStem()`, English `STOPWORDS`, `FEED_NOISE` set. |
-| `src/core/signal/frequency-engine.ts` | `generateReport()` + `pickWindow()` (exported so the store can detect cache staleness without rerunning the full engine). Internal helpers: `dedupeByTitle`, `buildIndex`, `scoreTerms`, `clusterGreedy`, `pickDisplayTerm`. |
+| `src/pages/signal-page.tsx` | The page. Three render branches (locked / empty / ready), Refresh button, topic blocks delegating each story to `<StoryRow>`. |
+| `src/stores/signal-store.ts` | Zustand store. `loadReport({ force? })`, status state machine, 24h localStorage cache with window + corpus-drift + schema-version invalidation. |
+| `src/core/signal/types.ts` | `Topic`, `Story`, `SignalReport`, `WindowChoice` plus gate / target / TTL constants and the `PROPER_NOUN_RATIO` / `PHRASE_BOOST` / `STORY_SIMILARITY` / `SIGNAL_REPORT_SCHEMA_VERSION` tuning knobs. |
+| `src/core/signal/tokenize.ts` | `tokenize()`, `lightStem()`, exported case-preserving `stripHtml()`, English `STOPWORDS`, `FEED_NOISE` set. |
+| `src/core/signal/entities.ts` | `buildLexicon()` (proper-noun casing consensus) + `extractEntities()` (proper/compound noun keys). |
+| `src/core/signal/stories.ts` | `groupIntoStories()` — fuzzy + exact same-story grouping with outlet counts. |
+| `src/core/signal/frequency-engine.ts` | `generateReport()` + `pickWindow()` (exported so the store can detect cache staleness without rerunning the full engine). Internal helpers: `groupExactDuplicates`, `buildIndex`, `scoreTerms`, `clusterGreedy`. |
+| `src/components/signal/story-row.tsx` | Renders a `Story`: single/multi-outlet row, hover/tap preview, expand-to-outlets. |
+| `src/components/signal/article-preview.tsx` | Compact peek body (title, source, teaser, open actions). |
+| `src/components/ui/hover-card.tsx` | Radix HoverCard wrapper for the desktop peek. |
 | `src/lib/format-relative.ts` | Newspaper-style relative date label ("5m ago", "yesterday", "Mon 15"). |
 | `src/components/layout/sidebar-body.tsx` | Sparkles "Signal" entry between Explore and All items. |
 | `src/app.tsx` | `<Route path="/signal" element={<SignalRoute />} />`, lazy-loaded. |
@@ -121,11 +156,13 @@ Feature: Signal — cross-feed topic surface
 | File | Coverage |
 |------|----------|
 | `tests/core/signal/tokenize.test.ts` | HTML strip, lowercase, stopword/feed-noise drop, light stemming with double-consonant collapse. |
-| `tests/core/signal/frequency-engine.test.ts` | Happy path: 60 articles across 8 feeds → topics ordered by signal, single-feed terms dropped, disjoint topics, intra-topic recency order, displayTerm casing. |
+| `tests/core/signal/entities.test.ts` | Proper-noun consensus (Apple≠apple, sentence-initial-only, common-word rejection, stopword skip), compound extraction, Title-Case headline guard, possessive stripping. |
+| `tests/core/signal/stories.test.ts` | Similar-headline merge, unrelated-headline split, exact-duplicate outlet counting, ordering by outlet count then recency, member recency order. |
+| `tests/core/signal/frequency-engine.test.ts` | Happy path: entity-anchored topics ordered by signal, compound preferred over constituent, single-feed terms dropped, multi-outlet story surfaced, disjoint stories, displayTerm casing, schema version. |
 | `tests/core/signal/frequency-engine-window.test.ts` | Adaptive window picks the smallest with ≥50 articles, falls back to "all" when every window is sparse. |
-| `tests/core/signal/frequency-engine-edge.test.ts` | Title-hash dedupe, single-feed corpus → empty topics, body-token fallback when title is uninformative, deterministic across input order, non-English content does not crash, dominant-term cap. |
+| `tests/core/signal/frequency-engine-edge.test.ts` | Common nouns never anchor a topic, syndicated story collapses to one multi-outlet story, single-feed corpus → empty, body-only entity detection, deterministic across input order, non-English does not crash, dominant-entity cap. |
 | `tests/stores/signal-store.test.ts` | Locked / loading / ready transitions, empty-ready handling, cache TTL hit, force-reload bypasses cache, window change invalidates cache, ±10% corpus drift invalidates cache, persistence across state reset. |
-| `tests/pages/signal-page.test.tsx` | Locked tile shows progress, empty-ready message, topic headers + article rows render, Refresh re-runs the engine, article click navigates to the reader, cache priming reads from localStorage. |
+| `tests/pages/signal-page.test.tsx` | Locked tile, empty-ready message, entity topic heading + story rows, multi-outlet badge + expand, desktop click → reader, mobile tap → preview → reader, Refresh re-runs, cache priming, schema-version invalidation. |
 | `tests/e2e/signal.spec.ts` | Sidebar Sparkles entry navigates to `/signal`, locked tile renders with the gate copy when the corpus is empty. |
 | `tests/core/features/tier-matrix.test.ts` | `signal` is shipped, Personal+ available, Free unavailable; round-trips through `GATED_FEATURE_IDS`. |
 
@@ -151,6 +188,30 @@ Feature: Signal — cross-feed topic surface
   every user reaches the feature; the gate only bites once
   `VITE_PAID_TIER_VISIBLE=1`. The sidebar entry stays visible
   regardless (discoverability).
+- **Entities only, by capitalization consensus.** A topic must name
+  something — a proper noun ("OpenAI") or compound noun ("Iran War") — not a
+  bare common noun ("tariffs"). Without an ML POS tagger, capitalization is
+  the available signal: a word capitalized across the corpus's sentence-case
+  bodies is a proper noun; "apple" the fruit stays lowercase, "Apple" the
+  company does not. Title-Cased headlines capitalize everything, so they are
+  excluded from the casing tally and only contribute already-confirmed
+  entities. Compounds come from contiguous capitalized runs. The trade-off
+  is recall on thin, Title-Case-only feeds (see Limitations) — accepted in
+  exchange for topics that are always nameable.
+- **Compound beats constituent via a phrase boost.** Multiplying signal by
+  `1 + 0.5·(words−1)` lets "Iran War" win the greedy claim before "Iran",
+  and the existing bleed-over guard then drops the fragmented unigram. This
+  reuses the clustering machinery instead of a separate subsumption pass.
+- **Same story across outlets is grouped, not hidden.** Earlier the engine
+  deduped syndicated copies and discarded all but the most recent. Now exact
+  duplicates are grouped (and similar headlines fuzzy-merged within a topic)
+  into a story that reports how many outlets ran it — the multi-outlet
+  signal the user asked to see. Scoring still runs on representatives so
+  syndication volume doesn't distort cluster strength.
+- **Peek before read.** A topic row is a triage surface, not a destination.
+  Hover (desktop) / tap (mobile) shows a teaser; the click commits to the
+  reader. Reusing `ArticleContent`, `HoverCard`, and `Sheet` keeps it to one
+  small component with no new primitives beyond the HoverCard wrapper.
 - **Cross-feed diversity is the signal.** Score = `articles × log(1 + feeds)`.
   Multiplying by log-feeds means a story appearing in 10 outlets
   outranks one outlet posting 10 times, which matches the
@@ -175,6 +236,18 @@ Feature: Signal — cross-feed topic surface
 
 ## Limitations
 
+- **Strict entity gate can leave sparse feeds quiet.** Proper-noun
+  detection needs sentence-case casing evidence. Feeds that publish only
+  Title-Case headlines with empty/thin bodies give the lexicon nothing to
+  confirm, so fewer (or no) topics surface. This is the deliberate
+  trade-off for "topics are always nameable"; the empty-but-ready caption
+  covers the degenerate case. A future relaxation could admit
+  recurring-bigram entities even from Title-Case headlines if recall proves
+  too low in practice.
+- **Capitalization is script-bound.** Casing-based entity detection only
+  works for cased scripts (Latin, Cyrillic, Greek). CJK and other caseless
+  scripts produce no entities and therefore no topics — a stricter form of
+  the English-only limitation below.
 - **English-only.** Stopwords are English; tokenize uses `\W+` which
   handles ASCII word boundaries cleanly but collapses CJK/RTL text into
   long single tokens. The engine produces *something* on non-English

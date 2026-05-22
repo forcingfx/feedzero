@@ -21,7 +21,7 @@ test.describe("Signal — sidebar + locked state", () => {
   test("locked tile renders when the corpus is below the gate", async ({ feedPage: page }) => {
     await page.goto("/signal");
     // Default fresh app has zero articles; signal goes straight to locked.
-    await expect(page.getByText(/Signal needs noise to filter/i)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(`0 / ${SIGNAL_CORPUS_GATE}`)).toBeVisible();
+    await expect(page.getByText(/more articles to unlock/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(`0 of ${SIGNAL_CORPUS_GATE} articles in your store`)).toBeVisible();
   });
 });
