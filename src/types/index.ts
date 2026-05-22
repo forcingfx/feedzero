@@ -118,6 +118,35 @@ export const ARTICLE_SORT_MODES: readonly ArticleSortMode[] = [
   "unread-first",
 ] as const;
 
+/**
+ * User preferences consolidated into a single synced, encrypted-at-rest
+ * record (the `preferences` Dexie table; rides through the vault as
+ * VaultData v3+). Replaces the loose, unencrypted `localStorage` keys that
+ * previously stranded these settings on one device. Conflict resolution is
+ * timestamp-gated last-write-wins via VaultData.preferencesUpdatedAt — see
+ * `mergeVaults` and `sync-store.pull`.
+ *
+ * `theme` is declared here but not yet wired (next-themes bridge lands in a
+ * follow-up PR); until then it stays undefined.
+ */
+export interface UserPreferences {
+  feedSortMode: FeedSortMode;
+  feedCustomOrder: string[];
+  folderCustomOrder: string[];
+  articleSortMode: ArticleSortMode;
+  groupArticleFloods: boolean;
+  theme?: "light" | "dark" | "system";
+}
+
+/** Baseline preferences used before hydration and for first-run defaults. */
+export const DEFAULT_PREFERENCES: UserPreferences = {
+  feedSortMode: "name",
+  feedCustomOrder: [],
+  folderCustomOrder: [],
+  articleSortMode: "newest",
+  groupArticleFloods: true,
+};
+
 export interface CreateArticleInput {
   feedId: string;
   title: string;
