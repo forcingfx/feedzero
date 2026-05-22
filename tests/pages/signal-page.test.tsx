@@ -318,7 +318,7 @@ describe("SignalPage", () => {
       renderAt();
       // Gate short-circuits before any report computation.
       await waitFor(() =>
-        expect(screen.getByText(/Signal is a Personal feature/i)).toBeInTheDocument(),
+        expect(screen.getByText(/Unlock Signal/i)).toBeInTheDocument(),
       );
       expect(screen.getByRole("button", { name: /Upgrade to Personal/i })).toBeInTheDocument();
       // The report UI must NOT render.
@@ -332,7 +332,7 @@ describe("SignalPage", () => {
 
       renderAt();
       await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
-      expect(screen.queryByText(/Signal is a Personal feature/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Unlock Signal/i)).not.toBeInTheDocument();
     });
 
     it("does NOT gate a self-hosted Free user", async () => {
@@ -343,7 +343,7 @@ describe("SignalPage", () => {
 
       renderAt();
       await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
-      expect(screen.queryByText(/Signal is a Personal feature/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Unlock Signal/i)).not.toBeInTheDocument();
     });
 
     it("does NOT gate when the paid tier is dormant (pre-launch)", async () => {
@@ -353,7 +353,7 @@ describe("SignalPage", () => {
 
       renderAt();
       await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
-      expect(screen.queryByText(/Signal is a Personal feature/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Unlock Signal/i)).not.toBeInTheDocument();
     });
 
     it("Upgrade button routes to the subscription settings tab", async () => {

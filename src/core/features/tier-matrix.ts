@@ -369,6 +369,48 @@ export function isGated(id: FeatureId): boolean {
   return !t.free.available || !t.personal.available || !t.pro.available;
 }
 
+// ── Matrix-derived gate messaging ──────────────────────────────────────
+//
+// Every upgrade surface (toasts, splashes, inline lock badges) derives its
+// copy from these helpers, so editing a feature's `name` or moving it
+// between tiers in the matrix flows through the whole app with no string
+// edits at the call sites. Tests in `gate-messaging.test.ts` lock this.
+
+const TIER_LABEL: Record<Tier, string> = {
+  free: "Free",
+  personal: "Personal",
+  pro: "Pro",
+};
+
+/** Human-readable tier label, e.g. "Personal". */
+export function tierLabel(tier: Tier): string {
+  return TIER_LABEL[tier];
+}
+
+/** The matrix display name, e.g. "Smart filters", "Signal", "Rules". */
+export function featureName(id: FeatureId): string {
+  return TIER_MATRIX[id].name;
+}
+
+/** Capitalized label of the lowest tier that unlocks the feature. */
+export function requiredTierLabel(id: FeatureId): string {
+  return TIER_LABEL[getRequiredTier(id)];
+}
+
+/** The matrix description, reused on every upgrade surface. */
+export function gateDescription(id: FeatureId): string {
+  return TIER_MATRIX[id].description;
+}
+
+/**
+ * Canonical one-line gate copy for toasts and CTAs. Grammar-neutral so it
+ * reads correctly for singular ("Signal") and plural ("Smart filters",
+ * "Rules") feature names alike.
+ */
+export function gateToast(id: FeatureId): string {
+  return `Subscribe to ${requiredTierLabel(id)} to unlock ${featureName(id)}.`;
+}
+
 /**
  * Explicit literal tuple of gated feature ids.
  *

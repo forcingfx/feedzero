@@ -26,13 +26,12 @@ import {
 import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { useLicenseStore } from "./license-store.ts";
-import { gateState } from "../core/features/feature-gates.ts";
 import { isSelfHosted } from "../core/features/self-hosted.ts";
 import { isPaidTierActive } from "../core/features/paid-tier-active.ts";
 import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
+import { isFeatureEnabled, enforceFeature } from "./enforce-feature.ts";
 import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
-import { toast } from "sonner";
 import type {
   Feed,
   Folder,
@@ -184,12 +183,7 @@ function sortFoldersByName(folders: Folder[]): Folder[] {
 
 /** True when the current session may mutate per-feed rules. */
 function isRulesGateOpen(): boolean {
-  return gateState(
-    "rules",
-    useLicenseStore.getState().tier,
-    isSelfHosted(),
-    isPaidTierActive(),
-  ).enabled;
+  return isFeatureEnabled("rules");
 }
 
 /**
@@ -272,13 +266,7 @@ export const FEED_PREFETCH_LIMIT = 20;
  * the UI doesn't block on a potentially multi-second batch.
  */
 async function schedulePrefetch(feeds: Feed[]): Promise<void> {
-  const gate = gateState(
-    "offline-prefetch",
-    useLicenseStore.getState().tier,
-    isSelfHosted(),
-    isPaidTierActive(),
-  );
-  if (!gate.enabled) return;
+  if (!isFeatureEnabled("offline-prefetch")) return;
 
   // Two passes — starred (always-on for prefetch-gated users) and
   // per-feed (only feeds the user has explicitly opted in). The
@@ -437,6 +425,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   setFeedPrefetchEnabled: async (feedId, value) => {
+    // Defense-in-depth: the UI disables this toggle for gated users, but
+    // guard the store too so a programmatic caller can't enable a paid
+    // capability. Disabling is always allowed (turning off an inert flag
+    // after a downgrade). Silent — the UI owns the upgrade messaging.
+    if (value && !isFeatureEnabled("offline-prefetch")) return;
     const feedResult = await getFeed(feedId);
     if (!feedResult.ok) return;
     await dbUpdateFeed({
@@ -587,18 +580,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   applyAutoOrganize: async (plan) => {
     // Defense-in-depth: even when the UI thinks the user is paid, gate the
     // store action so programmatic callers (future shortcuts, scripts) cannot
-    // bypass the honor-system check. UI handles its own messaging — the toast
-    // here is for the edge case where state diverges.
-    const gate = gateState(
-      "auto-organize",
-      useLicenseStore.getState().tier,
-      isSelfHosted(),
-      isPaidTierActive(),
-    );
-    if (!gate.enabled) {
-      toast("Auto-organize is a Personal feature. Subscribe to unlock.");
-      return;
-    }
+    // bypass the honor-system check. UI handles its own messaging; the toast
+    // here covers the edge case where state diverges.
+    if (!enforceFeature("auto-organize")) return;
 
     const nonEmpty = plan.filter((p) => p.feedIds.length > 0);
     if (nonEmpty.length === 0) return;
@@ -655,10 +639,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   addFeedRule: async (feedId, input) => {
-    if (!isRulesGateOpen()) {
-      toast("Rules are a Personal feature. Subscribe to unlock.");
-      return err("Rules require the Personal tier");
-    }
+    if (!enforceFeature("rules")) return err("Rules require the Personal tier");
     const created = createRule(input);
     if (!created.ok) return err(created.error);
 
@@ -672,10 +653,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   updateFeedRule: async (feedId, rule) => {
-    if (!isRulesGateOpen()) {
-      toast("Rules are a Personal feature. Subscribe to unlock.");
-      return err("Rules require the Personal tier");
-    }
+    if (!enforceFeature("rules")) return err("Rules require the Personal tier");
     let found = false;
     const result = await persistFeedRules(
       feedId,

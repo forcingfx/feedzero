@@ -94,7 +94,7 @@ export function AutoOrganizePill() {
           <div>
             <p className="font-medium text-sm">
               {showUpgrade
-                ? "Auto-organize is a Personal feature"
+                ? `${gate.featureName} is a ${gate.requiredTierLabel} feature`
                 : "Auto-organize feeds"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">

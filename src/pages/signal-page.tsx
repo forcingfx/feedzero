@@ -17,6 +17,7 @@ import { goToSettings } from "@/lib/go-to-settings.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
 import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
+import { UpgradeSplash } from "@/components/features/upgrade-splash.tsx";
 import type { Article, Feed } from "@/types/index.ts";
 
 /**
@@ -54,7 +55,7 @@ export function SignalPage() {
   }, [loadReport, totalArticles, tierLocked]);
 
   if (tierLocked) {
-    return <UpgradeSplash onUpgrade={gate.promptUpgrade} />;
+    return <UpgradeSplash feature="signal" />;
   }
 
   if (status === "locked") {
@@ -78,24 +79,6 @@ export function SignalPage() {
   }
 
   return <ReadyView report={report} onRefresh={() => loadReport({ force: true })} />;
-}
-
-function UpgradeSplash({ onUpgrade }: { onUpgrade: () => void }) {
-  return (
-    <div className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-6 px-6 py-12 text-center">
-      <Sparkles className="size-10 text-primary" />
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Signal is a Personal feature</h1>
-        <p className="text-sm text-muted-foreground">
-          Signal surfaces the topics multiple outlets are converging on across
-          your feeds — computed entirely on your device, no AI, no tracking.
-        </p>
-      </div>
-      <Button onClick={onUpgrade} className="w-full" size="lg">
-        Upgrade to Personal
-      </Button>
-    </div>
-  );
 }
 
 function LockedSplash({ count }: { count: number }) {

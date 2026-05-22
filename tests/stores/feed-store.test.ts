@@ -885,8 +885,9 @@ describe("feed-store", () => {
 
         expect(addFolder).not.toHaveBeenCalled();
         expect(updateFeed).not.toHaveBeenCalled();
+        // Matrix-derived upgrade copy: references the feature name + tier.
         expect(toast).toHaveBeenCalledWith(
-          expect.stringMatching(/personal feature/i),
+          expect.stringMatching(/unlock Auto-organize/i),
         );
       });
 

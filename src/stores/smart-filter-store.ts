@@ -14,7 +14,6 @@
  */
 
 import { create } from "zustand";
-import { toast } from "sonner";
 import {
   getSmartFilters,
   addSmartFilter,
@@ -23,10 +22,7 @@ import {
 } from "../core/storage/db.ts";
 import { createSmartFilter } from "../core/storage/schema.ts";
 import { useSyncStore } from "./sync-store.ts";
-import { useLicenseStore } from "./license-store.ts";
-import { gateState } from "../core/features/feature-gates.ts";
-import { isSelfHosted } from "../core/features/self-hosted.ts";
-import { isPaidTierActive } from "../core/features/paid-tier-active.ts";
+import { enforceFeature } from "./enforce-feature.ts";
 import type {
   SmartFilter,
   CreateSmartFilterInput,
@@ -56,26 +52,14 @@ interface SmartFilterStore {
   closeEditor: () => void;
 }
 
-/** True when the current session is allowed to mutate filters. */
-function isFilterGateOpen(): boolean {
-  const gate = gateState(
-    "filters",
-    useLicenseStore.getState().tier,
-    isSelfHosted(),
-    isPaidTierActive(),
-  );
-  return gate.enabled;
-}
-
 /**
- * Toast + abort when the feature gate is closed. Mirrors the
- * auto-organize precedent in feed-store. Returns the structural err
+ * Toast + abort when the feature gate is closed. Delegates to the shared
+ * `enforceFeature` (matrix-derived message). Returns the structural err
  * shape directly so each call site can `return rejected` without
  * fighting the discriminated-union narrowing on the wider Result<T>.
  */
 function rejectIfGateClosed(): { ok: false; error: string } | null {
-  if (isFilterGateOpen()) return null;
-  toast("Smart filters are a Personal feature. Subscribe to unlock.");
+  if (enforceFeature("filters")) return null;
   return { ok: false, error: "Smart filters require the Personal tier" };
 }
 
