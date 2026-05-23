@@ -35,3 +35,37 @@ describe("index.html viewport meta", () => {
     expect(INDEX_HTML).toMatch(/viewport-fit=cover/);
   });
 });
+
+describe("index.html iOS PWA meta tags (native-app feel)", () => {
+  // Without these, "Add to Home Screen" on iOS still opens FeedZero inside
+  // the Safari chrome — the URL bar, tab bar and bottom toolbar all stay,
+  // which immediately reveals it's not a native app. The standalone meta
+  // tags + the manifest's "display":"standalone" together unlock a
+  // chrome-less fullscreen launch on both iOS and Android.
+
+  it("declares apple-mobile-web-app-capable=yes for standalone iOS launch", () => {
+    expect(INDEX_HTML).toMatch(
+      /<meta[^>]*name=["']apple-mobile-web-app-capable["'][^>]*content=["']yes["']/,
+    );
+  });
+
+  it("declares the legacy mobile-web-app-capable=yes for older Android browsers", () => {
+    expect(INDEX_HTML).toMatch(
+      /<meta[^>]*name=["']mobile-web-app-capable["'][^>]*content=["']yes["']/,
+    );
+  });
+
+  it("declares a status-bar style so the iOS status bar blends with the app", () => {
+    // black-translucent lets the app paint behind the status bar; combined
+    // with env(safe-area-inset-top) in body padding, content stays clear.
+    expect(INDEX_HTML).toMatch(
+      /<meta[^>]*name=["']apple-mobile-web-app-status-bar-style["'][^>]*content=["'](black-translucent|default|black)["']/,
+    );
+  });
+
+  it("declares an apple-mobile-web-app-title for the home-screen icon label", () => {
+    expect(INDEX_HTML).toMatch(
+      /<meta[^>]*name=["']apple-mobile-web-app-title["'][^>]*content=["']FeedZero["']/,
+    );
+  });
+});
