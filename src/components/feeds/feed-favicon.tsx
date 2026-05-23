@@ -100,7 +100,7 @@ export function FeedFavicon({
         className={`${className} shrink-0 ${
           avatar
             ? "rounded-full bg-white object-cover p-px"
-            : "rounded-sm ring-1 ring-border/50"
+            : "rounded-sm ring-1 ring-border/50 dark:bg-white dark:p-px"
         } ${loaded ? "" : "hidden"}`}
         onLoad={() => {
           recordFaviconSuccess(origin, pathIndex);

@@ -96,6 +96,26 @@ describe("FeedFavicon", () => {
     expect(img.className).toContain("ring-1");
   });
 
+  // Some favicons are dark-on-transparent (TechCrunch, GitHub octocat dark variants).
+  // Without a backing, they blend into the dark theme background. Default variant
+  // must get a white pill in dark mode so any icon stays visible.
+  it("paints a white backing in dark mode so dark favicons stay visible", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    const img = container.querySelector("img")!;
+    expect(img.className).toContain("dark:bg-white");
+    expect(img.className).toContain("dark:p-px");
+  });
+
+  it("avatar variant keeps its always-on white backing (unaffected by dark-mode default)", () => {
+    const { container } = render(
+      <FeedFavicon siteUrl="https://example.com" avatar />,
+    );
+    const img = container.querySelector("img")!;
+    expect(img.className).toContain("bg-white");
+    expect(img.className).toContain("p-px");
+    expect(img.className).not.toContain("dark:bg-white");
+  });
+
   it("retries after cached failure once TTL expires", () => {
     setFaviconCacheEntry("https://stale.example.com", -1, 0);
 
