@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { readFileSync } from "fs";
 import { toWebRequest, sendWebResponse } from "./scripts/dev-proxy.js";
+import { visualizer } from "rollup-plugin-visualizer";
 
 // Inject the current package.json version as a build-time constant so
 // the SPA and dev server can identify which build is running. The
@@ -356,6 +357,20 @@ function apiProxyPlugin() {
   };
 }
 
+// Opt-in bundle analysis: `ANALYZE=1 npm run build` emits dist/stats.html
+// with a treemap of every chunk. Used to verify server-only deps (Stripe,
+// @upstash/redis, @vercel/blob, the Hono server stack) stay out of the
+// browser bundle and to catch new bloat in PR review.
+const analyzePlugin =
+  process.env.ANALYZE === "1"
+    ? visualizer({
+        filename: "dist/stats.html",
+        gzipSize: true,
+        brotliSize: true,
+        template: "treemap",
+      })
+    : null;
+
 export default defineConfig({
   server: {
     port: 3000,
@@ -368,5 +383,17 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  plugins: [react(), tailwindcss(), apiProxyPlugin()],
+  build: {
+    rollupOptions: {
+      // Hard-exclude server-only deps from the client bundle. If Vite/Rollup
+      // ever follows a stray import path that pulls them in, the build fails
+      // loudly instead of silently shipping ~500 KB of unused SDK to every
+      // visitor. The Hono server (server.ts) and Vercel wrappers (api/*.ts)
+      // bundle these via scripts/build-api.js, not this build.
+      external: ["stripe", "@upstash/redis", "@vercel/blob", "@hono/node-server"],
+    },
+  },
+  plugins: [react(), tailwindcss(), apiProxyPlugin(), analyzePlugin].filter(
+    Boolean,
+  ),
 });
