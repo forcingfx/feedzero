@@ -23,6 +23,9 @@ import type { Article, Feed } from "@/types/index.ts";
 const ROW_CLASS =
   "flex w-full flex-col gap-1 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none";
 
+const MULTI_BADGE_CLASS =
+  "inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary";
+
 interface StoryRowProps {
   story: Story;
   articleMap: Map<string, Article>;
@@ -45,13 +48,16 @@ export function StoryRow({ story, articleMap, feedMap, now }: StoryRowProps) {
   const multi = story.feedCount >= 2;
 
   return (
-    <li>
+    <li className={cn(multi && "border-l-2 border-l-primary pl-3")}>
       <PreviewLink article={head} feedTitle={headFeed} now={now}>
         <span className="text-sm text-foreground">{decodeEntities(head.title)}</span>
-        <span className="text-xs text-muted-foreground">
-          {multi ? `Covered by ${story.feedCount} outlets` : headFeed}
-          {" · "}
-          {formatRelative(head.publishedAt, now)}
+        <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {multi ? (
+            <span className={MULTI_BADGE_CLASS}>{`Covered by ${story.feedCount} outlets`}</span>
+          ) : (
+            <span>{headFeed}</span>
+          )}
+          <span>{formatRelative(head.publishedAt, now)}</span>
         </span>
       </PreviewLink>
 
@@ -75,8 +81,10 @@ export function StoryRow({ story, articleMap, feedMap, now }: StoryRowProps) {
                 return (
                   <li key={id}>
                     <PreviewLink article={member} feedTitle={feedTitle} now={now}>
-                      <span className="text-sm text-foreground">{feedTitle}</span>
+                      <span className="text-sm text-foreground">{decodeEntities(member.title)}</span>
                       <span className="text-xs text-muted-foreground">
+                        {feedTitle}
+                        {" · "}
                         {formatRelative(member.publishedAt, now)}
                       </span>
                     </PreviewLink>

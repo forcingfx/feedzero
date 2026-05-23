@@ -8,6 +8,7 @@ import {
   SIGNAL_ARTICLES_PER_TOPIC,
   SIGNAL_CORPUS_GATE,
   type SignalReport,
+  type Story,
   type Topic,
   type WindowChoice,
 } from "@/core/signal/types.ts";
@@ -167,6 +168,7 @@ function ReadyView({
   });
 
   const hasTopics = report.topics.length > 0;
+  const topStories = useMemo(() => collectTopStories(report.topics), [report.topics]);
   const generatedLabel = formatRelative(report.generatedAt);
 
   return (
@@ -208,6 +210,14 @@ function ReadyView({
           <EmptyState onAddFeeds={() => navigate("/explore")} />
         ) : (
           <div className="flex flex-col gap-8">
+            {topStories.length >= TOP_STORIES_MIN ? (
+              <TopStoriesBlock
+                stories={topStories}
+                articleMap={articleMap}
+                feedMap={feedMap}
+                now={report.generatedAt}
+              />
+            ) : null}
             {report.topics.map((topic) => (
               <TopicBlock
                 key={topic.term}
@@ -221,6 +231,69 @@ function ReadyView({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The Top stories digest only renders when at least this many stories
+ * have multiple sources. One multi-source story isn't a "digest" — it's a
+ * single row already visible in its topic — so the bar starts at two.
+ */
+const TOP_STORIES_MIN = 2;
+
+/**
+ * Collect stories with at least two sources across every topic, deduped
+ * by id (the rare case where the same article is claimed by multiple
+ * topics) and ordered outlet-count-desc — most-corroborated first.
+ * Stories within a topic are already most-recent-first, which carries
+ * through stable sort.
+ */
+function collectTopStories(topics: Topic[]): Story[] {
+  const seen = new Set<string>();
+  const out: Story[] = [];
+  for (const topic of topics) {
+    for (const story of topic.stories) {
+      if (story.feedCount >= 2 && !seen.has(story.id)) {
+        seen.add(story.id);
+        out.push(story);
+      }
+    }
+  }
+  out.sort((a, b) => b.feedCount - a.feedCount);
+  return out;
+}
+
+function TopStoriesBlock({
+  stories,
+  articleMap,
+  feedMap,
+  now,
+}: {
+  stories: Story[];
+  articleMap: Map<string, Article>;
+  feedMap: Map<string, Feed>;
+  now: number;
+}) {
+  return (
+    <section>
+      <header className="mb-1.5">
+        <h2 className="text-lg font-semibold leading-tight">Top stories</h2>
+        <p className="text-xs text-muted-foreground">
+          {`${stories.length} stories multiple outlets are running right now`}
+        </p>
+      </header>
+      <ul className="divide-y divide-border">
+        {stories.map((story) => (
+          <StoryRow
+            key={story.id}
+            story={story}
+            articleMap={articleMap}
+            feedMap={feedMap}
+            now={now}
+          />
+        ))}
+      </ul>
+    </section>
   );
 }
 
