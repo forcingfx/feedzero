@@ -629,4 +629,78 @@ describe("useKeyboardNav", () => {
       expect(event.defaultPrevented).toBe(true);
     });
   });
+
+  describe("command palette (Cmd/Ctrl + K)", () => {
+    it("toggles the palette on Cmd+K", async () => {
+      const { useCommandPaletteStore } = await import(
+        "@/stores/command-palette-store.ts"
+      );
+      useCommandPaletteStore.setState({ isOpen: false });
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      const event = new KeyboardEvent("keydown", {
+        key: "k",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      document.dispatchEvent(event);
+
+      expect(useCommandPaletteStore.getState().isOpen).toBe(true);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it("toggles the palette on Ctrl+K", async () => {
+      const { useCommandPaletteStore } = await import(
+        "@/stores/command-palette-store.ts"
+      );
+      useCommandPaletteStore.setState({ isOpen: false });
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      const event = new KeyboardEvent("keydown", {
+        key: "k",
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      document.dispatchEvent(event);
+
+      expect(useCommandPaletteStore.getState().isOpen).toBe(true);
+    });
+
+    it("works when focus is in an input — overrides the input-focus early return", async () => {
+      const { useCommandPaletteStore } = await import(
+        "@/stores/command-palette-store.ts"
+      );
+      useCommandPaletteStore.setState({ isOpen: false });
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      input.focus();
+
+      const event = new KeyboardEvent("keydown", {
+        key: "k",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      input.dispatchEvent(event);
+
+      expect(useCommandPaletteStore.getState().isOpen).toBe(true);
+      input.remove();
+    });
+
+    it("a plain 'k' (no modifier) is not the palette shortcut", async () => {
+      const { useCommandPaletteStore } = await import(
+        "@/stores/command-palette-store.ts"
+      );
+      useCommandPaletteStore.setState({ isOpen: false });
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      pressKey("k");
+
+      expect(useCommandPaletteStore.getState().isOpen).toBe(false);
+    });
+  });
 });

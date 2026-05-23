@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
   RefreshCw,
+  Search,
   Settings,
   X,
 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { useCommandPaletteStore } from "@/stores/command-palette-store.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Tooltip,
@@ -39,6 +41,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
 const settingsShortcutLabel = isMac ? "⌘," : "Ctrl+,";
+const commandPaletteShortcutLabel = isMac ? "⌘K" : "Ctrl+K";
 
 function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) {
   if (!isOnline) {
@@ -187,6 +190,23 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                 FeedZero
               </span>
               <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => useCommandPaletteStore.getState().open()}
+                      className="size-8"
+                    >
+                      <Search className="size-4" />
+                      <span className="sr-only">Open command palette</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent hidden={isMobile}>
+                    Command palette{" "}
+                    <Kbd className="ml-1">{commandPaletteShortcutLabel}</Kbd>
+                  </TooltipContent>
+                </Tooltip>
                 {feeds.length > 0 && (
                   <Tooltip>
                     <TooltipTrigger asChild>
