@@ -1,5 +1,5 @@
-import { ok, err } from "@feedzero/core/utils/result";
-import type { Result } from "@feedzero/core/utils/result";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
 
 /**
  * Parser for Omnivore's "Export Library" JSON. Omnivore shipped a ZIP
