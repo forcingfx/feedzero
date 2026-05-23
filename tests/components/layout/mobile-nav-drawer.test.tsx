@@ -79,6 +79,34 @@ describe("MobileNavDrawer", () => {
     expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
   });
 
+  describe("closed handle strip iOS clearance", () => {
+    // The strip sits at the bottom of the viewport on mobile (parent is
+    // `h-dvh` and the strip is the last child). Without safe-area handling,
+    // the iOS home indicator overlays the dock buttons and the device's
+    // rounded display corners clip the leftmost/rightmost favicons. These
+    // tests pin both: vertical clearance for the home indicator (and the
+    // iOS Safari toolbar shadow on dynamic-viewport switches) and
+    // horizontal clearance for landscape notch / rounded corners.
+
+    it("extends height with env(safe-area-inset-bottom) so dock buttons clear the iOS home indicator", () => {
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      // The strip's content area must stay 60px (so taps still land on
+      // the dock buttons), but its total height grows by the home-indicator
+      // inset. A `pb-[env(safe-area-inset-bottom)]` paired with a height
+      // expression that includes the same env() is the recipe; here we
+      // assert structurally on the env() token's presence.
+      expect(strip.className).toMatch(/safe-area-inset-bottom/);
+    });
+
+    it("includes env(safe-area-inset-left) and env(safe-area-inset-right) so edge buttons clear rounded corners / landscape notch", () => {
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      expect(strip.className).toMatch(/safe-area-inset-left/);
+      expect(strip.className).toMatch(/safe-area-inset-right/);
+    });
+  });
+
   describe("closed-state quick-switch dock", () => {
     it("shows the selected feed's favicons in the closed strip (no drawer open needed)", () => {
       useFeedStore.setState({
