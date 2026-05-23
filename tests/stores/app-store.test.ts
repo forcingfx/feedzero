@@ -294,6 +294,42 @@ describe("app-store", () => {
 
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
+
+    it("still initializes when the sync pull never resolves (boot must not hang on the network)", async () => {
+      // Reproduces the production hang: a returning sync user whose
+      // /api/sync request stalls indefinitely (slow upstream, dropped
+      // connection mid-response, edge function cold-start hang). Before
+      // the boot-time pull timeout, isDbReady stayed false forever and
+      // the user was stuck on "Loading…" with no escape.
+      vi.mocked(restore).mockResolvedValue({
+        status: "ready",
+        isSyncUser: true,
+        credentials: {
+          vaultId: "vault-id",
+          vaultKey: "mock-key" as unknown as CryptoKey,
+        },
+      });
+      // pullVaultIfChanged returns a promise that never resolves.
+      vi.mocked(pullVaultIfChanged).mockReturnValue(
+        new Promise(() => {
+          /* never resolves */
+        }),
+      );
+
+      vi.useFakeTimers();
+      try {
+        const initPromise = useAppStore.getState().initializeReturningUser();
+        // Advance past the boot-time pull watchdog (BOOT_PULL_TIMEOUT_MS,
+        // currently 10s). The pull stays in-flight in the background; boot
+        // proceeds with whatever local data the canary already validated.
+        await vi.advanceTimersByTimeAsync(15_000);
+        await initPromise;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(useAppStore.getState().isDbReady).toBe(true);
+    });
   });
 
   describe("resetApp", () => {

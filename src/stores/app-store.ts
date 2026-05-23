@@ -5,7 +5,7 @@ import {
   destroy,
 } from "../core/storage/key-manager.ts";
 import { dedupeArticles } from "../core/storage/db.ts";
-import { LOCAL_STORAGE } from "../utils/constants.ts";
+import { BOOT_PULL_TIMEOUT_MS, LOCAL_STORAGE } from "../utils/constants.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { usePreferencesStore } from "./preferences-store.ts";
 import { persistPreferences } from "./persist-preferences.ts";
@@ -107,6 +107,43 @@ async function runDedupeMigrationOnce(): Promise<void> {
   }
 }
 
+/**
+ * Race the sync pull against a watchdog. Resolves either when the pull
+ * settles or when `BOOT_PULL_TIMEOUT_MS` elapses, whichever comes first.
+ * Returning early on timeout lets boot proceed with the local DB; the
+ * pull stays in-flight in the background and `useSyncStore.pull()`'s
+ * own `inFlightPull` dedup means a downstream `refreshAll()` will await
+ * the same promise rather than firing a second pull.
+ *
+ * Background completion triggers a `loadFeeds` so the sidebar reflects
+ * any data the pull eventually imported. Only fires when the pull
+ * actually finishes — if it never does, the background side stays a
+ * pending promise (which the runtime GCs on tab close).
+ */
+async function pullWithBootWatchdog(): Promise<void> {
+  const pull = useSyncStore.getState().pull();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const watchdog = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), BOOT_PULL_TIMEOUT_MS);
+  });
+  const outcome = await Promise.race([pull.then(() => "settled" as const), watchdog]);
+  if (timer !== undefined) clearTimeout(timer);
+  if (outcome === "timeout") {
+    // Best-effort: if the pull eventually completes after we've given up
+    // on it, refresh the in-memory feed list so the UI catches up to the
+    // imported vault. Failures are ignored — the user can manually
+    // refresh if needed.
+    void pull
+      .then(async () => {
+        const { useFeedStore } = await import("./feed-store.ts");
+        await useFeedStore.getState().loadFeeds();
+      })
+      .catch(() => {
+        /* noop — pull's own error handling already set sync status */
+      });
+  }
+}
+
 // Dedup concurrent boot-time calls. AppInit's effect 1 fires twice in
 // React StrictMode (dev), and could plausibly fire from a remount in
 // other contexts (fast refresh, suspense). Without this guard, a second
@@ -191,8 +228,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // clear+bulkPut sequences interleave, leaving a window where feeds
       // appear absent. See tests/e2e/sync-100-feeds.spec.ts for the
       // reproducer.
+      //
+      // BUT: a pull that never settles must not trap the user on the
+      // "Loading…" splash. Race against a watchdog timer — on timeout we
+      // proceed with the (canary-validated) local DB; the pull stays
+      // in-flight and an eventual `loadFeeds` picks up its result if it
+      // ever lands. Boot-blocks-on-network was the production hang
+      // reported here.
       if (status.isSyncUser) {
-        await useSyncStore.getState().pull();
+        await pullWithBootWatchdog();
         if (useSyncStore.getState().status !== "error") {
           useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
         }
