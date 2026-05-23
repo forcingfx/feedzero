@@ -194,7 +194,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         variant="ghost"
                         size="icon"
                         disabled={isRefreshingAll}
-                        onClick={refreshAll}
+                        onClick={() => refreshAll()}
                         className="size-8"
                       >
                         <RefreshCw

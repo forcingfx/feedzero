@@ -131,7 +131,17 @@ interface FeedStore {
   setFeedPrefetchEnabled: (feedId: string, value: boolean) => Promise<void>;
   reloadSingleFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
-  refreshAll: () => Promise<void>;
+  /**
+   * Refresh every feed. `respectBackoff` (default false) is set by the
+   * auto-refresh timer so quiet feeds (consecutive 304s past the
+   * backoff threshold) get skipped. Explicit user-triggered refreshes
+   * (the toolbar button, the `r` keyboard shortcut) leave it false so
+   * every feed is queried.
+   */
+  refreshAll: (options?: {
+    respectBackoff?: boolean;
+    intervalMs?: number;
+  }) => Promise<void>;
   /**
    * Refresh only the scope currently being viewed, then reload the article
    * list so new items appear in place. The header refresh control routes
@@ -545,7 +555,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     set({ recentFeedIds: recent });
   },
 
-  refreshAll: async () => {
+  refreshAll: async (options = {}) => {
     if (get().isRefreshingAll) return;
     set({ isRefreshingAll: true });
     // A refresh is the user's "try again" — give favicons that failed during a
@@ -558,7 +568,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         await syncStore.pull();
         await reloadFeeds(set);
       }
-      await refreshAllFeeds();
+      await refreshAllFeeds(
+        options.respectBackoff && options.intervalMs !== undefined
+          ? { respectBackoffWithDefaultMs: options.intervalMs }
+          : {},
+      );
       await reloadFeeds(set);
       schedulePush();
     } finally {
