@@ -17,7 +17,7 @@
  * customer record over the active one.
  */
 
-import { err, ok, type Result } from "../../utils/result";
+import { err, ok, type Result } from "../../../packages/core/src/utils/result";
 
 /** Minimal subset of Stripe `customers.list` we depend on. */
 export interface CustomersClient {

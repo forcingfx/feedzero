@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { handleSyncRequest } from "@/core/sync/sync-handler";
 import { createMemoryAdapter } from "@/core/sync/adapters/memory-adapter";
 import type { SyncStorageAdapter } from "@/core/sync/types";
-import { err } from "@/utils/result";
+import { err } from "@feedzero/core/utils/result";
 
 describe("sync-handler", () => {
   let adapter: SyncStorageAdapter;

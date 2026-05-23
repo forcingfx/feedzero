@@ -7,7 +7,7 @@ import { LicenseIssuerImpl } from "@/core/license/issuer";
 import { MemoryLicenseStorage, type LicenseStorage } from "@/core/license/storage";
 import type { SigningKey } from "@/core/license/sign";
 import { verifyLicense } from "@/core/license/verify";
-import { err } from "@/utils/result";
+import { err } from "@feedzero/core/utils/result";
 
 const SECRET = "this-is-a-test-signing-secret-32-bytes!";
 const ADMIN_KEY = "admin_test_key_with_enough_entropy_to_be_realistic_64ch";

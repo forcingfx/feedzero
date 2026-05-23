@@ -1,4 +1,4 @@
-import type { Article } from "@/types";
+import type { Article } from "@feedzero/core/types";
 
 /**
  * Find the article that follows `current` in the loaded list.

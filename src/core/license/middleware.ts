@@ -21,7 +21,7 @@ import { verifyLicense } from "./verify";
 import type { LicensePayload } from "./format";
 import type { SigningKey } from "./sign";
 import type { LicenseStorage } from "./storage";
-import { ok, err, type Result } from "../../utils/result";
+import { ok, err, type Result } from "../../../packages/core/src/utils/result";
 
 export interface LicenseAuthContext {
   /** The verified payload, with revocation already checked. */

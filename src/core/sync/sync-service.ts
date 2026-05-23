@@ -1,6 +1,6 @@
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
-import { SYNC } from "../../utils/constants.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
+import { SYNC } from "../../../packages/core/src/utils/constants";
 import { exportAll, importAll } from "../storage/db.ts";
 import {
   deriveVaultId,

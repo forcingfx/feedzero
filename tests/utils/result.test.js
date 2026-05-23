@@ -10,7 +10,7 @@ import {
   mapErr,
   andThen,
   fromPromise,
-} from "../../src/utils/result.ts";
+} from "@feedzero/core/utils/result";
 
 describe("Result", () => {
   describe("ok", () => {

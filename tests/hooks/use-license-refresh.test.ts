@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useLicenseRefresh } from "@/hooks/use-license-refresh.ts";
 import { useLicenseStore } from "@/stores/license-store.ts";
-import { LICENSE_RECHECK_INTERVAL_MS } from "@/utils/constants.ts";
+import { LICENSE_RECHECK_INTERVAL_MS } from "@feedzero/core/utils/constants";
 
 function setOnline(value: boolean) {
   Object.defineProperty(navigator, "onLine", { value, configurable: true });

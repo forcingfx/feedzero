@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { logError } from "@/utils/log-error";
+import { logError } from "@feedzero/core/utils/log-error";
 
 describe("logError", () => {
   let consoleError: ReturnType<typeof vi.spyOn>;

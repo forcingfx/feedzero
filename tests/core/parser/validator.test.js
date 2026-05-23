@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validate } from '../../../src/core/parser/validator.ts';
-import { isOk, isErr, unwrap } from '../../../src/utils/result.ts';
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 
 describe('Validator', () => {
   it('should accept valid RSS 2.0', () => {

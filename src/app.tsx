@@ -5,7 +5,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSyncStore } from "@/stores/sync-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
-import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
+import { CHANGELOG_FEED_URL } from "@feedzero/core/utils/constants";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SmartFilterEditorDialog } from "@/components/smart-filters/smart-filter-editor-dialog.tsx";
 import { RulesEditorDialog } from "@/components/rules/rules-editor-dialog.tsx";

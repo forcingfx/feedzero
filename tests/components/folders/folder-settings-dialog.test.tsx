@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { FolderSettingsDialog } from "@/components/folders/folder-settings-dialog.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import type { Folder } from "@/types/index.ts";
+import type { Folder } from "@feedzero/core/types";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),

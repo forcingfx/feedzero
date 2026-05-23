@@ -1,4 +1,4 @@
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 /**
  * A feed is considered "stale" after 14 days of silent failure — i.e. we

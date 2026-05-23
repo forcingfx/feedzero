@@ -1,4 +1,4 @@
-import type { Feed } from "../../types/index.ts";
+import type { Feed } from "../../../packages/core/src/types";
 
 /**
  * Threshold of consecutive 304 Not Modified responses at which we

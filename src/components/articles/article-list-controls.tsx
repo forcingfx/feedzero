@@ -14,8 +14,8 @@ import {
   fromFolderFeedId,
   isFilterFeedId,
   fromFilterFeedId,
-} from "@/utils/constants.ts";
-import type { ArticleSortMode } from "@/types/index.ts";
+} from "@feedzero/core/utils/constants";
+import type { ArticleSortMode } from "@feedzero/core/types";
 
 interface ArticleListControlsProps {
   sortMode: ArticleSortMode;

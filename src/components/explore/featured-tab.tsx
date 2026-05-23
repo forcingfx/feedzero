@@ -10,7 +10,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { upgradeToast } from "@/lib/upgrade-toast.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { FeedRow } from "@/components/explore/feed-row.tsx";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 interface FeaturedTabProps {
   subscribedFeeds: Feed[];

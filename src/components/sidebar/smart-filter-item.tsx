@@ -3,7 +3,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar.tsx";
-import type { SmartFilter } from "@/types/index.ts";
+import type { SmartFilter } from "@feedzero/core/types";
 
 interface SmartFilterItemProps {
   filter: SmartFilter;

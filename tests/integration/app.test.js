@@ -10,7 +10,7 @@ import {
 } from "../../src/core/storage/db.ts";
 import { parse } from "../../src/core/parser/parser.ts";
 import { createFeed, createArticle } from "../../src/core/storage/schema.ts";
-import { isOk, unwrap } from "../../src/utils/result.ts";
+import { isOk, unwrap } from "@feedzero/core/utils/result";
 
 describe("App Integration", () => {
   beforeEach(async () => {

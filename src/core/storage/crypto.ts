@@ -1,6 +1,6 @@
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
-import { CRYPTO } from "../../utils/constants.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
+import { CRYPTO } from "../../../packages/core/src/utils/constants";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();

@@ -12,7 +12,7 @@ import type {
   Article,
   Feed,
   ConditionGroup,
-} from "@/types/index.ts";
+} from "@feedzero/core/types";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getSmartFilters: vi.fn().mockResolvedValue({ ok: true, value: [] }),

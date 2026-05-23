@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useLicenseStore } from "@/stores/license-store.ts";
-import { LICENSE_RECHECK_INTERVAL_MS } from "@/utils/constants.ts";
+import { LICENSE_RECHECK_INTERVAL_MS } from "@feedzero/core/utils/constants";
 
 /**
  * Re-verifies the license token against the server while a tab stays open.

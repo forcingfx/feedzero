@@ -15,9 +15,9 @@ import {
   isFilterFeedId,
   fromFolderFeedId,
   fromFilterFeedId,
-} from "../utils/constants.ts";
-import type { Article, ArticleSortMode } from "../types/index.ts";
-import { ARTICLE_SORT_MODES } from "../types/index.ts";
+} from "@feedzero/core/utils/constants";
+import type { Article, ArticleSortMode } from "@feedzero/core/types";
+import { ARTICLE_SORT_MODES } from "@feedzero/core/types";
 import { useSmartFilterStore } from "./smart-filter-store.ts";
 import { persistPreferences } from "./persist-preferences.ts";
 import {

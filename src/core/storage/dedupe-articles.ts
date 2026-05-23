@@ -1,4 +1,4 @@
-import type { Article } from "../../types/index.ts";
+import type { Article } from "../../../packages/core/src/types";
 
 /**
  * Collapse duplicate copies of one article (same feedId+guid) into a single

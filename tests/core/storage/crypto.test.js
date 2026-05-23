@@ -10,7 +10,7 @@ import {
   exportCryptoKey,
   importCryptoKey,
 } from "../../../src/core/storage/crypto.ts";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 
 describe("Crypto", () => {
   const passphrase = "test-passphrase-123";

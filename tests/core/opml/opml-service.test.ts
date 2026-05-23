@@ -4,8 +4,8 @@ import {
   generateOpmlFile,
   generateUrlList,
 } from "../../../src/core/opml/opml-service.ts";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
-import type { Feed } from "../../../src/types/index.ts";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
+import type { Feed } from "@feedzero/core/types";
 
 // Sample OPML with multiple feeds
 const SAMPLE_OPML = `<?xml version="1.0" encoding="UTF-8"?>

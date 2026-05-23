@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { AUTO_REFRESH_INTERVAL_MS } from "@/utils/constants.ts";
+import { AUTO_REFRESH_INTERVAL_MS } from "@feedzero/core/utils/constants";
 
 function setOnline(value: boolean) {
   Object.defineProperty(navigator, "onLine", { value, configurable: true });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createMemoryAdapter } from "@/core/sync/adapters/memory-adapter";
-import { isOk, unwrap } from "@/utils/result";
+import { isOk, unwrap } from "@feedzero/core/utils/result";
 
 describe("memory-adapter", () => {
   it("returns null for a missing vault", async () => {

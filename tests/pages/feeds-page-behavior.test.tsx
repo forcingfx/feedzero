@@ -9,8 +9,8 @@ import { StageView } from "@/pages/stage-view.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, clearArticleCache } from "@/stores/article-store.ts";
 import * as db from "@/core/storage/db.ts";
-import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
-import type { Article, Feed } from "@/types/index.ts";
+import { ALL_FEEDS_ID, toFolderFeedId } from "@feedzero/core/utils/constants";
+import type { Article, Feed } from "@feedzero/core/types";
 
 const ExploreCatalog = lazy(() =>
   import("@/components/explore/explore-catalog.tsx").then((m) => ({

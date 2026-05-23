@@ -6,7 +6,7 @@
  * Pure, framework-agnostic, runs entirely in the browser. No data leaves
  * the device — the user's whole feed corpus is the only input.
  */
-import type { Article, Feed } from "@/types";
+import type { Article, Feed } from "../../../packages/core/src/types";
 
 export interface Topic {
   /** Stable id used as the result key. */

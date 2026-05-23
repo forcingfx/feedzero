@@ -26,7 +26,7 @@
  * recognize the pattern.
  */
 
-import { type Result, ok, err } from "../../../utils/result";
+import { type Result, ok, err } from "../../../../packages/core/src/utils/result";
 import type { SyncStorageAdapter } from "../types";
 
 /**

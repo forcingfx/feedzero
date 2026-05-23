@@ -22,7 +22,7 @@
  * `tests/core/license/storage.test.ts` for the contract pinning this.
  */
 
-import { type Result, ok, err } from "../../utils/result";
+import { type Result, ok, err } from "../../../packages/core/src/utils/result";
 import {
   type LicenseRecord,
   type LicenseStorage,

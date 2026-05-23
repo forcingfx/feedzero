@@ -4,7 +4,7 @@ import {
   type ArticleGroup,
   type ArticleEntry,
 } from "@/lib/group-articles";
-import type { Article } from "@/types/index";
+import type { Article } from "@feedzero/core/types";
 
 const MIN = 60_000;
 

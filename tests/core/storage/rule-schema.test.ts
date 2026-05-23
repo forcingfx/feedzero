@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createRule, validateRule } from "../../../src/core/storage/schema.ts";
-import type { ConditionGroup } from "../../../src/types/index.ts";
+import type { ConditionGroup } from "@feedzero/core/types";
 
 const matchAll: ConditionGroup = {
   kind: "group",

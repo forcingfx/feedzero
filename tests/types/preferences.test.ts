@@ -1,6 +1,6 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import type { UserPreferences } from "../../src/types/index.ts";
-import { DEFAULT_PREFERENCES } from "../../src/types/index.ts";
+import type { UserPreferences } from "@feedzero/core/types";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 
 /**
  * Type-shape tripwire for the synced preferences record. The runtime

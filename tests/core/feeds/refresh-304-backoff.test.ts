@@ -13,7 +13,7 @@ import "fake-indexeddb/auto";
 import { open, addFeed, getFeeds } from "@/core/storage/db";
 import { refreshFeed, refreshAllFeeds } from "@/core/feeds/feed-service";
 import { createFeed } from "@/core/storage/schema";
-import type { Feed } from "@/types";
+import type { Feed } from "@feedzero/core/types";
 
 const PASSPHRASE = "alpha bravo charlie delta";
 

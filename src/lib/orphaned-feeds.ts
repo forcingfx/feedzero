@@ -1,4 +1,4 @@
-import type { Feed, Folder } from "@/types/index.ts";
+import type { Feed, Folder } from "@feedzero/core/types";
 
 /**
  * Feeds whose `folderId` points at a folder that doesn't exist on this

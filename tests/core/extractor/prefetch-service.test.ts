@@ -21,7 +21,7 @@ import {
 import { getAllArticles, updateArticle } from "../../../src/core/storage/db.ts";
 import { proxyFetch } from "../../../src/core/proxy/proxy-fetch.ts";
 import { extract } from "../../../src/core/extractor/extractor.ts";
-import type { Article } from "../../../src/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 function mockArticle(overrides: Partial<Article> = {}): Article {
   return {

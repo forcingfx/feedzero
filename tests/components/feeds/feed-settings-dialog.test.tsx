@@ -15,7 +15,7 @@ import { MemoryRouter } from "react-router";
 import { toast } from "sonner";
 import { FeedSettingsDialog } from "@/components/feeds/feed-settings-dialog.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import type { Feed, Folder } from "@/types/index.ts";
+import type { Feed, Folder } from "@feedzero/core/types";
 
 vi.mock("sonner", () => ({ toast: vi.fn() }));
 

@@ -24,7 +24,7 @@ import type {
   ConditionGroup,
   SmartFilter,
   ArticleSortMode,
-} from "@/types/index.ts";
+} from "@feedzero/core/types";
 
 const EMPTY_RULE: ConditionGroup = {
   kind: "group",

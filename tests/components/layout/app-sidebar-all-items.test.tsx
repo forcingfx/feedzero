@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID } from "@feedzero/core/utils/constants";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),

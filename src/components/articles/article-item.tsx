@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Star } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
-import type { Article } from "@/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 interface ArticleItemProps {
   article: Article;

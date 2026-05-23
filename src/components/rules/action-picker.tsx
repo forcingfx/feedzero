@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
-import type { Folder, RuleAction } from "@/types/index.ts";
+import type { Folder, RuleAction } from "@feedzero/core/types";
 
 interface ActionPickerProps {
   value: RuleAction[];

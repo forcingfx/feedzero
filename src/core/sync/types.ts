@@ -4,8 +4,8 @@ import type {
   Folder,
   SmartFilter,
   UserPreferences,
-} from "../../types/index.ts";
-import type { Result } from "../../utils/result.ts";
+} from "../../../packages/core/src/types";
+import type { Result } from "../../../packages/core/src/utils/result";
 
 /**
  * Plaintext vault structure before encryption (client-side only).

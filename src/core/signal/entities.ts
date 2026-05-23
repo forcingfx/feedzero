@@ -22,7 +22,7 @@
 
 import { stripHtml, STOPWORDS } from "./tokenize.ts";
 import { PROPER_NOUN_RATIO } from "./types.ts";
-import type { Article } from "../../types/index.ts";
+import type { Article } from "../../../packages/core/src/types";
 
 /** Lowercase connector words allowed to sit inside a compound entity. */
 const CONNECTORS = new Set([

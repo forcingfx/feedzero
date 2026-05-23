@@ -5,7 +5,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { ArrowUpDown, Check } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
-import { toFolderFeedId } from "@/utils/constants.ts";
+import { toFolderFeedId } from "@feedzero/core/utils/constants";
 import { SidebarSeparator } from "@/components/ui/sidebar.tsx";
 import {
   DropdownMenu,
@@ -17,7 +17,7 @@ import { FeedItem } from "./feed-item.tsx";
 import { FolderItem } from "./folder-item.tsx";
 import { NewFolderInput } from "./new-folder-input.tsx";
 import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 interface SidebarFeedListProps {
   onFeedSelect: (feedId: string) => void;

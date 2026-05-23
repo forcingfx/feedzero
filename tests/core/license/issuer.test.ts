@@ -3,7 +3,7 @@ import { LicenseIssuerImpl } from "@/core/license/issuer";
 import { MemoryLicenseStorage } from "@/core/license/storage";
 import { verifyLicense } from "@/core/license/verify";
 import type { SigningKey } from "@/core/license/sign";
-import { isOk } from "@/utils/result";
+import { isOk } from "@feedzero/core/utils/result";
 
 const SECRET = "this-is-a-test-signing-secret-32-bytes!";
 const KEY: SigningKey = { secret: SECRET };

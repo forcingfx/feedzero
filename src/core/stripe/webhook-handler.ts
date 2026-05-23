@@ -14,10 +14,10 @@
  * [1] https://stripe.com/docs/webhooks#verify-manually
  */
 
-import type { Result } from "../../utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
 import type { SeenEventStore } from "./seen-event-store";
-import { newTraceId } from "../../utils/trace-id";
-import { logError } from "../../utils/log-error";
+import { newTraceId } from "../../../packages/core/src/utils/trace-id";
+import { logError } from "../../../packages/core/src/utils/log-error";
 
 const ROUTE = "/api/stripe/webhook";
 

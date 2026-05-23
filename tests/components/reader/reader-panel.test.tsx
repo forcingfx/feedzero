@@ -5,7 +5,7 @@ import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
-import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, toFolderFeedId } from "@feedzero/core/utils/constants";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn(),

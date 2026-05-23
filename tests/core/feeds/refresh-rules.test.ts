@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Article, Feed, Rule } from "../../../src/types/index.ts";
+import type { Article, Feed, Rule } from "@feedzero/core/types";
 
 const SPONSORED_FEED_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">

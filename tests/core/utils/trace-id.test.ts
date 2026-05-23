@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { newTraceId } from "@/utils/trace-id";
+import { newTraceId } from "@feedzero/core/utils/trace-id";
 
 describe("newTraceId", () => {
   it("returns a string starting with 'req_'", () => {

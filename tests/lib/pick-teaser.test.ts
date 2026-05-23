@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { pickTeaser } from "../../src/lib/pick-teaser.ts";
-import type { Article } from "../../src/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 function buildArticle(overrides: Partial<Article> = {}): Article {
   return {

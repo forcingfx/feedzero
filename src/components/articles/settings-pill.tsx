@@ -9,7 +9,7 @@ import {
   fromFolderFeedId,
   isFilterFeedId,
   fromFilterFeedId,
-} from "@/utils/constants.ts";
+} from "@feedzero/core/utils/constants";
 
 /**
  * Floating cog above the article list. Context-aware: clicks
@@ -67,7 +67,7 @@ type Target =
   | { kind: "folder"; id: string; label: string }
   | {
       kind: "filter";
-      filter: import("@/types/index.ts").SmartFilter;
+      filter: import("@feedzero/core/types").SmartFilter;
       label: string;
     };
 
@@ -78,9 +78,9 @@ function resolveTarget({
   filters,
 }: {
   selectedFeedId: string | null;
-  feeds: import("@/types/index.ts").Feed[];
-  folders: import("@/types/index.ts").Folder[];
-  filters: import("@/types/index.ts").SmartFilter[];
+  feeds: import("@feedzero/core/types").Feed[];
+  folders: import("@feedzero/core/types").Folder[];
+  filters: import("@feedzero/core/types").SmartFilter[];
 }): Target | null {
   if (!selectedFeedId) return null;
   if (selectedFeedId === ALL_FEEDS_ID) return null;

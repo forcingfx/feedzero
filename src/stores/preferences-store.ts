@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { getPreferences, putPreferences } from "../core/storage/db.ts";
-import { LOCAL_STORAGE } from "../utils/constants.ts";
-import { DEFAULT_PREFERENCES } from "../types/index.ts";
-import type { UserPreferences, FeedSortMode, ArticleSortMode } from "../types/index.ts";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
+import type { UserPreferences, FeedSortMode, ArticleSortMode } from "@feedzero/core/types";
 
 /**
  * Single source of truth for synced user preferences. Replaces the loose,

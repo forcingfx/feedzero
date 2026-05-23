@@ -1,4 +1,4 @@
-import type { Article } from "@/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 /**
  * Pick the best available extracted-content source for an article.

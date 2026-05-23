@@ -9,7 +9,7 @@ import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { FeedPreviewSheet } from "@/components/explore/feed-preview-sheet.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 export interface FeedRowProps {
   name: string;

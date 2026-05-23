@@ -3,7 +3,7 @@ import { useNavigate, type NavigateFunction } from "react-router";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
-import { toFolderFeedId } from "@/utils/constants.ts";
+import { toFolderFeedId } from "@feedzero/core/utils/constants";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 
 /**

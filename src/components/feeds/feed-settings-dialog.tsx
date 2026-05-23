@@ -48,7 +48,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import { TierLockBadge } from "@/components/features/tier-lock-badge.tsx";
 import type { Feature } from "@/core/features/feature-gates.ts";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 export function FeedSettingsDialog() {
   const feedId = useFeedStore((s) => s.feedSettingsDialogId);

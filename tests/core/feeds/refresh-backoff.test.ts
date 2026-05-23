@@ -3,7 +3,7 @@ import {
   effectiveRefreshIntervalMs,
   isFeedDueForRefresh,
 } from "@/core/feeds/refresh-backoff";
-import type { Feed } from "@/types";
+import type { Feed } from "@feedzero/core/types";
 
 function buildFeed(overrides: Partial<Feed> = {}): Feed {
   return {

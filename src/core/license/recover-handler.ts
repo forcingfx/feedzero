@@ -28,10 +28,10 @@
 import { hmacSha256, base64UrlEncode, base64UrlDecodeToString } from "./crypto";
 import { findCustomerByEmail } from "../stripe/find-customer-by-email";
 import type { CustomersClient } from "../stripe/find-customer-by-email";
-import { newTraceId } from "../../utils/trace-id";
-import { logError } from "../../utils/log-error";
-import type { Result } from "../../utils/result";
-import { ok, err } from "../../utils/result";
+import { newTraceId } from "../../../packages/core/src/utils/trace-id";
+import { logError } from "../../../packages/core/src/utils/log-error";
+import type { Result } from "../../../packages/core/src/utils/result";
+import { ok, err } from "../../../packages/core/src/utils/result";
 
 const ROUTE = "/api/license/recover";
 

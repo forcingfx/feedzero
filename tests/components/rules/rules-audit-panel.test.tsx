@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { RulesAuditPanel } from "@/components/settings/tabs/rules-audit-panel";
 import { useFeedStore } from "@/stores/feed-store";
-import type { Feed, Rule } from "@/types/index.ts";
+import type { Feed, Rule } from "@feedzero/core/types";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),

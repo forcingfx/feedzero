@@ -27,7 +27,7 @@ import type {
   LicenseStorage,
 } from "./storage";
 import type { LicenseIssuer } from "../stripe/webhook-handler";
-import { ok, type Result } from "../../utils/result";
+import { ok, type Result } from "../../../packages/core/src/utils/result";
 
 /** 31 days. Matches a typical Stripe billing cycle plus grace. */
 const DEFAULT_EXPIRY_SEC = 31 * 24 * 3600;

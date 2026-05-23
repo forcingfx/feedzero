@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createSmartFilter } from "../../../src/core/storage/schema.ts";
-import type { ConditionGroup } from "../../../src/types/index.ts";
+import type { ConditionGroup } from "@feedzero/core/types";
 
 const emptyRule: ConditionGroup = { kind: "group", match: "all", children: [] };
 

@@ -1,4 +1,4 @@
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 /**
  * Max favicons rendered in the closed mobile-drawer quick-switch dock.

@@ -6,8 +6,8 @@ import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
-import { STARRED_FEED_ID } from "@/utils/constants.ts";
-import type { Article, Feed } from "@/types/index.ts";
+import { STARRED_FEED_ID } from "@feedzero/core/utils/constants";
+import type { Article, Feed } from "@feedzero/core/types";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),

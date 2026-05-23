@@ -38,7 +38,7 @@ import {
   isFolderFeedId,
   fromFolderFeedId,
   isAggregatedFeedId,
-} from "../utils/constants.ts";
+} from "@feedzero/core/utils/constants";
 import { pickNextFolderColor } from "../lib/folder-colors.ts";
 import { recordRecentFeed } from "../lib/recent-feeds.ts";
 import type {
@@ -47,9 +47,9 @@ import type {
   FeedSortMode,
   Rule,
   CreateRuleInput,
-} from "../types/index.ts";
-import type { Result } from "../utils/result.ts";
-import { ok, err } from "../utils/result.ts";
+} from "@feedzero/core/types";
+import type { Result } from "@feedzero/core/utils/result";
+import { ok, err } from "@feedzero/core/utils/result";
 
 /**
  * `addFeed` result. Result-shaped plus an optional `reason` on the err

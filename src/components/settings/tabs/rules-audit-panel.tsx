@@ -10,7 +10,7 @@ import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFeedStore } from "@/stores/feed-store";
 import { useFeatureGate } from "@/hooks/use-feature-gate";
-import type { Feed, Rule, RuleAction } from "@/types/index.ts";
+import type { Feed, Rule, RuleAction } from "@feedzero/core/types";
 
 interface FeedWithRules {
   feed: Feed;

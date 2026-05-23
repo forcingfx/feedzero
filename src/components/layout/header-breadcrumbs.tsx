@@ -10,7 +10,7 @@ import {
   STARRED_FEED_ID,
   isFilterFeedId,
   fromFilterFeedId,
-} from "@/utils/constants.ts";
+} from "@feedzero/core/utils/constants";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,7 +19,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb.tsx";
-import type { SmartFilter } from "@/types/index.ts";
+import type { SmartFilter } from "@feedzero/core/types";
 
 interface HeaderBreadcrumbsProps {
   fallback?: string;

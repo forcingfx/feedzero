@@ -25,7 +25,7 @@ import { findCustomerByEmail } from "../stripe/find-customer-by-email";
 import type { CustomersClient } from "../stripe/find-customer-by-email";
 import { LicenseIssuerImpl } from "./issuer";
 import type { LicenseRecord, LicenseStorage } from "./storage";
-import { err, ok, type Result } from "../../utils/result";
+import { err, ok, type Result } from "../../../packages/core/src/utils/result";
 
 export interface LookupValue {
   customer: { id: string; email: string | null } | null;

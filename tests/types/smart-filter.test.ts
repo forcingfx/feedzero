@@ -3,7 +3,7 @@ import type {
   SmartFilter,
   ConditionGroup,
   Condition,
-} from "../../src/types/index.ts";
+} from "@feedzero/core/types";
 
 /**
  * Type-shape tripwires for the smart-filter data model. The runtime

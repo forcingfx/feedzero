@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { ok, err } from "../../../utils/result.ts";
+import { ok, err } from "../../../../packages/core/src/utils/result";
 import type { SyncStorageAdapter } from "../types.ts";
 
 const VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;

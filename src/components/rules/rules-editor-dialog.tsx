@@ -30,7 +30,7 @@ import type {
   Feed,
   Rule,
   RuleAction,
-} from "@/types/index.ts";
+} from "@feedzero/core/types";
 
 type Mode = { kind: "list" } | { kind: "edit"; rule: Rule | null };
 
@@ -196,7 +196,7 @@ function ListView({ feed, rules, onEdit, onAdd, onDelete, onClose }: ListViewPro
 interface EditViewProps {
   feed: Feed | undefined;
   target: Rule | null;
-  folders: import("@/types/index.ts").Folder[];
+  folders: import("@feedzero/core/types").Folder[];
   onBack: () => void;
   onSave: (
     next:

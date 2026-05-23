@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { waitFor } from "@testing-library/react";
-import type { Feed } from "../../src/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 const { feeds, articles } = vi.hoisted(() => ({
   feeds: new Map<string, Feed>(),

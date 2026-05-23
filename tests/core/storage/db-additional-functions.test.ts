@@ -22,8 +22,8 @@ import {
   dedupeArticles,
 } from "@/core/storage/db";
 import { createFeed, createArticle } from "@/core/storage/schema";
-import { isOk, isErr, unwrap } from "@/utils/result";
-import type { Article, Feed } from "@/types";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
+import type { Article, Feed } from "@feedzero/core/types";
 
 const TEST_PASSPHRASE = "correct horse battery staple";
 

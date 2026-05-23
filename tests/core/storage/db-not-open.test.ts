@@ -26,8 +26,8 @@ import {
   getSalt,
 } from "@/core/storage/db";
 import { createFeed, createArticle } from "@/core/storage/schema";
-import { isErr, unwrap } from "@/utils/result";
-import type { Feed, Article, Folder } from "@/types";
+import { isErr, unwrap } from "@feedzero/core/utils/result";
+import type { Feed, Article, Folder } from "@feedzero/core/types";
 
 /**
  * Characterisation tests for the "database not open" error path.

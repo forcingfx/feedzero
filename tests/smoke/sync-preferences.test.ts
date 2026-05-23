@@ -6,7 +6,7 @@ import {
   encryptVault,
   decryptVault,
 } from "../../src/core/sync/vault-crypto.ts";
-import { DEFAULT_PREFERENCES } from "../../src/types/index.ts";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 import type { VaultData } from "../../src/core/sync/types.ts";
 
 /**

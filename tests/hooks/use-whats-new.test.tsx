@@ -8,7 +8,7 @@ import { renderHook, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { useWhatsNew } from "@/hooks/use-whats-new";
 import { useFeedStore } from "@/stores/feed-store";
-import { CHANGELOG_FEED_URL } from "@/utils/constants";
+import { CHANGELOG_FEED_URL } from "@feedzero/core/utils/constants";
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <MemoryRouter>{children}</MemoryRouter>;

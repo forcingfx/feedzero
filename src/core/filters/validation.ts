@@ -7,13 +7,13 @@
  * match nothing.
  */
 
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
 import type {
   Condition,
   ConditionGroup,
   SmartFilter,
-} from "../../types/index.ts";
+} from "../../../packages/core/src/types";
 
 export function validateFilter(filter: SmartFilter): Result<void> {
   if (!filter.name || !filter.name.trim()) {

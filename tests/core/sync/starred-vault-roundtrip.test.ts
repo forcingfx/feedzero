@@ -5,7 +5,7 @@ import {
   decryptVault,
 } from "../../../src/core/sync/vault-crypto.ts";
 import type { VaultData } from "../../../src/core/sync/types.ts";
-import type { Article, Feed } from "../../../src/types/index.ts";
+import type { Article, Feed } from "@feedzero/core/types";
 
 /**
  * `starred`, `starredAt`, `extractedContent`, and `extractedAt` are new

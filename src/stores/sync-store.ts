@@ -25,9 +25,9 @@ import {
 } from "../core/storage/db.ts";
 import type { VaultData } from "../core/sync/types.ts";
 import { clearLicenseToken } from "../core/license/license-token-store.ts";
-import { LOCAL_STORAGE } from "../utils/constants.ts";
-import type { Result } from "../utils/result.ts";
-import { ok, err } from "../utils/result.ts";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
+import type { Result } from "@feedzero/core/utils/result";
+import { ok, err } from "@feedzero/core/utils/result";
 
 export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 

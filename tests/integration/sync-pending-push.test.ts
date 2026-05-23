@@ -15,9 +15,9 @@
  */
 import "fake-indexeddb/auto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ok } from "../../src/utils/result.ts";
+import { ok } from "@feedzero/core/utils/result";
 import type { VaultData } from "../../src/core/sync/types.ts";
-import type { Feed } from "../../src/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 const pushVaultMock = vi.fn();
 const pullVaultMock = vi.fn();
@@ -55,7 +55,7 @@ import {
   addFeed as dbAddFeed,
   getFeeds as dbGetFeeds,
 } from "../../src/core/storage/db.ts";
-import { LOCAL_STORAGE } from "../../src/utils/constants.ts";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 
 function makeFeed(id: string, title: string): Feed {
   return {

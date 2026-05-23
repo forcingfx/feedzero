@@ -11,9 +11,9 @@ import {
   getArticleByGuid,
 } from "@/core/storage/db";
 import { createFeed, createArticle } from "@/core/storage/schema";
-import { isOk, isErr, unwrap } from "@/utils/result";
-import { ok, err } from "@/utils/result";
-import { DB_NAME, DB_VERSION } from "@/utils/constants";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
+import { ok, err } from "@feedzero/core/utils/result";
+import { DB_NAME, DB_VERSION } from "@feedzero/core/utils/constants";
 
 /**
  * Mock the crypto module so individual tests can override `decrypt` to simulate

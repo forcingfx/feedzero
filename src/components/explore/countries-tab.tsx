@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { GeneratedCatalog } from "@/lib/catalog-search.ts";
 import { CategoryGrid, type GridItem } from "@/components/explore/category-grid.tsx";
 import { CategoryDetail } from "@/components/explore/category-detail.tsx";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 interface CountriesTabProps {
   catalog: GeneratedCatalog;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createVercelBlobAdapter } from "@/core/sync/adapters/vercel-blob-adapter";
-import { isOk, isErr, unwrap } from "@/utils/result";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 
 // Mock @vercel/blob dynamic imports
 const mockHead = vi.fn();

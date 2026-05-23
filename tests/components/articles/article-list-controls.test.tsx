@@ -25,8 +25,8 @@ import {
   STARRED_FEED_ID,
   toFolderFeedId,
   toFilterFeedId,
-} from "@/utils/constants.ts";
-import type { Feed, Folder, SmartFilter } from "@/types/index.ts";
+} from "@feedzero/core/utils/constants";
+import type { Feed, Folder, SmartFilter } from "@feedzero/core/types";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),

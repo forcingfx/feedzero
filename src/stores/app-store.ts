@@ -5,11 +5,11 @@ import {
   destroy,
 } from "../core/storage/key-manager.ts";
 import { dedupeArticles } from "../core/storage/db.ts";
-import { LOCAL_STORAGE } from "../utils/constants.ts";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import { useSyncStore } from "./sync-store.ts";
 import { usePreferencesStore } from "./preferences-store.ts";
 import { persistPreferences } from "./persist-preferences.ts";
-import { DEFAULT_PREFERENCES } from "../types/index.ts";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 import { generatePassphrase } from "../core/crypto/passphrase-generator.ts";
 import {
   checkSecureContext,

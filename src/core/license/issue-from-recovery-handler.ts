@@ -22,8 +22,8 @@
 import { signLicense } from "./sign";
 import { verifyRecoveryToken, type SigningKey } from "./recover-handler";
 import type { LicenseStorage, LicenseRecord } from "./storage";
-import { newTraceId } from "../../utils/trace-id";
-import { logError } from "../../utils/log-error";
+import { newTraceId } from "../../../packages/core/src/utils/trace-id";
+import { logError } from "../../../packages/core/src/utils/log-error";
 
 const ROUTE = "/api/license/issue-from-recovery";
 

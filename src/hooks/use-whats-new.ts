@@ -10,7 +10,7 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useFeedStore } from "@/stores/feed-store";
-import { CHANGELOG_FEED_URL } from "@/utils/constants";
+import { CHANGELOG_FEED_URL } from "@feedzero/core/utils/constants";
 
 export function useWhatsNew(): () => Promise<void> {
   const navigate = useNavigate();

@@ -20,7 +20,7 @@
 
 import { evaluateGroup } from "../filters/evaluator.ts";
 import type { EvalContext } from "../filters/evaluator.ts";
-import type { Article, Rule, RuleAction } from "../../types/index.ts";
+import type { Article, Rule, RuleAction } from "../../../packages/core/src/types";
 
 /**
  * Apply each enabled rule whose condition matches the article. Returns

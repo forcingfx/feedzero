@@ -12,7 +12,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { validateCondition } from "@/core/filters/validation.ts";
-import type { Condition } from "@/types/index.ts";
+import type { Condition } from "@feedzero/core/types";
 
 interface ConditionRowProps {
   condition: Condition;

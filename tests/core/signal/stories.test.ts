@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { groupIntoStories } from "@/core/signal/stories.ts";
-import type { Article } from "@/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 const NOW = new Date("2026-05-21T12:00:00Z").getTime();
 const DAY = 24 * 60 * 60 * 1000;

@@ -1,7 +1,7 @@
 import { parseOpml, generateOpml } from "feedsmith";
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
-import type { Feed, Folder } from "../../types/index.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
+import type { Feed, Folder } from "../../../packages/core/src/types";
 
 /** Represents a feed entry extracted from OPML. */
 export interface OpmlFeedEntry {

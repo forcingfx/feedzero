@@ -1,4 +1,4 @@
-import type { UserPreferences } from "../types/index.ts";
+import type { UserPreferences } from "@feedzero/core/types";
 
 /**
  * Fire-and-forget writethrough from a consumer store's setter into the

@@ -1,4 +1,4 @@
-import type { Article } from "../../types/index.ts";
+import type { Article } from "../../../packages/core/src/types";
 
 /**
  * Tiny predicate, no Defuddle dependency. Lives in its own module so

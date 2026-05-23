@@ -18,7 +18,7 @@ import { formatRelative } from "@/lib/format-relative.ts";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { cn } from "@/lib/utils.ts";
 import type { Story } from "@/core/signal/types.ts";
-import type { Article, Feed } from "@/types/index.ts";
+import type { Article, Feed } from "@feedzero/core/types";
 
 const ROW_CLASS =
   "flex w-full flex-col gap-1 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none";

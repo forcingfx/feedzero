@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { FolderColorPicker } from "./folder-color-picker.tsx";
-import type { Folder } from "@/types/index.ts";
+import type { Folder } from "@feedzero/core/types";
 
 export function FolderSettingsDialog() {
   const folderId = useFeedStore((s) => s.folderSettingsDialogId);

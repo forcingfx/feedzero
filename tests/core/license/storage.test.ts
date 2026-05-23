@@ -4,7 +4,7 @@ import {
   type LicenseRecord,
   type LicenseStorage,
 } from "../../../src/core/license/storage";
-import { isOk } from "../../../src/utils/result";
+import { isOk } from "@feedzero/core/utils/result";
 
 /**
  * Build a sample LicenseRecord for tests. Defaults are intentionally boring

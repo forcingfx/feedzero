@@ -5,7 +5,7 @@ import { ArticleList } from "@/components/articles/article-list.tsx";
 import { ArticleItem } from "@/components/articles/article-item.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import type { Article } from "@/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 import {
   installVirtualizerShims,
   restoreVirtualizerShims,

@@ -37,7 +37,7 @@ import {
   deleteDatabase,
   importAll,
 } from "../../src/core/storage/db.ts";
-import type { Feed, Folder } from "../../src/types/index.ts";
+import type { Feed, Folder } from "@feedzero/core/types";
 
 vi.mock("../../src/core/feeds/feed-service.ts", () => ({
   addFeedFlow: vi.fn(),

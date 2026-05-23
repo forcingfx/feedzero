@@ -8,7 +8,7 @@ import {
   SIGNAL_REPORT_TTL_MS,
   type SignalReport,
 } from "../core/signal/types.ts";
-import type { Article } from "../types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 /**
  * localStorage key holding the most recent Signal report. The report is

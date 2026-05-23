@@ -14,7 +14,7 @@
 
 import { tokenize } from "./tokenize.ts";
 import { STORY_SIMILARITY, type Story } from "./types.ts";
-import type { Article } from "../../types/index.ts";
+import type { Article } from "../../../packages/core/src/types";
 
 interface StoryAccumulator {
   members: Article[];

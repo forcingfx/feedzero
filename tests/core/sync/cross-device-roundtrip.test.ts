@@ -36,8 +36,8 @@ import { importCryptoKey } from "@/core/storage/crypto";
 import { encryptVault, decryptVault } from "@/core/sync/vault-crypto";
 import { importVault, pushVault } from "@/core/sync/sync-service";
 import { useSyncStore } from "@/stores/sync-store";
-import { SYNC, CRYPTO } from "@/utils/constants";
-import { unwrap, isOk } from "@/utils/result";
+import { SYNC, CRYPTO } from "@feedzero/core/utils/constants";
+import { unwrap, isOk } from "@feedzero/core/utils/result";
 
 /**
  * Stand-up a fake sync server: maps `/api/sync` PUT/GET/DELETE to an

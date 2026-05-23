@@ -1,5 +1,5 @@
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
 import { parse } from "../parser/parser.ts";
 import { discoverFeed } from "../discovery/discovery.ts";
 import { createFeed, createArticle } from "../storage/schema.ts";
@@ -15,7 +15,7 @@ import {
   removeArticlesByFeedId,
   dedupeArticles,
 } from "../storage/db.ts";
-import type { Feed, Article } from "../../types/index.ts";
+import type { Feed, Article } from "../../../packages/core/src/types";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
 import { groupByHostForRefresh } from "./group-by-host.ts";
 import { parseRetryAfter } from "./parse-retry-after.ts";

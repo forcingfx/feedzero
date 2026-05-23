@@ -10,7 +10,7 @@ import { useLicenseStore } from "@/stores/license-store.ts";
 import { isSelfHosted } from "@/core/features/self-hosted.ts";
 import { isPaidTierActive } from "@/core/features/paid-tier-active.ts";
 import { SIGNAL_CORPUS_GATE, SIGNAL_REPORT_SCHEMA_VERSION } from "@/core/signal/types.ts";
-import type { Article, Feed } from "@/types/index.ts";
+import type { Article, Feed } from "@feedzero/core/types";
 
 vi.mock("@/core/features/self-hosted.ts", () => ({ isSelfHosted: vi.fn(() => false) }));
 vi.mock("@/core/features/paid-tier-active.ts", () => ({ isPaidTierActive: vi.fn(() => false) }));

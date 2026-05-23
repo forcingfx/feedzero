@@ -14,7 +14,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useLicenseStore } from "@/stores/license-store.ts";
 import { isSelfHosted } from "@/core/features/self-hosted.ts";
 import { isPaidTierActive } from "@/core/features/paid-tier-active.ts";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),

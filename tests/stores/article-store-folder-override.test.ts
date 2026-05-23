@@ -15,7 +15,7 @@ import {
   useArticleStore,
 } from "../../src/stores/article-store.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
-import { toFolderFeedId } from "../../src/utils/constants.ts";
+import { toFolderFeedId } from "@feedzero/core/utils/constants";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
   getArticles: vi.fn(),
@@ -33,7 +33,7 @@ import {
   getArticles,
   getAllArticles,
 } from "../../src/core/storage/db.ts";
-import type { Article, Feed } from "../../src/types/index.ts";
+import type { Article, Feed } from "@feedzero/core/types";
 
 function article(
   id: string,

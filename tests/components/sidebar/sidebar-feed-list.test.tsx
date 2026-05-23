@@ -5,7 +5,7 @@ import { SidebarFeedList } from "@/components/sidebar/sidebar-feed-list.tsx";
 import { SidebarProvider, SidebarMenu } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
-import { toFolderFeedId } from "@/utils/constants.ts";
+import { toFolderFeedId } from "@feedzero/core/utils/constants";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("@/core/storage/db.ts", () => ({

@@ -1,5 +1,5 @@
 import { decodeEntities } from "./decode-entities.ts";
-import type { Article } from "@/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 /**
  * Pick the best plain-text teaser for an article preview surface.

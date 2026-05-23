@@ -9,7 +9,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
 } from "@/components/ui/sidebar.tsx";
-import type { Folder } from "@/types/index.ts";
+import type { Folder } from "@feedzero/core/types";
 
 interface FolderItemProps {
   folder: Folder;

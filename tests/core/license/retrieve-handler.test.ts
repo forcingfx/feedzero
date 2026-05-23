@@ -11,7 +11,7 @@ import {
   type LicenseRecord,
   type LicenseStorage,
 } from "@/core/license/storage";
-import { err } from "@/utils/result";
+import { err } from "@feedzero/core/utils/result";
 
 const SECRET = "this-is-a-test-signing-secret-32-bytes!";
 const key: SigningKey = { secret: SECRET };

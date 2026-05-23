@@ -39,8 +39,8 @@ import {
   type Topic,
   type WindowChoice,
 } from "./types.ts";
-import { ok, type Result } from "../../utils/result.ts";
-import type { Article, Feed } from "../../types/index.ts";
+import { ok, type Result } from "../../../packages/core/src/utils/result";
+import type { Article, Feed } from "../../../packages/core/src/types";
 
 /**
  * Optional context the engine might consume in future phases (e.g. folder

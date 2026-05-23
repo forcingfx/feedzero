@@ -32,7 +32,7 @@ import {
   ALL_FEEDS_ID,
   STARRED_FEED_ID,
   toFolderFeedId,
-} from "../../src/utils/constants.ts";
+} from "@feedzero/core/utils/constants";
 
 const mockArticle = (id: string, read = false) => ({
   id,

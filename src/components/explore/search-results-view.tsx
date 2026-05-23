@@ -1,7 +1,7 @@
 import { isSubscribed } from "@/lib/feed-catalog.ts";
 import type { SearchableItem } from "@/lib/catalog-search.ts";
 import { FeedRow } from "@/components/explore/feed-row.tsx";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 interface SearchResultsViewProps {
   results: SearchableItem[];

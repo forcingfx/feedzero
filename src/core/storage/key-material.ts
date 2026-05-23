@@ -1,6 +1,6 @@
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
-import { LOCAL_STORAGE } from "../../utils/constants.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
+import { LOCAL_STORAGE } from "../../../packages/core/src/utils/constants";
 import {
   deriveKey,
   deriveHmacKey,

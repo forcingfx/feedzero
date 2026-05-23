@@ -1,4 +1,4 @@
-import type { Result } from "../../utils/result.ts";
+import type { Result } from "../../../packages/core/src/utils/result";
 
 /** A feed in the global catalog. Contains only public/aggregate data — no user identity. */
 export interface CatalogFeed {

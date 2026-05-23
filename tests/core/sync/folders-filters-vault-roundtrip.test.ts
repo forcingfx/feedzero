@@ -21,7 +21,7 @@ import type {
   Folder,
   SmartFilter,
   ConditionGroup,
-} from "../../../src/types/index.ts";
+} from "@feedzero/core/types";
 import type { VaultData } from "../../../src/core/sync/types.ts";
 
 const emptyRule: ConditionGroup = { kind: "group", match: "all", children: [] };

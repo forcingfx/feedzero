@@ -6,7 +6,7 @@ import {
   validateArticle,
   SCHEMA_VERSION,
 } from "../../../src/core/storage/schema.ts";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 
 describe("Schema", () => {
   describe("SCHEMA_VERSION", () => {

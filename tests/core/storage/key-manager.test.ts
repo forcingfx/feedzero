@@ -26,7 +26,7 @@ import {
 } from "@/core/storage/key-manager";
 import { close } from "@/core/storage/db";
 import { deleteVault } from "@/core/sync/sync-service";
-import { LOCAL_STORAGE } from "@/utils/constants";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};

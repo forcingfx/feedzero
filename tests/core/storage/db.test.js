@@ -24,7 +24,7 @@ import {
   updateFeed,
 } from "../../../src/core/storage/db.ts";
 import { createFeed, createArticle } from "../../../src/core/storage/schema.ts";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 
 describe("Database", () => {
   beforeEach(async () => {

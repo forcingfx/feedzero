@@ -1,13 +1,13 @@
 import Dexie from "dexie";
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
 import {
   DB_NAME,
   DB_VERSION,
   CRYPTO,
   PREFERENCES_ROW_ID,
   META_KEY,
-} from "../../utils/constants.ts";
+} from "../../../packages/core/src/utils/constants";
 import {
   deriveKey,
   deriveHmacKey,
@@ -23,7 +23,7 @@ import type {
   Folder,
   SmartFilter,
   UserPreferences,
-} from "../../types/index.ts";
+} from "../../../packages/core/src/types";
 import { mergeDuplicateArticles } from "./dedupe-articles.ts";
 
 interface DexieRecord {

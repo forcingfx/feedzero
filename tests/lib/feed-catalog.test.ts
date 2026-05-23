@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { feedCatalog, isSubscribed, findSubscribedFeed } from "@/lib/feed-catalog.ts";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 function makeFeed(url: string): Feed {
   return {

@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
 import { useSmartFilterStore } from "../../src/stores/smart-filter-store.ts";
-import { toFilterFeedId } from "../../src/utils/constants.ts";
+import { toFilterFeedId } from "@feedzero/core/utils/constants";
 import type {
   Article,
   Feed,
   SmartFilter,
-} from "../../src/types/index.ts";
+} from "@feedzero/core/types";
 
 vi.mock("../../src/core/storage/db.ts", () => ({
   getArticles: vi.fn(),

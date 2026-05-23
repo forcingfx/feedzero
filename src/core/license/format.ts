@@ -16,7 +16,7 @@
  * verification in `verify.ts`; this module only handles the payload shape.
  */
 
-import { ok, err, type Result } from "../../utils/result";
+import { ok, err, type Result } from "../../../packages/core/src/utils/result";
 
 export type LicenseTier = "free" | "personal" | "pro";
 

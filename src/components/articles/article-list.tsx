@@ -5,13 +5,13 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useAppStore } from "@/stores/app-store.ts";
-import { isAggregatedFeedId } from "@/utils/constants.ts";
+import { isAggregatedFeedId } from "@feedzero/core/utils/constants";
 import { Button } from "@/components/ui/button.tsx";
 import { ArticleItem } from "./article-item.tsx";
 import { ArticleGroupSummaryRow } from "./article-group-summary-row.tsx";
 import { ArticleListControls } from "./article-list-controls.tsx";
 import { groupArticles } from "@/lib/group-articles.ts";
-import type { Article } from "@/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 /**
  * Flat list-entry shape: every row the virtualizer renders is either a

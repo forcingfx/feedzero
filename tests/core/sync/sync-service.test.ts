@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "fake-indexeddb/auto";
 import { open, close, addFeed, addArticles } from "@/core/storage/db";
 import { createFeed, createArticle } from "@/core/storage/schema";
-import { unwrap, isOk, isErr } from "@/utils/result";
-import { SYNC } from "@/utils/constants";
+import { unwrap, isOk, isErr } from "@feedzero/core/utils/result";
+import { SYNC } from "@feedzero/core/utils/constants";
 
 // Must import after fake-indexeddb
 import {

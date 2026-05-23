@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { formatRelative } from "@/lib/format-relative.ts";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { pickTeaser } from "@/lib/pick-teaser.ts";
-import type { Article } from "@/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 interface ArticlePreviewProps {
   article: Article;

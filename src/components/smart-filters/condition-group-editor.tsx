@@ -12,7 +12,7 @@ import { ConditionRow } from "./condition-row.tsx";
 import type {
   Condition,
   ConditionGroup,
-} from "@/types/index.ts";
+} from "@feedzero/core/types";
 
 interface ConditionGroupEditorProps {
   group: ConditionGroup;

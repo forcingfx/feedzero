@@ -57,15 +57,15 @@ import {
   getPreferences as dbGetPreferences,
   setPreferencesUpdatedAt as dbSetPreferencesUpdatedAt,
 } from "../../src/core/storage/db.ts";
-import { DEFAULT_PREFERENCES } from "../../src/types/index.ts";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 import {
   initFresh,
   restore,
 } from "../../src/core/storage/key-manager.ts";
 import { clearLicenseToken } from "../../src/core/license/license-token-store.ts";
-import { LOCAL_STORAGE } from "../../src/utils/constants.ts";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import type { VaultData } from "../../src/core/sync/types.ts";
-import type { Feed } from "../../src/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 // Network boundary. pushVault / pullVault / deleteVault hit /api/sync;
 // the rest (exportVault, importVault, mergeVaults) is pure or db-bound

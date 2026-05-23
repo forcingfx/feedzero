@@ -1,5 +1,5 @@
-import type { Article } from "@/types/index.ts";
-import { ARTICLE_GROUPING } from "@/utils/constants.ts";
+import type { Article } from "@feedzero/core/types";
+import { ARTICLE_GROUPING } from "@feedzero/core/utils/constants";
 
 /**
  * A stacked "flood" of consecutive same-feed articles within the

@@ -3,8 +3,8 @@ import type { FeedCache } from "./feed-cache.ts";
 import type { CatalogStorageAdapter } from "../catalog/catalog-types.ts";
 import { cleanFeedContent } from "../cleaner/cleaner.ts";
 import { pickUserAgent } from "./pick-user-agent.ts";
-import { logError } from "../../utils/log-error.ts";
-import { newTraceId } from "../../utils/trace-id.ts";
+import { logError } from "../../../packages/core/src/utils/log-error";
+import { newTraceId } from "../../../packages/core/src/utils/trace-id";
 
 /**
  * HTTP methods the proxy handler accepts.

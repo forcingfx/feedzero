@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { waitFor } from "@testing-library/react";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { useExtensionStore } from "@/stores/extension-store.ts";
-import { ok, err } from "@/utils/result.ts";
+import { ok, err } from "@feedzero/core/utils/result";
 
 vi.mock("@/core/extractor/extractor.ts", () => ({
   extract: vi.fn(),

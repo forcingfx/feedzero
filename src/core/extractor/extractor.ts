@@ -1,6 +1,6 @@
 import { registry } from "./adapters/index.ts";
 import { defaultAdapter } from "./adapters/default-adapter.ts";
-import type { Result } from "../../utils/result.ts";
+import type { Result } from "../../../packages/core/src/utils/result";
 import type { ExtractionResult } from "./defuddle-extractor.ts";
 
 // Re-export so existing call sites keep working. The implementation

@@ -1,6 +1,6 @@
-import { SYNC } from "../../utils/constants.ts";
-import { newTraceId } from "../../utils/trace-id.ts";
-import { logError } from "../../utils/log-error.ts";
+import { SYNC } from "../../../packages/core/src/utils/constants";
+import { newTraceId } from "../../../packages/core/src/utils/trace-id";
+import { logError } from "../../../packages/core/src/utils/log-error";
 import type { SyncStorageAdapter } from "./types.ts";
 import {
   authorizeLicense,

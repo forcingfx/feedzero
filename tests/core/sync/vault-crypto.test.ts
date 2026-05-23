@@ -6,8 +6,8 @@ import {
   encryptVault,
   decryptVault,
 } from "@/core/sync/vault-crypto";
-import { isOk, isErr, unwrap } from "@/utils/result";
-import { SYNC } from "@/utils/constants";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
+import { SYNC } from "@feedzero/core/utils/constants";
 import type { VaultData } from "@/core/sync/types";
 
 function makeVault(overrides: Partial<VaultData> = {}): VaultData {

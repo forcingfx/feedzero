@@ -33,7 +33,7 @@ import path from "node:path";
 import os from "node:os";
 import { createFilesystemAdapter } from "@/core/sync/adapters/filesystem-adapter";
 import { createMemoryAdapter } from "@/core/sync/adapters/memory-adapter";
-import { isOk, unwrap } from "@/utils/result";
+import { isOk, unwrap } from "@feedzero/core/utils/result";
 import type { SyncStorageAdapter } from "@/core/sync/types";
 
 type AdapterFactory = () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { findOrphanedFeeds } from "../../src/lib/orphaned-feeds.ts";
-import type { Feed, Folder } from "../../src/types/index.ts";
+import type { Feed, Folder } from "@feedzero/core/types";
 
 function feed(id: string, folderId?: string): Feed {
   return {

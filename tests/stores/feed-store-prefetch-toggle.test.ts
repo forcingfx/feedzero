@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Feed } from "../../src/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 vi.mock("../../src/core/storage/db.ts", () => {
   const feeds = new Map<string, Feed>();

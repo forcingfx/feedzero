@@ -11,7 +11,7 @@ import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
-import { isAggregatedFeedId } from "@/utils/constants.ts";
+import { isAggregatedFeedId } from "@feedzero/core/utils/constants";
 import { hasSummarySubheading, isFeedBlurbEmpty } from "@/lib/content-modes.ts";
 import { pickExtractedContent } from "@/lib/pick-extracted-content.ts";
 // needsExtraction lives in its own Defuddle-free module so the reader
@@ -21,7 +21,7 @@ import { pickExtractedContent } from "@/lib/pick-extracted-content.ts";
 // dedicated module here is what actually keeps Defuddle out.
 import { needsExtraction } from "@/core/extractor/needs-extraction.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
-import type { Article } from "@/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {

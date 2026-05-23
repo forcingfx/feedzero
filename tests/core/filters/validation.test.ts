@@ -8,7 +8,7 @@ import type {
   Condition,
   ConditionGroup,
   SmartFilter,
-} from "../../../src/types/index.ts";
+} from "@feedzero/core/types";
 
 const okGroup: ConditionGroup = { kind: "group", match: "all", children: [] };
 

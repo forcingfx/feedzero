@@ -13,7 +13,7 @@ import { useKeyboardNav } from "../../src/hooks/use-keyboard-nav.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useExtractionStore } from "../../src/stores/extraction-store.ts";
-import type { Article } from "../../src/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 const navigateSpy = vi.fn();
 

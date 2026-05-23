@@ -3,7 +3,7 @@ import {
   parseUrlList,
   isOpmlFormat,
 } from "../../../src/core/opml/url-list-parser.ts";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 
 describe("url-list-parser", () => {
   describe("parseUrlList", () => {

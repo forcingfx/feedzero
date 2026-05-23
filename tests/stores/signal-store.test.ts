@@ -3,7 +3,7 @@ import { useSignalStore, SIGNAL_REPORT_CACHE_KEY } from "@/stores/signal-store.t
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { SIGNAL_CORPUS_GATE } from "@/core/signal/types.ts";
-import type { Article, Feed } from "@/types/index.ts";
+import type { Article, Feed } from "@feedzero/core/types";
 
 const NOW = new Date("2026-05-21T12:00:00Z").getTime();
 const DAY = 24 * 60 * 60 * 1000;

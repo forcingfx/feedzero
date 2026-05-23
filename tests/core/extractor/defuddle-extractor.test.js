@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 import { extract } from "../../../src/core/extractor/defuddle-extractor.ts";
 
 const ARTICLE_HTML = `<!DOCTYPE html>

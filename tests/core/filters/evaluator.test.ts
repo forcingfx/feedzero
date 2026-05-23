@@ -12,7 +12,7 @@ import type {
   SmartFilter,
   Condition,
   ConditionGroup,
-} from "../../../src/types/index.ts";
+} from "@feedzero/core/types";
 
 // --- fixtures ------------------------------------------------------------
 

@@ -17,10 +17,11 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@feedzero/core/*": ["./packages/core/src/*"]
     },
     "baseUrl": "."
   },
-  "include": ["src", "tests"],
+  "include": ["src", "tests", "packages/core/src"],
   "exclude": ["node_modules"]
 }

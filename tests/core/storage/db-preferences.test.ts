@@ -10,8 +10,8 @@ import {
   exportAll,
   importAll,
 } from "../../../src/core/storage/db.ts";
-import { DEFAULT_PREFERENCES } from "../../../src/types/index.ts";
-import type { UserPreferences } from "../../../src/types/index.ts";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
+import type { UserPreferences } from "@feedzero/core/types";
 
 const customPrefs: UserPreferences = {
   feedSortMode: "custom",

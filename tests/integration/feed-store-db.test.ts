@@ -39,7 +39,7 @@ import {
   addFeed as dbAddFeed,
   getFolders as dbGetFolders,
 } from "../../src/core/storage/db.ts";
-import type { Feed } from "../../src/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 // Mock the network boundary inside feed-service. Everything else
 // (parse, sanitize, db.addFeed, db.addArticles) runs for real.

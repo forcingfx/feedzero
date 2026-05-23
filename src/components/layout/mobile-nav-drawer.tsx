@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { ChevronUp, Layers, RefreshCw, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID } from "@feedzero/core/utils/constants";
 import { orderFeedsByRecency, MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { SidebarMenu, SidebarProvider } from "@/components/ui/sidebar.tsx";

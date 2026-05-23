@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "fake-indexeddb/auto";
 import { open, close } from "@/core/storage/db";
 import { createFeed, createArticle } from "@/core/storage/schema";
-import { unwrap, isOk, isErr } from "@/utils/result";
+import { unwrap, isOk, isErr } from "@feedzero/core/utils/result";
 
 import { checkVaultExists, mergeVaults } from "@/core/sync/sync-service";
 

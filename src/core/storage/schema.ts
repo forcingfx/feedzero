@@ -1,6 +1,6 @@
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
-import { SCHEMA_VERSION } from "../../utils/constants.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
+import { SCHEMA_VERSION } from "../../../packages/core/src/utils/constants";
 import type {
   Feed,
   Article,
@@ -11,7 +11,7 @@ import type {
   CreateArticleInput,
   CreateSmartFilterInput,
   CreateRuleInput,
-} from "../../types/index.ts";
+} from "../../../packages/core/src/types";
 
 export { SCHEMA_VERSION };
 

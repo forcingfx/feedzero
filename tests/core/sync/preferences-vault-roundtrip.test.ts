@@ -12,8 +12,8 @@ import {
   importVault,
   mergeVaults,
 } from "../../../src/core/sync/sync-service.ts";
-import { DEFAULT_PREFERENCES } from "../../../src/types/index.ts";
-import type { UserPreferences } from "../../../src/types/index.ts";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
+import type { UserPreferences } from "@feedzero/core/types";
 import type { VaultData } from "../../../src/core/sync/types.ts";
 
 const localPrefs: UserPreferences = {

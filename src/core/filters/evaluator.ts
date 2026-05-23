@@ -16,7 +16,7 @@ import type {
   SmartFilter,
   Condition,
   ConditionGroup,
-} from "../../types/index.ts";
+} from "../../../packages/core/src/types";
 
 export interface EvalContext {
   feedsById: Record<string, Feed>;

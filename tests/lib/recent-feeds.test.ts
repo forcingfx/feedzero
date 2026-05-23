@@ -5,7 +5,7 @@ import {
   MOBILE_DOCK_FEED_CAP,
   RECENT_LIST_CAP,
 } from "../../src/lib/recent-feeds.ts";
-import type { Feed } from "../../src/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 const feed = (id: string): Feed => ({
   id,

@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Article } from "../../../src/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 const { articles } = vi.hoisted(() => ({
   articles: new Map<string, Article>(),

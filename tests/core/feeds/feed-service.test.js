@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
+import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 import { normalizeUrl } from "../../../src/core/feeds/feed-service.ts";
 
 // We'll test feed-service by mocking fetch and the db/parser modules

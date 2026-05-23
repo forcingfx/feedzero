@@ -4,7 +4,7 @@ import { useSyncStore } from "../../src/stores/sync-store.ts";
 import { useLicenseStore } from "../../src/stores/license-store.ts";
 import { isSelfHosted } from "../../src/core/features/self-hosted.ts";
 import { isPaidTierActive } from "../../src/core/features/paid-tier-active.ts";
-import type { ConditionGroup } from "../../src/types/index.ts";
+import type { ConditionGroup } from "@feedzero/core/types";
 
 vi.mock("../../src/core/features/self-hosted.ts", () => ({
   isSelfHosted: vi.fn(() => false),

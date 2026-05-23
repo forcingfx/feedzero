@@ -5,7 +5,7 @@ import {
   isAggregatedFeedId,
   isStarredFeedId,
   toFolderFeedId,
-} from "../../src/utils/constants.ts";
+} from "@feedzero/core/utils/constants";
 
 describe("STARRED_FEED_ID", () => {
   it("is a stable string distinct from ALL_FEEDS_ID and folder feed ids", () => {

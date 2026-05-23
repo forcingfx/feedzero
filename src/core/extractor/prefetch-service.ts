@@ -24,11 +24,11 @@
  *   first run.
  */
 
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
 import { getAllArticles, updateArticle } from "../storage/db.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
-import type { Article } from "../../types/index.ts";
+import type { Article } from "../../../packages/core/src/types";
 
 /**
  * Defuddle is hundreds of KB and is only ever needed once the user

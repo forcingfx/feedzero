@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { generateReport } from "@/core/signal/frequency-engine.ts";
 import { SIGNAL_MIN_PER_WINDOW } from "@/core/signal/types.ts";
-import { isOk } from "@/utils/result.ts";
-import type { Article, Feed } from "@/types/index.ts";
+import { isOk } from "@feedzero/core/utils/result";
+import type { Article, Feed } from "@feedzero/core/types";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date("2026-05-21T12:00:00Z").getTime();

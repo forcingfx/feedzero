@@ -5,7 +5,7 @@
  * worker. No HTTP, no FeedZero server involvement, no credential storage.
  */
 
-import { err, ok, type Result } from "../../utils/result.ts";
+import { err, ok, type Result } from "../../../packages/core/src/utils/result";
 
 export const PROTOCOL_VERSION = 1;
 

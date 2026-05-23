@@ -7,7 +7,7 @@ import { useAutoRefresh } from "@/hooks/use-auto-refresh.ts";
 import { useLicenseRefresh } from "@/hooks/use-license-refresh.ts";
 import { useSharedSidebarSize } from "@/hooks/use-shared-sidebar-size.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
-import { ALL_FEEDS_ID, PANEL_LAYOUT_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, PANEL_LAYOUT_ID } from "@feedzero/core/utils/constants";
 import {
   ResizablePanelGroup,
   ResizablePanel,

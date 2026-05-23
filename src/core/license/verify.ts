@@ -28,7 +28,7 @@ import {
   base64UrlEncode,
   base64UrlDecodeToString,
 } from "./crypto";
-import { ok, err, type Result } from "../../utils/result";
+import { ok, err, type Result } from "../../../packages/core/src/utils/result";
 
 const TOKEN_PREFIX = "fz_";
 

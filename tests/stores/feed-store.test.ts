@@ -72,7 +72,7 @@ vi.mock("../../src/core/sync/sync-service", () => ({
 }));
 
 import { getFeeds, getFeed, removeFeed, updateFeed, getFolders, addFolder, updateFolder, removeFolder, getArticles } from "../../src/core/storage/db.ts";
-import { ALL_FEEDS_ID, toFolderFeedId } from "../../src/utils/constants.ts";
+import { ALL_FEEDS_ID, toFolderFeedId } from "@feedzero/core/utils/constants";
 import {
   addFeedFlow,
   addPlaceholderFeed,

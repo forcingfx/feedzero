@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { uint8ArrayToBase64, base64ToUint8Array } from "@/utils/base64";
+import { uint8ArrayToBase64, base64ToUint8Array } from "@feedzero/core/utils/base64";
 
 describe("base64", () => {
   describe("uint8ArrayToBase64", () => {

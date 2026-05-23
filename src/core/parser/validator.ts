@@ -1,5 +1,5 @@
-import { ok, err } from "../../utils/result.ts";
-import type { Result } from "../../utils/result.ts";
+import { ok, err } from "../../../packages/core/src/utils/result";
+import type { Result } from "../../../packages/core/src/utils/result";
 
 export type FeedType = "rss" | "atom" | "jsonfeed";
 

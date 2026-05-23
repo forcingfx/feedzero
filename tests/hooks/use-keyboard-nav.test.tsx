@@ -6,7 +6,7 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { toFolderFeedId } from "@/utils/constants.ts";
+import { toFolderFeedId } from "@feedzero/core/utils/constants";
 
 const navigateSpy = vi.fn();
 

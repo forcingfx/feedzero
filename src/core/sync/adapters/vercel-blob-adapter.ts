@@ -1,4 +1,4 @@
-import { ok, err } from "../../../utils/result.ts";
+import { ok, err } from "../../../../packages/core/src/utils/result";
 import type { SyncStorageAdapter } from "../types.ts";
 
 /**

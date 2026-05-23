@@ -6,7 +6,7 @@ import type {
   Feed,
   Rule,
   ConditionGroup,
-} from "../../../src/types/index.ts";
+} from "@feedzero/core/types";
 
 function article(overrides: Partial<Article> = {}): Article {
   return {

@@ -73,7 +73,7 @@ vi.mock("@/stores/preferences-store", () => ({
 
 import { addFeedFlow, refreshAllFeeds } from "@/core/feeds/feed-service";
 import { restore } from "@/core/storage/key-manager";
-import { CHANGELOG_FEED_URL } from "@/utils/constants";
+import { CHANGELOG_FEED_URL } from "@feedzero/core/utils/constants";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};

@@ -15,7 +15,7 @@ import {
   customEvent,
   type StripeFixture,
 } from "@/core/stripe/test-fixtures";
-import { ok, err } from "@/utils/result";
+import { ok, err } from "@feedzero/core/utils/result";
 import { MemorySeenEventStore } from "@/core/stripe/seen-event-store";
 
 const ENDPOINT = "http://localhost/api/stripe/webhook";

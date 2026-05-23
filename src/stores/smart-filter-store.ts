@@ -26,9 +26,9 @@ import { enforceFeature } from "./enforce-feature.ts";
 import type {
   SmartFilter,
   CreateSmartFilterInput,
-} from "../types/index.ts";
-import type { Result } from "../utils/result.ts";
-import { ok, err } from "../utils/result.ts";
+} from "@feedzero/core/types";
+import type { Result } from "@feedzero/core/utils/result";
+import { ok, err } from "@feedzero/core/utils/result";
 
 interface SmartFilterStore {
   filters: SmartFilter[];

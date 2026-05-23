@@ -380,6 +380,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "@feedzero/core": path.resolve(__dirname, "./packages/core/src"),
       "@": path.resolve(__dirname, "./src"),
     },
   },

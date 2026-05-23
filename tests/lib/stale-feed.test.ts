@@ -3,7 +3,7 @@ import {
   isFeedStale,
   STALE_FEED_THRESHOLD_MS,
 } from "../../src/lib/stale-feed.ts";
-import type { Feed } from "../../src/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 const baseFeed: Feed = {
   id: "f1",

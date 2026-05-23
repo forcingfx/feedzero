@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router";
 import { RulesEditorDialog } from "@/components/rules/rules-editor-dialog.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useLicenseStore } from "@/stores/license-store.ts";
-import type { Feed, Rule } from "@/types/index.ts";
+import type { Feed, Rule } from "@feedzero/core/types";
 
 vi.mock("@/core/storage/db.ts", () => {
   const feeds = new Map<string, Feed>();

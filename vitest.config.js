@@ -4,6 +4,7 @@ import path from "path";
 export default defineConfig({
   resolve: {
     alias: {
+      "@feedzero/core": path.resolve(__dirname, "./packages/core/src"),
       "@": path.resolve(__dirname, "./src"),
     },
   },
@@ -13,12 +14,15 @@ export default defineConfig({
     setupFiles: ["tests/setup.ts"],
     coverage: {
       provider: "v8",
-      include: ["src/**/*.{js,ts,tsx}"],
+      include: [
+        "src/**/*.{js,ts,tsx}",
+        "packages/core/src/**/*.{js,ts,tsx}",
+      ],
       exclude: [
         "src/workers/**",
         "src/main.tsx",
         "src/**/*.d.ts",
-        "src/types/**",
+        "packages/core/src/types/**",
         "src/core/extractor/adapters/types.ts",
         "src/core/sync/types.ts",
         "src/core/catalog/catalog-types.ts",

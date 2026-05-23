@@ -16,8 +16,8 @@ import { verifyLicense } from "./verify";
 import type { LicensePayload } from "./format";
 import type { SigningKey } from "./sign";
 import type { LicenseStorage } from "./storage";
-import { newTraceId } from "../../utils/trace-id";
-import { logError } from "../../utils/log-error";
+import { newTraceId } from "../../../packages/core/src/utils/trace-id";
+import { logError } from "../../../packages/core/src/utils/log-error";
 
 export const SUPPORTED_METHODS: readonly string[] = ["POST"];
 const ROUTE = "/api/license/verify";

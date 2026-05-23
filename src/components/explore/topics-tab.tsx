@@ -4,7 +4,7 @@ import type { CatalogSection, GeneratedCatalog } from "@/lib/catalog-search.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { CategoryGrid, type GridItem } from "@/components/explore/category-grid.tsx";
 import { CategoryDetail } from "@/components/explore/category-detail.tsx";
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 interface TopicsTabProps {
   catalog: GeneratedCatalog;

@@ -8,7 +8,7 @@ import {
   ALL_FEEDS_ID,
   STARRED_FEED_ID,
   toFilterFeedId,
-} from "@/utils/constants.ts";
+} from "@feedzero/core/utils/constants";
 import {
   SidebarMenu,
   SidebarMenuItem,

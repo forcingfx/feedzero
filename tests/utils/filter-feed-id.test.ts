@@ -10,7 +10,7 @@ import {
   ALL_FEEDS_ID,
   STARRED_FEED_ID,
   toFolderFeedId,
-} from "../../src/utils/constants.ts";
+} from "@feedzero/core/utils/constants";
 
 describe("FILTER_FEED_PREFIX and helpers", () => {
   it("toFilterFeedId prefixes a filter id with 'filter:'", () => {

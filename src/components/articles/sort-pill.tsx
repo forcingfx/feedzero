@@ -6,8 +6,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { ExpandingPill } from "@/components/ui/expanding-pill.tsx";
-import type { ArticleSortMode } from "@/types/index.ts";
-import { ARTICLE_SORT_MODES } from "@/types/index.ts";
+import type { ArticleSortMode } from "@feedzero/core/types";
+import { ARTICLE_SORT_MODES } from "@feedzero/core/types";
 
 const SORT_LABELS: Record<ArticleSortMode, string> = {
   newest: "Newest first",

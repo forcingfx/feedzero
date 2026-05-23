@@ -10,7 +10,7 @@ import { MemoryRouter } from "react-router";
 import { useExtractionStore } from "../../src/stores/extraction-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useKeyboardNav } from "../../src/hooks/use-keyboard-nav.ts";
-import type { Article } from "../../src/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return <MemoryRouter>{children}</MemoryRouter>;

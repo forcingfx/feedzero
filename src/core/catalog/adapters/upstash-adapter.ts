@@ -26,7 +26,7 @@
  * (sync adapter from PR #45), or `customer:*` (license customer index).
  */
 
-import { type Result, ok, err } from "../../../utils/result";
+import { type Result, ok, err } from "../../../../packages/core/src/utils/result";
 import type {
   CatalogFeed,
   CatalogStorageAdapter,

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { isOk, isErr } from "@/utils/result.ts";
+import { isOk, isErr } from "@feedzero/core/utils/result";
 import {
   ping,
   fetchArticle,

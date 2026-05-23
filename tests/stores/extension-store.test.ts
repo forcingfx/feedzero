@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useExtensionStore } from "@/stores/extension-store.ts";
 import * as protocol from "@/core/extension/protocol.ts";
-import { ok, err } from "@/utils/result.ts";
+import { ok, err } from "@feedzero/core/utils/result";
 
 function resetStore() {
   useExtensionStore.setState({

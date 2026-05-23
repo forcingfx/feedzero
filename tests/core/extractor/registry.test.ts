@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ok } from "../../../src/utils/result.ts";
+import { ok } from "@feedzero/core/utils/result";
 import type { SiteAdapter } from "../../../src/core/extractor/adapters/types.ts";
 
 // We test a fresh registry instance each time to avoid cross-test pollution.

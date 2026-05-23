@@ -12,7 +12,7 @@ import {
   FREQUENCY_THRESHOLD,
   FREQUENCY_WINDOW_MS,
 } from "../../../src/core/extractor/prefetch-service.ts";
-import type { Article } from "../../../src/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 function article(
   id: string,

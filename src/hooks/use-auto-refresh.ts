@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { AUTO_REFRESH_INTERVAL_MS } from "@/utils/constants.ts";
+import { AUTO_REFRESH_INTERVAL_MS } from "@feedzero/core/utils/constants";
 
 /**
  * Keeps an open tab's feeds fresh without user action.

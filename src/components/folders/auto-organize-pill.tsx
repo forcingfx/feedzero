@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Wand2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store";
 import { useFeatureGate } from "@/hooks/use-feature-gate";
-import { LOCAL_STORAGE } from "@/utils/constants";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import { AutoOrganizeDialog } from "./auto-organize-dialog";
 import { Button } from "@/components/ui/button";
 import {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateProxyUrl } from "@/core/proxy/validate-url";
-import { unwrap } from "@/utils/result";
+import { unwrap } from "@feedzero/core/utils/result";
 
 function expectErr(result: { ok: boolean }) {
   expect(result.ok).toBe(false);

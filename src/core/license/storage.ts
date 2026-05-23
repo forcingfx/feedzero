@@ -1,4 +1,4 @@
-import { type Result } from "../../utils/result";
+import { type Result } from "../../../packages/core/src/utils/result";
 
 /**
  * A single issued license. The runtime license-check endpoint reads these

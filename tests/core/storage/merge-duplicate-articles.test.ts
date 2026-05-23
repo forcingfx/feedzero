@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mergeDuplicateArticles } from "../../../src/core/storage/dedupe-articles.ts";
-import type { Article } from "../../../src/types/index.ts";
+import type { Article } from "@feedzero/core/types";
 
 const article = (overrides: Partial<Article>): Article => ({
   id: "a1",

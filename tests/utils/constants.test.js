@@ -12,7 +12,7 @@ import {
   fromFolderFeedId,
   isFolderFeedId,
   isAggregatedFeedId,
-} from "../../src/utils/constants.ts";
+} from "@feedzero/core/utils/constants";
 
 describe("Constants", () => {
   it("should define database config", () => {

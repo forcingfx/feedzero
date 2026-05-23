@@ -1,4 +1,4 @@
-import type { Feed } from "@/types/index.ts";
+import type { Feed } from "@feedzero/core/types";
 
 export interface CatalogFeed {
   name: string;

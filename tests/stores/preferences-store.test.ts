@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ok } from "../../src/utils/result.ts";
-import { DEFAULT_PREFERENCES } from "../../src/types/index.ts";
+import { ok } from "@feedzero/core/utils/result";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 
 // db boundary — preferences-store reads/writes the encrypted row through it.
 const getPreferencesMock = vi.fn();

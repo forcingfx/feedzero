@@ -8,8 +8,8 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { useLicenseStore } from "@/stores/license-store.ts";
-import { toFilterFeedId } from "@/utils/constants.ts";
-import type { Feed, SmartFilter, ConditionGroup } from "@/types/index.ts";
+import { toFilterFeedId } from "@feedzero/core/utils/constants";
+import type { Feed, SmartFilter, ConditionGroup } from "@feedzero/core/types";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),

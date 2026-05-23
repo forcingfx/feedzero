@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { findNextArticle, findPrevArticle } from "@/lib/next-article";
-import type { Article } from "@/types";
+import type { Article } from "@feedzero/core/types";
 
 function makeArticle(id: string): Article {
   return {

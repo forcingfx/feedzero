@@ -20,7 +20,7 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
 import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { UpgradeSplash } from "@/components/features/upgrade-splash.tsx";
-import type { Article, Feed } from "@/types/index.ts";
+import type { Article, Feed } from "@feedzero/core/types";
 
 /**
  * Signal — Phase 1.

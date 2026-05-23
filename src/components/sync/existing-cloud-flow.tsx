@@ -27,7 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { checkVaultExists } from "@/core/sync/sync-service";
 import { toast } from "sonner";
-import type { Result } from "@/utils/result";
+import type { Result } from "@feedzero/core/utils/result";
 
 type ExistingStep =
   | "passphrase"

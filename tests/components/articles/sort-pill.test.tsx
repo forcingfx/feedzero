@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SortPill } from "@/components/articles/sort-pill.tsx";
-import type { ArticleSortMode } from "@/types/index.ts";
+import type { ArticleSortMode } from "@feedzero/core/types";
 
 describe("SortPill", () => {
   let onChange: ReturnType<typeof vi.fn>;

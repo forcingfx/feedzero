@@ -1,4 +1,4 @@
-import { ok } from "../../../utils/result.ts";
+import { ok } from "../../../../packages/core/src/utils/result";
 import type { CatalogFeed, CatalogStorageAdapter } from "../catalog-types.ts";
 
 /** In-memory catalog adapter for development and testing. */

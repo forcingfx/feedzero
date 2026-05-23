@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
-import { PANEL_LAYOUT_ID } from "@/utils/constants.ts";
+import { PANEL_LAYOUT_ID } from "@feedzero/core/utils/constants";
 import { findNextArticle, findPrevArticle } from "@/lib/next-article.ts";
 import {
   ResizablePanelGroup,

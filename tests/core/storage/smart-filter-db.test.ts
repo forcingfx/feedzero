@@ -10,7 +10,7 @@ import {
   removeSmartFilter,
 } from "../../../src/core/storage/db.ts";
 import { createSmartFilter } from "../../../src/core/storage/schema.ts";
-import type { SmartFilter, ConditionGroup } from "../../../src/types/index.ts";
+import type { SmartFilter, ConditionGroup } from "@feedzero/core/types";
 
 const emptyRule: ConditionGroup = { kind: "group", match: "all", children: [] };
 

@@ -4,7 +4,7 @@ import {
   DEFAULT_TAXONOMY,
   type Topic,
 } from "@/core/folders/topic-matcher";
-import type { Feed, Article } from "@/types";
+import type { Feed, Article } from "@feedzero/core/types";
 
 function makeFeed(overrides: Partial<Feed> & { id: string }): Feed {
   return {
