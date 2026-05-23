@@ -80,3 +80,89 @@ function toOrigin(href: string): string | null {
     return null;
   }
 }
+
+/**
+ * Detect a Pocket CSV export. Late-stage Pocket exports were CSV with a
+ * `title, url, time_added, tags, status` header (order varied by tool).
+ * Heuristic: a header row whose lowercased columns include both `url`
+ * and `time_added` — the latter is Pocket-specific and not standard CSV.
+ */
+export function isPocketCsvExport(text: string): boolean {
+  if (!text) return false;
+  const firstLine = text.slice(0, 2048).split(/\r?\n/, 1)[0];
+  if (!firstLine) return false;
+  const columns = parseCsvRow(firstLine).map((c) => c.trim().toLowerCase());
+  return columns.includes("url") && columns.includes("time_added");
+}
+
+/**
+ * Extract unique origin URLs from a Pocket CSV export. Returns origins
+ * sorted alphabetically for deterministic output.
+ *
+ * The CSV is best-effort: Pocket's late-stage export tool produced
+ * standard RFC 4180-ish CSV with quoted fields. We handle quoted and
+ * unquoted columns, embedded commas inside quotes, and skip the header.
+ */
+export function parsePocketCsvExport(text: string): Result<string[]> {
+  if (!text || typeof text !== "string" || !text.trim()) {
+    return err("Input is empty");
+  }
+
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 1) return err("Input is empty");
+
+  const header = parseCsvRow(lines[0]).map((c) => c.trim().toLowerCase());
+  const urlIdx = header.indexOf("url");
+  if (urlIdx === -1) {
+    return err("Pocket CSV is missing the 'url' header column");
+  }
+
+  const origins = new Set<string>();
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parseCsvRow(lines[i]);
+    const href = cells[urlIdx]?.trim();
+    if (!href) continue;
+    const origin = toOrigin(href);
+    if (origin) origins.add(origin);
+  }
+
+  if (origins.size === 0) {
+    return err("No valid http(s) URLs found in Pocket CSV export");
+  }
+
+  return ok(Array.from(origins).sort());
+}
+
+/**
+ * Minimal RFC 4180-ish CSV row parser: handles quoted fields, embedded
+ * commas inside quotes, and the "" escape for a literal quote. Doesn't
+ * span newlines because Pocket exports don't embed them — keeping it
+ * line-by-line means we can stream through `split(/\r?\n/)`.
+ */
+function parseCsvRow(row: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+    if (inQuotes) {
+      if (ch === '"' && row[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      cells.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current);
+  return cells;
+}

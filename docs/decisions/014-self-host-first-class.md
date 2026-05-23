@@ -87,11 +87,23 @@ Self-hosting is a supported first-class deployment with:
 
 **Followups** (deliberately out of scope for this ADR)
 
-- A4-extras: per-host serialization of `refreshAll()` and `Retry-After`
-  consumption in the refresh worker.
-- A3: in-app self-host preflight UI.
-- A8: existing-vault detection on the second-device onboarding flow.
-- A7: dark mode toggle surfaced in the sidebar.
+- A4-extras: ~~per-host serialization of `refreshAll()`~~ ✅ shipped
+  via `groupByHostForRefresh`; ~~`Retry-After` consumption in the
+  refresh worker~~ ✅ shipped via `src/core/feeds/host-pause.ts` — a
+  429/503 on any feed pauses every other feed on the same host until
+  the indicated time.
+- A3: ~~in-app self-host preflight UI~~ ✅ shipped as
+  `<PreflightPanel>` in Settings → Help, backed by
+  `src/core/diagnostics/self-host-preflight.ts`.
+- A8: ~~existing-vault detection on the second-device onboarding flow~~
+  ✅ `RecoveryStep` now runs `checkVaultExists()` (HEAD-only) before
+  the destructive `pullVault` + `initFresh` path. A 404 short-circuits
+  with a precise "no vault matched that passphrase" message instead of
+  the generic spinner-then-error, and a real network failure (5xx,
+  CORS) surfaces verbatim so the user doesn't blame their passphrase.
+- A7: ~~dark mode toggle surfaced in the sidebar~~ ✅ shipped as the
+  Settings → Reading theme toggle plus vault-synced `<ThemeBridge>`
+  (see ADR 022 follow-up).
 
 ## Lesson worth recording
 

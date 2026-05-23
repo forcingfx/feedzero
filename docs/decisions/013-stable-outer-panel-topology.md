@@ -47,7 +47,7 @@ Putting `article-list` + `reader` in their own group, keyed by `feedzero:layout:
 
 ### Why we kept `useSharedSidebarSize`
 
-After this refactor, the hook's imperative `panelRef.resize()` effect is no longer load-bearing — the outer group's child set is constant, so the library preserves the sidebar width on its own. The hook remains as a safety net for HMR remounts and any future code path that re-mounts the SidebarProvider. Removing it is a follow-up; doing it in the same PR would conflate two concerns.
+After this refactor, the hook's imperative `panelRef.resize()` effect is no longer load-bearing — the outer group's child set is constant, so the library preserves the sidebar width on its own. ✅ The safety-net effect (and the `layoutKey` argument + `panelRef` it required) was removed in the follow-up. The hook is now just a localStorage read at mount → `defaultSize`, localStorage write on `onResize`. The "sidebar width only changes when the user drags or resizes the window" rule now holds by construction throughout — no imperative correction step that could fight the library's layout pass.
 
 ## Consequences
 

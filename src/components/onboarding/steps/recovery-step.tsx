@@ -13,46 +13,72 @@ import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
 import { initFresh } from "@/core/storage/key-manager";
-import { pullVault, importVault } from "@/core/sync/sync-service";
+import {
+  checkVaultExists,
+  importVault,
+  pullVault,
+} from "@/core/sync/sync-service";
+
+type Phase = "idle" | "checking" | "restoring";
 
 export function RecoveryStep() {
   const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [phase, setPhase] = useState<Phase>("idle");
   const setStep = useOnboardingStore((s) => s.setStep);
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
+  const isLoading = phase !== "idle";
 
   const handleRecover = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!passphrase.trim()) return;
 
-    setIsLoading(true);
     setError(null);
-
     const trimmed = passphrase.trim();
 
-    // 1. Pull vault FIRST — before any destructive operations.
-    //    This ensures the vault data is safely in memory before we
-    //    touch local state or risk deleting the server vault.
-    const pullResult = await pullVault(trimmed);
-    if (!pullResult.ok) {
-      setError("Could not find a vault for this passphrase. Please check and try again.");
-      setIsLoading(false);
+    // 1. HEAD-based existence check (ADR 014 A8). Lets a wrong passphrase
+    //    fail fast with a clear message before we run the full PBKDF2 +
+    //    GET + decrypt path, AND lets the UI distinguish "checking" from
+    //    "restoring" so the user sees progress instead of a 2-second
+    //    opaque spinner.
+    setPhase("checking");
+    const existsResult = await checkVaultExists(trimmed);
+    if (!existsResult.ok) {
+      setError(existsResult.error);
+      setPhase("idle");
+      return;
+    }
+    if (!existsResult.value) {
+      setError(
+        "No vault matched that passphrase. Double-check spelling and word " +
+          "order — every word counts.",
+      );
+      setPhase("idle");
       return;
     }
 
-    // 2. Now that vault data is safely in hand, initialize local DB.
+    // 2. Pull vault — vault is confirmed to exist, but pull still gates
+    //    the destructive op below in case of transient network failure.
+    setPhase("restoring");
+    const pullResult = await pullVault(trimmed);
+    if (!pullResult.ok) {
+      setError("Could not find a vault for this passphrase. Please check and try again.");
+      setPhase("idle");
+      return;
+    }
+
+    // 3. Now that vault data is safely in hand, initialize local DB.
     //    skipServerCleanup prevents deleting the vault we just pulled from.
     const initResult = await initFresh(trimmed, { sync: true, skipServerCleanup: true });
     if (!initResult.ok) {
       setError("Could not initialize. Please check your passphrase.");
-      setIsLoading(false);
+      setPhase("idle");
       return;
     }
 
     const credentials = initResult.value.credentials;
 
-    // 3. Import the pulled vault data and restore sync state.
+    // 4. Import the pulled vault data and restore sync state.
     //    `initFresh` already opened a fresh DB with passphrase-derived
     //    keys AND wrote those keys to localStorage. `importVault` runs
     //    encryption against the same in-memory keys, so on-disk
@@ -107,10 +133,15 @@ export function RecoveryStep() {
             disabled={!passphrase.trim() || isLoading}
             className="w-full"
           >
-            {isLoading ? (
+            {phase === "checking" ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" />
-                Recovering...
+                Checking…
+              </>
+            ) : phase === "restoring" ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Found your vault — restoring…
               </>
             ) : (
               <>

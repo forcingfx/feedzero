@@ -145,6 +145,14 @@ beforeEach(async () => {
   db._reset();
   vi.clearAllMocks();
 
+  // The refresh worker's host-pause map (Retry-After consumption) is a
+  // process-level singleton — leak across tests would short-circuit
+  // subsequent refresh calls before they reach the proxy mock.
+  const { clearHostPauses } = await import(
+    "../../../src/core/feeds/host-pause.ts"
+  );
+  clearHostPauses();
+
   // Reset module to clear any cached state
   const mod = await import("../../../src/core/feeds/feed-service.ts");
   addFeedFlow = mod.addFeedFlow;

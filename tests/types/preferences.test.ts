@@ -15,10 +15,11 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       folderCustomOrder: [],
       articleSortMode: "newest",
       groupArticleFloods: true,
+      theme: "system",
     });
   });
 
-  it("UserPreferences accepts the optional theme field (populated in PR2)", () => {
+  it("UserPreferences accepts a non-default theme value", () => {
     const withTheme: UserPreferences = {
       ...DEFAULT_PREFERENCES,
       theme: "dark",

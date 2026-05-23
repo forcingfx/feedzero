@@ -19,6 +19,7 @@
     "test:e2e": "playwright test",
     "serve": "node --import tsx server.ts",
     "docs:tier-matrix": "tsx scripts/generate-tier-matrix-doc.ts",
+    "check-env": "tsx scripts/check-env.ts",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -70,6 +71,7 @@
     "@upstash/redis": "^1.38.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "defuddle": "^0.18.1",
     "dexie": "^4.4.2",
     "dompurify": "^3.4.3",

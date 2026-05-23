@@ -2,6 +2,11 @@
 
 Status: copy drafted, deployment + campaigns not yet executed. This file tracks the work that has to happen *outside* this repo before the migration story actually lands.
 
+> **For the landing-repo agent**: a self-contained brief is at
+> [`LANDING_PROMPT.md`](./LANDING_PROMPT.md). Paste it into a fresh
+> Claude Code session opened against the `feedzero-landing` repo to
+> ship the three pages + homepage panel below.
+
 ## Per-page deployment
 
 The landing pages live as markdown here. The actual landing site (`feedzero.app`) is a separate repo. Each page below needs:
