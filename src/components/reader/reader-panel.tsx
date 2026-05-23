@@ -12,7 +12,7 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { isAggregatedFeedId } from "@/utils/constants.ts";
-import { hasSummarySubheading } from "@/lib/content-modes.ts";
+import { hasSummarySubheading, isFeedBlurbEmpty } from "@/lib/content-modes.ts";
 import { pickExtractedContent } from "@/lib/pick-extracted-content.ts";
 // needsExtraction lives in its own Defuddle-free module so the reader
 // can ask "does this article need extraction?" without pulling the
@@ -80,19 +80,29 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   // previous (article A) scroll offset before the position snaps back to 0.
   // See GitLab #8.
   //
-  // When the feed has preferFullText=true, immediately switch to extracted
-  // view so the user doesn't see the teaser flash before the cached or
-  // newly-fetched full text takes over.
+  // When the feed has preferFullText=true, OR the article has no readable
+  // blurb in the feed (no content/summary), immediately switch to extracted
+  // view so the user doesn't see the teaser flash — or worse, a blank pane —
+  // before the cached or newly-fetched full text takes over.
   useLayoutEffect(() => {
     resetForArticle();
     if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
-    if (article?.link) {
+    if (article?.link?.startsWith("http")) {
       const feed = useFeedStore.getState().feeds.find((f) => f.id === article.feedId);
-      if (feed?.preferFullText) {
+      const emptyBlurb = isFeedBlurbEmpty(article.content, article.summary);
+      if (feed?.preferFullText || emptyBlurb) {
         switchToExtracted(article.link);
       }
     }
-  }, [article?.id, article?.link, article?.feedId, resetForArticle, switchToExtracted]);
+  }, [
+    article?.id,
+    article?.link,
+    article?.feedId,
+    article?.content,
+    article?.summary,
+    resetForArticle,
+    switchToExtracted,
+  ]);
 
   // Auto-extract teaser articles in background
   useEffect(() => {
