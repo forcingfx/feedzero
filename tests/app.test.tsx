@@ -27,10 +27,21 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
 }));
 
 vi.mock("@/core/sync/sync-service", () => ({
-  pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
+  pushVault: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { updatedAt: Date.now(), etag: null },
+  }),
   pullVault: vi.fn().mockResolvedValue({
     ok: true,
     value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+  }),
+  pullVaultIfChanged: vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      notModified: false,
+      vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      etag: null,
+    },
   }),
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
   deleteVault: vi.fn().mockResolvedValue({ ok: true, value: true }),

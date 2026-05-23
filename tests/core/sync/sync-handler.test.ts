@@ -601,4 +601,87 @@ describe("sync-handler", () => {
       expect(response.status).toBe(404);
     });
   });
+
+  describe("conditional GET with ETag (If-None-Match)", () => {
+    const vaultId = "5".repeat(64);
+    const payload = '{"ok":true,"vault":{"v":"deadbeef"}}';
+
+    it("returns an ETag on the GET response", async () => {
+      await adapter.put(vaultId, payload);
+      const res = await handleSyncRequest(makeGetRequest(vaultId), adapter);
+      expect(res.status).toBe(200);
+      // Weak validator, hex-ish digest in quotes.
+      expect(res.headers.get("ETag")).toMatch(/^W\/"[a-f0-9]+"$/);
+    });
+
+    it("returns the same ETag for identical stored content across two GETs", async () => {
+      await adapter.put(vaultId, payload);
+      const a = await handleSyncRequest(makeGetRequest(vaultId), adapter);
+      const b = await handleSyncRequest(makeGetRequest(vaultId), adapter);
+      expect(a.headers.get("ETag")).toBe(b.headers.get("ETag"));
+    });
+
+    it("returns 304 Not Modified when If-None-Match matches the stored ETag", async () => {
+      await adapter.put(vaultId, payload);
+      const first = await handleSyncRequest(
+        makeGetRequest(vaultId),
+        adapter,
+      );
+      const etag = first.headers.get("ETag")!;
+
+      const second = await handleSyncRequest(
+        new Request(`http://localhost/api/sync?vaultId=${vaultId}`, {
+          method: "GET",
+          headers: { "If-None-Match": etag },
+        }),
+        adapter,
+      );
+      expect(second.status).toBe(304);
+      // 304 must still echo the validator (RFC 9110 §15.4.5) and must
+      // carry no message body.
+      expect(second.headers.get("ETag")).toBe(etag);
+      expect(await second.text()).toBe("");
+    });
+
+    it("returns 200 + new body when If-None-Match is stale", async () => {
+      await adapter.put(vaultId, payload);
+      const first = await handleSyncRequest(
+        makeGetRequest(vaultId),
+        adapter,
+      );
+      const staleEtag = first.headers.get("ETag")!;
+
+      // PUT new content — server-stored bytes change → ETag changes.
+      await adapter.put(vaultId, '{"ok":true,"vault":{"v":"updated"}}');
+
+      const res = await handleSyncRequest(
+        new Request(`http://localhost/api/sync?vaultId=${vaultId}`, {
+          method: "GET",
+          headers: { "If-None-Match": staleEtag },
+        }),
+        adapter,
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get("ETag")).not.toBe(staleEtag);
+      const body = await res.text();
+      expect(body).toContain("updated");
+    });
+
+    it("PUT response includes the ETag of the just-stored value", async () => {
+      const res = await handleSyncRequest(
+        makePutRequest({ vaultId, vault: { v: "fresh" } }),
+        adapter,
+      );
+      expect(res.status).toBe(200);
+      const putEtag = res.headers.get("ETag");
+      expect(putEtag).toMatch(/^W\/"[a-f0-9]+"$/);
+
+      // Confirm the PUT's ETag matches what GET would return.
+      const getRes = await handleSyncRequest(
+        makeGetRequest(vaultId),
+        adapter,
+      );
+      expect(getRes.headers.get("ETag")).toBe(putEtag);
+    });
+  });
 });

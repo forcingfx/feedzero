@@ -122,9 +122,18 @@ export async function importVault(vault: VaultData): Promise<Result<boolean>> {
 /**
  * Encrypt local data and push it to the sync server.
  * Accepts a passphrase string or pre-derived SyncCredentials.
- * Returns the server-reported timestamp on success.
+ * Returns the server-reported timestamp + the post-write ETag (when
+ * the server emits one) so the caller can prime its conditional-pull
+ * cache without an extra round-trip.
  */
-export async function pushVault(auth: SyncAuth): Promise<Result<number>> {
+export interface PushOutcome {
+  updatedAt: number;
+  etag: string | null;
+}
+
+export async function pushVault(
+  auth: SyncAuth,
+): Promise<Result<PushOutcome>> {
   try {
     const [credsResult, vaultResult] = await Promise.all([
       resolveCredentials(auth),
@@ -156,7 +165,10 @@ export async function pushVault(auth: SyncAuth): Promise<Result<number>> {
     }
 
     const data = await response.json();
-    return ok(data.updatedAt ?? Date.now());
+    return ok({
+      updatedAt: data.updatedAt ?? Date.now(),
+      etag: response.headers?.get?.("ETag") ?? null,
+    });
   } catch (e) {
     return err(`Sync push failed: ${(e as Error).message}`);
   }
@@ -192,21 +204,59 @@ export async function deleteVault(auth: SyncAuth): Promise<Result<boolean>> {
  * Does NOT import into local DB — caller decides what to do with the data.
  */
 export async function pullVault(auth: SyncAuth): Promise<Result<VaultData>> {
+  const result = await pullVaultIfChanged(auth);
+  if (!result.ok) return result;
+  // Unconditional pull never returns notModified because no
+  // If-None-Match is sent — but the type union forces a guard.
+  if (result.value.notModified) {
+    return err("Unexpected 304 on unconditional pull");
+  }
+  return ok(result.value.vault);
+}
+
+/**
+ * Successful conditional-pull outcomes.
+ *  - notModified: true → server replied 304; the caller's cached vault
+ *    is still current. `etag` echoes the validator so the caller can
+ *    refresh its cache marker.
+ *  - notModified: false → fresh vault decrypted; `etag` is the value
+ *    the caller should send back as If-None-Match on the next pull.
+ */
+export type PullVaultOutcome =
+  | { notModified: true; etag: string | null }
+  | { notModified: false; vault: VaultData; etag: string | null };
+
+/**
+ * Conditional pull. When `ifNoneMatch` matches the server-side ETag,
+ * the server replies 304 and we save the full vault download (plus the
+ * decryption work). The sync-store calls this with the last ETag it
+ * saw; first-ever pulls pass `undefined` and always get a fresh vault.
+ */
+export async function pullVaultIfChanged(
+  auth: SyncAuth,
+  ifNoneMatch?: string,
+): Promise<Result<PullVaultOutcome>> {
   try {
     const credsResult = await resolveCredentials(auth);
     if (!credsResult.ok) return credsResult;
     const { vaultId, vaultKey } = credsResult.value;
 
-    const response = await syncFetch(`/api/sync?vaultId=${vaultId}`);
+    const headers: Record<string, string> = {};
+    if (ifNoneMatch) headers["If-None-Match"] = ifNoneMatch;
+
+    const response = await syncFetch(`/api/sync?vaultId=${vaultId}`, {
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
+    });
+
+    if (response.status === 304) {
+      // Nothing changed — caller skips the import; vault stays as-is.
+      return ok({
+        notModified: true,
+        etag: response.headers?.get?.("ETag") ?? null,
+      });
+    }
 
     if (!response.ok) {
-      // 404 = "no vault exists for this derived vaultId". The two real
-      // user-facing causes are (a) first sync from this passphrase (no
-      // vault has ever been pushed) or (b) typo in the passphrase on a
-      // restore. Either way the raw "Sync pull failed (404): Vault not
-      // found" string leaks implementation and tells the user nothing
-      // actionable. Translate it. Other statuses still pass through —
-      // a 401/500 is useful diagnostic information.
       if (response.status === 404) {
         return err(
           "No cloud vault was found for this passphrase. " +
@@ -224,7 +274,14 @@ export async function pullVault(auth: SyncAuth): Promise<Result<VaultData>> {
       return err("Server returned no vault data");
     }
 
-    return decryptVault(vaultKey, data.vault as EncryptedVault);
+    const decryptResult = await decryptVault(vaultKey, data.vault as EncryptedVault);
+    if (!decryptResult.ok) return decryptResult;
+
+    return ok({
+      notModified: false,
+      vault: decryptResult.value,
+      etag: response.headers?.get?.("ETag") ?? null,
+    });
   } catch (e) {
     return err(`Sync pull failed: ${(e as Error).message}`);
   }

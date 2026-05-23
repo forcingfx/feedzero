@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   pushVault,
   pullVault,
+  pullVaultIfChanged,
   importVault,
   deleteVault,
   exportVault,
@@ -59,6 +60,14 @@ interface SyncStore {
   lastSyncedAt: number | null;
   error: string | null;
   credentials: SyncCredentials | null;
+  /**
+   * Most-recent vault ETag observed from the server (after a push or
+   * pull). Replayed as `If-None-Match` on the next pull so the server
+   * can short-circuit with 304 when nothing changed — the common case
+   * for periodic pulls on a single-device user, and for multi-device
+   * users between active windows.
+   */
+  lastVaultEtag: string | null;
 
   enableSync: (passphrase: string) => Promise<void>;
   restoreSync: (credentials: SyncCredentials) => void;
@@ -144,6 +153,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   lastSyncedAt: null,
   error: null,
   credentials: null,
+  lastVaultEtag: null,
 
   enableSync: async (passphrase) => {
     // Derive vault keys and persist alongside existing DB keys
@@ -161,7 +171,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     const result = await pushVault(credentials);
     if (result.ok) {
       clearPendingPush();
-      set({ status: "synced", lastSyncedAt: result.value, error: null });
+      set({ status: "synced", lastSyncedAt: result.value.updatedAt, lastVaultEtag: result.value.etag, error: null });
     } else {
       set({ status: "error", error: result.error });
     }
@@ -233,7 +243,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     const result = await pushVault(credentials);
     if (result.ok) {
       clearPendingPush();
-      set({ status: "synced", lastSyncedAt: result.value, error: null });
+      set({ status: "synced", lastSyncedAt: result.value.updatedAt, lastVaultEtag: result.value.etag, error: null });
     } else {
       set({ status: "error", error: result.error });
     }
@@ -261,23 +271,50 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
           return;
         }
         clearPendingPush();
+        // The flush wrote a fresh ETag — record it so the conditional
+        // pull below short-circuits with 304 (the vault we'd download
+        // is exactly the one we just uploaded).
+        set({ lastVaultEtag: flushResult.value.etag });
       }
 
-      const pullResult = await pullVault(credentials);
+      // Send If-None-Match when we have a cached ETag from the
+      // previous push/pull. The server's 304 response skips the
+      // entire decrypt + importVault path — the most common case for
+      // periodic pulls on a single-device user.
+      const cachedEtag = get().lastVaultEtag ?? undefined;
+      const pullResult = await pullVaultIfChanged(credentials, cachedEtag);
       if (!pullResult.ok) {
         set({ status: "error", error: pullResult.error });
         return;
       }
 
+      if (pullResult.value.notModified) {
+        // Nothing changed; no import. Refresh the ETag if the server
+        // sent one (some adapters re-emit the same value, some won't).
+        const next = pullResult.value.etag ?? get().lastVaultEtag;
+        set({
+          status: "synced",
+          lastSyncedAt: Date.now(),
+          lastVaultEtag: next,
+          error: null,
+        });
+        return;
+      }
+
       const importResult = await importVault(
-        await gatePreferencesByTimestamp(pullResult.value),
+        await gatePreferencesByTimestamp(pullResult.value.vault),
       );
       if (!importResult.ok) {
         set({ status: "error", error: importResult.error });
         return;
       }
 
-      set({ status: "synced", lastSyncedAt: Date.now(), error: null });
+      set({
+        status: "synced",
+        lastSyncedAt: Date.now(),
+        lastVaultEtag: pullResult.value.etag,
+        error: null,
+      });
     })().finally(() => {
       inFlightPull = null;
     });
@@ -417,7 +454,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     set({
       credentials,
       status: "synced",
-      lastSyncedAt: pushResult.value,
+      lastSyncedAt: pushResult.value.updatedAt,
+      lastVaultEtag: pushResult.value.etag,
       error: null,
     });
     return ok(true);

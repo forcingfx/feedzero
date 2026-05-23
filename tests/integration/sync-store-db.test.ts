@@ -78,10 +78,23 @@ vi.mock("../../src/core/sync/sync-service.ts", async () => {
   const actual = await vi.importActual<
     typeof import("../../src/core/sync/sync-service.ts")
   >("../../src/core/sync/sync-service.ts");
+  // pullVaultIfChanged delegates to the same mock as pullVault — tests
+  // express their fixture in vault-shaped Results; the wrapper here
+  // adapts to the conditional-pull shape (notModified=false, etag=null)
+  // so the production sync-store path sees what it expects.
+  const pullCompat = async (...args: unknown[]) => {
+    const r = await pullVaultMock(...args);
+    if (!r.ok) return r;
+    return {
+      ok: true as const,
+      value: { notModified: false, vault: r.value, etag: null },
+    };
+  };
   return {
     ...actual,
     pushVault: (...args: unknown[]) => pushVaultMock(...args),
     pullVault: (...args: unknown[]) => pullVaultMock(...args),
+    pullVaultIfChanged: pullCompat,
     deleteVault: (...args: unknown[]) => deleteVaultMock(...args),
   };
 });
