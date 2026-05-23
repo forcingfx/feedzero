@@ -386,6 +386,16 @@ async function startServer(): Promise<void> {
   };
   const app = createApp(adapter, cache, catalog, licenseDeps);
 
+  // Long-lived immutable caching for hashed asset filenames (everything
+  // under /assets/ comes out of Vite with a content hash in its name, so
+  // the URL changes whenever the bytes change). Without this, every
+  // self-host visitor re-downloads ~430 KB of vendor chunks on each
+  // revisit — defeats the per-vendor split. The hosted (Vercel)
+  // deployment sets the same header automatically for hashed assets.
+  app.use("/assets/*", async (c, next) => {
+    await next();
+    c.header("Cache-Control", "public, max-age=31536000, immutable");
+  });
   app.use("/*", serveStatic({ root: "./dist" }));
   app.get("/*", serveStatic({ path: "./dist/index.html" }));
 

@@ -391,7 +391,64 @@ export default defineConfig({
       // visitor. The Hono server (server.ts) and Vercel wrappers (api/*.ts)
       // bundle these via scripts/build-api.js, not this build.
       external: ["stripe", "@upstash/redis", "@vercel/blob", "@hono/node-server"],
+      output: {
+        // Split low-churn vendor code into its own chunks so a typical
+        // FeedZero release (which touches src/ but rarely a vendor lib)
+        // only invalidates the small app chunk in the user's browser
+        // cache. Asset filenames are already content-hashed; Vercel and
+        // the self-host static server both serve them with long-lived
+        // immutable Cache-Control. Without splits, every release forces
+        // re-download of React + Radix + Dexie + Defuddle (~250 KB gz).
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          // React core — stable, rarely changes between FeedZero releases.
+          if (
+            id.includes("/node_modules/react/") ||
+            id.includes("/node_modules/react-dom/") ||
+            id.includes("/node_modules/react-router/") ||
+            id.includes("/node_modules/scheduler/")
+          ) {
+            return "vendor-react";
+          }
+          // Radix primitives + the umbrella export. Largest single vendor
+          // surface; isolating it shrinks the diff a Radix bump produces.
+          if (
+            id.includes("/node_modules/@radix-ui/") ||
+            id.includes("/node_modules/radix-ui/")
+          ) {
+            return "vendor-radix";
+          }
+          // IndexedDB layer.
+          if (id.includes("/node_modules/dexie/")) {
+            return "vendor-dexie";
+          }
+          // Parsing + extraction pipeline. Heavy and infrequently bumped.
+          if (
+            id.includes("/node_modules/feedsmith/") ||
+            id.includes("/node_modules/defuddle/") ||
+            id.includes("/node_modules/marked/") ||
+            id.includes("/node_modules/dompurify/")
+          ) {
+            return "vendor-parsing";
+          }
+          // Icon set — large but rarely versioned.
+          if (id.includes("/node_modules/lucide-react/")) {
+            return "vendor-icons";
+          }
+          // Drag-and-drop primitives (folder reordering, sortable lists).
+          if (id.includes("/node_modules/@dnd-kit/")) {
+            return "vendor-dnd";
+          }
+          // Everything else falls into the default vendor bucket so we
+          // don't fragment into dozens of tiny chunks.
+          return "vendor";
+        },
+      },
     },
+    // Raise the warning threshold to 800 KB — the React/Radix vendor
+    // chunks legitimately exceed 500 KB unminified but are not a
+    // first-paint concern (cached aggressively, lazy-parsed by V8).
+    chunkSizeWarningLimit: 800,
   },
   plugins: [react(), tailwindcss(), apiProxyPlugin(), analyzePlugin].filter(
     Boolean,
