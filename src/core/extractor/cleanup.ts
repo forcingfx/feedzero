@@ -48,8 +48,27 @@ export function cleanExtractedContent(html: string): string {
 
   removeEmptyElements(root);
   collapseConsecutiveBrs(root);
+  lazyLoadImages(root);
 
   return root.innerHTML.trim();
+}
+
+/**
+ * Annotate every `<img>` in the extracted HTML with native lazy-loading
+ * and async decoding when the publisher didn't already specify them.
+ * Long-form articles routinely embed dozens of images; loading them
+ * eagerly on the first paint of the reader pane is wasted bytes
+ * (most are below the fold), wasted main-thread time (decoding),
+ * and a real-world memory hit on mobile. Standard HTML attributes —
+ * already in the DOMPurify allowlist — so no new sanitization rule
+ * is needed.
+ */
+function lazyLoadImages(root: HTMLElement): void {
+  const images = root.querySelectorAll("img");
+  for (const img of images) {
+    if (!img.hasAttribute("loading")) img.setAttribute("loading", "lazy");
+    if (!img.hasAttribute("decoding")) img.setAttribute("decoding", "async");
+  }
 }
 
 /**

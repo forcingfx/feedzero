@@ -55,4 +55,25 @@ describe("cleanExtractedContent", () => {
     const result = cleanExtractedContent(html);
     expect(result).toBe("<p>Content</p>");
   });
+
+  it("should add loading=lazy and decoding=async to images that lack them", () => {
+    const html = '<p>Above the fold</p><img src="a.jpg"><img src="b.jpg">';
+    const result = cleanExtractedContent(html);
+    // happy-dom serializes attributes in source order — both new
+    // attributes appear; exact order is not asserted to keep the test
+    // robust against happy-dom version drift.
+    expect(result).toMatch(/<img[^>]*\bloading="lazy"/);
+    expect(result).toMatch(/<img[^>]*\bdecoding="async"/);
+    // Count: both images get both attributes.
+    expect(result.match(/loading="lazy"/g)).toHaveLength(2);
+    expect(result.match(/decoding="async"/g)).toHaveLength(2);
+  });
+
+  it("should keep an existing loading attribute if the publisher set one", () => {
+    const html = '<img src="hero.jpg" loading="eager"><img src="b.jpg">';
+    const result = cleanExtractedContent(html);
+    expect(result).toMatch(/<img[^>]*src="hero\.jpg"[^>]*loading="eager"/);
+    // The second image (no publisher loading attr) gets lazy.
+    expect(result.match(/loading="lazy"/g)).toHaveLength(1);
+  });
 });
