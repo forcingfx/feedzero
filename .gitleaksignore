@@ -1,0 +1,23 @@
+# Synthetic test fixtures flagged by gitleaks' generic-api-key rule.
+#
+# Every entry below is the same 32-char hex string
+# `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6` used as a fake license `keyId`
+# in license/Stripe/subscription unit tests. Sequential hex pairs —
+# visibly synthetic, not a real secret. Fingerprints are pinned to
+# commit:file:rule:line so a newly-introduced high-entropy string
+# in any of these files still trips the scanner.
+
+3c0f37fa6fe672eaa2cef3fd2c0a2baa1248c207:tests/components/settings/subscription-tab-deactivate.test.tsx:generic-api-key:43
+3c0f37fa6fe672eaa2cef3fd2c0a2baa1248c207:tests/components/settings/subscription-tab.test.tsx:generic-api-key:31
+6b6105f7ba4728c4ec3b91729cf346f01ee6c785:tests/core/license/issue-from-recovery-handler.test.ts:generic-api-key:36
+6b6105f7ba4728c4ec3b91729cf346f01ee6c785:tests/components/settings/account-tab.test.tsx:generic-api-key:35
+f28d5ee875cda2d8aa28a15adce679399649a3ca:tests/stores/license-store.test.ts:generic-api-key:16
+535ec078eb926e7b717279ad86f0981e597e311d:tests/stores/license-store.test.ts:generic-api-key:16
+b530c484bbefe7afe2a3f5ebed135a1ed728b589:tests/core/license/retrieve-handler.test.ts:generic-api-key:46
+b530c484bbefe7afe2a3f5ebed135a1ed728b589:tests/core/stripe/portal-handler.test.ts:generic-api-key:27
+8bbc206e361da3ac1526df03e44b94b4b362ee71:tests/core/license/verify-handler.test.ts:generic-api-key:18
+8bbc206e361da3ac1526df03e44b94b4b362ee71:tests/server.test.ts:generic-api-key:679
+37a7cacbf8469c7e7d96b525004dbcfc4fa604ef:tests/core/license/middleware.test.ts:generic-api-key:19
+0a884d43a51383feb4c39e369321cc23fd1d4627:tests/core/license/sign.test.ts:generic-api-key:11
+0a884d43a51383feb4c39e369321cc23fd1d4627:tests/core/license/verify.test.ts:generic-api-key:14
+883205b9dd19389c869e64bc66717edb22cc3d88:tests/core/license/format.test.ts:generic-api-key:12
