@@ -3,6 +3,7 @@ import { useNavigate, type NavigateFunction } from "react-router";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
+import { useCommandPaletteStore } from "@/stores/command-palette-store.ts";
 import { toFolderFeedId } from "@/utils/constants.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 
@@ -23,6 +24,17 @@ import { goToSettings } from "@/lib/go-to-settings.ts";
 export function useKeyboardNav() {
   const navigate = useNavigate();
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Cmd/Ctrl+K toggles the command palette. This check runs BEFORE
+    // the input-focus early return below — the palette must be
+    // summonable from anywhere, including the explore search box and
+    // the import textarea, so power users never have to mouse out
+    // first.
+    if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      useCommandPaletteStore.getState().toggle();
+      return;
+    }
+
     // Cmd/Ctrl+, navigates to the Settings stage page. The previous
     // event-indirection lived because the SettingsMenu dropdown listened
     // for it; Settings is now a route, so we just navigate.
