@@ -9,6 +9,9 @@ import { BOOT_PULL_TIMEOUT_MS, LOCAL_STORAGE } from "../utils/constants.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { usePreferencesStore } from "./preferences-store.ts";
 import { persistPreferences } from "./persist-preferences.ts";
+import { useFeedStore } from "./feed-store.ts";
+import { useArticleStore } from "./article-store.ts";
+import { useOnboardingStore } from "./onboarding-store.ts";
 import { DEFAULT_PREFERENCES } from "../types/index.ts";
 import { generatePassphrase } from "../core/crypto/passphrase-generator.ts";
 import {
@@ -135,7 +138,6 @@ async function pullWithBootWatchdog(): Promise<void> {
     // refresh if needed.
     void pull
       .then(async () => {
-        const { useFeedStore } = await import("./feed-store.ts");
         await useFeedStore.getState().loadFeeds();
       })
       .catch(() => {
@@ -319,7 +321,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       hasCompletedOnboarding: false,
       recoveryMode: null,
     });
-    await resetAllStores();
+    resetAllStores();
   },
 }));
 
@@ -327,10 +329,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
  * Reset all stores to initial state. Called by sync-store.logout()
  * to avoid cross-store knowledge in individual stores.
  */
-export async function resetAllStores(): Promise<void> {
-  const { useFeedStore } = await import("./feed-store.ts");
-  const { useArticleStore } = await import("./article-store.ts");
-  const { useOnboardingStore } = await import("./onboarding-store.ts");
+export function resetAllStores(): void {
   useAppStore.setState({ isDbReady: false, hasCompletedOnboarding: false });
   useFeedStore.setState({ feeds: [], selectedFeedId: null });
   useArticleStore.setState({ articles: [], selectedArticle: null });

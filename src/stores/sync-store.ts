@@ -28,6 +28,11 @@ import { clearLicenseToken } from "../core/license/license-token-store.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
 import type { Result } from "../utils/result.ts";
 import { ok, err } from "../utils/result.ts";
+import { useLicenseStore } from "./license-store.ts";
+import { useFeedStore } from "./feed-store.ts";
+import { useArticleStore } from "./article-store.ts";
+import { usePreferencesStore } from "./preferences-store.ts";
+import { resetAllStores } from "./app-store.ts";
 
 export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 
@@ -218,7 +223,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     await get().disableSync();
     // Nudge license-store to re-resolve tier in this tab (the storage
     // event from clearLicenseToken only fires in OTHER tabs).
-    const { useLicenseStore } = await import("./license-store.ts");
     void useLicenseStore.getState().refresh();
   },
 
@@ -232,8 +236,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       error: null,
       credentials: null,
     });
-    const { resetAllStores } = await import("./app-store.ts");
-    await resetAllStores();
+    resetAllStores();
   },
 
   push: async () => {
@@ -351,13 +354,13 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     }
 
     // Refresh in-memory stores so the UI shows the imported vault
-    // without waiting for the user to navigate. Lazy-imports avoid
-    // a circular dependency on app boot.
-    const { useFeedStore } = await import("./feed-store.ts");
+    // without waiting for the user to navigate. The store imports
+    // are static at the top of this file; the sync-store ↔
+    // feed/article/preferences cycle is safe because both sides
+    // only access each other's exports inside function bodies, not
+    // during module evaluation. Cf. the 2026-05-23 postmortem.
     await useFeedStore.getState().loadFeeds();
-    const { useArticleStore } = await import("./article-store.ts");
     await useArticleStore.getState().preloadAll();
-    const { usePreferencesStore } = await import("./preferences-store.ts");
     await usePreferencesStore.getState().reload();
 
     set({ status: "synced", lastSyncedAt: Date.now(), error: null });
@@ -542,13 +545,11 @@ async function applyCloudVault(
   if (!couplingResult.ok) return couplingResult;
 
   // Refresh in-memory store state. Without this, the sidebar shows
-  // empty until the user navigates (issue #117 symptom). Lazy imports
-  // avoid a circular dependency at module load.
-  const { useFeedStore } = await import("./feed-store.ts");
+  // empty until the user navigates (issue #117 symptom). The
+  // store imports are static at the top of this file; the cycle
+  // is safe — see the matching block in pullFlow above.
   await useFeedStore.getState().loadFeeds();
-  const { useArticleStore } = await import("./article-store.ts");
   await useArticleStore.getState().preloadAll();
-  const { usePreferencesStore } = await import("./preferences-store.ts");
   await usePreferencesStore.getState().reload();
 
   return ok(true);

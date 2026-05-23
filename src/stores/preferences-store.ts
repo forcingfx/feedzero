@@ -6,6 +6,7 @@ import type { UserPreferences, FeedSortMode, ArticleSortMode } from "../types/in
 import { useFeedStore } from "./feed-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { useAppStore } from "./app-store.ts";
+import { useSyncStore } from "./sync-store.ts";
 
 /**
  * Single source of truth for synced user preferences. Replaces the loose,
@@ -175,7 +176,6 @@ export const usePreferencesStore = create<PreferencesStore>((set, get) => ({
     const next = { ...get().preferences, ...patch };
     set({ preferences: next });
     await putPreferences(next);
-    const { useSyncStore } = await import("./sync-store.ts");
     useSyncStore.getState().scheduleSyncPush();
   },
 }));

@@ -16,6 +16,7 @@ import {
   encrypt,
   decrypt,
   importCryptoKey,
+  exportCryptoKey,
 } from "./crypto.ts";
 import type {
   Feed,
@@ -153,7 +154,6 @@ export async function exportCurrentKeys(): Promise<
 > {
   try {
     const ctx = requireOpen();
-    const { exportCryptoKey } = await import("./crypto.ts");
     const dbKeyJwk = await exportCryptoKey(ctx.cryptoKey);
     const hmacKeyJwk = await exportCryptoKey(ctx.hmacKey);
     return ok({ dbKeyJwk, hmacKeyJwk });

@@ -668,7 +668,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       const feed = feedResult.value;
 
       await reloadFeed(feed);
-      const { loadArticles, preloadAll } = await import("./article-store.ts").then(m => m.useArticleStore.getState());
+      const { loadArticles, preloadAll } = useArticleStore.getState();
       await preloadAll();
       const selectedFeedId = get().selectedFeedId;
       if (selectedFeedId) await loadArticles(selectedFeedId);
