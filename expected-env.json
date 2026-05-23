@@ -1,0 +1,135 @@
+{
+  "$comment": "Single source of truth for every environment variable the codebase reads. Compared against grep'd source via `npm run check-env`, and against a pulled deployment env when a path is passed. See docs/operations/env-audit.md for the runbook.",
+  "spec": {
+    "LICENSE_SIGNING_KEY": {
+      "required": "production",
+      "description": "HMAC secret for signing/verifying license tokens. Rotate triggers full re-issue.",
+      "consumers": ["api/stripe/webhook.ts", "server.ts", "src/core/license/issuer.ts"]
+    },
+    "STRIPE_SECRET_KEY": {
+      "required": "production",
+      "description": "Stripe API key used by checkout / recover / admin / billing paths.",
+      "consumers": ["api/checkout/create-session.ts", "api/stripe/webhook.ts", "server.ts"]
+    },
+    "STRIPE_WEBHOOK_SECRET": {
+      "required": "production",
+      "description": "Webhook signing secret used to verify Stripe event signatures.",
+      "consumers": ["api/stripe/webhook.ts", "server.ts"]
+    },
+    "STRIPE_ALLOWED_PRICES": {
+      "required": "production",
+      "description": "Comma-separated list of allowed Stripe price IDs. Defence against price-id tampering at checkout creation.",
+      "consumers": ["api/checkout/create-session.ts"]
+    },
+    "UPSTASH_REDIS_REST_URL": {
+      "required": "production",
+      "description": "Upstash REST URL (canonical name). Used by sync / catalog / license / stripe seen-events stores. Accept either this OR KV_REST_API_URL.",
+      "consumers": ["src/core/sync/adapters/upstash-adapter.ts", "src/core/catalog/adapters/upstash-adapter.ts", "src/core/license/storage-upstash.ts", "src/core/stripe/resolve-seen-event-store.ts", "src/core/proxy/resolve-rate-limiter.ts"]
+    },
+    "UPSTASH_REDIS_REST_TOKEN": {
+      "required": "production",
+      "description": "Upstash REST token paired with UPSTASH_REDIS_REST_URL.",
+      "consumers": ["src/core/sync/adapters/upstash-adapter.ts"]
+    },
+    "KV_REST_API_URL": {
+      "required": "optional",
+      "description": "Vercel-Marketplace-injected legacy name for the Upstash REST URL. Auto-detected as a fallback; do not set manually when UPSTASH_REDIS_REST_URL is present.",
+      "consumers": ["src/core/sync/adapters/upstash-adapter.ts"]
+    },
+    "KV_REST_API_TOKEN": {
+      "required": "optional",
+      "description": "Vercel-Marketplace-injected legacy name paired with KV_REST_API_URL.",
+      "consumers": ["src/core/sync/adapters/upstash-adapter.ts"]
+    },
+    "GITHUB_FEEDBACK_TOKEN": {
+      "required": "production",
+      "description": "Fine-grained GitHub PAT with `issues: write` for /api/feedback. Without it the endpoint 503s gracefully.",
+      "consumers": ["src/core/feedback/feedback-handler.ts", "api/feedback.ts"]
+    },
+    "GITHUB_REPO": {
+      "required": "production",
+      "description": "owner/repo target for /api/feedback issue creation (e.g. forcingfx/feedzero).",
+      "consumers": ["src/core/feedback/feedback-handler.ts", "api/feedback.ts"]
+    },
+    "ADMIN_API_KEY": {
+      "required": "production",
+      "description": "Shared secret for admin endpoints (license find / revoke / re-issue).",
+      "consumers": ["server.ts", "api/checkout/create-session.ts"]
+    },
+    "OPERATOR_ALERT_URL": {
+      "required": "optional",
+      "description": "Webhook URL (Slack / Discord / generic) that receives operator alerts on 5xx and sync regressions. Optional but recommended.",
+      "consumers": ["src/utils/log-error.ts", "api/sync.ts", "api/feed.ts", "api/page.ts", "api/icon.ts", "api/checkout/create-session.ts", "api/stripe/webhook.ts"]
+    },
+    "RATE_LIMIT_HASH_SALT": {
+      "required": "production",
+      "description": "Salt for the IP-hashing rate limiter so a stolen Upstash dump cannot be reversed into raw IPs.",
+      "consumers": ["src/core/proxy/rate-limiter.ts", "api/feed.ts", "api/page.ts"]
+    },
+    "APP_VERSION": {
+      "required": "optional",
+      "description": "Reported by /api/health-version. Injected by the build at compile time via scripts/build-api.js; leave unset in the env.",
+      "consumers": ["src/core/health/health-handler.ts"]
+    },
+    "FEED_USER_AGENT": {
+      "required": "optional",
+      "description": "Operator-supplied User-Agent for outbound /api/feed and /api/page requests. Overrides the default browser-like UA used under SELF_HOSTED.",
+      "consumers": ["src/core/proxy/pick-user-agent.ts"]
+    },
+    "BLOB_READ_WRITE_TOKEN": {
+      "required": "optional",
+      "description": "Legacy Vercel Blob credential. Only set if rolling back to the pre-Upstash sync backend; the Upstash backend supersedes it (ADR 008).",
+      "consumers": ["src/core/sync/adapters/resolve-adapter.ts", "src/core/sync/adapters/vercel-blob-adapter.ts"]
+    },
+    "SYNC_STORAGE": {
+      "required": "optional",
+      "description": "Explicit override for the sync adapter (`upstash` | `vercel-blob` | `filesystem` | `memory`). Auto-detect is preferred; only set when the operator deliberately wants a different backend than the credentials imply.",
+      "consumers": ["src/core/sync/adapters/resolve-adapter.ts"]
+    },
+    "DATA_DIR": {
+      "required": "self-host",
+      "description": "Directory for the filesystem sync adapter's vault files. Self-host only.",
+      "consumers": ["src/core/sync/adapters/resolve-adapter.ts"]
+    },
+    "PORT": {
+      "required": "self-host",
+      "description": "Listen port for the Hono standalone server (npm run serve). Self-host only.",
+      "consumers": ["server.ts"]
+    },
+    "SELF_HOSTED": {
+      "required": "self-host",
+      "description": "Runtime flag (`1`) that forces paid-tier UI off and switches the proxy to a browser-like UA (ADR 014). Self-host only.",
+      "consumers": ["src/core/features/self-hosted.ts", "src/core/proxy/pick-user-agent.ts"]
+    },
+    "VITE_SELF_HOSTED": {
+      "required": "self-host",
+      "description": "Build-time twin of SELF_HOSTED. Set during `npm run build:all` so the SPA bundle hides the Subscribe UI.",
+      "consumers": ["src/core/features/self-hosted.ts"]
+    },
+    "VITE_PAID_TIER_VISIBLE": {
+      "required": "optional",
+      "description": "Build-time flag that flips the paid-tier UI visibility independently of SELF_HOSTED. Default off; production sets it to surface checkout flows.",
+      "consumers": ["src/core/features/paid-tier-active.ts"]
+    },
+    "VITE_PRICE_PERSONAL_MONTHLY": {
+      "required": "production",
+      "description": "Stripe price id for the Personal monthly plan, baked into the SPA bundle for the Checkout call.",
+      "consumers": ["src/app.tsx"]
+    },
+    "VITE_PRICE_PERSONAL_YEARLY": {
+      "required": "production",
+      "description": "Stripe price id for the Personal yearly plan.",
+      "consumers": ["src/app.tsx"]
+    },
+    "VITE_APP_VERSION": {
+      "required": "optional",
+      "description": "Version string surfaced in the About dialog. Injected at build time; leave unset in the env.",
+      "consumers": ["src/components/settings/tabs/about-tab.tsx"]
+    },
+    "VITE_EXTENSION_ENABLED": {
+      "required": "optional",
+      "description": "Build-time flag that shows the browser-extension affordance in the SPA.",
+      "consumers": ["src/core/extension/extension-enabled.ts"]
+    }
+  }
+}

@@ -31,6 +31,31 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+  # `check-env` walks the source tree, extracts every env-variable reference,
+  # and diffs against `expected-env.json`. New `process.env.X` references
+  # without a one-line spec entry fail CI, so the "stale env var nobody
+  # remembers" failure mode (2026-05-12 sync regression) cannot recur
+  # silently. The audit mode that compares against a `vercel env pull`
+  # snapshot runs locally — CI has no Vercel credentials. See
+  # docs/operations/env-audit.md.
+  env-audit:
+    name: Env spec
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check env spec
+        run: npm run check-env
+
   # The unit suite is sharded across parallel runners to keep wall-clock low.
   # Each shard collects coverage as a `blob` report (not a final report) and
   # uploads it; the `coverage` job merges all shards and enforces thresholds
