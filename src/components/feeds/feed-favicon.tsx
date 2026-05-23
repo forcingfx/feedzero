@@ -67,8 +67,16 @@ export function FeedFavicon({
 
   if (seenGeneration !== generation) {
     setSeenGeneration(generation);
-    setPathIndex(origin ? getFaviconStrategyIndex(origin) : 0);
-    setLoaded(false);
+    // Only restart resolution when THIS origin's cached strategy changed.
+    // Successful favicons share the generation bump but shouldn't drop their
+    // loaded state — otherwise a single cleared failure elsewhere makes every
+    // mounted favicon flash to the RSS placeholder and re-hit /api/favicon on
+    // each refresh-all. See issue #117.
+    const next = origin ? getFaviconStrategyIndex(origin) : 0;
+    if (next !== pathIndex) {
+      setPathIndex(next);
+      setLoaded(false);
+    }
   }
 
   if (!origin || pathIndex < 0 || pathIndex >= STRATEGIES.length) {

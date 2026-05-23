@@ -56,9 +56,13 @@ function persistCache() {
 
 /**
  * Generation counter bumped whenever the cache changes in a way that should
- * make mounted favicons re-evaluate (currently: a retry clears failures).
- * Components subscribe via `useSyncExternalStore` so a refresh re-attempts
- * favicons that are already on screen, not just ones mounted afterwards.
+ * prompt mounted favicons to re-check their cached strategy (currently: a
+ * retry that clears failure entries). Components subscribe via
+ * `useSyncExternalStore` so a refresh re-attempts favicons that are already
+ * on screen, not just ones mounted afterwards. Subscribers must compare the
+ * new strategy index against their current one and no-op when unchanged —
+ * otherwise a single cleared failure makes every working favicon flash and
+ * refetch (issue #117).
  */
 let generation = 0;
 const listeners = new Set<() => void>();
