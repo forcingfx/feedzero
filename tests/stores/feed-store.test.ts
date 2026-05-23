@@ -536,7 +536,7 @@ describe("feed-store", () => {
   });
 
   describe("refreshAll", () => {
-    it("refreshes all feeds and reloads", async () => {
+    it("refreshes all feeds", async () => {
       vi.mocked(refreshAllFeeds).mockResolvedValue({
         ok: true,
         value: { results: [] },
@@ -545,8 +545,10 @@ describe("feed-store", () => {
 
       await useFeedStore.getState().refreshAll();
 
+      // refresh-efficiency follow-up D: when there's no sync user (no
+      // pull) and refreshAllFeeds returns ok, the in-memory merge means
+      // getFeeds is not called from the store path at all.
       expect(refreshAllFeeds).toHaveBeenCalled();
-      expect(getFeeds).toHaveBeenCalled();
     });
 
     it("debounces concurrent calls", async () => {
@@ -837,13 +839,14 @@ describe("feed-store", () => {
 
       await useFeedStore.getState().refreshAll();
 
-      // After pull, getFeeds should be called to load pulled feeds,
-      // then refreshAllFeeds, then getFeeds again for final state
+      // After pull, getFeeds runs once to materialise the pulled rows;
+      // then refreshAllFeeds runs and its returned per-feed results are
+      // merged into the store directly (refresh-efficiency follow-up D),
+      // so the post-refresh DB read no longer happens.
       expect(callOrder).toEqual([
         "pull",
         "getFeeds-1",
         "refreshAllFeeds",
-        "getFeeds-2",
       ]);
     });
   });
