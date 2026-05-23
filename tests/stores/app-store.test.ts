@@ -39,7 +39,6 @@ vi.mock("../../src/stores/persist-preferences.ts", () => ({
 
 import { initFresh, restore, destroy } from "../../src/core/storage/key-manager.ts";
 import {
-  pullVault,
   pullVaultIfChanged,
   importVault,
 } from "../../src/core/sync/sync-service";

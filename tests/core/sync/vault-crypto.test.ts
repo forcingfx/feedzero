@@ -139,6 +139,64 @@ describe("vault-crypto", () => {
       const result = await decryptVault(key2, encrypted);
       expect(isErr(result)).toBe(true);
     });
+
+    it("compresses before encrypting (v4) — payload smaller than raw JSON for a repetitive vault", async () => {
+      // A vault stuffed with repetitive content compresses very well;
+      // the test asserts the ciphertext is meaningfully smaller than
+      // the raw JSON would be. This locks in the compress-before-
+      // encrypt invariant — once it lands, removing compression would
+      // make this fail loudly.
+      const key = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const repetitiveBody = "Lorem ipsum dolor sit amet, ".repeat(2000);
+      const vault = makeVault({
+        articles: Array.from({ length: 20 }, (_, i) => ({
+          id: `a${i}`,
+          feedId: "f1",
+          guid: `g${i}`,
+          title: `Title ${i}`,
+          link: `https://example.com/${i}`,
+          content: repetitiveBody,
+          summary: repetitiveBody.slice(0, 200),
+          author: "Author",
+          publishedAt: 1700000000000 + i,
+          read: false,
+          createdAt: 1700000000000,
+        })),
+      });
+      const encrypted = unwrap(await encryptVault(key, vault));
+      expect(encrypted.version).toBeGreaterThanOrEqual(4);
+      // Decoded base64 → cipher bytes; compare against the raw JSON byte length.
+      const cipherBytes = atob(encrypted.ciphertext).length;
+      const rawBytes = new TextEncoder().encode(JSON.stringify(vault)).length;
+      expect(cipherBytes).toBeLessThan(rawBytes * 0.5);
+    });
+
+    it("decrypts a v3 (plaintext-then-encrypt) vault for back-compat", async () => {
+      // Forge a v3 vault by encrypting the JSON directly (the old shape).
+      // The decryptor must detect the version and skip the gunzip step.
+      const key = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const vault = makeVault();
+      const plaintext = new TextEncoder().encode(JSON.stringify(vault));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = new Uint8Array(
+        await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv: iv as BufferSource },
+          key,
+          plaintext as BufferSource,
+        ),
+      );
+      let bin = "";
+      for (const b of ct) bin += String.fromCharCode(b);
+      const v3Encrypted = {
+        version: 3,
+        iv: Array.from(iv),
+        ciphertext: btoa(bin),
+      };
+
+      const decrypted = unwrap(await decryptVault(key, v3Encrypted));
+      expect(decrypted.feeds).toEqual(vault.feeds);
+      expect(decrypted.articles).toEqual(vault.articles);
+    });
   });
 
   describe("vault ID and encryption key are independent", () => {
