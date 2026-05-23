@@ -40,6 +40,16 @@ export interface Feed {
    * `applyRules` call.
    */
   rules?: Rule[];
+  /**
+   * Most-recent `ETag` returned by the publisher on a 2xx fetch. Replayed
+   * on the next refresh as `If-None-Match`; a 304 short-circuits the
+   * download. These are public HTTP cache validators for a public feed
+   * URL — they betray nothing about the user's read state — so they
+   * ride in the encrypted vault alongside the other feed metadata.
+   */
+  etag?: string;
+  /** Most-recent `Last-Modified` returned by the publisher; see {@link Feed.etag}. */
+  lastModified?: string;
 }
 
 export interface Folder {

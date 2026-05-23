@@ -356,7 +356,23 @@ export async function previewFeed(
 export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
   const now = Date.now();
   try {
-    const response = await proxyFetch("/api/feed", feed.url);
+    const response = await proxyFetch("/api/feed", feed.url, {
+      etag: feed.etag,
+      lastModified: feed.lastModified,
+    });
+    // 304 Not Modified: the publisher confirms nothing changed since the
+    // last fetch. Don't parse, don't write the DB, don't reshuffle the
+    // article list — just record that we tried and got a clean "no
+    // change" signal. The user-facing sidebar still updates its
+    // "last refreshed" indicator off `lastSuccessfulFetchAt`.
+    if (response.status === 304) {
+      await persistFreshness(feed, {
+        fetchedAt: now,
+        successfulAt: now,
+        lastError: null,
+      });
+      return ok({ newCount: 0, updatedCount: 0 });
+    }
     if (!response.ok) {
       // Always record the attempt so the stale-indicator clock keeps
       // moving; never clobber a prior success timestamp. The user-facing
@@ -458,6 +474,20 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
       if (parsedFeed.description) feed.description = parsedFeed.description;
       if (parsedFeed.siteUrl) feed.siteUrl = parsedFeed.siteUrl;
     }
+
+    // Capture the upstream's cache validators so the next refresh can
+    // present them and resolve as a 304 when nothing changed. Either
+    // header may be absent — many feeds set one but not both. Strip
+    // when absent so a publisher that drops one between fetches doesn't
+    // leave a stale validator on the Feed record. Defensive `?.get?.`
+    // covers test mocks that return bare objects without a `headers`
+    // shape (refresh tests that pre-date this finding).
+    const upstreamEtag = response.headers?.get?.("etag") ?? null;
+    const upstreamLastModified = response.headers?.get?.("last-modified") ?? null;
+    if (upstreamEtag) feed.etag = upstreamEtag;
+    else delete feed.etag;
+    if (upstreamLastModified) feed.lastModified = upstreamLastModified;
+    else delete feed.lastModified;
 
     await persistFreshness(feed, {
       fetchedAt: now,

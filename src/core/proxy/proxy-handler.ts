@@ -106,16 +106,39 @@ export async function handleProxyRequest(
     }
   }
 
+  // Pluck conditional-fetch validators from the POST body so they can
+  // ride upstream as standard HTTP cache headers. Clients (refresh
+  // path in feed-service.ts) cache the upstream's ETag / Last-Modified
+  // on the Feed record and replay them here so unchanged feeds resolve
+  // as a free 304 instead of a full re-download of every item.
+  const validators = await extractValidators(req);
+  const upstreamHeaders: Record<string, string> = {
+    "User-Agent": pickUserAgent(process.env),
+  };
+  if (validators.etag) upstreamHeaders["If-None-Match"] = validators.etag;
+  if (validators.lastModified)
+    upstreamHeaders["If-Modified-Since"] = validators.lastModified;
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
     const response = await fetch(url, {
-      headers: { "User-Agent": pickUserAgent(process.env) },
+      headers: upstreamHeaders,
       signal: controller.signal,
     });
     clearTimeout(timeout);
     const contentType =
       response.headers.get("content-type") || defaultContentType;
+
+    // 304 Not Modified: empty body, propagate status so the client
+    // treats it as "nothing changed; do not parse / write the DB".
+    if (response.status === 304) {
+      return new Response("", {
+        status: 304,
+        headers: buildResponseHeaders(contentType, response),
+      });
+    }
+
     const body = await response.arrayBuffer();
 
     // Cache successful feed/page responses
@@ -164,7 +187,9 @@ export async function handleProxyRequest(
 /**
  * Build the response headers for an upstream passthrough. Always sets
  * Content-Type. For 429/503, propagates Retry-After verbatim (RFC 7231 §7.1.3)
- * so the client can back off instead of hammering the origin.
+ * so the client can back off instead of hammering the origin. ETag and
+ * Last-Modified are passed through whenever the upstream emits them so
+ * the client can replay the validators on its next refresh.
  */
 function buildResponseHeaders(
   contentType: string,
@@ -175,19 +200,59 @@ function buildResponseHeaders(
     const retryAfter = upstream.headers.get("Retry-After");
     if (retryAfter) headers["Retry-After"] = retryAfter;
   }
+  const etag = upstream.headers.get("ETag");
+  if (etag) headers["ETag"] = etag;
+  const lastModified = upstream.headers.get("Last-Modified");
+  if (lastModified) headers["Last-Modified"] = lastModified;
   return headers;
+}
+
+/**
+ * Request body parsing is intentionally separated from URL extraction:
+ * a single POST body can carry several optional fields (target URL,
+ * conditional-fetch validators) and we want to parse the body once.
+ */
+interface ProxyBody {
+  url: string | null;
+  etag: string | null;
+  lastModified: string | null;
+}
+
+async function parseBody(req: Request): Promise<ProxyBody> {
+  if (req.method !== "POST") {
+    return { url: null, etag: null, lastModified: null };
+  }
+  try {
+    const body = (await req.clone().json()) as {
+      url?: string;
+      etag?: string;
+      lastModified?: string;
+    };
+    return {
+      url: body.url ?? null,
+      etag: body.etag ?? null,
+      lastModified: body.lastModified ?? null,
+    };
+  } catch {
+    return { url: null, etag: null, lastModified: null };
+  }
 }
 
 /** Extract target URL from POST body (preferred) or GET query param (fallback). */
 async function extractTargetUrl(req: Request): Promise<string | null> {
   if (req.method === "POST") {
-    try {
-      const body = (await req.json()) as { url?: string };
-      return body.url ?? null;
-    } catch {
-      return null;
-    }
+    const body = await parseBody(req);
+    return body.url;
   }
   const url = new URL(req.url, "http://localhost");
   return url.searchParams.get("url");
+}
+
+/** Extract conditional-fetch validators from POST body; GET has none. */
+async function extractValidators(
+  req: Request,
+): Promise<{ etag: string | null; lastModified: string | null }> {
+  if (req.method !== "POST") return { etag: null, lastModified: null };
+  const body = await parseBody(req);
+  return { etag: body.etag, lastModified: body.lastModified };
 }
