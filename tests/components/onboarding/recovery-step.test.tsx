@@ -16,10 +16,11 @@ vi.mock("@/core/sync/sync-service", () => ({
   pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
   pullVault: vi.fn().mockResolvedValue({ ok: false, error: "Not found" }),
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  checkVaultExists: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
 import { initFresh } from "@/core/storage/key-manager";
-import { pullVault, importVault } from "@/core/sync/sync-service";
+import { pullVault, importVault, checkVaultExists } from "@/core/sync/sync-service";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -422,6 +423,97 @@ describe("RecoveryStep", () => {
       // Onboarding should NOT complete — no silent data loss
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
       // initFresh should NOT have been called — no destructive action taken
+      expect(initFresh).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("HEAD-first vault detection (ADR 014 A8)", () => {
+    it("calls checkVaultExists BEFORE pullVault — HEAD precedes GET", async () => {
+      const user = userEvent.setup();
+      const callOrder: string[] = [];
+      vi.mocked(checkVaultExists).mockImplementation(async () => {
+        callOrder.push("checkVaultExists");
+        return { ok: true, value: true };
+      });
+      vi.mocked(pullVault).mockImplementation(async () => {
+        callOrder.push("pullVault");
+        return {
+          ok: true,
+          value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+        };
+      });
+      vi.mocked(initFresh).mockResolvedValue({
+        ok: true,
+        value: {
+          credentials: {
+            vaultId: "v",
+            vaultKey: "k" as unknown as CryptoKey,
+          },
+        },
+      });
+
+      renderInDialog(<RecoveryStep />);
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+      });
+      // HEAD before GET — cheaper failure when the passphrase is wrong,
+      // and lets the UI distinguish "checking" from "restoring."
+      expect(callOrder).toEqual(["checkVaultExists", "pullVault"]);
+    });
+
+    it("short-circuits when checkVaultExists returns false — no pullVault, no initFresh", async () => {
+      const user = userEvent.setup();
+      vi.mocked(checkVaultExists).mockResolvedValue({
+        ok: true,
+        value: false,
+      });
+
+      renderInDialog(<RecoveryStep />);
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "wrong passphrase guessed here",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/no vault matched that passphrase/i),
+        ).toBeInTheDocument();
+      });
+
+      // The whole point: bail before the destructive flow.
+      expect(pullVault).not.toHaveBeenCalled();
+      expect(initFresh).not.toHaveBeenCalled();
+      expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
+    });
+
+    it("surfaces the network error when checkVaultExists itself fails", async () => {
+      // A real failure (5xx, network, CORS) is different from "no vault."
+      // The user shouldn't be told to check their passphrase when the
+      // server is the problem.
+      const user = userEvent.setup();
+      vi.mocked(checkVaultExists).mockResolvedValue({
+        ok: false,
+        error: "Check vault failed (503): backend overloaded",
+      });
+
+      renderInDialog(<RecoveryStep />);
+      await user.type(
+        screen.getByPlaceholderText(/enter your 4-word passphrase/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /recover/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/backend overloaded/i)).toBeInTheDocument();
+      });
+      expect(pullVault).not.toHaveBeenCalled();
       expect(initFresh).not.toHaveBeenCalled();
     });
   });
