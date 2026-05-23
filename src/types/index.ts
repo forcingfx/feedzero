@@ -163,6 +163,11 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   folderCustomOrder: [],
   articleSortMode: "newest",
   groupArticleFloods: true,
+  // "system" honors the OS color-scheme preference. The ThemeBridge bridges
+  // this value to next-themes after preferences hydrate; first paint comes
+  // from next-themes' own localStorage (its <head> script runs before
+  // React) so this default only takes effect on a brand-new install.
+  theme: "system",
 };
 
 export interface CreateArticleInput {
