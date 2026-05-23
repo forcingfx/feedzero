@@ -1,7 +1,7 @@
 # 003 — Playing to Win
 
 ## Status
-Refreshed 2026-05-16 against first competitor scan. Sections sharpened with concrete competitive data; markers below show what moved.
+Refreshed 2026-05-23 to move **native iOS** from *Defer* to *Build* (see ADR 023). Last full refresh 2026-05-16 against first competitor scan. Markers below show what moved.
 
 <!-- changed 2026-05-16: focus declaration added -->
 ## Focus
@@ -11,7 +11,8 @@ Refreshed 2026-05-16 against first competitor scan. Sections sharpened with conc
 Concretely:
 
 - **Build:** anything that makes feed fetching more reliable, more respectful of the publisher, or makes reading faster, calmer, and more legible.
-- **Defer:** AI summarization, advanced filtering rules, social graph features, native apps. These are not bad — they just don't compound on the trunk and they trade against the privacy stance.
+- **Build:** <!-- changed 2026-05-23 --> native iOS app (see ADR 023). The framework-agnostic core (ADR 005) was paid for in advance; Reeder's broken iCloud sync and the Pocket migration window make the App Store presence load-bearing for the journalist segment. macOS and Android remain *defer*.
+- **Defer:** AI summarization, advanced filtering rules, social graph features, **native macOS / Android apps**. <!-- changed 2026-05-23: iOS removed from this list --> These are not bad — they just don't compound on the trunk and they trade against the privacy stance.
 - **Refuse:** anything that requires server-side access to plaintext (algorithmic feeds, cross-user discovery, server-side ML). These contradict §3 and are not on any roadmap.
 
 When in doubt, the test is: _does this change make FeedZero a better reader of RSS, today, for one person?_ If yes, ship it. If it makes FeedZero a better something-else (a knowledge graph, an AI tool, a team product), it goes on a wishlist, not a sprint.
@@ -68,10 +69,11 @@ What winning is **not**: maximum DAU, paid conversion, or feature-parity with Fe
 - Users who want centralized AI summarization at any privacy cost (Readless, Brief Digest's audience).
 - Apple-ecosystem-only users where NetNewsWire 7 already solves the problem for free. They are NNW's; chasing them is a losing fight.
 
-**Surfaces:**
+**Surfaces:** <!-- changed 2026-05-23: iOS promoted to a shipping surface; macOS/Android remain deferred -->
 - Primary: web app (PWA-capable, works offline, no install friction).
+- Primary, shipping: **native iOS app** (React Native, App Store; in build per ADR 023). The "Reeder + NNW own that surface" premise has weakened — Reeder's iCloud sync is broken in 2026 and the Pocket migration window favors a native option with the App Store as a trust signal. The privacy wedge (§3) survives the move because `src/core/` is framework-agnostic (ADR 005) and the sync vault remains zero-knowledge regardless of client.
 - Secondary: self-hosted Hono server (`server.ts`) for users who want to run their own proxy.
-- Not now: native iOS/macOS/Android apps. Reeder + NetNewsWire own that surface; competing there dilutes the privacy story. **However** — see Capabilities §4: Reeder Classic supports the Fever / Google Reader API, and our self-hosted server could expose one. That's a distribution lever without building a native app.
+- Not now: native macOS / Android apps. React Native makes Android cheaper later; macOS via Mac Catalyst is a near-free byproduct of an iPad layout. Neither is in scope yet. **Distribution lever still on the table:** Reeder Classic supports the Fever / Google Reader API, and our self-hosted server could expose one — a way to reach Reeder users without building for every Apple form factor.
 
 **Geographies:** wherever the audience is. English-first; localization follows demand from at-risk communities.
 
@@ -147,3 +149,6 @@ Re-verify each refresh: do sections 2–5 actually follow from section 1? When a
 
 <!-- changed 2026-05-16 -->
 **2026-05-16 coherence check:** §1 (winning aspiration: protect at-risk users) → §2 (segments centered on adversarial-environment users + privacy-conscious migrants from shutdowns) → §3 (E2E architecture as both moat and sustainability story, sharpened against the Norwegian audit finding) → §4 (capabilities concentrated on crypto, sync reliability, AI-without-telemetry, lossless migration) → §5 (measurement aligned with no-telemetry constraint; shutdown-event trigger added). **Cascade composes.** The one tension to flag: §3 ("the operator cannot read your data") + §4's AI proposal ("BYO API key proxied through our server") — the proxy must be **provably** no-log for the proposal to be coherent. That's an architecture work item for the run that implements (1), not a contradiction in the strategy.
+
+<!-- changed 2026-05-23 -->
+**2026-05-23 partial coherence check (iOS surface promotion, ADR 023):** §1 unchanged — App Store presence strengthens the "protect at-risk users" aspiration by adding Apple's identity / signing / review work as a third-party trust signal for the journalist segment. §2 surfaces updated to make iOS a shipping primary surface; §3 wedge unchanged because the sync vault remains zero-knowledge regardless of client (`src/core/` is framework-agnostic per ADR 005, and the SQLite-backed iOS storage uses the same AES-GCM ciphertext + HMAC index columns as the web Dexie store). §4 capabilities row for "Sync UX without lock-in" is materially strengthened: iOS users no longer have to choose between FeedZero and a native client. §5 measurement is unchanged in shape but gains an App Review event class — a rejection or a 7-day review lag is a release-cadence failure signal worth reviewing. **Cascade composes.** New tension to track: Apple IAP takes 15–30%, so the "survival" success measure in §1 now has a per-channel cost asymmetry — iOS-acquired paid users contribute less per subscription than web-acquired ones. Not a contradiction; a metric to watch.
