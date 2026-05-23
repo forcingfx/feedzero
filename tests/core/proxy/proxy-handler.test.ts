@@ -421,6 +421,50 @@ describe("handleProxyRequest — rate limiting", () => {
   });
 });
 
+describe("Cache-Control on image responses", () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+  });
+
+  it("sets a long-lived Cache-Control on proxied image responses", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(new ArrayBuffer(64), {
+        status: 200,
+        headers: { "Content-Type": "image/png" },
+      }),
+    );
+    const req = new Request("http://localhost/api/icon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/favicon.ico" }),
+    });
+    const res = await handleProxyRequest(req, "image/x-icon");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toMatch(/max-age=86400/);
+    expect(res.headers.get("Cache-Control")).toMatch(/stale-while-revalidate/);
+  });
+
+  it("does NOT set Cache-Control on text feed responses", async () => {
+    // Feed XML is driven by the refresh cycle (and now ETag); a stale
+    // HTTP cache hit would mask publisher updates the user expects to
+    // see on their next refresh. Keep the no-cache default in place.
+    fetchSpy.mockResolvedValue(
+      new Response("<rss/>", {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBeNull();
+  });
+});
+
 describe("conditional-fetch (ETag / Last-Modified) passthrough", () => {
   beforeEach(() => {
     fetchSpy.mockReset();
