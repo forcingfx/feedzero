@@ -62,6 +62,11 @@ export function WelcomeStep() {
         sync is experimental.
       </div>
 
+      <p className="text-center text-xs text-muted-foreground">
+        Coming from Pocket, Omnivore, or TT-RSS? Import your export after
+        setup.
+      </p>
+
       <DialogFooter className="sm:justify-center sm:flex-col sm:gap-2">
         <Button size="lg" onClick={() => setStep("storage-choice")} autoFocus>
           Get Started
