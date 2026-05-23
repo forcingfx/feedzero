@@ -3,6 +3,9 @@ import { getPreferences, putPreferences } from "../core/storage/db.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
 import { DEFAULT_PREFERENCES } from "../types/index.ts";
 import type { UserPreferences, FeedSortMode, ArticleSortMode } from "../types/index.ts";
+import { useFeedStore } from "./feed-store.ts";
+import { useArticleStore } from "./article-store.ts";
+import { useAppStore } from "./app-store.ts";
 
 /**
  * Single source of truth for synced user preferences. Replaces the loose,
@@ -110,15 +113,23 @@ function clearLegacyPreferenceKeys(): void {
 /**
  * Push hydrated preferences into the consumer stores' in-memory fields via
  * setState (NOT their writethrough setters — that would loop back here and
- * trigger a spurious sync push). Lazy imports avoid a boot-time cycle.
+ * trigger a spurious sync push).
+ *
+ * Stores are statically imported. An earlier version used dynamic
+ * `import("./app-store.ts")` here ("Lazy imports avoid a boot-time
+ * cycle") — but Rollup bundles app-store into the entry chunk
+ * (`index-*.js`), and the entry chunk doesn't re-export source-name
+ * properties (only minified aliases used by static importers). The
+ * dynamic-import promise resolved fine, the destructure
+ * `{ useAppStore } = aps` came back undefined, and the next setState
+ * blew up boot with `Cannot read properties of undefined (reading
+ * 'setState')` — the user saw "Failed to initialize: undefined is not
+ * an object". Static imports go through the proper re-export pipeline
+ * in every chunk topology. The cycle the original comment worried
+ * about is harmless because the stores are only touched at runtime,
+ * never during module evaluation.
  */
-async function propagateToStores(prefs: UserPreferences): Promise<void> {
-  const [{ useFeedStore }, { useArticleStore }, { useAppStore }] =
-    await Promise.all([
-      import("./feed-store.ts"),
-      import("./article-store.ts"),
-      import("./app-store.ts"),
-    ]);
+function propagateToStores(prefs: UserPreferences): void {
   useFeedStore.setState({
     feedSortMode: prefs.feedSortMode,
     feedCustomOrder: prefs.feedCustomOrder,
@@ -150,14 +161,14 @@ export const usePreferencesStore = create<PreferencesStore>((set, get) => ({
     clearLegacyPreferenceKeys();
 
     set({ preferences: prefs, hydrated: true });
-    await propagateToStores(prefs);
+    propagateToStores(prefs);
   },
 
   reload: async () => {
     const result = await getPreferences();
     const prefs = result.ok && result.value ? result.value : { ...DEFAULT_PREFERENCES };
     set({ preferences: prefs, hydrated: true });
-    await propagateToStores(prefs);
+    propagateToStores(prefs);
   },
 
   update: async (patch) => {
