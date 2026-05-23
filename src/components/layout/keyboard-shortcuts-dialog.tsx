@@ -29,6 +29,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Actions",
     shortcuts: [
+      { keys: [isMac ? "⌘K" : "Ctrl+K"], description: "Open command palette" },
       { keys: ["Enter"], description: "Add selected feed" },
       { keys: ["p"], description: "Preview feed" },
       { keys: ["o"], description: "Open original article" },
