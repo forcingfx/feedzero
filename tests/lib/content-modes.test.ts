@@ -5,6 +5,7 @@ import {
   getAvailableModes,
   hasSummarySubheading,
   isExtractionMeaningful,
+  isFeedBlurbEmpty,
 } from "../../src/lib/content-modes.ts";
 
 /** Generate a string with exactly `n` words, starting from offset `from` to avoid prefix overlap. */
@@ -187,6 +188,29 @@ describe("content-modes", () => {
       expect(hasSummarySubheading(null as unknown as string, "A summary")).toBe(
         false,
       );
+    });
+  });
+
+  describe("isFeedBlurbEmpty", () => {
+    it("returns true when both content and summary are empty", () => {
+      expect(isFeedBlurbEmpty("", "")).toBe(true);
+    });
+
+    it("returns true when both content and summary are null/undefined", () => {
+      expect(isFeedBlurbEmpty(null as unknown as string, undefined as unknown as string)).toBe(true);
+    });
+
+    it("returns true for HTML that strips to nothing (image-only, empty tags)", () => {
+      expect(isFeedBlurbEmpty('<img alt="">', "<p></p>")).toBe(true);
+      expect(isFeedBlurbEmpty("<div>   </div>", "")).toBe(true);
+    });
+
+    it("returns false when content has readable text", () => {
+      expect(isFeedBlurbEmpty("<p>Some text.</p>", "")).toBe(false);
+    });
+
+    it("returns false when summary has readable text", () => {
+      expect(isFeedBlurbEmpty("", "<p>A teaser.</p>")).toBe(false);
     });
   });
 

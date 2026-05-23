@@ -30,6 +30,16 @@ function countWords(text: string): number {
   return text.split(/\s+/).filter((w) => w.length > 0).length;
 }
 
+/**
+ * True when the feed view would render nothing — both content and summary
+ * are missing or strip down to no readable text (e.g. image-only payloads,
+ * empty `<p></p>` wrappers). Used by the reader to auto-switch to Full text
+ * so the user doesn't land on a blank pane.
+ */
+export function isFeedBlurbEmpty(content: string, summary: string): boolean {
+  return stripHtml(content || "").length === 0 && stripHtml(summary || "").length === 0;
+}
+
 const MIN_WORDS_FOR_FULL_ARTICLE = 100;
 
 /**

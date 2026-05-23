@@ -96,6 +96,26 @@ describe("FeedFavicon", () => {
     expect(img.className).toContain("ring-1");
   });
 
+  // Some favicons are dark-on-transparent (TechCrunch, GitHub octocat dark variants).
+  // Without a backing, they blend into the dark theme background. Default variant
+  // must get a white pill in dark mode so any icon stays visible.
+  it("paints a white backing in dark mode so dark favicons stay visible", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    const img = container.querySelector("img")!;
+    expect(img.className).toContain("dark:bg-white");
+    expect(img.className).toContain("dark:p-px");
+  });
+
+  it("avatar variant keeps its always-on white backing (unaffected by dark-mode default)", () => {
+    const { container } = render(
+      <FeedFavicon siteUrl="https://example.com" avatar />,
+    );
+    const img = container.querySelector("img")!;
+    expect(img.className).toContain("bg-white");
+    expect(img.className).toContain("p-px");
+    expect(img.className).not.toContain("dark:bg-white");
+  });
+
   it("retries after cached failure once TTL expires", () => {
     setFaviconCacheEntry("https://stale.example.com", -1, 0);
 
@@ -118,5 +138,29 @@ describe("FeedFavicon", () => {
     const img = container.querySelector("img");
     expect(img).toBeTruthy();
     expect(img!.getAttribute("src")).toBe("/api/favicon?domain=example.com");
+  });
+
+  // Regression: refresh-all clears another origin's failure entry, which used
+  // to bump the global generation and force EVERY mounted favicon to drop its
+  // `loaded` state — making working favicons flash to the RSS placeholder and
+  // re-hit /api/favicon on every refresh. See issue #117.
+  it("keeps an already-loaded favicon visible when an unrelated origin's failure is cleared", () => {
+    // Site A: loads successfully.
+    const { container } = render(<FeedFavicon siteUrl="https://a.example.com" />);
+    const img = container.querySelector("img")!;
+    fireEvent.load(img);
+    expect(img.classList.contains("hidden")).toBe(false);
+    expect(container.querySelector("svg")).toBeNull();
+
+    // Site B (rendered elsewhere) had previously failed; clearing it bumps
+    // the favicon-cache generation.
+    setFaviconCacheEntry("https://b.example.com", -1, Date.now());
+    act(() => retryFailedFavicons());
+
+    // Site A must stay visible — same img, still loaded, no flash to RSS.
+    const after = container.querySelector("img")!;
+    expect(after).toBe(img);
+    expect(after.classList.contains("hidden")).toBe(false);
+    expect(container.querySelector("svg")).toBeNull();
   });
 });

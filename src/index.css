@@ -141,6 +141,13 @@
         font-family: var(--font-sans);
         font-size: 14px;
         line-height: 1.5;
+        /* Prevent iOS landscape orientation from auto-bumping font sizes
+           and breaking the carefully-tuned text scale. */
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        /* Kill the document-root rubber-band overscroll and Chrome Android
+           pull-to-refresh — neither belongs in an app-shell experience. */
+        overscroll-behavior-y: none;
     }
 
     body {
@@ -154,6 +161,43 @@
         padding-bottom: env(safe-area-inset-bottom);
         padding-left: env(safe-area-inset-left);
         padding-right: env(safe-area-inset-right);
+        /* Remove the gray "tap flash" iOS Safari draws on every tap — the
+           single biggest "this is a web page, not an app" tell on iOS. */
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: none;
+    }
+
+    /* Remove the 300ms double-tap-zoom delay on interactive elements so
+       rapid taps (e.g. article-list navigation) feel instant. We exclude
+       form controls so the browser's input gestures (text-selection,
+       caret placement) stay intact. */
+    button,
+    [role="button"],
+    a,
+    summary,
+    [role="tab"],
+    [role="menuitem"],
+    label {
+        touch-action: manipulation;
+    }
+
+}
+
+/* iOS Safari auto-zooms a focused form control when its computed font-size
+   is below 16px. Our html font-size is 14px (so Tailwind's text-base = 1rem
+   = 14px), which trips the heuristic on every input. Pinning a literal 16px
+   on touch viewports stops the zoom without touching the desktop text scale.
+
+   This rule sits OUTSIDE @layer base on purpose: Tailwind utilities live in
+   @layer utilities, which beats @layer base, so a base-layer rule would lose
+   to the `text-base` / `text-sm` utilities the shadcn Input/Textarea apply.
+   Unlayered CSS wins the cascade against every layered rule. */
+@media (max-width: 767px) {
+    input,
+    textarea,
+    select,
+    [contenteditable="true"] {
+        font-size: 16px;
     }
 }
 

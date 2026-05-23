@@ -118,6 +118,23 @@ Feature: Mobile navigation
 | `tests/lib/recent-feeds.test.ts` | Recency ordering, cap, dedupe |
 | `tests/stores/feed-store.test.ts` | `selectFeed` records recency; `removeFeed` prunes it |
 
+## Native-app feel (CSS + meta tag baseline)
+
+These are app-wide rules, not navigation-specific, but they live alongside the mobile work because they're how the mobile web app stops feeling like a web page. All defined in `src/index.css` and `index.html`.
+
+| Rule | Where | What it does |
+|------|-------|--------------|
+| `font-size: 16px` on `input, textarea, select, [contenteditable="true"]` at `max-width: 767px` | `src/index.css` (unlayered, after the `.dark` block) | Prevents iOS Safari's auto-zoom on input focus. Our `html { font-size: 14px }` makes Tailwind's `text-base` resolve to 14px, which trips Safari's `font-size < 16px → zoom in` heuristic. The rule sits OUTSIDE `@layer base` because utility classes (`text-base`, `text-sm`) live in `@layer utilities` and would otherwise win the cascade. |
+| `-webkit-text-size-adjust: 100%` | `html` in `@layer base` | Pins the text scale in iOS landscape — without it the OS reflows fonts and breaks the tuned scale. |
+| `-webkit-tap-highlight-color: transparent` | `body` in `@layer base` | Removes the gray flash iOS draws on every tap. The single biggest "I'm a web page" tell. |
+| `overscroll-behavior-y: none` | `html, body` in `@layer base` | Kills the document-root rubber-band overscroll on iOS and Chrome Android's pull-to-refresh — neither belongs in an app shell. |
+| `touch-action: manipulation` | `button, [role="button"], a, summary, [role="tab"], [role="menuitem"], label` in `@layer base` | Removes the 300ms double-tap-zoom delay on interactive elements so rapid taps feel instant. Form controls are excluded so text-selection / caret gestures stay intact. |
+| `apple-mobile-web-app-capable=yes` + `mobile-web-app-capable=yes` | `index.html` | Standalone launch from Add-to-Home-Screen (drops the URL bar / tab strip). |
+| `apple-mobile-web-app-status-bar-style=black-translucent` | `index.html` | App paints behind the iOS status bar; combined with the existing `env(safe-area-inset-top)` body padding, content stays clear. |
+| `apple-mobile-web-app-title=FeedZero` | `index.html` | Sets the home-screen icon label on iOS. |
+
+Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta tags) and `tests/index-css-native-feel.test.ts` (CSS rules + the *unlayered* placement of the iOS-zoom rule).
+
 ## Design Decisions
 
 - **Ref-based skip flag** — Using a ref (`skipAutoSelectRef`) instead of state avoids re-renders while still persisting across the async article load cycle. The ref is reset only when `articleId` appears in the URL, ensuring the skip persists through multiple effect runs.

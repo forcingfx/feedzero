@@ -64,7 +64,13 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     <Drawer.Root open={open} onOpenChange={setOpen}>
       <div
         data-testid="drawer-handle-strip"
-        className="relative flex items-center gap-1 px-2 h-[60px] shrink-0 border-t bg-background"
+        // iOS safe-area clearance:
+        //   pb-[env(safe-area-inset-bottom)] + matching h-[calc()] keeps the
+        //   60px dock content area above the home indicator.
+        //   pl/pr-[max(0.75rem,env(safe-area-inset-left|right))] holds a
+        //   visual gutter from the rounded display corners in portrait and
+        //   clears the notch/camera cutout in landscape.
+        className="relative flex items-center gap-1 shrink-0 border-t bg-background pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] h-[calc(60px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]"
       >
         <div className="absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-muted-foreground/30" />
 
