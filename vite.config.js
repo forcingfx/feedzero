@@ -385,6 +385,29 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      // Promote a small set of Rollup warnings to hard build errors so a
+      // CI deploy can never ship a bundle that exhibits them. The set is
+      // deliberately narrow — these are the warnings that, in our
+      // codebase, have shipped working-looking but broken bundles.
+      //
+      // INEFFECTIVE_DYNAMIC_IMPORT: triggered when a module is both
+      // statically and dynamically imported across the codebase. Rollup
+      // collapses the dynamic import into the parent chunk, and if any
+      // caller destructures a named export from the dynamic promise,
+      // the result can come back `undefined` (the entry chunk does not
+      // re-export source-name properties — only the minified aliases
+      // used by static importers). This is exactly the failure mode of
+      // the 2026-05-23 prod-bundle boot crash; see
+      // docs/incidents/2026-05-23-prod-bundle-boot-crash.md.
+      onwarn(warning, defaultHandler) {
+        if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
+          throw new Error(
+            `[build] Refusing INEFFECTIVE_DYNAMIC_IMPORT — convert the dynamic ` +
+              `import to a static one at the file's top.\n${warning.message}`,
+          );
+        }
+        defaultHandler(warning);
+      },
       // Hard-exclude server-only deps from the client bundle. If Vite/Rollup
       // ever follows a stray import path that pulls them in, the build fails
       // loudly instead of silently shipping ~500 KB of unused SDK to every
