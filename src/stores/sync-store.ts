@@ -24,6 +24,7 @@ import {
 } from "../core/storage/db.ts";
 import type { VaultData } from "../core/sync/types.ts";
 import { clearLicenseToken } from "../core/license/license-token-store.ts";
+import { LOCAL_STORAGE } from "../utils/constants.ts";
 import type { Result } from "../utils/result.ts";
 import { ok, err } from "../utils/result.ts";
 
@@ -31,6 +32,25 @@ export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 
 const DEBOUNCE_MS = 5000;
 const MAX_JITTER_MS = 30000;
+
+/**
+ * The debounced push timer lives only in memory, so a tab reload drops it
+ * and the queued change is never sent. This localStorage marker records
+ * "local has changes the cloud hasn't seen yet" so it outlives the reload;
+ * pull() flushes it before importVault would overwrite the change. Set when
+ * a push is scheduled, cleared when one succeeds.
+ */
+function markPendingPush(): void {
+  localStorage.setItem(LOCAL_STORAGE.SYNC_PENDING_PUSH, "1");
+}
+
+function clearPendingPush(): void {
+  localStorage.removeItem(LOCAL_STORAGE.SYNC_PENDING_PUSH);
+}
+
+function hasPendingPush(): boolean {
+  return localStorage.getItem(LOCAL_STORAGE.SYNC_PENDING_PUSH) !== null;
+}
 
 type SwitchMode = "replace" | "merge";
 
@@ -140,6 +160,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     // (next session will have sync mode set, and can retry push)
     const result = await pushVault(credentials);
     if (result.ok) {
+      clearPendingPush();
       set({ status: "synced", lastSyncedAt: result.value, error: null });
     } else {
       set({ status: "error", error: result.error });
@@ -211,6 +232,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
     const result = await pushVault(credentials);
     if (result.ok) {
+      clearPendingPush();
       set({ status: "synced", lastSyncedAt: result.value, error: null });
     } else {
       set({ status: "error", error: result.error });
@@ -224,6 +246,23 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
     inFlightPull = (async () => {
       set({ status: "syncing", error: null });
+
+      // Flush any local change whose debounced push never fired (e.g. a
+      // rename made just before a tab reload dropped the timer). Otherwise
+      // the importVault below — which REPLACES all local data — would
+      // silently revert it to the stale cloud copy. If the flush can't
+      // reach the server, abort: better to keep the unsynced local change
+      // than to clobber it. Forced cloud-replacement bypasses this via
+      // forceResync, which calls pullVault directly.
+      if (hasPendingPush()) {
+        const flushResult = await pushVault(credentials);
+        if (!flushResult.ok) {
+          set({ status: "error", error: flushResult.error });
+          return;
+        }
+        clearPendingPush();
+      }
+
       const pullResult = await pullVault(credentials);
       if (!pullResult.ok) {
         set({ status: "error", error: pullResult.error });
@@ -253,8 +292,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     }
 
     // Cancel any pending push so it can't fire after our import and
-    // overwrite cloud with stale local state.
+    // overwrite cloud with stale local state. forceResync is the explicit
+    // "discard local, take cloud" action, so the pending-push marker is
+    // dropped too — the local change the user chose to discard must not
+    // resurrect itself on the next pull's flush.
     clearPendingTimers();
+    clearPendingPush();
 
     set({ status: "syncing", error: null });
 
@@ -288,6 +331,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     const { credentials } = get();
     if (!credentials) return;
 
+    // Record the intent durably before arming the in-memory timer, so a
+    // reload between now and the push still leaves a trail pull() can flush.
+    markPendingPush();
     clearPendingTimers();
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
