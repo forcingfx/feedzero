@@ -96,4 +96,14 @@ describe("WelcomeStep", () => {
     );
     expect(useOnboardingStore.getState().step).toBe("recovery");
   });
+
+  it("surfaces a migration hint naming Pocket, Omnivore, and TT-RSS", () => {
+    // Refugees from category-wide shutdowns (Pocket 2025-11, Omnivore
+    // 2024-11, TT-RSS 2025-11) need to see the product recognises their
+    // export type before they invest in setup. See strategy 001 + 003 §2.
+    renderInDialog(<WelcomeStep />);
+    expect(screen.getByText(/pocket/i)).toBeInTheDocument();
+    expect(screen.getByText(/omnivore/i)).toBeInTheDocument();
+    expect(screen.getByText(/tt-rss/i)).toBeInTheDocument();
+  });
 });

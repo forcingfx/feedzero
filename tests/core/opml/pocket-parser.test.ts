@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   parsePocketExport,
   isPocketExport,
+  parsePocketCsvExport,
+  isPocketCsvExport,
 } from "../../../src/core/opml/pocket-parser.ts";
 
 const SAMPLE_POCKET_HTML = `<!DOCTYPE html>
@@ -97,6 +99,101 @@ describe("parsePocketExport", () => {
     const result = parsePocketExport(
       '<a href="mailto:a@b.com">x</a><a href="javascript:1">y</a>',
     );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toMatch(/no valid http/i);
+  });
+});
+
+const SAMPLE_POCKET_CSV = `title,url,time_added,tags,status
+"NYT Article","https://www.nytimes.com/2024/04/01/world/example.html","1712000000","","unread"
+"Guardian Article","https://www.theguardian.com/article-1","1712010000","politics","archive"
+"Another NYT","https://www.nytimes.com/2024/04/02/world/another.html","1712020000","","unread"
+"Subdomain Substack","https://writer.substack.com/p/post","1712030000","newsletter","archive"`;
+
+describe("isPocketCsvExport", () => {
+  it("recognises a CSV with the Pocket header row", () => {
+    expect(isPocketCsvExport(SAMPLE_POCKET_CSV)).toBe(true);
+  });
+
+  it("recognises the header even when columns are in different order", () => {
+    const csv = `url,title,time_added,tags,status
+"https://example.com","Title","1","","unread"`;
+    expect(isPocketCsvExport(csv)).toBe(true);
+  });
+
+  it("rejects a plain URL-list file (no header)", () => {
+    expect(isPocketCsvExport("https://a.com\nhttps://b.com")).toBe(false);
+  });
+
+  it("rejects a CSV that lacks the canonical url + time_added columns", () => {
+    const generic = `name,email\n"Alice","a@b.com"`;
+    expect(isPocketCsvExport(generic)).toBe(false);
+  });
+
+  it("rejects HTML input", () => {
+    expect(isPocketCsvExport("<html></html>")).toBe(false);
+  });
+
+  it("rejects empty input", () => {
+    expect(isPocketCsvExport("")).toBe(false);
+  });
+});
+
+describe("parsePocketCsvExport", () => {
+  it("extracts unique origins from a Pocket CSV export", () => {
+    const result = parsePocketCsvExport(SAMPLE_POCKET_CSV);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toEqual([
+      "https://writer.substack.com",
+      "https://www.nytimes.com",
+      "https://www.theguardian.com",
+    ]);
+  });
+
+  it("locates the url column by header name regardless of column order", () => {
+    const csv = `tags,status,url,title,time_added
+"","unread","https://example.com/a","A","1"
+"","archive","https://other.com/b","B","2"`;
+    const result = parsePocketCsvExport(csv);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toEqual([
+      "https://example.com",
+      "https://other.com",
+    ]);
+  });
+
+  it("skips rows where the url column is empty", () => {
+    const csv = `title,url,time_added,tags,status
+"A","","1","","unread"
+"B","https://example.com/x","2","","unread"`;
+    const result = parsePocketCsvExport(csv);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toEqual(["https://example.com"]);
+  });
+
+  it("returns err on empty input", () => {
+    const result = parsePocketCsvExport("");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toMatch(/empty/i);
+  });
+
+  it("returns err when the url header is missing", () => {
+    const result = parsePocketCsvExport(`title,added\n"A","1"`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toMatch(/url column|header/i);
+  });
+
+  it("returns err when every row's url is non-http(s)", () => {
+    const csv = `title,url,time_added
+"A","mailto:a@b.com","1"
+"B","javascript:1","2"`;
+    const result = parsePocketCsvExport(csv);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toMatch(/no valid http/i);

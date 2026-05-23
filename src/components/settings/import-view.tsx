@@ -5,7 +5,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { parseOpmlFile } from "@/core/opml/opml-service";
 import { parseUrlList, isOpmlFormat } from "@/core/opml/url-list-parser";
-import { parsePocketExport, isPocketExport } from "@/core/opml/pocket-parser";
+import {
+  parsePocketExport,
+  isPocketExport,
+  parsePocketCsvExport,
+  isPocketCsvExport,
+} from "@/core/opml/pocket-parser";
+import {
+  parseOmnivoreExport,
+  isOmnivoreExport,
+} from "@/core/opml/omnivore-parser";
 import {
   useImportStore,
   selectTotalCount,
@@ -67,17 +76,28 @@ export function ImportView({ onClose }: ImportViewProps) {
 
   /**
    * Parse the import content into rich entries that carry folder context.
-   * URL-list and Pocket-export imports always have folderName=undefined;
-   * OPML imports carry the parent group name when one exists (PR E).
+   * Shutdown-migration formats (Pocket HTML, Pocket CSV, Omnivore JSON)
+   * have folderName=undefined; OPML imports carry the parent group name
+   * when one exists (PR E).
    *
-   * Pocket-export detection runs first because the Pocket HTML neither
-   * looks like OPML nor like a URL list — without explicit dispatch we'd
-   * silently get garbage out of parseUrlList.
+   * Specific-format detection runs before the URL-list fallback because
+   * each format would otherwise be misread as a URL list and silently
+   * produce garbage.
    */
   const extractEntries = useCallback(
     async (
       content: string,
     ): Promise<Array<{ xmlUrl: string; folderName?: string }>> => {
+      if (isPocketCsvExport(content)) {
+        const result = parsePocketCsvExport(content);
+        if (!result.ok) throw new Error(result.error);
+        return result.value.map((url) => ({ xmlUrl: url }));
+      }
+      if (isOmnivoreExport(content)) {
+        const result = parseOmnivoreExport(content);
+        if (!result.ok) throw new Error(result.error);
+        return result.value.map((url) => ({ xmlUrl: url }));
+      }
       if (isPocketExport(content)) {
         const result = parsePocketExport(content);
         if (!result.ok) throw new Error(result.error);
@@ -329,7 +349,7 @@ export function ImportView({ onClose }: ImportViewProps) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".opml,.xml,.html,.htm"
+            accept=".opml,.xml,.html,.htm,.csv,.json"
             onChange={handleFileSelect}
             className="hidden"
           />
@@ -352,7 +372,7 @@ export function ImportView({ onClose }: ImportViewProps) {
             <>
               <Upload className="mb-2 size-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Drag and drop an OPML or Pocket export, or
+                Drag and drop an OPML, Pocket, or Omnivore export, or
               </p>
               <Button
                 variant="link"
@@ -362,7 +382,7 @@ export function ImportView({ onClose }: ImportViewProps) {
                 browse to select
               </Button>
               <p className="mt-2 text-xs text-muted-foreground/70">
-                .opml, .xml, .html
+                .opml, .xml, .html, .csv, .json
               </p>
             </>
           )}
@@ -371,7 +391,7 @@ export function ImportView({ onClose }: ImportViewProps) {
 
       {inputMode === "text" && (
         <Textarea
-          placeholder="Paste OPML XML, Pocket HTML export, or feed URLs (one per line)"
+          placeholder="Paste OPML XML, Pocket HTML/CSV, Omnivore JSON, or feed URLs (one per line)"
           value={textInput}
           onChange={(e) => {
             setTextInput(e.target.value);
