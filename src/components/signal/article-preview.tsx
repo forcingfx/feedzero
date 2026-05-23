@@ -2,6 +2,7 @@ import { BookOpen, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { formatRelative } from "@/lib/format-relative.ts";
 import { decodeEntities } from "@/lib/decode-entities.ts";
+import { pickTeaser } from "@/lib/pick-teaser.ts";
 import type { Article } from "@/types/index.ts";
 
 interface ArticlePreviewProps {
@@ -12,12 +13,20 @@ interface ArticlePreviewProps {
 }
 
 /**
+ * Approximate cap for the extracted-text fallback. Five `line-clamp` lines
+ * at ~50–60 chars per line is roughly this; the CSS clamp handles overflow,
+ * but capping the string keeps the layout predictable when extractedContent
+ * is enormous.
+ */
+const TEASER_CHAR_LIMIT = 280;
+
+/**
  * Compact peek at an article — title, source, a plain-text teaser, and the
  * two ways to act on it. Shown in a HoverCard (desktop) or Sheet (mobile)
  * so the reader can triage from Signal without leaving the page.
  */
 export function ArticlePreview({ article, feedTitle, now, onOpen }: ArticlePreviewProps) {
-  const teaser = toPlainText(article.content || article.summary || "");
+  const teaser = pickTeaser(article, TEASER_CHAR_LIMIT);
   return (
     <div className="flex flex-col gap-3">
       <div className="space-y-1">
@@ -47,9 +56,4 @@ export function ArticlePreview({ article, feedTitle, now, onOpen }: ArticlePrevi
       </div>
     </div>
   );
-}
-
-function toPlainText(html: string): string {
-  const stripped = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  return decodeEntities(stripped);
 }

@@ -65,6 +65,37 @@ function makeArticle(id: string, feedId: string, title: string, ageDays: number)
 }
 
 /**
+ * A corpus with two multi-outlet stories so the Top stories digest
+ * (which only renders when at least two stories have >1 source) lights up.
+ */
+function seedCorpusWithMultipleTopStories() {
+  const feeds: Feed[] = Array.from({ length: 4 }, (_, i) => makeFeed(`f${i + 1}`, `Outlet ${i + 1}`));
+  const articlesByFeedId: Record<string, Article[]> = { f1: [], f2: [], f3: [], f4: [] };
+  let id = 0;
+  // Story 1: OpenAI launches atlas browser — 3 outlets
+  ["f1", "f2", "f3"].forEach((feedId) => {
+    articlesByFeedId[feedId].push(makeArticle(`a-${id++}`, feedId, "OpenAI launches atlas browser", 1));
+  });
+  // Story 2: OpenAI partners with chipmakers — 2 outlets
+  ["f1", "f2"].forEach((feedId) => {
+    articlesByFeedId[feedId].push(makeArticle(`b-${id++}`, feedId, "OpenAI partners with chipmakers", 2));
+  });
+  // 12 distinct single-outlet OpenAI stories so the topic still has many
+  // rows beneath the top-stories digest.
+  OPENAI_HEADLINES.forEach((title, i) => {
+    const feedId = `f${(i % 4) + 1}`;
+    articlesByFeedId[feedId].push(makeArticle(`o-${id++}`, feedId, title, i % 4));
+  });
+  // Entity-free noise to clear the gate.
+  for (let i = 0; i < 95; i++) {
+    const feedId = `f${(i % 4) + 1}`;
+    articlesByFeedId[feedId].push(makeArticle(`n-${id++}`, feedId, `memo${i} note${i} item${i}`, i % 4));
+  }
+  useFeedStore.setState({ feeds });
+  useArticleStore.setState({ articlesByFeedId });
+}
+
+/**
  * A corpus with one OpenAI topic: 12 distinct stories, one of them
  * syndicated verbatim across three outlets, plus entity-free noise so the
  * total clears the gate.
@@ -189,18 +220,30 @@ describe("SignalPage", () => {
     expect(screen.getByText(/last 7 days/i)).toBeInTheDocument();
   });
 
-  it("badges a story covered by multiple outlets and expands to list them", async () => {
+  it("badges a story covered by multiple outlets and expands to list each member's title + outlet", async () => {
     seedReadyCorpus();
     renderAt();
     await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
 
-    expect(screen.getByText(/covered by 3 outlets/i)).toBeInTheDocument();
+    // The multi-outlet badge is rendered with the primary accent color so
+    // the eye finds it before reading.
+    const badge = screen.getByText(/covered by 3 outlets/i);
+    expect(badge.className).toMatch(/text-primary/);
+
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /show all 3 outlets/i }));
-    // Each outlet's name appears in the expanded list.
-    expect(screen.getByText("Outlet 1")).toBeInTheDocument();
-    expect(screen.getByText("Outlet 2")).toBeInTheDocument();
-    expect(screen.getByText("Outlet 3")).toBeInTheDocument();
+
+    // Each outlet still surfaces by name in the meta line.
+    expect(screen.queryAllByText(/Outlet 1/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Outlet 2/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Outlet 3/).length).toBeGreaterThan(0);
+
+    // The article title appears for every member in the expanded list,
+    // plus once in the head row — four occurrences total. Previously the
+    // expanded list only showed the feed name, so a reader couldn't tell
+    // whether two outlets actually ran the same headline.
+    const titleMatches = screen.getAllByText("OpenAI launches atlas browser");
+    expect(titleMatches.length).toBe(4);
   });
 
   it("on desktop, clicking a story opens the reader directly", async () => {
@@ -212,6 +255,33 @@ describe("SignalPage", () => {
     const user = userEvent.setup();
     await user.click(screen.getByText("OpenAI ships a release"));
     await waitFor(() => expect(screen.getByText("READER")).toBeInTheDocument());
+  });
+
+  it("preview falls back to the first sentence of extractedContent when content/summary are empty", async () => {
+    mockViewport(false);
+    // Start from the seedReadyCorpus shape, then enrich the first OpenAI
+    // headline with extractedContent. Feed-provided content/summary stay
+    // empty so the preview must reach into the body for its teaser.
+    seedReadyCorpus();
+    const grouped = { ...useArticleStore.getState().articlesByFeedId };
+    grouped.f1 = grouped.f1.map((article) =>
+      article.title === "OpenAI ships a release"
+        ? {
+            ...article,
+            extractedContent:
+              "<p>The first sentence is the lede. Then the body continues.</p>",
+          }
+        : article,
+    );
+    useArticleStore.setState({ articlesByFeedId: grouped });
+
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText("OpenAI ships a release"));
+    expect(await screen.findByText(/The first sentence is the lede\./)).toBeInTheDocument();
+    expect(screen.queryByText(/no preview available/i)).toBeNull();
   });
 
   it("on mobile, tapping a story opens a preview then 'Open in reader' navigates", async () => {
@@ -237,6 +307,39 @@ describe("SignalPage", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /refresh/i }));
     await waitFor(() => expect(useSignalStore.getState().report?.generatedAt).not.toBe(first));
+  });
+
+  describe("Top stories digest", () => {
+    it("renders a 'Top stories' section above the topic blocks when 2+ stories have multiple sources", async () => {
+      seedCorpusWithMultipleTopStories();
+      renderAt();
+      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+      const topStoriesHeading = screen.getByRole("heading", { level: 2, name: /top stories/i });
+      expect(topStoriesHeading).toBeInTheDocument();
+
+      // The Top stories section sits above the topic heading in the DOM,
+      // because it's a digest the reader should land on first.
+      const topicHeading = screen.getByRole("heading", { level: 2, name: "OpenAI" });
+      expect(
+        topStoriesHeading.compareDocumentPosition(topicHeading)
+          & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      // Each multi-outlet story title appears twice — once in the digest,
+      // once in its topic block.
+      expect(screen.getAllByText("OpenAI launches atlas browser").length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText("OpenAI partners with chipmakers").length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("does NOT render the 'Top stories' section when there is only one multi-outlet story", async () => {
+      // seedReadyCorpus has exactly one multi-outlet story ("OpenAI launches atlas browser").
+      seedReadyCorpus();
+      renderAt();
+      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+      expect(screen.queryByRole("heading", { level: 2, name: /top stories/i })).toBeNull();
+    });
   });
 
   it("reveals additional stories when '+ N more' is clicked", async () => {
