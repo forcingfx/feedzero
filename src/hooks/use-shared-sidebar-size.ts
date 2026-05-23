@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
+import { useCallback, useRef } from "react";
+import type { PanelSize } from "react-resizable-panels";
 
 /**
  * localStorage key for the sidebar's preferred width in absolute pixels.
@@ -42,41 +42,35 @@ function writeStored(value: number) {
 }
 
 interface UseSharedSidebarSizeResult {
-  panelRef: React.MutableRefObject<PanelImperativeHandle | null>;
   onResize: (panelSize: PanelSize) => void;
   defaultSize: string | undefined;
 }
 
 /**
- * Persists the sidebar's user-dragged pixel width across reloads and across
- * layout transitions that may remount the panel group (HMR, SidebarProvider
- * remount).
+ * Persists the sidebar's user-dragged pixel width across reloads.
  *
- * The imperative panelRef.resize() on layoutKey change is a safety net for
- * remount paths; the outer panel group's child set is constant across
- * routes (PR #103) so the library's own layout reconciliation no longer
- * rebalances the sidebar on navigation.
+ * Returns a `defaultSize` (px-suffixed string for react-resizable-panels)
+ * read once at mount, plus an `onResize` callback the panel calls every
+ * time the user drags the handle.
+ *
+ * ADR 013 made the outer panel topology constant across routes, so
+ * react-resizable-panels' own per-id persistence preserves the sidebar
+ * width on navigation. The imperative `panelRef.resize()` safety net the
+ * hook used to ship was deleted in the ADR 013 follow-up — keeping it
+ * would have given the false impression that the rule "the sidebar
+ * width only changes when the user drags or resizes the window" was held
+ * by correction rather than by construction.
  */
-export function useSharedSidebarSize(layoutKey: string): UseSharedSidebarSizeResult {
+export function useSharedSidebarSize(): UseSharedSidebarSizeResult {
   const sizeRef = useRef<number | null>(readStored());
-  const panelRef = useRef<PanelImperativeHandle | null>(null);
 
   const onResize = useCallback((panelSize: PanelSize) => {
     sizeRef.current = panelSize.inPixels;
     writeStored(panelSize.inPixels);
   }, []);
 
-  useEffect(() => {
-    const stored = sizeRef.current;
-    if (stored == null) return;
-    const handle = panelRef.current;
-    if (!handle) return;
-    handle.resize(`${stored}px`);
-  }, [layoutKey]);
-
   const initial = sizeRef.current;
   return {
-    panelRef,
     onResize,
     defaultSize: initial != null ? `${initial}px` : undefined,
   };

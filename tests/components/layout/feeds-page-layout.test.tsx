@@ -479,7 +479,9 @@ describe("FeedsPage layout — desktop", () => {
     // naturally preserved by react-resizable-panels' per-id persistence.
     // PR J: the hook now stores pixels (not percentages) so the width
     // survives viewport changes between drag and reload. The defaultSize
-    // returned by the hook is a px-suffixed string.
+    // returned by the hook is a px-suffixed string. ADR 013 follow-up:
+    // the hook no longer takes a layoutKey arg — the imperative
+    // safety-net effect was deleted now that topology is stable.
     const hookModule = await import("@/hooks/use-shared-sidebar-size.ts");
     const spy = vi.spyOn(hookModule, "useSharedSidebarSize");
 
@@ -489,8 +491,6 @@ describe("FeedsPage layout — desktop", () => {
     renderPage("/explore");
 
     expect(spy).toHaveBeenCalled();
-    const lastCallLayoutKey = spy.mock.calls.at(-1)?.[0];
-    expect(lastCallLayoutKey).toBe("feedzero:layout:main");
 
     const lastResult = spy.mock.results.at(-1)?.value;
     expect(lastResult).toBeDefined();

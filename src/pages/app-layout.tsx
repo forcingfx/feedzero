@@ -117,7 +117,7 @@ export function AppLayout() {
 
 function DesktopShell({ onFeedSelect }: { onFeedSelect: (id: string) => void }) {
   const layoutId = PANEL_LAYOUT_ID.MAIN;
-  const sidebarSize = useSharedSidebarSize(layoutId);
+  const sidebarSize = useSharedSidebarSize();
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
@@ -133,7 +133,6 @@ function DesktopShell({ onFeedSelect }: { onFeedSelect: (id: string) => void }) 
           minSize="150px"
           maxSize="280px"
           className="overflow-hidden"
-          panelRef={sidebarSize.panelRef}
           onResize={sidebarSize.onResize}
         >
           <AppSidebar
