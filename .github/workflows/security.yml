@@ -64,7 +64,11 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Gitleaks history scan
-        uses: gitleaks/gitleaks-action@v2
         env:
-          # Open-source invocation — no GITLEAKS_LICENSE for solo repos.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.18.4
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --no-banner --redact --verbose
