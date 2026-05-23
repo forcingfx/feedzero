@@ -246,5 +246,79 @@ describe("extraction-store", () => {
       // Oldest entry should be evicted
       expect(state.cache["https://example.com/0"]).toBeUndefined();
     });
+
+    it("evicts entries older than the TTL when a new entry is added", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+      try {
+        // Seed an entry by going through the public extraction path so
+        // its timestamp is recorded by the eviction metadata.
+        const longHtml = `<article>${"<p>Old readable paragraph. </p>".repeat(40)}</article>`;
+        vi.mocked(fetch).mockResolvedValueOnce(
+          new Response(longHtml, { status: 200 }),
+        );
+        vi.mocked(extract).mockReturnValueOnce({
+          ok: true,
+          value: { content: "old-content", title: "", author: "", excerpt: "" },
+        });
+        await useExtractionStore
+          .getState()
+          .fetchExtracted("https://example.com/old");
+        expect(useExtractionStore.getState().cache["https://example.com/old"]).toBe(
+          "old-content",
+        );
+
+        // Advance past the 30-minute TTL.
+        vi.setSystemTime(new Date("2026-01-01T00:31:00Z"));
+
+        const freshHtml = `<article>${"<p>Fresh readable paragraph. </p>".repeat(40)}</article>`;
+        vi.mocked(fetch).mockResolvedValueOnce(
+          new Response(freshHtml, { status: 200 }),
+        );
+        vi.mocked(extract).mockReturnValueOnce({
+          ok: true,
+          value: { content: "fresh-content", title: "", author: "", excerpt: "" },
+        });
+        await useExtractionStore
+          .getState()
+          .fetchExtracted("https://example.com/fresh");
+
+        const state = useExtractionStore.getState();
+        expect(state.cache["https://example.com/fresh"]).toBe("fresh-content");
+        expect(state.cache["https://example.com/old"]).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("evicts oldest entries when cumulative cache bytes exceed the size cap", async () => {
+      // Two MB body + new entry will exceed the 5 MB cap when added 3x.
+      const bigBody = "x".repeat(2 * 1024 * 1024);
+      // Match the paywall-detector-friendly body shape used elsewhere
+      // in this file — long enough to clear the "body too short" heuristic.
+      const fullHtml = `<html><body><article>${"<p>Full readable article paragraph. </p>".repeat(40)}</article></body></html>`;
+      const fetchMock = vi.fn();
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      async function pump(url: string, content: string) {
+        fetchMock.mockResolvedValueOnce(
+          new Response(fullHtml, { status: 200 }),
+        );
+        vi.mocked(extract).mockReturnValueOnce({
+          ok: true,
+          value: { content, title: "", author: "", excerpt: "" },
+        });
+        await useExtractionStore.getState().fetchExtracted(url);
+      }
+
+      await pump("https://example.com/a", bigBody);
+      await pump("https://example.com/b", bigBody);
+      await pump("https://example.com/c", bigBody);
+
+      const state = useExtractionStore.getState();
+      // The oldest 2 MB entry must be evicted to keep totals under 5 MB.
+      expect(state.cache["https://example.com/c"]).toBe(bigBody);
+      expect(state.cache["https://example.com/a"]).toBeUndefined();
+    });
   });
 });

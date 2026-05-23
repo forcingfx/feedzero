@@ -72,18 +72,108 @@ interface ExtractionStore {
   ) => (PaywallVerdict & { paywalled: true }) | null;
 }
 
+/** Maximum number of cached extractions held in memory. */
 const MAX_CACHE_SIZE = 50;
+/** Per-entry TTL — older entries are evicted on the next write. */
+const CACHE_TTL_MS = 30 * 60 * 1000;
+/** Aggregate byte budget — totals over this trigger LRU eviction. */
+const MAX_CACHE_BYTES = 5 * 1024 * 1024;
 
-/** Evict oldest entries if cache exceeds max size. */
+/**
+ * Per-URL metadata for cache eviction. Lives at module scope (not in
+ * the store) so the public `cache` shape stays `Record<string, string>`
+ * for the components and tests that read entries directly. Tests can
+ * still pre-populate the cache via setState; entries without metadata
+ * are treated as zero-byte and unbounded-age (they participate in
+ * count-based eviction only — matching the original behavior).
+ */
+interface CacheMeta {
+  ts: number;
+  bytes: number;
+}
+const cacheMeta = new Map<string, CacheMeta>();
+
+/** Test/internal helper: wipe the eviction metadata. */
+export function _resetExtractionCacheMeta(): void {
+  cacheMeta.clear();
+}
+
+/**
+ * Evict cache entries based on three policies, in order:
+ *   1. TTL — anything older than CACHE_TTL_MS is dropped.
+ *   2. Bytes — if total bytes exceeds MAX_CACHE_BYTES, evict oldest
+ *      first until under the cap. A user who keeps clicking "Extracted"
+ *      on long-form articles would otherwise grow the cache without
+ *      bound; counting bytes (not just entries) catches the case where
+ *      50 small entries are fine but 5 huge ones aren't.
+ *   3. Count — final guard, mirrors the original behavior.
+ *
+ * Pure function: returns a new cache object; mutates `cacheMeta`
+ * in-place since metadata isn't part of observable store state.
+ */
 function evictCache(cache: Record<string, string>): Record<string, string> {
-  const keys = Object.keys(cache);
-  if (keys.length <= MAX_CACHE_SIZE) return cache;
-  const evicted = { ...cache };
-  const toRemove = keys.length - MAX_CACHE_SIZE;
-  for (let i = 0; i < toRemove; i++) {
-    delete evicted[keys[i]];
+  const now = Date.now();
+  let next = cache;
+
+  // TTL sweep.
+  for (const [url, meta] of cacheMeta) {
+    if (!(url in next)) {
+      cacheMeta.delete(url);
+      continue;
+    }
+    if (now - meta.ts > CACHE_TTL_MS) {
+      if (next === cache) next = { ...cache };
+      delete next[url];
+      cacheMeta.delete(url);
+    }
   }
-  return evicted;
+
+  // Order keys by timestamp ascending (no meta → treated as oldest,
+  // matches the historical "first key is oldest" insertion order).
+  const ordered = (): string[] =>
+    Object.keys(next).sort((a, b) => {
+      const ta = cacheMeta.get(a)?.ts ?? 0;
+      const tb = cacheMeta.get(b)?.ts ?? 0;
+      return ta - tb;
+    });
+
+  // Bytes sweep.
+  let totalBytes = 0;
+  for (const url of Object.keys(next)) {
+    totalBytes += cacheMeta.get(url)?.bytes ?? 0;
+  }
+  if (totalBytes > MAX_CACHE_BYTES) {
+    const sorted = ordered();
+    let i = 0;
+    while (totalBytes > MAX_CACHE_BYTES && i < sorted.length) {
+      const url = sorted[i++];
+      const bytes = cacheMeta.get(url)?.bytes ?? 0;
+      if (next === cache) next = { ...cache };
+      delete next[url];
+      cacheMeta.delete(url);
+      totalBytes -= bytes;
+    }
+  }
+
+  // Count sweep.
+  const keys = Object.keys(next);
+  if (keys.length > MAX_CACHE_SIZE) {
+    const sorted = ordered();
+    const toRemove = keys.length - MAX_CACHE_SIZE;
+    if (next === cache) next = { ...cache };
+    for (let i = 0; i < toRemove; i++) {
+      const url = sorted[i];
+      delete next[url];
+      cacheMeta.delete(url);
+    }
+  }
+
+  return next;
+}
+
+/** Record metadata for a newly-cached entry before eviction runs. */
+function recordCacheEntry(url: string, html: string): void {
+  cacheMeta.set(url, { ts: Date.now(), bytes: html.length });
 }
 
 export const useExtractionStore = create<ExtractionStore>((set, get) => ({
@@ -159,6 +249,7 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
 
       const result = extract(anonymousHtml, url);
       if (result.ok && result.value.content) {
+        recordCacheEntry(url, result.value.content);
         set({
           cache: evictCache({ ...get().cache, [url]: result.value.content }),
           statusMap: { ...get().statusMap, [url]: "available" },
@@ -246,6 +337,7 @@ async function handlePaywalledFetch(
 
   const extracted = extract(retry.value.html, url);
   if (extracted.ok && extracted.value.content) {
+    recordCacheEntry(url, extracted.value.content);
     set({
       cache: evictCache({ ...get().cache, [url]: extracted.value.content }),
       statusMap: { ...get().statusMap, [url]: "available" },
