@@ -10,6 +10,7 @@ vi.mock("../../src/core/storage/key-manager.ts", () => ({
 vi.mock("../../src/core/sync/sync-service", () => ({
   pushVault: vi.fn(),
   pullVault: vi.fn(),
+  pullVaultIfChanged: vi.fn(),
   importVault: vi.fn(),
 }));
 
@@ -37,7 +38,10 @@ vi.mock("../../src/stores/persist-preferences.ts", () => ({
 }));
 
 import { initFresh, restore, destroy } from "../../src/core/storage/key-manager.ts";
-import { pullVault, importVault } from "../../src/core/sync/sync-service";
+import {
+  pullVaultIfChanged,
+  importVault,
+} from "../../src/core/sync/sync-service";
 import { dedupeArticles } from "../../src/core/storage/db.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 import { persistPreferences } from "../../src/stores/persist-preferences.ts";
@@ -255,9 +259,13 @@ describe("app-store", () => {
         isSyncUser: true,
         credentials: mockCredentials,
       });
-      vi.mocked(pullVault).mockResolvedValue({
+      vi.mocked(pullVaultIfChanged).mockResolvedValue({
         ok: true,
-        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+        value: {
+          notModified: false,
+          vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+          etag: null,
+        },
       });
       vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
 
@@ -277,7 +285,7 @@ describe("app-store", () => {
           vaultKey: "mock-key" as unknown as CryptoKey,
         },
       });
-      vi.mocked(pullVault).mockResolvedValue({
+      vi.mocked(pullVaultIfChanged).mockResolvedValue({
         ok: false,
         error: "Not found",
       });

@@ -4,6 +4,7 @@ import { useSyncStore } from "../../src/stores/sync-store";
 vi.mock("../../src/core/sync/sync-service", () => ({
   pushVault: vi.fn(),
   pullVault: vi.fn(),
+  pullVaultIfChanged: vi.fn(),
   importVault: vi.fn(),
   deleteVault: vi.fn(),
 }));
@@ -34,6 +35,7 @@ vi.mock("../../src/core/sync/vault-crypto", () => ({
 import {
   pushVault,
   pullVault,
+  pullVaultIfChanged,
   importVault,
   deleteVault,
 } from "../../src/core/sync/sync-service";
@@ -42,6 +44,7 @@ import { addVaultKeys, removeVaultKeys } from "../../src/core/storage/key-manage
 
 const mockPushVault = vi.mocked(pushVault);
 const mockPullVault = vi.mocked(pullVault);
+const mockPullVaultIfChanged = vi.mocked(pullVaultIfChanged);
 const mockImportVault = vi.mocked(importVault);
 const mockDeleteVault = vi.mocked(deleteVault);
 
@@ -99,7 +102,7 @@ describe("sync-store", () => {
         value: mockCredentials,
       });
       const timestamp = Date.now();
-      mockPushVault.mockResolvedValue({ ok: true, value: timestamp });
+      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: timestamp, etag: null } });
 
       await useSyncStore.getState().enableSync("test passphrase");
 
@@ -265,7 +268,7 @@ describe("sync-store", () => {
   describe("push", () => {
     it("pushes vault and updates status", async () => {
       const timestamp = Date.now();
-      mockPushVault.mockResolvedValue({ ok: true, value: timestamp });
+      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: timestamp, etag: null } });
       useSyncStore.setState({ credentials: mockCredentials });
 
       await useSyncStore.getState().push();
@@ -282,22 +285,56 @@ describe("sync-store", () => {
 
   describe("pull", () => {
     it("pulls vault and imports data", async () => {
-      mockPullVault.mockResolvedValue({
+      mockPullVaultIfChanged.mockResolvedValue({
         ok: true,
-        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+        value: {
+          notModified: false,
+          vault: {
+            version: 1,
+            exportedAt: Date.now(),
+            feeds: [],
+            articles: [],
+          },
+          etag: 'W/"abc"',
+        },
       });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
       useSyncStore.setState({ credentials: mockCredentials });
 
       await useSyncStore.getState().pull();
 
-      expect(mockPullVault).toHaveBeenCalledWith(mockCredentials);
+      expect(mockPullVaultIfChanged).toHaveBeenCalledWith(
+        mockCredentials,
+        undefined,
+      );
       expect(mockImportVault).toHaveBeenCalled();
+      expect(useSyncStore.getState().status).toBe("synced");
+      // ETag from the server response is cached for next pull.
+      expect(useSyncStore.getState().lastVaultEtag).toBe('W/"abc"');
+    });
+
+    it("short-circuits import on a 304-equivalent (notModified) response", async () => {
+      mockPullVaultIfChanged.mockResolvedValue({
+        ok: true,
+        value: { notModified: true, etag: 'W/"abc"' },
+      });
+      useSyncStore.setState({
+        credentials: mockCredentials,
+        lastVaultEtag: 'W/"abc"',
+      });
+
+      await useSyncStore.getState().pull();
+
+      expect(mockPullVaultIfChanged).toHaveBeenCalledWith(
+        mockCredentials,
+        'W/"abc"',
+      );
+      expect(mockImportVault).not.toHaveBeenCalled();
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
     it("sets error on pull failure", async () => {
-      mockPullVault.mockResolvedValue({
+      mockPullVaultIfChanged.mockResolvedValue({
         ok: false,
         error: "Vault not found",
       });

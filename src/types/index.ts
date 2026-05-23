@@ -50,6 +50,14 @@ export interface Feed {
   etag?: string;
   /** Most-recent `Last-Modified` returned by the publisher; see {@link Feed.etag}. */
   lastModified?: string;
+  /**
+   * Number of consecutive 304 Not Modified responses the publisher has
+   * returned. Used by the bulk auto-refresh path to stretch the effective
+   * refresh interval for feeds that publish infrequently — see
+   * `effectiveRefreshIntervalMs` in `src/core/feeds/refresh-backoff.ts`.
+   * Cleared on any non-304 response.
+   */
+  consecutive304Count?: number;
 }
 
 export interface Folder {

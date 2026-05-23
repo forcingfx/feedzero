@@ -252,6 +252,17 @@ export const SYNC = {
   ENCRYPTION_SALT_LENGTH: 16,
   /** Maximum vault payload size in bytes (5 MB). */
   MAX_VAULT_SIZE: 5 * 1024 * 1024,
-  /** Sync data format version for forward compatibility. */
-  FORMAT_VERSION: 3,
+  /**
+   * Sync data format version for forward compatibility.
+   *
+   * - v3 and below: ciphertext = AES-GCM(JSON.stringify(vault))
+   * - v4: ciphertext = AES-GCM(gzip(JSON.stringify(vault)))
+   *
+   * decryptVault reads the version off the envelope and dispatches.
+   * The on-wire shape ({version, iv, ciphertext}) is unchanged; only
+   * the inner-bytes contract differs. A v3 vault produced by an older
+   * device is still readable by this code; a v4 vault produced here is
+   * NOT readable by code that predates v4 — release notes mention this.
+   */
+  FORMAT_VERSION: 4,
 } as const;

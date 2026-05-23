@@ -189,7 +189,12 @@ export async function handleProxyRequest(
  * Content-Type. For 429/503, propagates Retry-After verbatim (RFC 7231 §7.1.3)
  * so the client can back off instead of hammering the origin. ETag and
  * Last-Modified are passed through whenever the upstream emits them so
- * the client can replay the validators on its next refresh.
+ * the client can replay the validators on its next refresh. Image
+ * responses (proxied favicons via /api/icon) get a long-lived
+ * Cache-Control so the browser HTTP cache satisfies repeat fetches
+ * without a server round-trip; other content types (feed XML, page HTML)
+ * remain uncached because their freshness is driven by the refresh
+ * cycle, not the HTTP cache layer.
  */
 function buildResponseHeaders(
   contentType: string,
@@ -204,6 +209,14 @@ function buildResponseHeaders(
   if (etag) headers["ETag"] = etag;
   const lastModified = upstream.headers.get("Last-Modified");
   if (lastModified) headers["Last-Modified"] = lastModified;
+  if (
+    upstream.status >= 200 &&
+    upstream.status < 300 &&
+    /^image\//i.test(contentType)
+  ) {
+    headers["Cache-Control"] =
+      "public, max-age=86400, stale-while-revalidate=604800";
+  }
   return headers;
 }
 

@@ -44,7 +44,16 @@ export async function handleFaviconRequest(
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "no-cache",
+        // Favicons are extremely stable per-domain — a publisher
+        // changes theirs once every year or two at most. Cache for
+        // 24h with a week-long stale-while-revalidate so a returning
+        // visitor's browser HTTP cache satisfies the request without
+        // re-hitting the server. Before this commit the explicit
+        // `no-cache` here forced a round-trip on every page load,
+        // wasting one request per unique feed domain per session
+        // (≥ 20 requests for a typical sidebar refresh).
+        "Cache-Control":
+          "public, max-age=86400, stale-while-revalidate=604800",
       },
     });
   } catch {

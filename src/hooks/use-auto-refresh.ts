@@ -21,7 +21,15 @@ export function useAutoRefresh() {
   useEffect(() => {
     function refreshNow() {
       if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-      void useFeedStore.getState().refreshAll();
+      // Pass respectBackoff so quiet feeds (publishers who've returned
+      // 304 Not Modified at least three times in a row) get skipped this
+      // pass. The user clicking the explicit "Refresh All" button or
+      // hitting `r` calls refreshAll() without options and bypasses
+      // the gate.
+      void useFeedStore.getState().refreshAll({
+        respectBackoff: true,
+        intervalMs: AUTO_REFRESH_INTERVAL_MS,
+      });
     }
 
     const timer = setInterval(refreshNow, AUTO_REFRESH_INTERVAL_MS);

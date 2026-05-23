@@ -30,7 +30,7 @@ describe("handleFaviconRequest", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns the fetched icon body with content-type and no-cache header", async () => {
+  it("returns the fetched icon body with content-type and long-lived cache", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(imageHeadResponse()) // resolver finds /favicon.ico
@@ -48,7 +48,13 @@ describe("handleFaviconRequest", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
-    expect(res.headers.get("cache-control")).toBe("no-cache");
+    // Favicons are extremely stable per-domain; cache for 24h with a
+    // week-long stale-while-revalidate so a returning visitor's
+    // browser HTTP cache satisfies the request without re-hitting the
+    // server. See the cache-control assertion in the dedicated test
+    // below for the full rationale.
+    expect(res.headers.get("cache-control")).toMatch(/max-age=86400/);
+    expect(res.headers.get("cache-control")).toMatch(/stale-while-revalidate/);
     const body = await res.arrayBuffer();
     expect(body.byteLength).toBe(FAVICON_PIXEL_BYTES.byteLength);
   });

@@ -51,6 +51,28 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 /**
+ * Compute a weak ETag for a stored payload. SHA-256 truncated to the
+ * first 16 hex characters (64 bits) — collision risk is negligible at
+ * one ETag per vault per change, and the short form keeps headers
+ * compact. Weak validator (W/"…") because the server may re-serialize
+ * structurally-equivalent JSON; the bytes match only the byte-shape
+ * stored, not the semantic content.
+ */
+async function etagOf(data: string): Promise<string> {
+  const bytes = new TextEncoder().encode(data);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 16);
+  return `W/"${hex}"`;
+}
+
+function apiHeadersWithEtag(etag: string): Record<string, string> {
+  return { ...apiHeaders(), ETag: etag };
+}
+
+/**
  * 4xx response — surfaces traceId to the client (so they can quote it in
  * a support report) but does NOT write a server-side log line. Client
  * errors are not ops-actionable; logging them inflates the error log.
@@ -113,7 +135,22 @@ async function handleGet(
   }
   if (result.value === null) return clientError("Vault not found", 404, ctx);
 
-  return new Response(result.value, { status: 200, headers: apiHeaders() });
+  // Compute the ETag from the stored bytes so the client can
+  // short-circuit unchanged pulls. If the client's If-None-Match
+  // matches, return 304 (no body) — typical multi-device sync where
+  // the user hasn't touched anything between pulls.
+  const etag = await etagOf(result.value);
+  const ifNoneMatch = request.headers.get("if-none-match");
+  if (ifNoneMatch && ifNoneMatch === etag) {
+    return new Response(null, {
+      status: 304,
+      headers: apiHeadersWithEtag(etag),
+    });
+  }
+  return new Response(result.value, {
+    status: 200,
+    headers: apiHeadersWithEtag(etag),
+  });
 }
 
 async function handlePut(
@@ -143,7 +180,15 @@ async function handlePut(
     return serverError(result.error, "AdapterPutFailed", 500, ctx);
   }
 
-  return jsonResponse({ ok: true, updatedAt: Date.now() });
+  // Return the ETag of the just-stored bytes so the client can cache
+  // it without an extra GET round-trip — sync push then immediate
+  // pull is the most common pattern and would otherwise re-download
+  // the same payload.
+  const etag = await etagOf(data);
+  return new Response(
+    JSON.stringify({ ok: true, updatedAt: Date.now() }),
+    { status: 200, headers: apiHeadersWithEtag(etag) },
+  );
 }
 
 async function handleDelete(
