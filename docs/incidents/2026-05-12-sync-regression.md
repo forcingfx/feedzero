@@ -76,8 +76,8 @@ The deeper architectural fix — eliminating the Vercel Blob backend entirely an
 | Migrate sync off Vercel Blob entirely (consolidate on Upstash to eliminate the "two integrations to keep healthy" failure mode) | Founder + Claude | ✅ PR #45 / ADR 008 |
 | Add post-deploy smoke tests for `/api/sync` that PUT, GET, DELETE a sentinel vault against production | Founder + Claude | ✅ PR #49 / ADR 011 |
 | Make smoke tests a required phase of the RGR cycle so every future API change ships with one | Founder + Claude | ✅ PR #48 / CLAUDE.md RGR+S |
-| Quarantine memory adapters as test fixtures (resolver should refuse them in `NODE_ENV=production`) | Founder | 🔄 Open follow-up |
-| Commit an `expected-env.json` listing required env-var *names*; CI compares against Vercel pulled env | Founder | 🔄 Open follow-up |
+| Quarantine memory adapters as test fixtures (resolver should refuse them in `NODE_ENV=production`) | Founder + Claude | ✅ All four memory adapters (sync / catalog / license / stripe) branded test-only via `src/core/test-only-brand.ts`; resolvers assert and throw a loud module-load error when a branded adapter would be returned under `NODE_ENV=production` |
+| Commit an `expected-env.json` listing required env-var *names*; CI compares against Vercel pulled env | Founder + Claude | ✅ `expected-env.json` + `scripts/check-env.ts`; `env-audit` job in CI enforces "every `process.env.X` has a one-line spec entry". Audit mode (`npm run check-env -- --env <file> --target production`) compares a `vercel env pull` snapshot against the spec. See `docs/operations/env-audit.md`. |
 
 ## What went well
 

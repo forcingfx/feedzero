@@ -110,9 +110,18 @@ push.
 - `SYNC.FORMAT_VERSION` 2 → 3 and `DB_VERSION` 5 → 6 (Dexie auto-creates the
   new table). The format version is informational; consumers tolerate any
   shape.
-- `theme` is reserved in `UserPreferences` but not yet wired — next-themes
-  owns first-paint and needs a two-way bridge, deferred to a follow-up to
-  isolate its flash risk.
+- `theme` is wired via the `<ThemeBridge>` component
+  (`src/components/theme-bridge.tsx`) mounted under `<ThemeProvider>`
+  in `src/main.tsx`. The bridge is one-way (vault → next-themes); the
+  reverse direction is owned by `ThemeToggle`'s click handler, which
+  calls `setTheme()` and `usePreferencesStore.update({ theme })`
+  atomically. next-themes still owns first paint via its `<head>` script
+  + its own localStorage cache, so the originally-feared flash only
+  appears in the one case we couldn't avoid by construction: a
+  cross-device pull where the user picked a different theme on the
+  other device. Locked by
+  `tests/components/theme-bridge.test.tsx` (one-way invariant) and
+  `tests/components/settings/theme-toggle-vault.test.tsx` (write-through).
 
 ## Alternatives considered
 - **Model preferences as an id-keyed collection and reuse

@@ -14,6 +14,7 @@
  * catch a regression to memory mode on first deploy.
  */
 
+import { assertNotTestOnlyInProduction } from "../test-only-brand";
 import {
   createMemoryCatalogAdapter,
 } from "./adapters/memory-adapter";
@@ -29,7 +30,12 @@ export async function resolveCatalogStorage(
   if (hasUpstashCatalogCredentials(env)) {
     return createUpstashCatalogAdapter(env);
   }
-  return createMemoryCatalogAdapter();
+  const adapter = createMemoryCatalogAdapter();
+  // NODE_ENV is a runtime property, not a credential — read from process.env
+  // even when the caller passes a synthetic `env` (the test/server use it for
+  // Upstash credentials only).
+  assertNotTestOnlyInProduction(adapter, "catalog.resolveCatalogStorage");
+  return adapter;
 }
 
 /** Label form of `resolveCatalogStorage` for module-load logging. */

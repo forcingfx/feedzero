@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import {
   useSharedSidebarSize,
@@ -32,7 +32,7 @@ describe("useSharedSidebarSize", () => {
   });
 
   it("returns no defaultSize when nothing is stored", () => {
-    const { result } = renderHook(() => useSharedSidebarSize("feeds"));
+    const { result } = renderHook(() => useSharedSidebarSize());
     expect(result.current.defaultSize).toBeUndefined();
   });
 
@@ -43,7 +43,7 @@ describe("useSharedSidebarSize", () => {
     // dragged). The returned defaultSize is a px-suffixed string so
     // react-resizable-panels parses it as pixels (see its bt() unit parser).
     window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, "250");
-    const { result } = renderHook(() => useSharedSidebarSize("feeds"));
+    const { result } = renderHook(() => useSharedSidebarSize());
     expect(result.current.defaultSize).toBe("250px");
   });
 
@@ -54,7 +54,7 @@ describe("useSharedSidebarSize", () => {
     // new key, which is empty, so defaultSize is undefined and the page's
     // own fallback applies.
     window.localStorage.setItem("feedzero:sidebar-size", "17");
-    const { result } = renderHook(() => useSharedSidebarSize("feeds"));
+    const { result } = renderHook(() => useSharedSidebarSize());
     expect(result.current.defaultSize).toBeUndefined();
   });
 
@@ -62,49 +62,10 @@ describe("useSharedSidebarSize", () => {
     // PanelSize from react-resizable-panels carries both asPercentage and
     // inPixels. We store inPixels so the next reload reproduces the exact
     // pixel width the user dragged, independent of viewport.
-    const { result } = renderHook(() => useSharedSidebarSize("feeds"));
+    const { result } = renderHook(() => useSharedSidebarSize());
     act(() => {
       result.current.onResize({ asPercentage: 19.5, inPixels: 240 });
     });
     expect(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)).toBe("240");
-  });
-
-  it("re-applies the remembered width as a px-suffixed string when layoutKey changes", () => {
-    // The library's imperative resize() accepts either a number (pixels) or
-    // a string with units. Passing "240px" makes the unit explicit so any
-    // future refactor of the library's number-default can't silently flip
-    // our intent.
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, "240");
-    const resize = vi.fn();
-    const { result, rerender } = renderHook(
-      ({ key }: { key: string }) => useSharedSidebarSize(key),
-      { initialProps: { key: "feeds" } },
-    );
-    result.current.panelRef.current = {
-      resize,
-      collapse: vi.fn(),
-      expand: vi.fn(),
-      getSize: vi.fn(() => ({ asPercentage: 19.5, inPixels: 240 })),
-      isCollapsed: vi.fn(() => false),
-    };
-    rerender({ key: "explore" });
-    expect(resize).toHaveBeenCalledWith("240px");
-  });
-
-  it("does not call resize when nothing has been stored yet", () => {
-    const resize = vi.fn();
-    const { result, rerender } = renderHook(
-      ({ key }: { key: string }) => useSharedSidebarSize(key),
-      { initialProps: { key: "feeds" } },
-    );
-    result.current.panelRef.current = {
-      resize,
-      collapse: vi.fn(),
-      expand: vi.fn(),
-      getSize: vi.fn(() => ({ asPercentage: 17, inPixels: 170 })),
-      isCollapsed: vi.fn(() => false),
-    };
-    rerender({ key: "explore" });
-    expect(resize).not.toHaveBeenCalled();
   });
 });

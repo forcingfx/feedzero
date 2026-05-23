@@ -25,6 +25,7 @@
  */
 
 import { type Result, ok, err } from "../../utils/result";
+import { markTestOnly } from "../test-only-brand";
 
 /**
  * Subset of the Upstash Redis client used by {@link UpstashSeenEventStore}.
@@ -64,6 +65,10 @@ const DEFAULT_TTL_SEC = 7 * 24 * 60 * 60;
  */
 export class MemorySeenEventStore implements SeenEventStore {
   private readonly seen = new Set<string>();
+
+  constructor() {
+    markTestOnly(this);
+  }
 
   async markSeenIfNew(eventId: string): Promise<Result<boolean>> {
     if (this.seen.has(eventId)) return ok(false);

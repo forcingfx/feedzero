@@ -45,7 +45,7 @@ the vault with timestamp last-write-wins — see [ADR 022](decisions/022-prefere
 | folderCustomOrder | string[]                              | Manual folder order (folder ids)  |
 | articleSortMode   | `"newest" \| "oldest" \| "unread-first"` | Article list ordering          |
 | groupArticleFloods| boolean                               | Collapse same-feed bursts         |
-| theme             | `"light" \| "dark" \| "system"`       | Reserved (wired in a follow-up)   |
+| theme             | `"light" \| "dark" \| "system"`       | Color scheme (synced; bridged into next-themes by `<ThemeBridge>`) |
 
 ### Meta (internal)
 

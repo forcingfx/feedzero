@@ -272,6 +272,29 @@ async function reloadFeeds(
   if (all.ok) set({ feeds: sortFeeds(all.value) });
 }
 
+/**
+ * Apply the per-feed results returned by `refreshAllFeeds()` to the
+ * in-memory feeds list, replacing each refreshed entry with the
+ * (freshness-mutated) feed object the worker carried back. Feeds not
+ * present in `results` (skipped by backoff, or pre-existing rows the
+ * worker didn't touch) stay at their previous in-memory state — they
+ * already match the DB. Avoids the full IndexedDB re-decrypt the
+ * previous `reloadFeeds` after-refresh call cost on every tick.
+ */
+function mergeRefreshResultsIntoStore(
+  set: (partial: Partial<FeedStore> | ((s: FeedStore) => Partial<FeedStore>)) => void,
+  get: () => FeedStore,
+  results: Array<{ feed: Feed; newCount: number; updatedCount: number; error?: string }>,
+): void {
+  if (results.length === 0) return;
+  const byId = new Map<string, Feed>();
+  for (const result of results) {
+    if (result.feed.id) byId.set(result.feed.id, result.feed);
+  }
+  const merged = get().feeds.map((existing) => byId.get(existing.id) ?? existing);
+  set({ feeds: sortFeeds(merged) });
+}
+
 /** Same contract as reloadFeeds(), for the folders table. */
 async function reloadFolders(
   set: (partial: Partial<FeedStore> | ((s: FeedStore) => Partial<FeedStore>)) => void,
@@ -566,14 +589,26 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       const syncStore = useSyncStore.getState();
       if (syncStore.credentials) {
         await syncStore.pull();
+        // Pull may have added/removed rows; full reload is the cheapest
+        // way to reconcile.
         await reloadFeeds(set);
       }
-      await refreshAllFeeds(
+      const refreshResult = await refreshAllFeeds(
         options.respectBackoff && options.intervalMs !== undefined
           ? { respectBackoffWithDefaultMs: options.intervalMs }
           : {},
       );
-      await reloadFeeds(set);
+      // Merge the per-feed freshness from the refresh results into the
+      // in-memory store, skipping a second full DB read (refresh-efficiency
+      // follow-up D). On a refresh-level failure we don't have per-feed
+      // granularity, so fall back to the full reload to keep the store
+      // honest.
+      const results = refreshResult?.ok ? refreshResult.value?.results : null;
+      if (results) {
+        mergeRefreshResultsIntoStore(set, get, results);
+      } else {
+        await reloadFeeds(set);
+      }
       schedulePush();
     } finally {
       set({ isRefreshingAll: false, lastRefreshAllAt: Date.now() });

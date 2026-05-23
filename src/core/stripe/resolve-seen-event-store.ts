@@ -12,6 +12,7 @@
  * pooling makes this a non-issue.
  */
 
+import { assertNotTestOnlyInProduction } from "../test-only-brand";
 import {
   MemorySeenEventStore,
   UpstashSeenEventStore,
@@ -23,7 +24,11 @@ export async function resolveSeenEventStore(
   env: Record<string, string | undefined> = process.env,
 ): Promise<SeenEventStore> {
   if (!hasUpstashCredentials(env)) {
-    return new MemorySeenEventStore();
+    const store = new MemorySeenEventStore();
+    // NODE_ENV is a runtime property, not a credential — read from process.env
+    // even when the caller passes a synthetic `env` (used for credentials only).
+    assertNotTestOnlyInProduction(store, "stripe.resolveSeenEventStore");
+    return store;
   }
   const url = env.UPSTASH_REDIS_REST_URL ?? env.KV_REST_API_URL;
   const token = env.UPSTASH_REDIS_REST_TOKEN ?? env.KV_REST_API_TOKEN;

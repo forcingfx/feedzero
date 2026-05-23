@@ -19,6 +19,10 @@ import type { Feed, Article } from "../../types/index.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
 import { groupByHostForRefresh } from "./group-by-host.ts";
 import { parseRetryAfter } from "./parse-retry-after.ts";
+import {
+  hostPausedUntil,
+  recordHostPauseFromResponse,
+} from "./host-pause.ts";
 import { applyRules } from "../rules/engine.ts";
 import { buildContext } from "../filters/evaluator.ts";
 import { isFeedDueForRefresh } from "./refresh-backoff.ts";
@@ -356,11 +360,31 @@ export async function previewFeed(
  */
 export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
   const now = Date.now();
+  // Skip the fetch entirely when the upstream's last response told us
+  // to back off (Retry-After). Surfaces a precise wait time to the user
+  // and saves the round-trip / cache-busting overhead of issuing a
+  // request the upstream will just 429 again.
+  const pausedUntil = hostPausedUntil(feed.url, now);
+  if (pausedUntil !== null) {
+    const seconds = Math.ceil((pausedUntil - now) / 1000);
+    const message = `Skipped: host paused, retry after ${seconds}s`;
+    await persistFreshness(feed, {
+      fetchedAt: now,
+      successfulAt: null,
+      lastError: message,
+    });
+    return err(message);
+  }
   try {
     const response = await proxyFetch("/api/feed", feed.url, {
       etag: feed.etag,
       lastModified: feed.lastModified,
     });
+    // Register a host pause as soon as we see the response, BEFORE the
+    // generic non-OK branch. A 429/503 with Retry-After means every
+    // other feed on this host should also back off — recording the
+    // pause now is what ADR 014 follow-up A4-extras protects.
+    recordHostPauseFromResponse(feed.url, response, now);
     // 304 Not Modified: the publisher confirms nothing changed since the
     // last fetch. Don't parse, don't write the DB, don't reshuffle the
     // article list — just record that we tried and got a clean "no

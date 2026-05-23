@@ -32,8 +32,15 @@ The proxy at `/api/feed` (`src/core/proxy/proxy-handler.ts`) doesn't forward `If
 ### C — Push only when user-meaningful state actually changed *(medium win, larger effort)*
 `schedulePush()` fires whenever feed rows are touched, and freshness timestamps count as a touch. Splitting `Feed` into "synced shape" (url/title/folderId/prefs/rules) vs "device-local freshness" (lastFetchedAt/lastSuccessfulFetchAt/lastError) means a refresh that only changes freshness doesn't push. The two halves can stay in the same table; we just exclude the freshness fields from the vault payload and re-derive them locally on pull. Needs an ADR — back-compat with v3 vaults is fiddly.
 
-### D — `reloadFeeds` runs twice per refresh *(small win, trivial effort)*
-Two full IndexedDB reads of feeds+folders per tick. The first (after `pull`) is needed because the merge may have changed rows; the second (after `refreshAllFeeds`) only needs the freshness columns. Could collapse to one read if (C) lands, or update in-memory rows from the refresh result directly.
+### D — `reloadFeeds` runs twice per refresh *(small win, trivial effort)* ✅
+~~Two full IndexedDB reads of feeds+folders per tick.~~ Resolved by
+`mergeRefreshResultsIntoStore` in `src/stores/feed-store.ts`: the
+per-feed results returned by `refreshAllFeeds()` are merged into the
+in-memory list directly, skipping the post-refresh DB read. The
+post-pull reload still runs because `pull()` may have added or removed
+rows. On a refresh-level failure (rare — DB error inside
+`refreshAllFeeds` itself), the store falls back to a full reload to
+stay honest.
 
 ### E — Fan-out backpressure *(small win, small effort)*
 60 concurrent `/api/feed` requests hit a self-hosted server that allows 100/min. Already grouped by host in `refreshAllFeeds` (`src/core/feeds/group-by-host.ts`) but not throttled per-process. A small concurrency cap (e.g. 8 in-flight) keeps the user's other API calls (sync, favicon, paywall) within budget. Pairs well with (A) since 304s are cheap once we have them.
@@ -55,6 +62,14 @@ Smallest unit of progress and the thing DoubtfulYeti592 asked for.
 ## Step 2+ (follow-up PRs)
 
 Land (A), then (B), in that order. (C) needs an ADR before code. (D) and (E) ride along with whichever PR is next in the same files.
+
+### Status (2026-05-23)
+
+- (A) ✅ shipped — `refreshFeed` forwards `If-None-Match` / `If-Modified-Since`; proxy honours 304 short-circuit; `consecutive304Count` powers `effectiveRefreshIntervalMs` backoff.
+- (B) ✅ shipped — `pullVaultIfChanged` HEADs the vault first and skips the GET when the cached ETag still matches.
+- (C) ⏸ ADR ready ([ADR 023](../decisions/023-freshness-fields-device-local.md)). Implementation PR remaining.
+- (D) ✅ shipped — `mergeRefreshResultsIntoStore` merges per-feed results into the in-memory list directly, skipping the post-refresh DB re-read.
+- (E) ✅ shipped — `groupByHostForRefresh` packs batches that respect per-host serialization within a `REFRESH_CONCURRENCY` cap. The companion `host-pause.ts` (ADR 014 A4-extras) consumes Retry-After to back off the host entirely.
 
 ## Out of scope
 

@@ -1,4 +1,5 @@
 import type { SyncStorageAdapter } from "../types.ts";
+import { assertNotTestOnlyInProduction } from "../../test-only-brand.ts";
 import { createFilesystemAdapter } from "./filesystem-adapter.ts";
 import { createMemoryAdapter } from "./memory-adapter.ts";
 import { createVercelBlobAdapter } from "./vercel-blob-adapter.ts";
@@ -53,8 +54,11 @@ export function resolveAdapter(
       return wrapAsyncAdapter(createUpstashSyncAdapter());
     case "vercel-blob":
       return createVercelBlobAdapter();
-    case "memory":
-      return createMemoryAdapter();
+    case "memory": {
+      const adapter = createMemoryAdapter();
+      assertNotTestOnlyInProduction(adapter, "sync.resolveAdapter");
+      return adapter;
+    }
     case "filesystem":
     default:
       return createFilesystemAdapter(

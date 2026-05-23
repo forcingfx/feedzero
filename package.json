@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "serve": "node --import tsx server.ts",
     "docs:tier-matrix": "tsx scripts/generate-tier-matrix-doc.ts",
+    "check-env": "tsx scripts/check-env.ts",
     "prepare": "husky"
   },
   "devDependencies": {
