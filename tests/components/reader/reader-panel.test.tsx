@@ -668,6 +668,84 @@ describe("ReaderPanel", () => {
     });
   });
 
+  describe("Empty-blurb auto-switch", () => {
+    it("opens articles in extracted view when content and summary are both empty", () => {
+      const article = mockArticle({
+        link: "https://example.com/empty-blurb",
+        content: "",
+        summary: "",
+      });
+      // Pre-seed cached extraction so switchToExtracted doesn't fire a fetch.
+      useExtractionStore.setState({
+        cache: { [article.link]: "<p>full text from cache</p>" },
+        statusMap: { [article.link]: "available" },
+        viewMode: "feed",
+      });
+      useArticleStore.setState({
+        selectedArticle: article,
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+    });
+
+    it("auto-switches when blurb HTML strips to nothing (image-only feed)", () => {
+      const article = mockArticle({
+        link: "https://example.com/image-only",
+        content: '<img alt="">',
+        summary: "<p></p>",
+      });
+      useExtractionStore.setState({
+        cache: { [article.link]: "<p>full text from cache</p>" },
+        statusMap: { [article.link]: "available" },
+        viewMode: "feed",
+      });
+      useArticleStore.setState({
+        selectedArticle: article,
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+    });
+
+    it("does not auto-switch when the article has no fetchable link", () => {
+      // Without a link there's nothing to extract; flipping the mode would
+      // leave the user on a permanent "extracting…" or empty extracted view.
+      const article = mockArticle({
+        link: "",
+        content: "",
+        summary: "",
+      });
+      useArticleStore.setState({
+        selectedArticle: article,
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(useExtractionStore.getState().viewMode).toBe("feed");
+    });
+
+    it("stays in feed view when content is present", () => {
+      useArticleStore.setState({
+        selectedArticle: mockArticle({ content: "<p>Hello.</p>", summary: "" }),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(useExtractionStore.getState().viewMode).toBe("feed");
+    });
+  });
+
   describe("star toggle placement (mobile-friendly)", () => {
     // The old layout dropped the star into the meta line alongside the
     // feed name, date and external-link icon. That line uses flex-wrap,
