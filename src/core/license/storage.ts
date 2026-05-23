@@ -1,4 +1,5 @@
 import { type Result } from "../../utils/result";
+import { markTestOnly } from "../test-only-brand";
 
 /**
  * A single issued license. The runtime license-check endpoint reads these
@@ -83,10 +84,17 @@ export interface LicenseStorage {
  * In-memory adapter. Used by tests, the dev server, and as the reference
  * implementation that pins the contract. Production uses
  * `VercelKVLicenseStorage` from `./storage-vercel-kv.ts`.
+ *
+ * Branded test-only so resolveLicenseStorage refuses to return it in
+ * production — see src/core/test-only-brand.ts.
  */
 export class MemoryLicenseStorage implements LicenseStorage {
   private readonly records = new Map<string, LicenseRecord>();
   private readonly denyList = new Set<string>();
+
+  constructor() {
+    markTestOnly(this);
+  }
 
   async put(record: LicenseRecord): Promise<Result<void>> {
     this.records.set(record.keyId, { ...record });

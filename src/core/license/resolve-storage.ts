@@ -23,6 +23,7 @@
  * loudly when production starts with Memory mode (follow-up).
  */
 
+import { assertNotTestOnlyInProduction } from "../test-only-brand";
 import {
   MemoryLicenseStorage,
   type LicenseStorage,
@@ -38,7 +39,11 @@ export async function resolveLicenseStorage(
   if (hasUpstashCredentials(env)) {
     return createUpstashLicenseStorage(env);
   }
-  return new MemoryLicenseStorage();
+  const storage = new MemoryLicenseStorage();
+  // NODE_ENV is a runtime property, not a credential — read from process.env
+  // even when the caller passes a synthetic `env` (used for credentials only).
+  assertNotTestOnlyInProduction(storage, "license.resolveLicenseStorage");
+  return storage;
 }
 
 /**

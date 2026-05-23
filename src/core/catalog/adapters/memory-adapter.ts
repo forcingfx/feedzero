@@ -1,11 +1,17 @@
+import { markTestOnly } from "../../test-only-brand.ts";
 import { ok } from "../../../utils/result.ts";
 import type { CatalogFeed, CatalogStorageAdapter } from "../catalog-types.ts";
 
-/** In-memory catalog adapter for development and testing. */
+/**
+ * In-memory catalog adapter for development and testing.
+ *
+ * Branded test-only so resolveCatalogStorage refuses to return it in
+ * production — see src/core/test-only-brand.ts.
+ */
 export function createMemoryCatalogAdapter(): CatalogStorageAdapter {
   const store = new Map<string, CatalogFeed>();
 
-  return {
+  return markTestOnly({
     async upsert(url) {
       const now = new Date().toISOString();
       const existing = store.get(url);
@@ -54,5 +60,5 @@ export function createMemoryCatalogAdapter(): CatalogStorageAdapter {
     async count() {
       return ok(store.size);
     },
-  };
+  } satisfies CatalogStorageAdapter);
 }

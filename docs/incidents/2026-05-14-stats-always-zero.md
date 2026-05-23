@@ -76,7 +76,7 @@ PR #47 (one merge):
 | Smoke test that triggers a proxy fetch then asserts the catalog count grew (cross-lambda persistence regression test) | Founder + Claude | ✅ PR #49 (`tests/smoke/catalog.test.ts`) |
 | Smoke test that asserts `/api/stats-sync` returns `vaults > 0` (catches the wrong-adapter regression) | Founder + Claude | ✅ PR #49 (`tests/smoke/stats-sync.test.ts`) |
 | Add SMOKE as a required phase of the RGR cycle so every future API change ships with one | Founder + Claude | ✅ PR #48 / CLAUDE.md RGR+S |
-| Move test-only adapters out of `src/core/*/adapters/` into `src/test-utils/` (or annotate `@testOnly` and have resolvers refuse them in production) | Founder | 🔄 Open follow-up (ADR 011 references this as next step) |
+| Move test-only adapters out of `src/core/*/adapters/` into `src/test-utils/` (or annotate `@testOnly` and have resolvers refuse them in production) | Founder + Claude | ✅ Annotated via `markTestOnly()` brand (`src/core/test-only-brand.ts`); the sync / catalog / license / stripe resolvers throw at module-load if a branded adapter would surface under `NODE_ENV=production`. Files kept in place — the brand is what carries the signal. |
 
 ## What went well
 
@@ -92,7 +92,7 @@ PR #47 (one merge):
 
 ## Open questions
 
-- Should the architecture forbid in-memory adapters in production at the *type* level (e.g. brand them with a `__testOnly` symbol the resolver refuses to return when `NODE_ENV === "production"`)? Open follow-up.
+- ~~Should the architecture forbid in-memory adapters in production at the *type* level (e.g. brand them with a `__testOnly` symbol the resolver refuses to return when `NODE_ENV === "production"`)?~~ ✅ Resolved: yes. Branded via `markTestOnly()` (`src/core/test-only-brand.ts`); all four memory adapters carry the brand and all four resolvers (sync / catalog / license / stripe) call `assertNotTestOnlyInProduction()` before returning. A misconfigured production deploy throws at module-load instead of silently routing writes to a per-cold-start `Map`.
 
 ## References
 
