@@ -4,6 +4,9 @@
   "description": "Privacy-first RSS reader",
   "license": "AGPL-3.0-or-later",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite --port 3000",
     "build": "vite build",

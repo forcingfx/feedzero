@@ -1,0 +1,8 @@
+{
+  "name": "@feedzero/web",
+  "version": "0.0.0",
+  "description": "Web SPA + Vercel serverless API + Hono self-hosted server. Today this is the root `src/`, `api/`, and `server.ts`; future PRs will migrate them here. See ADR 023.",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module"
+}

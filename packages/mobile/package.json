@@ -1,0 +1,8 @@
+{
+  "name": "@feedzero/mobile",
+  "version": "0.0.0",
+  "description": "React Native (Expo) iOS app. Empty placeholder — scaffolded in Phase 3 of the iOS rollout. See ADR 023.",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module"
+}

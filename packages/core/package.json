@@ -1,0 +1,8 @@
+{
+  "name": "@feedzero/core",
+  "version": "0.0.0",
+  "description": "Framework-agnostic core: storage, sync, crypto, parsing, extraction, license, tier matrix, Zustand stores. Shared by @feedzero/web and @feedzero/mobile.",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module"
+}
