@@ -67,7 +67,7 @@ Land (A), then (B), in that order. (C) needs an ADR before code. (D) and (E) rid
 
 - (A) ✅ shipped — `refreshFeed` forwards `If-None-Match` / `If-Modified-Since`; proxy honours 304 short-circuit; `consecutive304Count` powers `effectiveRefreshIntervalMs` backoff.
 - (B) ✅ shipped — `pullVaultIfChanged` HEADs the vault first and skips the GET when the cached ETag still matches.
-- (C) ⏸ still requires an ADR before code.
+- (C) ⏸ ADR ready ([ADR 023](../decisions/023-freshness-fields-device-local.md)). Implementation PR remaining.
 - (D) ✅ shipped — `mergeRefreshResultsIntoStore` merges per-feed results into the in-memory list directly, skipping the post-refresh DB re-read.
 - (E) ✅ shipped — `groupByHostForRefresh` packs batches that respect per-host serialization within a `REFRESH_CONCURRENCY` cap. The companion `host-pause.ts` (ADR 014 A4-extras) consumes Retry-After to back off the host entirely.
 
