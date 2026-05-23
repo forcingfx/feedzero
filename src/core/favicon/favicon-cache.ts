@@ -1,6 +1,14 @@
 const STORAGE_KEY = "feedzero:favicon-cache";
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days for successful
 const FAILURE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours for failures
+/**
+ * Hard cap on cached origins. A user with hundreds of feeds plus per-
+ * extracted-article images can otherwise accumulate cache entries
+ * indefinitely (TTL is days; never bounded by count). 1000 covers any
+ * plausible real library with substantial headroom; beyond that we
+ * drop the least-recently-inserted entry on every new insertion.
+ */
+const MAX_CACHE_ENTRIES = 1000;
 
 interface CacheEntry {
   index: number;
@@ -88,13 +96,30 @@ export function getFaviconStrategyIndex(origin: string): number {
 }
 
 export function recordFaviconSuccess(origin: string, index: number) {
-  resolvedCache.set(origin, { index, ts: Date.now() });
+  setEntryWithCap(origin, { index, ts: Date.now() });
   persistCache();
 }
 
 export function recordFaviconFailure(origin: string) {
-  resolvedCache.set(origin, { index: -1, ts: Date.now() });
+  setEntryWithCap(origin, { index: -1, ts: Date.now() });
   persistCache();
+}
+
+/**
+ * Insert/update an entry while enforcing the LRU cap. When adding a
+ * brand-new origin would push the map past MAX_CACHE_ENTRIES, the
+ * oldest insertion is evicted first. Updating an existing origin
+ * never grows the map and skips the eviction check entirely.
+ */
+function setEntryWithCap(origin: string, entry: CacheEntry): void {
+  if (
+    !resolvedCache.has(origin) &&
+    resolvedCache.size >= MAX_CACHE_ENTRIES
+  ) {
+    const oldest = resolvedCache.keys().next().value;
+    if (oldest !== undefined) resolvedCache.delete(oldest);
+  }
+  resolvedCache.set(origin, entry);
 }
 
 /**
