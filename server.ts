@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { compress } from "hono/compress";
 import { handleProxyRequest } from "./src/core/proxy/proxy-handler";
 import { handleFeedbackRequest } from "./src/core/feedback/feedback-handler";
 import { handleSyncRequest } from "./src/core/sync/sync-handler";
@@ -172,6 +173,16 @@ export function createApp(
     }
     await next();
   });
+
+  // Gzip/deflate compression for any compressible response above the
+  // default 1 KB threshold. Self-host parity with Vercel's edge — the
+  // hosted deployment compresses at the CDN automatically. Without
+  // this, a returning user pulling a 2 MB encrypted vault over
+  // /api/sync downloads the full ciphertext on every reload; with it,
+  // typical JSON+base64 responses compress 70–80%. Mounted AFTER the
+  // rate-limit middleware so 429 short-circuits don't pay the
+  // compression cost.
+  app.use("*", compress());
 
   // Health/diagnostics endpoint
   app.get("/api/diagnostics", (c) =>
