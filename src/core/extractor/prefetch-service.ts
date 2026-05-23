@@ -28,8 +28,24 @@ import { ok, err } from "../../utils/result.ts";
 import type { Result } from "../../utils/result.ts";
 import { getAllArticles, updateArticle } from "../storage/db.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
-import { extract } from "./extractor.ts";
 import type { Article } from "../../types/index.ts";
+
+/**
+ * Defuddle is hundreds of KB and is only ever needed once the user
+ * actually triggers extraction — manually (extraction-store) or via
+ * prefetch (here). A static `import { extract } from "./extractor"` in
+ * this module pulls the entire extractor pipeline into the main bundle
+ * because feed-store statically imports prefetch-service. Loading
+ * lazily keeps `vendor-parsing` out of first paint; the user pays the
+ * one-time chunk cost when prefetch first fires (post-refresh), not on
+ * cold start.
+ */
+async function loadExtract(): Promise<
+  typeof import("./extractor.ts").extract
+> {
+  const mod = await import("./extractor.ts");
+  return mod.extract;
+}
 
 /** Maximum concurrent extraction workers. Matches REFRESH_CONCURRENCY. */
 export const PREFETCH_CONCURRENCY = 3;
@@ -102,6 +118,7 @@ async function prefetchOne(article: Article): Promise<boolean> {
     const response = await proxyFetch("/api/page", article.link);
     if (!response.ok) return false;
     const html = await response.text();
+    const extract = await loadExtract();
     const extracted = extract(html, article.link);
     if (!extracted.ok || !extracted.value.content) return false;
 

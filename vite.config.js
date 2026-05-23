@@ -422,14 +422,24 @@ export default defineConfig({
           if (id.includes("/node_modules/dexie/")) {
             return "vendor-dexie";
           }
-          // Parsing + extraction pipeline. Heavy and infrequently bumped.
+          // Feed parsing — loaded at boot for every refresh.
+          if (id.includes("/node_modules/feedsmith/")) {
+            return "vendor-feedsmith";
+          }
+          // DOMPurify — loaded at boot for sanitizing every feed body.
+          if (id.includes("/node_modules/dompurify/")) {
+            return "vendor-dompurify";
+          }
+          // Extraction-only pipeline. Defuddle is the bulk of the
+          // production extractor; marked converts GitHub READMEs.
+          // Both are pulled only when the user clicks "Extracted" or
+          // the prefetch path runs after a refresh — keep them in a
+          // lazy chunk so first paint doesn't pay for them.
           if (
-            id.includes("/node_modules/feedsmith/") ||
             id.includes("/node_modules/defuddle/") ||
-            id.includes("/node_modules/marked/") ||
-            id.includes("/node_modules/dompurify/")
+            id.includes("/node_modules/marked/")
           ) {
-            return "vendor-parsing";
+            return "vendor-extractor";
           }
           // Icon set — large but rarely versioned.
           if (id.includes("/node_modules/lucide-react/")) {
