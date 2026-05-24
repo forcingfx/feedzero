@@ -3,19 +3,22 @@ import {
   pushVault,
   pullVault,
   pullVaultIfChanged,
+  recoverVault,
+  upgradeVaultKdf,
   importVault,
   deleteVault,
   exportVault,
   mergeVaults,
 } from "../core/sync/sync-service";
 import type { SyncCredentials } from "../core/sync/sync-service";
-import { deriveVaultId, deriveVaultKey } from "../core/sync/vault-crypto.ts";
+import type { VaultData } from "../core/sync/types.ts";
 import {
   addVaultKeys,
   removeVaultKeys,
   destroyLocal,
   persistDerivedKeysFromOpenDb,
   assertKeyDataCoupling,
+  updateStoredVaultKey,
 } from "../core/storage/key-manager.ts";
 import {
   close,
@@ -23,7 +26,6 @@ import {
   open,
   getPreferencesUpdatedAt,
 } from "../core/storage/db.ts";
-import type { VaultData } from "../core/sync/types.ts";
 import { clearLicenseToken } from "../core/license/license-token-store.ts";
 import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import type { Result } from "@feedzero/core/utils/result";
@@ -139,18 +141,6 @@ function clearPendingTimers(): void {
     clearTimeout(jitterTimer);
     jitterTimer = null;
   }
-}
-
-async function deriveSyncCredentials(
-  passphrase: string,
-): Promise<Result<SyncCredentials>> {
-  const [vaultIdResult, vaultKeyResult] = await Promise.all([
-    deriveVaultId(passphrase),
-    deriveVaultKey(passphrase),
-  ]);
-  if (!vaultIdResult.ok) return vaultIdResult;
-  if (!vaultKeyResult.ok) return vaultKeyResult;
-  return ok({ vaultId: vaultIdResult.value, vaultKey: vaultKeyResult.value });
 }
 
 export const useSyncStore = create<SyncStore>((set, get) => ({
@@ -388,32 +378,41 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   switchToExistingCloud: async (passphrase, mode) => {
     set({ status: "syncing", error: null });
 
-    const credsResult = await deriveSyncCredentials(passphrase);
-    if (!credsResult.ok) {
-      set({ status: "error", error: credsResult.error });
-      return err(credsResult.error);
-    }
-    const credentials = credsResult.value;
-
     // Mode-specific source data: either the cloud vault directly
     // (replace) or local merged with cloud (merge). The destructive
     // local rewrite happens INSIDE applyCloudVault — only after pull
     // succeeds. If pull fails, the local DB is untouched.
+    //
+    // Either mode uses `recoverVault` (not `pullVault`) so the cloud
+    // envelope's stamped KDF spec drives the matching key derivation;
+    // `deriveSyncCredentials` (legacy PBKDF2) here would have failed
+    // to decrypt any Argon2id-encrypted vault.
     if (mode === "replace") {
-      const pullResult = await pullVault(credentials);
-      if (!pullResult.ok) {
-        set({ status: "error", error: pullResult.error });
-        return pullResult;
+      const recoverResult = await recoverVault(passphrase);
+      if (!recoverResult.ok) {
+        set({ status: "error", error: recoverResult.error });
+        return err(recoverResult.error);
       }
+      const { vault: cloudVault, credentials } = recoverResult.value;
 
-      const applyResult = await applyCloudVault(passphrase, pullResult.value);
+      const applyResult = await applyCloudVault(
+        passphrase,
+        cloudVault,
+        credentials.kdfSpec,
+      );
       if (!applyResult.ok) {
         set({ status: "error", error: applyResult.error });
         return applyResult;
       }
 
-      set({
+      const finalCreds = await autoUpgradeOnPassphraseEntry(
+        passphrase,
         credentials,
+        cloudVault,
+      );
+
+      set({
+        credentials: finalCreds,
         status: "synced",
         lastSyncedAt: Date.now(),
         error: null,
@@ -421,28 +420,35 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return ok(true);
     }
 
-    // Merge mode: snapshot local, pull cloud, merge in memory, then
-    // apply the merged result. Push the (now-cloud-passphrase-encrypted)
-    // result so the cloud reflects the merge.
+    // Merge mode: snapshot local FIRST so a local-export failure
+    // short-circuits before we burn a network round-trip on the cloud
+    // pull. Then recoverVault discovers the cloud KDF + decrypts; the
+    // merged vault is pushed back with the same KDF the cloud
+    // envelope was already stamped with.
     const exportResult = await exportVault();
     if (!exportResult.ok) {
       set({ status: "error", error: exportResult.error });
       return exportResult;
     }
 
-    const pullResult = await pullVault(credentials);
-    if (!pullResult.ok) {
-      set({ status: "error", error: pullResult.error });
-      return pullResult;
+    const recoverResult = await recoverVault(passphrase);
+    if (!recoverResult.ok) {
+      set({ status: "error", error: recoverResult.error });
+      return err(recoverResult.error);
     }
+    const { vault: cloudVault, credentials } = recoverResult.value;
 
-    const mergeResult = mergeVaults(exportResult.value, pullResult.value);
+    const mergeResult = mergeVaults(exportResult.value, cloudVault);
     if (!mergeResult.ok) {
       set({ status: "error", error: mergeResult.error });
       return mergeResult;
     }
 
-    const applyResult = await applyCloudVault(passphrase, mergeResult.value);
+    const applyResult = await applyCloudVault(
+      passphrase,
+      mergeResult.value,
+      credentials.kdfSpec,
+    );
     if (!applyResult.ok) {
       set({ status: "error", error: applyResult.error });
       return applyResult;
@@ -454,8 +460,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return err(pushResult.error);
     }
 
-    set({
+    const finalCreds = await autoUpgradeOnPassphraseEntry(
+      passphrase,
       credentials,
+      mergeResult.value,
+    );
+
+    set({
+      credentials: finalCreds,
       status: "synced",
       lastSyncedAt: pushResult.value.updatedAt,
       lastVaultEtag: pushResult.value.etag,
@@ -464,6 +476,38 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     return ok(true);
   },
 }));
+
+/**
+ * Auto-upgrade hook for any passphrase-entry flow: when the cloud
+ * envelope is still on the legacy PBKDF2 KDF, derive a fresh Argon2id
+ * key, re-encrypt + push, and persist the new key locally so the
+ * device's stored JWK stays aligned with the cloud's encoding.
+ *
+ * Best-effort by design — failure here MUST NOT break recovery. The
+ * caller continues with the original `current` credentials and the
+ * upgrade can retry on the next passphrase entry.
+ *
+ * See CLAUDE.md "Auto-upgrade on next passphrase entry" — this is
+ * the migration plan for existing PBKDF2 sync users to land on
+ * Argon2id without a UI prompt.
+ */
+async function autoUpgradeOnPassphraseEntry(
+  passphrase: string,
+  current: SyncCredentials,
+  vault: VaultData,
+): Promise<SyncCredentials> {
+  const upgraded = await upgradeVaultKdf(passphrase, current, vault);
+  if (!upgraded.ok || upgraded.value === current) return current;
+  const persistResult = await updateStoredVaultKey(upgraded.value);
+  // If persistence fails, the cloud has been upgraded but local
+  // can't store the new JWK — degrade gracefully: keep using the
+  // old in-memory creds. The local JWK still decrypts what's in
+  // IndexedDB; only future cloud pulls would mismatch, and those
+  // will trigger a recovery flow that will derive the right key
+  // from the envelope's spec.
+  if (!persistResult.ok) return current;
+  return upgraded.value;
+}
 
 /**
  * Apply timestamp last-write-wins to the preferences carried by a pulled
@@ -521,6 +565,7 @@ async function gatePreferencesByTimestamp(
 async function applyCloudVault(
   passphrase: string,
   vault: import("../core/sync/types.ts").VaultData,
+  vaultKdfSpec: import("../core/sync/types.ts").KdfSpec,
 ): Promise<Result<boolean>> {
   close();
   const deleteResult = await deleteDatabase();
@@ -532,8 +577,14 @@ async function applyCloudVault(
   const importResult = await importVault(vault);
   if (!importResult.ok) return importResult;
 
+  // Persist the vault key with the SAME KDF that encrypted the cloud
+  // envelope. Defaulting to Argon2id here would silently re-key a
+  // legacy PBKDF2 vault's local store, and the next push would
+  // re-encrypt the cloud envelope with a key the originating device
+  // cannot reproduce — recovery on the original device would fail.
   const persistResult = await persistDerivedKeysFromOpenDb(passphrase, {
     sync: true,
+    vaultKdfSpec,
   });
   if (!persistResult.ok) return persistResult;
 

@@ -486,10 +486,10 @@ describe("ArticleList", () => {
       const favicons = container.querySelectorAll("img");
       expect(favicons).toHaveLength(2);
       expect(favicons[0].getAttribute("src")).toBe(
-        "/api/favicon?domain=f1.com",
+        "/api/icon?domain=f1.com",
       );
       expect(favicons[1].getAttribute("src")).toBe(
-        "/api/favicon?domain=f2.com",
+        "/api/icon?domain=f2.com",
       );
     });
 
@@ -580,10 +580,10 @@ describe("ArticleList", () => {
       const favicons = container.querySelectorAll("img");
       expect(favicons).toHaveLength(2);
       expect(favicons[0].getAttribute("src")).toBe(
-        "/api/favicon?domain=f1.com",
+        "/api/icon?domain=f1.com",
       );
       expect(favicons[1].getAttribute("src")).toBe(
-        "/api/favicon?domain=f2.com",
+        "/api/icon?domain=f2.com",
       );
     });
   });

@@ -303,6 +303,23 @@ export const TIER_MATRIX = {
     tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
     marketing: { blurb: "Signal — topics emerging across your feeds", rank: 20 },
   },
+  "signal-briefings": {
+    id: "signal-briefings",
+    name: "Signal Briefings",
+    description:
+      "Standing AI-written briefings on the topics you care about, with citations drawn from your own feeds. Bring your own Claude API key — FeedZero never sees your prompts or articles.",
+    category: "filtering-and-search",
+    status: "shipped",
+    tiers: {
+      free: UNAVAILABLE,
+      personal: { available: true, limit: 10, limitUnit: "briefings" },
+      pro: { available: true, limit: 10, limitUnit: "briefings" },
+    },
+    marketing: {
+      blurb: "Signal Briefings — standing AI briefs from your feeds, with citations",
+      rank: 19,
+    },
+  },
 
   // ── Delivery ───────────────────────────────────────────────────────────
   "authenticated-fetchers": {
@@ -494,6 +511,7 @@ export const GATED_FEATURE_IDS = [
   "rules",
   "search",
   "signal",
+  "signal-briefings",
   "authenticated-fetchers",
   "send-to-kindle",
   "bridges",

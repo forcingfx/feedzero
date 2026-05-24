@@ -18,6 +18,7 @@ const VALID_TABS: readonly SettingsTab[] = [
   "subscription",
   "sync-and-data",
   "reading",
+  "briefings",
   "help",
 ];
 

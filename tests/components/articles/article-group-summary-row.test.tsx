@@ -123,7 +123,7 @@ describe("ArticleGroupSummaryRow", () => {
     const favicon = screen.getByRole("button").querySelector("img");
     expect(favicon).not.toBeNull();
     expect(favicon?.getAttribute("src")).toContain(
-      "/api/favicon?domain=techcrunch.com",
+      "/api/icon?domain=techcrunch.com",
     );
   });
 });

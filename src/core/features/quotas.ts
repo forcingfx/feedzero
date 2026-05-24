@@ -26,6 +26,15 @@ import { getLimit } from "./tier-matrix";
  */
 export const FREE_FEED_LIMIT = getLimit("feed-subscriptions", "free") as number;
 
+/**
+ * Maximum saved Signal Briefings on a paid tier. Sourced from the
+ * matrix so re-tiering or cap changes happen in exactly one place.
+ * Currently the same on Personal and Pro; if they ever diverge,
+ * `checkBriefingQuota` reads the per-tier limit from the matrix
+ * directly and this constant becomes a convenience.
+ */
+export const BRIEFINGS_LIMIT = getLimit("signal-briefings", "personal") as number;
+
 export type QuotaCheck =
   | { ok: true }
   | {
@@ -90,4 +99,68 @@ export function quotaErrorMessage(check: Exclude<QuotaCheck, { ok: true }>): str
     return `You've reached the Free limit of ${check.limit} feeds. Subscribe to Personal for unlimited, or self-host with VITE_SELF_HOSTED=1.`;
   }
   return `Importing ${check.delta} feeds would exceed the Free limit of ${check.limit} (you have ${check.current}). Subscribe to Personal for unlimited, or self-host with VITE_SELF_HOSTED=1.`;
+}
+
+// ── Signal Briefings quota ─────────────────────────────────────────────
+
+export type BriefingQuotaCheck =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "quota-exceeded";
+      limit: number;
+      current: number;
+      delta: number;
+    };
+
+export interface BriefingQuotaArgs {
+  /** Current saved-briefing count on the user's account. */
+  currentCount: number;
+  /** Number of briefings about to be created (defaults to 1). */
+  delta?: number;
+  tier: Tier;
+  isSelfHosted: boolean;
+  paidTierActive: boolean;
+}
+
+/**
+ * Decide whether creating `delta` (default 1) more briefings is allowed.
+ *
+ * Free users are blocked by `feature-gates.gateState` upstream (the binary
+ * capability gate); this function enforces the numeric cap for any tier
+ * that has a per-tier limit set in the matrix. Mirrors `checkFeedQuota`
+ * for bypass behaviour:
+ *
+ *  - `paidTierActive: false`   → ok (pre-launch — no upgrade path exists).
+ *  - `isSelfHosted: true`       → ok (unlimited).
+ *  - tier has no matrix limit   → ok (feature gate already blocked the call,
+ *                                  or the tier is uncapped / unlimited).
+ *  - over cap                   → not ok with structured error.
+ *
+ * Matrix-derived: re-tiering Signal Briefings in `tier-matrix.ts` flows
+ * through here automatically — the per-tier limit comes from
+ * `getLimit("signal-briefings", tier)`.
+ */
+export function checkBriefingQuota(args: BriefingQuotaArgs): BriefingQuotaCheck {
+  const delta = args.delta ?? 1;
+  if (!args.paidTierActive) return { ok: true };
+  if (args.isSelfHosted) return { ok: true };
+  const limit = getLimit("signal-briefings", args.tier);
+  if (limit === undefined || limit === "unlimited") return { ok: true };
+  if (args.currentCount + delta > limit) {
+    return {
+      ok: false,
+      reason: "quota-exceeded",
+      limit,
+      current: args.currentCount,
+      delta,
+    };
+  }
+  return { ok: true };
+}
+
+export function briefingQuotaErrorMessage(
+  check: Exclude<BriefingQuotaCheck, { ok: true }>,
+): string {
+  return `You've reached the limit of ${check.limit} briefings. Archive or delete an existing briefing, or self-host with VITE_SELF_HOSTED=1.`;
 }

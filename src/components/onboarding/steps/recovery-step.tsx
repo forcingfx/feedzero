@@ -12,11 +12,12 @@ import {
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
-import { initFresh } from "@/core/storage/key-manager";
+import { initFresh, updateStoredVaultKey } from "@/core/storage/key-manager";
 import {
   checkVaultExists,
   importVault,
-  pullVault,
+  recoverVault,
+  upgradeVaultKdf,
 } from "@/core/sync/sync-service";
 
 type Phase = "idle" | "checking" | "restoring";
@@ -57,26 +58,38 @@ export function RecoveryStep() {
       return;
     }
 
-    // 2. Pull vault — vault is confirmed to exist, but pull still gates
-    //    the destructive op below in case of transient network failure.
+    // 2. Pull + decrypt the cloud envelope using the KDF it was stamped
+    //    with. `recoverVault` reads `envelope.kdf` so an Argon2id vault
+    //    written by another device decrypts here even though this
+    //    machine has never seen the spec — without that the wrong key
+    //    would silently fail to decrypt and the user would think their
+    //    passphrase was wrong.
     setPhase("restoring");
-    const pullResult = await pullVault(trimmed);
-    if (!pullResult.ok) {
+    const recoverResult = await recoverVault(trimmed);
+    if (!recoverResult.ok) {
       setError("Could not find a vault for this passphrase. Please check and try again.");
       setPhase("idle");
       return;
     }
+    const { vault, credentials: recoveredCredentials } = recoverResult.value;
 
-    // 3. Now that vault data is safely in hand, initialize local DB.
-    //    skipServerCleanup prevents deleting the vault we just pulled from.
-    const initResult = await initFresh(trimmed, { sync: true, skipServerCleanup: true });
+    // 3. Initialize a fresh local DB. Pass the recovered KDF spec so
+    //    `initFresh` derives a vault key that matches what's encrypting
+    //    the cloud envelope — otherwise the next push would re-encrypt
+    //    the cloud vault with a key from a different KDF, and the next
+    //    device's recovery would silently fail to decrypt.
+    const initResult = await initFresh(trimmed, {
+      sync: true,
+      skipServerCleanup: true,
+      vaultKdfSpec: recoveredCredentials.kdfSpec,
+    });
     if (!initResult.ok) {
       setError("Could not initialize. Please check your passphrase.");
       setPhase("idle");
       return;
     }
 
-    const credentials = initResult.value.credentials;
+    let credentials = initResult.value.credentials;
 
     // 4. Import the pulled vault data and restore sync state.
     //    `initFresh` already opened a fresh DB with passphrase-derived
@@ -86,7 +99,21 @@ export function RecoveryStep() {
     //    No separate "rekey" step needed — see #117 for the bug the
     //    old extra rekey call masked.
     if (credentials) {
-      await importVault(pullResult.value);
+      await importVault(vault);
+
+      // 5. Auto-upgrade the cloud envelope's KDF if it's still on the
+      //    legacy PBKDF2 spec. The decision per CLAUDE.md / migration
+      //    discussion: existing users get bumped to Argon2id the first
+      //    time they type their passphrase on a fresh device. Best-
+      //    effort — a push failure leaves the cloud at legacy, the
+      //    user keeps working with their PBKDF2 credentials, and the
+      //    next recovery attempt re-runs the upgrade.
+      const upgraded = await upgradeVaultKdf(trimmed, credentials, vault);
+      if (upgraded.ok && upgraded.value !== credentials) {
+        await updateStoredVaultKey(upgraded.value);
+        credentials = upgraded.value;
+      }
+
       useSyncStore.getState().restoreSync(credentials);
     }
 

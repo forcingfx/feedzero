@@ -282,6 +282,15 @@ function clusterGreedy(
       for (const m of members.get(article.id) ?? [article]) topicFeeds.add(m.feedId);
     }
 
+    // Newest article in the cluster (across all stories, including the
+    // members each story aggregates). Drives the final recency sort.
+    let newestActivityAt = 0;
+    for (const article of claimedHere) {
+      for (const m of members.get(article.id) ?? [article]) {
+        if (m.publishedAt > newestActivityAt) newestActivityAt = m.publishedAt;
+      }
+    }
+
     topics.push({
       term: term.term,
       displayTerm: term.displayTerm,
@@ -289,8 +298,24 @@ function clusterGreedy(
       totalStories: stories.length,
       totalArticlesInCluster: allMembers,
       feedCount: topicFeeds.size,
+      newestActivityAt,
     });
   }
+
+  // Topic *selection* is signal-score-based (the loop above iterates
+  // `ranked` desc). Topic *display order* is recency: the user's question
+  // when they open /signal is "what's happening right now," not "what's
+  // loudest across my whole library." Stable tiebreak by displayTerm so
+  // a tie doesn't shuffle between renders.
+  topics.sort(
+    (a, b) =>
+      b.newestActivityAt - a.newestActivityAt ||
+      (a.displayTerm < b.displayTerm
+        ? -1
+        : a.displayTerm > b.displayTerm
+          ? 1
+          : 0),
+  );
 
   return topics;
 }

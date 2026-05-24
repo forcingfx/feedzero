@@ -119,7 +119,7 @@ describe("app-store", () => {
   it("initialize passes sync option to initFresh", async () => {
     vi.mocked(initFresh).mockResolvedValue({
       ok: true,
-      value: { credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey } },
+      value: { credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } } },
     });
 
     await useAppStore.getState().initialize("test-key", { sync: true });
@@ -253,6 +253,7 @@ describe("app-store", () => {
       const mockCredentials = {
         vaultId: "vault-id",
         vaultKey: "mock-key" as unknown as CryptoKey,
+      kdfSpec: { kind: "pbkdf2-600k" } as const,
       };
       vi.mocked(restore).mockResolvedValue({
         status: "ready",
@@ -283,6 +284,7 @@ describe("app-store", () => {
         credentials: {
           vaultId: "vault-id",
           vaultKey: "mock-key" as unknown as CryptoKey,
+        kdfSpec: { kind: "pbkdf2-600k" } as const,
         },
       });
       vi.mocked(pullVaultIfChanged).mockResolvedValue({
@@ -307,6 +309,7 @@ describe("app-store", () => {
         credentials: {
           vaultId: "vault-id",
           vaultKey: "mock-key" as unknown as CryptoKey,
+        kdfSpec: { kind: "pbkdf2-600k" } as const,
         },
       });
       // pullVaultIfChanged returns a promise that never resolves.

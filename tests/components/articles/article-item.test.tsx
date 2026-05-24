@@ -196,7 +196,7 @@ describe("ArticleItem", () => {
 
       const img = container.querySelector("img");
       expect(img!.getAttribute("src")).toBe(
-        "/api/favicon?domain=example.com",
+        "/api/icon?domain=example.com",
       );
     });
 

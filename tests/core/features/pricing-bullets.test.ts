@@ -58,6 +58,12 @@ describe("pricingBullets — pricing cards derived from the matrix", () => {
     expect(pricingBullets("pro").some((b) => b.id === "search")).toBe(true);
   });
 
+  it("Signal Briefings lands on the Personal card (its lowest unlock tier)", () => {
+    expect(pricingBullets("personal").some((b) => b.id === "signal-briefings")).toBe(true);
+    expect(pricingBullets("pro").some((b) => b.id === "signal-briefings")).toBe(false);
+    expect(pricingBullets("free").some((b) => b.id === "signal-briefings")).toBe(false);
+  });
+
   it("does not surface gated features that opt out of pricing (no marketing field)", () => {
     // `rules` is a shipped Personal feature deliberately omitted from the
     // pricing grid — it must not appear on any card.

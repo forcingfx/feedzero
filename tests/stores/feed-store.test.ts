@@ -786,7 +786,7 @@ describe("feed-store", () => {
       });
       vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
       useSyncStore.setState({
-        credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey },
+        credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
       });
 
       await useFeedStore.getState().refreshAll();
@@ -834,7 +834,7 @@ describe("feed-store", () => {
         return { ok: true, value: { results: [] } };
       });
       useSyncStore.setState({
-        credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey },
+        credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
       });
 
       await useFeedStore.getState().refreshAll();

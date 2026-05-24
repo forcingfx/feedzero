@@ -322,3 +322,83 @@ export interface CreateRuleInput {
   actions: RuleAction[];
   enabled?: boolean;
 }
+
+/**
+ * Signal Briefing — a standing prompt + name the user creates to get
+ * AI-written briefings drawn from their own feeds. Persisted in the
+ * encrypted `briefings` Dexie table; syncs through the vault like every
+ * other user record. `lastReport` is the most recent generated briefing
+ * (or null before the first run); `staleArticleCount` counts new matching
+ * articles ingested since the last successful run, so the sidebar can
+ * surface a "refresh available" affordance without re-running the matcher.
+ *
+ * The Anthropic API call that produces the report is initiated only by an
+ * explicit user click — the autorefresh path bumps `staleArticleCount`
+ * but never calls the LLM on its own.
+ */
+export interface Briefing {
+  id: string;
+  /** User-supplied display name, e.g. "EU AI Act enforcement". */
+  name: string;
+  /** Free-text prompt describing what the briefing should cover. */
+  prompt: string;
+  createdAt: number;
+  /** Epoch ms of the most recent successful run, or null before first run. */
+  lastRunAt: number | null;
+  /** Most recently generated report, or null before first run. */
+  lastReport: BriefingReport | null;
+  /**
+   * New matching articles ingested since `lastRunAt`. Updated by the
+   * auto-refresh hook after each `refreshAll()` cycle. Surfaces as the
+   * stale-indicator dot in the sidebar; resets to 0 on a fresh report.
+   */
+  staleArticleCount: number;
+}
+
+/**
+ * The structured output produced by `generateBriefing` for a single
+ * refresh. Versioned so older cached reports can be invalidated when
+ * the schema evolves.
+ */
+export interface BriefingReport {
+  schemaVersion: number;
+  /** Markdown abstract; rendered via marked + DOMPurify at the UI layer. */
+  abstract: string;
+  /** Article ids referenced by the abstract, with short supporting quotes. */
+  citations: BriefingCitation[];
+  /** Local frequency-engine-derived corroboration score, 0–100. */
+  signalScore: number;
+  /** Feeds the model suggests the user subscribe to, each pending discovery resolution. */
+  suggestedFeeds: SuggestedFeed[];
+  /** The corpus snapshot ids passed to the model for this run. */
+  matchedArticleIds: string[];
+  /** Model id used, e.g. "claude-sonnet-4-6". */
+  modelId: string;
+  tokenUsage: { input: number; output: number };
+  generatedAt: number;
+}
+
+export interface BriefingCitation {
+  articleId: string;
+  /** Short paraphrase or excerpt supporting the cited claim. */
+  quote: string;
+}
+
+/**
+ * A feed the model suggested as a way to strengthen the briefing. The
+ * raw URL is run through the existing `discoverFeed` cascade before the
+ * user can subscribe, which is where hallucinated or dead URLs get
+ * filtered out (marked `unreachable`).
+ */
+export interface SuggestedFeed {
+  candidateUrl: string;
+  rationale: string;
+  discoveryStatus: "pending" | "resolved" | "unreachable";
+  resolvedFeedUrl?: string;
+  resolvedTitle?: string;
+}
+
+export interface CreateBriefingInput {
+  name: string;
+  prompt: string;
+}

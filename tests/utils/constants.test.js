@@ -17,7 +17,7 @@ import {
 describe("Constants", () => {
   it("should define database config", () => {
     expect(DB_NAME).toBe("feedzero");
-    expect(DB_VERSION).toBe(6);
+    expect(DB_VERSION).toBe(8);
   });
 
   it("should define crypto params with secure defaults", () => {

@@ -7,10 +7,12 @@ import type {
   SmartFilter,
   Rule,
   RuleAction,
+  Briefing,
   CreateFeedInput,
   CreateArticleInput,
   CreateSmartFilterInput,
   CreateRuleInput,
+  CreateBriefingInput,
 } from "../../../packages/core/src/types";
 
 export { SCHEMA_VERSION };
@@ -164,6 +166,30 @@ export function createRule({
     actions,
     createdAt: now,
     updatedAt: now,
+  });
+}
+
+/**
+ * Create a new Signal Briefing record. Trims whitespace and rejects empty
+ * names (sidebar would render an invisible row) and empty prompts (a
+ * briefing without a question has no shape).
+ */
+export function createBriefing({
+  name,
+  prompt,
+}: CreateBriefingInput): Result<Briefing> {
+  const trimmedName = name?.trim() ?? "";
+  if (!trimmedName) return err("Briefing requires a name");
+  const trimmedPrompt = prompt?.trim() ?? "";
+  if (!trimmedPrompt) return err("Briefing requires a prompt");
+  return ok({
+    id: crypto.randomUUID(),
+    name: trimmedName,
+    prompt: trimmedPrompt,
+    createdAt: Date.now(),
+    lastRunAt: null,
+    lastReport: null,
+    staleArticleCount: 0,
   });
 }
 

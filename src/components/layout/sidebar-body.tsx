@@ -3,6 +3,7 @@ import { Compass, Layers, Sparkles, Star, Plus } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
+import { useBriefingStore } from "@/stores/briefing-store.ts";
 import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import {
   ALL_FEEDS_ID,
@@ -50,8 +51,11 @@ export function SidebarBody({
   const smartFilters = useSmartFilterStore((s) => s.filters);
   const openFilterEditor = useSmartFilterStore((s) => s.openEditor);
   const filtersGate = useFeatureGate("filters");
+  const briefings = useBriefingStore((s) => s.briefings);
   const isExplorePage = pathname === "/explore";
-  const isSignalPage = pathname === "/signal";
+  // /signal AND /signal/briefings both light up the Signal entry since
+  // Briefings is a sub-tab of Signal now.
+  const isSignalPage = pathname === "/signal" || pathname.startsWith("/signal/");
 
   // Show "Starred" once the user has actually starred something; before
   // that, the entry would land on an empty view and feels like clutter.
@@ -70,6 +74,13 @@ export function SidebarBody({
     onBeforeNavigate?.();
     navigate("/signal");
   }
+
+  // Stale dot on the Signal entry when any briefing (sub-tab of
+  // Signal) has unconsumed new matching articles.
+  const briefingsStaleCount = briefings.reduce(
+    (n, b) => n + (b.staleArticleCount > 0 ? 1 : 0),
+    0,
+  );
 
   // Honor-system open-core: the Filters section stays visible to free
   // users so the feature is discoverable. Clicking "New filter" while
@@ -106,6 +117,12 @@ export function SidebarBody({
         >
           <Sparkles className="size-4" />
           <span>Signal</span>
+          {briefingsStaleCount > 0 && (
+            <span
+              aria-label={`${briefingsStaleCount} briefing(s) have new matching articles`}
+              className="ml-auto size-2 rounded-full bg-amber-500"
+            />
+          )}
         </SidebarMenuButton>
       </SidebarMenuItem>
       {feeds.length > 0 && (

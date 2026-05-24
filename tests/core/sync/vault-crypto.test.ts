@@ -5,10 +5,12 @@ import {
   deriveVaultKey,
   encryptVault,
   decryptVault,
+  readKdfSpec,
+  LEGACY_KDF_SPEC,
 } from "@/core/sync/vault-crypto";
 import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
 import { SYNC } from "@feedzero/core/utils/constants";
-import type { VaultData } from "@/core/sync/types";
+import type { VaultData, KdfSpec } from "@/core/sync/types";
 
 function makeVault(overrides: Partial<VaultData> = {}): VaultData {
   return {
@@ -100,6 +102,59 @@ describe("vault-crypto", () => {
       const decrypted = await decryptVault(key2, encrypted);
       expect(isOk(decrypted)).toBe(true);
       expect(unwrap(decrypted).feeds[0].title).toBe("Example Feed");
+    });
+
+    it("defaults to the legacy PBKDF2 KDF when no spec is given", async () => {
+      // Locks in that pre-existing callers (no spec arg) keep PBKDF2 —
+      // any silent switch to Argon2id here would mean a primary-device
+      // user's stored JWK no longer matches what `deriveVaultKey`
+      // produces on a passphrase re-entry, breaking recovery.
+      const legacy = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const explicit = unwrap(
+        await deriveVaultKey("carbon mango velvet prism", {
+          kdfSpec: LEGACY_KDF_SPEC,
+        }),
+      );
+      const encrypted = unwrap(await encryptVault(legacy, makeVault()));
+      const decrypted = await decryptVault(explicit, encrypted);
+      expect(isOk(decrypted)).toBe(true);
+    });
+
+    it("derives via Argon2id when given an argon2id spec", async () => {
+      const spec: KdfSpec = {
+        kind: "argon2id",
+        memoryKib: 256,
+        iterations: 1,
+        parallelism: 1,
+      };
+      const key = unwrap(
+        await deriveVaultKey("carbon mango velvet prism", { kdfSpec: spec }),
+      );
+      const sameKey = unwrap(
+        await deriveVaultKey("carbon mango velvet prism", { kdfSpec: spec }),
+      );
+      const vault = makeVault();
+      const encrypted = unwrap(await encryptVault(key, vault, spec));
+      const decrypted = unwrap(await decryptVault(sameKey, encrypted));
+      expect(decrypted.feeds[0].title).toBe("Example Feed");
+      expect(encrypted.kdf).toEqual(spec);
+    });
+
+    it("Argon2id and PBKDF2 keys are NOT interchangeable for the same passphrase", async () => {
+      const argon = unwrap(
+        await deriveVaultKey("carbon mango velvet prism", {
+          kdfSpec: {
+            kind: "argon2id",
+            memoryKib: 256,
+            iterations: 1,
+            parallelism: 1,
+          },
+        }),
+      );
+      const pbkdf2 = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const encrypted = unwrap(await encryptVault(argon, makeVault()));
+      const decrypted = await decryptVault(pbkdf2, encrypted);
+      expect(isErr(decrypted)).toBe(true);
     });
   });
 
@@ -196,6 +251,80 @@ describe("vault-crypto", () => {
       const decrypted = unwrap(await decryptVault(key, v3Encrypted));
       expect(decrypted.feeds).toEqual(vault.feeds);
       expect(decrypted.articles).toEqual(vault.articles);
+    });
+  });
+
+  describe("KDF spec on the envelope", () => {
+    it("encryptVault omits the kdf field when no spec is provided (back-compat)", async () => {
+      const key = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const encrypted = unwrap(await encryptVault(key, makeVault()));
+      expect("kdf" in encrypted).toBe(false);
+    });
+
+    it("encryptVault stamps the kdf field when a spec is provided", async () => {
+      const key = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const spec: KdfSpec = {
+        kind: "argon2id",
+        memoryKib: 65536,
+        iterations: 3,
+        parallelism: 1,
+      };
+      const encrypted = unwrap(
+        await encryptVault(key, makeVault(), spec),
+      );
+      expect(encrypted.kdf).toEqual(spec);
+    });
+
+    it("decryptVault still works on envelopes missing the kdf field", async () => {
+      // Decryption never reads the kdf field — the field is metadata for
+      // the recovery flow only. This locks in that legacy envelopes
+      // continue to decrypt without any code path change.
+      const key = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const vault = makeVault();
+      const encrypted = unwrap(await encryptVault(key, vault));
+      const decrypted = unwrap(await decryptVault(key, encrypted));
+      expect(decrypted.feeds).toEqual(vault.feeds);
+    });
+
+    it("decryptVault works on envelopes that DO carry a kdf field", async () => {
+      const key = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const vault = makeVault();
+      const encrypted = unwrap(
+        await encryptVault(key, vault, {
+          kind: "argon2id",
+          memoryKib: 256,
+          iterations: 1,
+          parallelism: 1,
+        }),
+      );
+      const decrypted = unwrap(await decryptVault(key, encrypted));
+      expect(decrypted.feeds).toEqual(vault.feeds);
+    });
+
+    it("readKdfSpec returns the legacy PBKDF2 default for envelopes without a kdf field", () => {
+      const envelope = {
+        version: SYNC.FORMAT_VERSION,
+        iv: [],
+        ciphertext: "",
+      };
+      expect(readKdfSpec(envelope)).toEqual(LEGACY_KDF_SPEC);
+      expect(LEGACY_KDF_SPEC).toEqual({ kind: "pbkdf2-600k" });
+    });
+
+    it("readKdfSpec returns the stamped spec when present", () => {
+      const spec: KdfSpec = {
+        kind: "argon2id",
+        memoryKib: 65536,
+        iterations: 3,
+        parallelism: 1,
+      };
+      const envelope = {
+        version: SYNC.FORMAT_VERSION,
+        iv: [],
+        ciphertext: "",
+        kdf: spec,
+      };
+      expect(readKdfSpec(envelope)).toEqual(spec);
     });
   });
 

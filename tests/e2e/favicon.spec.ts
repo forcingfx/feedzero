@@ -32,7 +32,7 @@ test.describe("Favicon rendering", () => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
 
     // Mock the smart favicon endpoint to return a real PNG
-    await page.route("**/api/favicon*", (route) => {
+    await page.route("**/api/icon*", (route) => {
       route.fulfill({
         status: 200,
         contentType: "image/png",
@@ -68,7 +68,7 @@ test.describe("Favicon rendering", () => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
 
     // Smart endpoint fails
-    await page.route("**/api/favicon*", (route) => {
+    await page.route("**/api/icon*", (route) => {
       route.fulfill({ status: 502, body: "fail" });
     });
 
@@ -104,7 +104,7 @@ test.describe("Favicon rendering", () => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
 
     // All favicon/icon endpoints fail
-    await page.route("**/api/favicon*", (route) => {
+    await page.route("**/api/icon*", (route) => {
       route.fulfill({ status: 502, body: "fail" });
     });
     await page.route("**/api/icon*", (route) => {

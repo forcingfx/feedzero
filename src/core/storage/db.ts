@@ -24,6 +24,7 @@ import type {
   Folder,
   SmartFilter,
   UserPreferences,
+  Briefing,
 } from "../../../packages/core/src/types";
 import { mergeDuplicateArticles } from "./dedupe-articles.ts";
 
@@ -65,6 +66,8 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
       folders: "id",
       smartFilters: "id",
       preferences: "id",
+      briefings: "id",
+      secrets: "id",
       meta: "key",
     });
 
@@ -109,6 +112,8 @@ export async function openWithKeys(
       folders: "id",
       smartFilters: "id",
       preferences: "id",
+      briefings: "id",
+      secrets: "id",
       meta: "key",
     });
 
@@ -525,8 +530,13 @@ export async function dedupeArticles(
 }
 
 /**
- * Export all user data (feeds, articles, folders, smartFilters) for
- * vault sync. Single bulk query per table.
+ * Export all user data (feeds, articles, folders, smartFilters,
+ * briefings, secrets) for vault sync. Single bulk query per table.
+ *
+ * `briefings` and `secrets.anthropicKey` ride through the encrypted
+ * vault like every other row, so creating a briefing or pasting an
+ * Anthropic key on one device propagates to the others without the
+ * user having to re-do the work.
  */
 export async function exportAll(): Promise<
   Result<{
@@ -536,6 +546,8 @@ export async function exportAll(): Promise<
     smartFilters: SmartFilter[];
     preferences: UserPreferences | null;
     preferencesUpdatedAt: number | null;
+    briefings: Briefing[];
+    anthropicKey: string | null;
   }>
 > {
   try {
@@ -546,6 +558,8 @@ export async function exportAll(): Promise<
       filtersResult,
       prefsResult,
       prefsTsResult,
+      briefingsResult,
+      anthropicResult,
     ] = await Promise.all([
       getFeeds(),
       getAllArticles(),
@@ -553,6 +567,8 @@ export async function exportAll(): Promise<
       getSmartFilters(),
       getPreferences(),
       getPreferencesUpdatedAt(),
+      getBriefings(),
+      getSecret("anthropic-api-key"),
     ]);
     if (!feedsResult.ok) return feedsResult;
     if (!articlesResult.ok) return articlesResult;
@@ -560,6 +576,8 @@ export async function exportAll(): Promise<
     if (!filtersResult.ok) return filtersResult;
     if (!prefsResult.ok) return prefsResult;
     if (!prefsTsResult.ok) return prefsTsResult;
+    if (!briefingsResult.ok) return briefingsResult;
+    if (!anthropicResult.ok) return anthropicResult;
 
     return ok({
       feeds: feedsResult.value,
@@ -568,6 +586,8 @@ export async function exportAll(): Promise<
       smartFilters: filtersResult.value,
       preferences: prefsResult.value,
       preferencesUpdatedAt: prefsTsResult.value,
+      briefings: briefingsResult.value,
+      anthropicKey: anthropicResult.value,
     });
   } catch (e) {
     return err(`Failed to export data: ${(e as Error).message}`);
@@ -585,6 +605,13 @@ export interface ImportAllInput {
   preferences?: UserPreferences;
   /** Timestamp to stamp alongside an imported preferences row. */
   preferencesUpdatedAt?: number;
+  /** Omit (undefined) to leave the briefings table untouched. */
+  briefings?: Briefing[];
+  /**
+   * Omit (undefined) to leave the anthropic-api-key secret row
+   * untouched. Empty string `""` is treated as "delete the row".
+   */
+  anthropicKey?: string;
 }
 
 /**
@@ -619,20 +646,35 @@ export async function importAll(
 
     // Encrypt every batch up front; the rw transaction can only await
     // Dexie operations, never Web Crypto.
-    const [feedRecords, articleRecords, folderRecords, filterRecords, prefRecords] =
-      await Promise.all([
-        encryptRecords(input.feeds),
-        encryptRecords(input.articles),
-        input.folders !== undefined
-          ? encryptRecords(input.folders)
-          : Promise.resolve(undefined),
-        input.smartFilters !== undefined
-          ? encryptRecords(input.smartFilters)
-          : Promise.resolve(undefined),
-        input.preferences !== undefined
-          ? encryptSingleRow(ctx.cryptoKey, PREFERENCES_ROW_ID, input.preferences)
-          : Promise.resolve(undefined),
-      ]);
+    const [
+      feedRecords,
+      articleRecords,
+      folderRecords,
+      filterRecords,
+      prefRecords,
+      briefingRecords,
+      anthropicRecord,
+    ] = await Promise.all([
+      encryptRecords(input.feeds),
+      encryptRecords(input.articles),
+      input.folders !== undefined
+        ? encryptRecords(input.folders)
+        : Promise.resolve(undefined),
+      input.smartFilters !== undefined
+        ? encryptRecords(input.smartFilters)
+        : Promise.resolve(undefined),
+      input.preferences !== undefined
+        ? encryptSingleRow(ctx.cryptoKey, PREFERENCES_ROW_ID, input.preferences)
+        : Promise.resolve(undefined),
+      input.briefings !== undefined
+        ? encryptRecords(input.briefings)
+        : Promise.resolve(undefined),
+      input.anthropicKey !== undefined && input.anthropicKey !== ""
+        ? encryptSingleRow(ctx.cryptoKey, "anthropic-api-key", {
+            value: input.anthropicKey,
+          })
+        : Promise.resolve(undefined),
+    ]);
 
     const tables = [ctx.db.table("feeds"), ctx.db.table("articles")];
     if (folderRecords !== undefined) tables.push(ctx.db.table("folders"));
@@ -640,6 +682,8 @@ export async function importAll(
     if (prefRecords !== undefined) {
       tables.push(ctx.db.table("preferences"), ctx.db.table("meta"));
     }
+    if (briefingRecords !== undefined) tables.push(ctx.db.table("briefings"));
+    if (input.anthropicKey !== undefined) tables.push(ctx.db.table("secrets"));
 
     const prefsTs = input.preferencesUpdatedAt ?? Date.now();
 
@@ -662,6 +706,16 @@ export async function importAll(
         await ctx.db
           .table("meta")
           .put({ key: META_KEY.PREFERENCES_UPDATED_AT, value: prefsTs });
+      }
+      if (briefingRecords !== undefined) {
+        await ctx.db.table("briefings").clear();
+        await ctx.db.table("briefings").bulkPut(briefingRecords);
+      }
+      if (input.anthropicKey !== undefined) {
+        await ctx.db.table("secrets").delete("anthropic-api-key");
+        if (anthropicRecord !== undefined) {
+          await ctx.db.table("secrets").put(anthropicRecord);
+        }
       }
     });
 
@@ -722,6 +776,90 @@ export async function removeSmartFilter(
     return ok(true);
   } catch (e) {
     return err(`Failed to remove smart filter: ${(e as Error).message}`);
+  }
+}
+
+// --- Secrets (encrypted, synced — user-supplied API keys etc.) ---
+//
+// Keyed by a stable name (e.g. "anthropic-api-key"). The stored value is
+// the raw string, encrypted at rest under the same vault key as every
+// other row, so the secret survives a tab close, sync push, and pull on
+// another device. The wrapper module `secrets.ts` exposes typed accessors
+// for each named secret so call sites don't depend on the key naming
+// convention.
+
+/** Read a single secret by name. Returns ok(null) when no row exists. */
+export async function getSecret(name: string): Promise<Result<string | null>> {
+  try {
+    const ctx = requireOpen();
+    const raw: DexieRecord | undefined = await ctx.db.table("secrets").get(name);
+    if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
+    const result = await decrypt(
+      ctx.cryptoKey,
+      new Uint8Array(raw.iv),
+      new Uint8Array(raw.ciphertext),
+    );
+    if (!result.ok) return result;
+    const decoded = result.value as { value: string };
+    return ok(decoded.value);
+  } catch (e) {
+    return err(`Failed to read secret: ${(e as Error).message}`);
+  }
+}
+
+/** Store a single secret by name (overwrites any existing value). */
+export async function putSecret(
+  name: string,
+  value: string,
+): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    const encResult = await encrypt(ctx.cryptoKey, { value });
+    if (!encResult.ok) return encResult;
+    const { iv, ciphertext } = encResult.value;
+    await ctx.db.table("secrets").put({
+      id: name,
+      iv: Array.from(iv),
+      ciphertext: Array.from(ciphertext),
+    });
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to store secret: ${(e as Error).message}`);
+  }
+}
+
+/** Remove a single secret by name. No-op if it doesn't exist. */
+export async function removeSecret(name: string): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    await ctx.db.table("secrets").delete(name);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove secret: ${(e as Error).message}`);
+  }
+}
+
+// --- Signal Briefings (encrypted, synced) ---
+
+export async function addBriefing(briefing: Briefing): Promise<Result<boolean>> {
+  return putEncrypted("briefings", briefing.id, briefing);
+}
+
+export async function getBriefings(): Promise<Result<Briefing[]>> {
+  return getAllDecrypted<Briefing>("briefings");
+}
+
+export async function updateBriefing(briefing: Briefing): Promise<Result<boolean>> {
+  return putEncrypted("briefings", briefing.id, briefing);
+}
+
+export async function removeBriefing(id: string): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    await ctx.db.table("briefings").delete(id);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove briefing: ${(e as Error).message}`);
   }
 }
 
@@ -795,7 +933,7 @@ export async function setPreferencesUpdatedAt(
 
 /** Encrypt an array of records into Dexie-ready objects with HMAC-hashed indexes. */
 async function encryptRecords(
-  items: Array<Feed | Article | Folder | SmartFilter>,
+  items: Array<Feed | Article | Folder | SmartFilter | Briefing>,
 ): Promise<DexieRecord[]> {
   const ctx = requireOpen();
   const records: DexieRecord[] = [];

@@ -64,7 +64,7 @@ export const STORY_SIMILARITY = 0.6;
  * discards any cached report tagged with a different version so a stale
  * payload from an older build can't mis-render.
  */
-export const SIGNAL_REPORT_SCHEMA_VERSION = 2;
+export const SIGNAL_REPORT_SCHEMA_VERSION = 3;
 
 /**
  * A group of articles from one or more feeds covering the same story.
@@ -103,6 +103,14 @@ export interface Topic {
   totalArticlesInCluster: number;
   /** Distinct feeds the cluster's articles came from. */
   feedCount: number;
+  /**
+   * Epoch ms of the most recent article in the cluster. Drives the
+   * topic display order (newest activity first) so /signal answers
+   * "what's happening right now" rather than "what's loudest." Topic
+   * *selection* still uses cross-feed term-frequency scoring — only
+   * the final display order changes.
+   */
+  newestActivityAt: number;
 }
 
 export interface SignalReport {
@@ -118,4 +126,24 @@ export interface SignalReport {
   feedsInWindow: number;
   /** Unix epoch ms when this report was generated. */
   generatedAt: number;
+}
+
+/**
+ * AI-generated Signal report. Same topic shape as the ML report so the
+ * existing TopicSection / StoryRow rendering works for both modes —
+ * Claude does the clustering + naming instead of the frequency engine,
+ * and each topic carries a one-line summary the model wrote.
+ *
+ * Mode is opt-in (off by default) so Signal's "fully local, no LLM"
+ * default claim stays accurate for users who don't enable it.
+ */
+export interface AISignalReport extends SignalReport {
+  /** Always "ai" — discriminator vs the ML report shape. */
+  source: "ai";
+  /** Per-topic one-line summary produced by the model. */
+  summaries: Record<string, string>;
+  /** Model id used (e.g. "claude-sonnet-4-6"). */
+  modelId: string;
+  /** Input/output token counts so the UI can surface "your bill" transparency. */
+  tokenUsage: { input: number; output: number };
 }

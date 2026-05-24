@@ -51,6 +51,7 @@ Legend:
 | **Rules** — Per-feed auto-action rules: mute, star, mark-read, or route articles by title, author, content, date, and more. | — | ✓ | ✓ | Shipped |
 | **Full-text search** — Search across every cached article body, title, and author. | — | — | ✓ | Coming soon |
 | **Signal** — Topics emerging across your feeds, ranked by cross-feed term frequency. Fully local — no LLM, no third party. | — | ✓ | ✓ | Shipped |
+| **Signal Briefings** — Standing AI-written briefings on the topics you care about, with citations drawn from your own feeds. Bring your own Claude API key — FeedZero never sees your prompts or articles. | — | 10 briefings | 10 briefings | Shipped |
 
 ## Delivery
 

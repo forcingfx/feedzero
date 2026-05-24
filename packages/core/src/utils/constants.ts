@@ -4,11 +4,20 @@ export const DB_NAME = "feedzero";
  *  4 → feeds, articles, folders, meta
  *  5 → + smartFilters (user-defined virtual feeds)
  *  6 → + preferences (single-row synced user preferences)
+ *  7 → + briefings (Signal Briefings — saved prompts with cached reports)
+ *  8 → + secrets (encrypted user-supplied API keys, e.g. Anthropic)
  *
  * Dexie auto-creates new tables on open; no migration code needed
  * because each new table starts empty and existing tables are untouched.
  */
-export const DB_VERSION = 6;
+export const DB_VERSION = 8;
+
+/**
+ * Versioning marker for the cached `BriefingReport` payload. Bumped when
+ * the report shape changes so older cached reports surface as "needs
+ * refresh" rather than crashing the renderer.
+ */
+export const BRIEFING_REPORT_SCHEMA_VERSION = 1;
 
 /** Stable id of the single row in the `preferences` table. */
 export const PREFERENCES_ROW_ID = "preferences";
