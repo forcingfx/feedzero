@@ -7,26 +7,46 @@ import {
   exportCryptoKey,
   generateSalt,
 } from "./crypto.ts";
-import { deriveVaultId, deriveVaultKey } from "../sync/vault-crypto.ts";
+import {
+  deriveVaultId,
+  deriveVaultKey,
+  DEFAULT_NEW_VAULT_KDF,
+} from "../sync/vault-crypto.ts";
+import type { KdfSpec } from "../sync/types.ts";
 
-/** Serializable key material stored in localStorage (JWK format). */
+/**
+ * Serializable key material stored in localStorage (JWK format).
+ *
+ * `vaultKdfSpec` records which KDF produced `vaultKeyJwk`. Entries
+ * written before this field existed lack it; readers treat `undefined`
+ * as legacy PBKDF2 so a returning user whose vault key was minted that
+ * way keeps using the matching spec on subsequent pushes.
+ */
 export interface StoredKeyMaterial {
   dbKeyJwk: JsonWebKey;
   hmacKeyJwk: JsonWebKey;
   dbSalt: number[];
   vaultId?: string;
   vaultKeyJwk?: JsonWebKey;
+  vaultKdfSpec?: KdfSpec;
 }
 
 /**
  * Derive all cryptographic keys from a passphrase, export them as JWKs,
  * and persist to localStorage. The raw passphrase is not stored.
  * If dbSalt is provided, reuses it; otherwise generates a new one.
+ *
+ * `vaultKdfSpec` overrides which KDF derives the vault key when
+ * `includeVaultKeys` is set. Defaults to `DEFAULT_NEW_VAULT_KDF`
+ * (Argon2id) so new sync signups encrypt their cloud vault with the
+ * memory-hard KDF; recovery flows pass the spec they read off the
+ * existing cloud envelope to keep the local key aligned with the
+ * cloud encoding.
  */
 export async function deriveAndStoreKeys(
   passphrase: string,
   dbSalt?: Uint8Array,
-  options?: { includeVaultKeys: boolean },
+  options?: { includeVaultKeys: boolean; vaultKdfSpec?: KdfSpec },
 ): Promise<Result<StoredKeyMaterial>> {
   try {
     const salt = dbSalt ?? generateSalt();
@@ -48,16 +68,19 @@ export async function deriveAndStoreKeys(
     };
 
     if (options?.includeVaultKeys) {
+      const vaultKdfSpec = options.vaultKdfSpec ?? DEFAULT_NEW_VAULT_KDF;
       const vaultIdResult = await deriveVaultId(passphrase);
       if (!vaultIdResult.ok) return vaultIdResult;
 
       const vaultKeyResult = await deriveVaultKey(passphrase, {
         extractable: true,
+        kdfSpec: vaultKdfSpec,
       });
       if (!vaultKeyResult.ok) return vaultKeyResult;
 
       material.vaultId = vaultIdResult.value;
       material.vaultKeyJwk = await exportCryptoKey(vaultKeyResult.value);
+      material.vaultKdfSpec = vaultKdfSpec;
     }
 
     localStorage.setItem(LOCAL_STORAGE.DERIVED_KEYS, JSON.stringify(material));

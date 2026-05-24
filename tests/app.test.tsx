@@ -168,6 +168,7 @@ describe("App sync-aware init", () => {
     const mockCredentials = {
       vaultId: "stored-vault-id",
       vaultKey: "mock-key" as unknown as CryptoKey,
+      kdfSpec: { kind: "pbkdf2-600k" } as const,
     };
     vi.mocked(restore).mockResolvedValue({
       status: "ready",

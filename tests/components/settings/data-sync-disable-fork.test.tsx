@@ -41,6 +41,7 @@ import { deleteVault as deleteVaultMock } from "@/core/sync/sync-service";
 const mockCredentials = {
   vaultId: "test-vault-id",
   vaultKey: "test-vault-key" as unknown as CryptoKey,
+  kdfSpec: { kind: "pbkdf2-600k" } as const,
 };
 
 function renderSection() {

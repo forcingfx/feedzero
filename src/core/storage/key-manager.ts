@@ -7,7 +7,13 @@ import {
   exportCryptoKey,
   importCryptoKey,
 } from "./crypto.ts";
-import { deriveVaultId, deriveVaultKey } from "../sync/vault-crypto.ts";
+import {
+  deriveVaultId,
+  deriveVaultKey,
+  DEFAULT_NEW_VAULT_KDF,
+  LEGACY_KDF_SPEC,
+} from "../sync/vault-crypto.ts";
+import type { KdfSpec } from "../sync/types.ts";
 import {
   open,
   openWithKeys,
@@ -45,13 +51,22 @@ export async function assertKeyDataCoupling(): Promise<Result<void>> {
 }
 import type { SyncCredentials } from "../sync/sync-service.ts";
 
-/** Serializable key material stored in localStorage (JWK format). */
+/**
+ * Serializable key material stored in localStorage (JWK format).
+ *
+ * `vaultKdfSpec` records which KDF produced `vaultKeyJwk`. Absent on
+ * material written before the field existed; consumers default to
+ * legacy PBKDF2 so existing sync users keep stamping the same KDF on
+ * their pushes (no involuntary upgrade) until an explicit recovery
+ * triggers the auto-upgrade path.
+ */
 export interface StoredKeyMaterial {
   dbKeyJwk: JsonWebKey;
   hmacKeyJwk: JsonWebKey;
   dbSalt: number[];
   vaultId?: string;
   vaultKeyJwk?: JsonWebKey;
+  vaultKdfSpec?: KdfSpec;
 }
 
 export type RestoreStatus =
@@ -93,7 +108,14 @@ async function tryDeleteServerVault(): Promise<void> {
       length: CRYPTO.KEY_LENGTH,
     });
     const { deleteVault } = await import("../sync/sync-service.ts");
-    await deleteVault({ vaultId: storedKeys.vaultId, vaultKey });
+    // `deleteVault` only reads `vaultId`; the actual KDF spec is
+    // irrelevant for a DELETE. Stamping legacy here keeps the type
+    // honest without pretending we know which KDF the cloud vault used.
+    await deleteVault({
+      vaultId: storedKeys.vaultId,
+      vaultKey,
+      kdfSpec: storedKeys.vaultKdfSpec ?? LEGACY_KDF_SPEC,
+    });
   } catch {
     // Best-effort — vault is encrypted and unreadable without passphrase
   }
@@ -119,10 +141,18 @@ async function deriveAndExportDbKeys(
 
 async function deriveVaultMaterial(
   passphrase: string,
-): Promise<Result<{ vaultId: string; vaultKeyJwk: JsonWebKey; vaultKey: CryptoKey }>> {
+  kdfSpec: KdfSpec,
+): Promise<
+  Result<{
+    vaultId: string;
+    vaultKeyJwk: JsonWebKey;
+    vaultKey: CryptoKey;
+    kdfSpec: KdfSpec;
+  }>
+> {
   const [vaultIdResult, vaultKeyResult] = await Promise.all([
     deriveVaultId(passphrase),
-    deriveVaultKey(passphrase, { extractable: true }),
+    deriveVaultKey(passphrase, { extractable: true, kdfSpec }),
   ]);
   if (!vaultIdResult.ok) return vaultIdResult;
   if (!vaultKeyResult.ok) return vaultKeyResult;
@@ -131,6 +161,7 @@ async function deriveVaultMaterial(
     vaultId: vaultIdResult.value,
     vaultKeyJwk: await exportCryptoKey(vaultKeyResult.value),
     vaultKey: vaultKeyResult.value,
+    kdfSpec,
   });
 }
 
@@ -143,7 +174,20 @@ async function deriveVaultMaterial(
  */
 export async function initFresh(
   passphrase: string,
-  options?: { sync: boolean; skipServerCleanup?: boolean },
+  options?: {
+    sync: boolean;
+    skipServerCleanup?: boolean;
+    /**
+     * KDF used to derive the vault key. Defaults to
+     * `DEFAULT_NEW_VAULT_KDF` (Argon2id) for new sync signups. The
+     * recovery flow passes the spec it read off the cloud envelope so
+     * the locally-persisted JWK matches the cloud's encoding —
+     * otherwise the next push would re-encrypt the cloud vault with a
+     * key derived from a different KDF and a recovering second device
+     * would silently fail to decrypt.
+     */
+    vaultKdfSpec?: KdfSpec;
+  },
 ): Promise<Result<{ credentials: SyncCredentials | null }>> {
   try {
     // 1. Clean up any previous session
@@ -172,7 +216,8 @@ export async function initFresh(
     let credentials: SyncCredentials | null = null;
 
     if (options?.sync) {
-      const vaultResult = await deriveVaultMaterial(passphrase);
+      const kdfSpec = options.vaultKdfSpec ?? DEFAULT_NEW_VAULT_KDF;
+      const vaultResult = await deriveVaultMaterial(passphrase, kdfSpec);
       if (!vaultResult.ok) {
         // Roll back: close DB, clear everything
         await deleteDatabase();
@@ -181,10 +226,12 @@ export async function initFresh(
 
       material.vaultId = vaultResult.value.vaultId;
       material.vaultKeyJwk = vaultResult.value.vaultKeyJwk;
+      material.vaultKdfSpec = vaultResult.value.kdfSpec;
 
       credentials = {
         vaultId: vaultResult.value.vaultId,
         vaultKey: vaultResult.value.vaultKey,
+        kdfSpec: vaultResult.value.kdfSpec,
       };
     }
 
@@ -239,7 +286,15 @@ export async function restore(): Promise<RestoreStatus> {
         name: CRYPTO.ALGORITHM,
         length: CRYPTO.KEY_LENGTH,
       });
-      credentials = { vaultId: storedKeys.vaultId, vaultKey };
+      // vaultKdfSpec is absent on legacy material — those entries were
+      // produced by the PBKDF2 path before the field existed, so the
+      // legacy default is the correct fallback. New material always
+      // writes this field, so reading it back is the round-trip.
+      credentials = {
+        vaultId: storedKeys.vaultId,
+        vaultKey,
+        kdfSpec: storedKeys.vaultKdfSpec ?? LEGACY_KDF_SPEC,
+      };
     } catch {
       // Vault keys corrupted — still return ready, just without sync
     }
@@ -255,11 +310,13 @@ export async function restore(): Promise<RestoreStatus> {
  */
 export async function addVaultKeys(
   passphrase: string,
+  options?: { vaultKdfSpec?: KdfSpec },
 ): Promise<Result<SyncCredentials>> {
   const storedKeys = loadStoredKeys();
   if (!storedKeys) return err("No stored keys — cannot add vault keys");
 
-  const vaultResult = await deriveVaultMaterial(passphrase);
+  const kdfSpec = options?.vaultKdfSpec ?? DEFAULT_NEW_VAULT_KDF;
+  const vaultResult = await deriveVaultMaterial(passphrase, kdfSpec);
   if (!vaultResult.ok) return vaultResult;
 
   // Persist DB keys + vault keys together
@@ -267,6 +324,7 @@ export async function addVaultKeys(
     ...storedKeys,
     vaultId: vaultResult.value.vaultId,
     vaultKeyJwk: vaultResult.value.vaultKeyJwk,
+    vaultKdfSpec: vaultResult.value.kdfSpec,
   };
   storeKeys(material);
   localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
@@ -274,7 +332,41 @@ export async function addVaultKeys(
   return ok({
     vaultId: vaultResult.value.vaultId,
     vaultKey: vaultResult.value.vaultKey,
+    kdfSpec: vaultResult.value.kdfSpec,
   });
+}
+
+/**
+ * Persist an upgraded vault key + spec to localStorage. Called by the
+ * recovery flow after `upgradeVaultKdf` has successfully re-encrypted
+ * the cloud envelope with a stronger KDF — the locally-stored JWK
+ * MUST match what's now encrypting the cloud, or the next pull would
+ * decrypt with the old key and fail. Caller is responsible for
+ * exporting the credentials' `vaultKey` as a JWK before passing the
+ * result through to `restoreSync`.
+ *
+ * Idempotent: if no keys are stored, returns ok without writing
+ * anything (the recovery flow has bigger problems in that case, but
+ * we don't want this best-effort upgrade to be the error vector).
+ */
+export async function updateStoredVaultKey(
+  credentials: SyncCredentials,
+): Promise<Result<void>> {
+  const storedKeys = loadStoredKeys();
+  if (!storedKeys) return ok(undefined);
+
+  try {
+    const material: StoredKeyMaterial = {
+      ...storedKeys,
+      vaultId: credentials.vaultId,
+      vaultKeyJwk: await exportCryptoKey(credentials.vaultKey),
+      vaultKdfSpec: credentials.kdfSpec,
+    };
+    storeKeys(material);
+    return ok(undefined);
+  } catch (e) {
+    return err(`Failed to persist upgraded vault key: ${(e as Error).message}`);
+  }
 }
 
 /**
@@ -349,7 +441,7 @@ export async function destroyLocal(): Promise<void> {
  */
 export async function persistDerivedKeysFromOpenDb(
   passphrase: string,
-  options?: { sync: boolean },
+  options?: { sync: boolean; vaultKdfSpec?: KdfSpec },
 ): Promise<Result<{ credentials: SyncCredentials | null }>> {
   const saltResult = await getSalt();
   if (!saltResult.ok) return saltResult;
@@ -366,14 +458,17 @@ export async function persistDerivedKeysFromOpenDb(
   let credentials: SyncCredentials | null = null;
 
   if (options?.sync) {
-    const vaultResult = await deriveVaultMaterial(passphrase);
+    const kdfSpec = options.vaultKdfSpec ?? DEFAULT_NEW_VAULT_KDF;
+    const vaultResult = await deriveVaultMaterial(passphrase, kdfSpec);
     if (!vaultResult.ok) return vaultResult;
 
     material.vaultId = vaultResult.value.vaultId;
     material.vaultKeyJwk = vaultResult.value.vaultKeyJwk;
+    material.vaultKdfSpec = vaultResult.value.kdfSpec;
     credentials = {
       vaultId: vaultResult.value.vaultId,
       vaultKey: vaultResult.value.vaultKey,
+      kdfSpec: vaultResult.value.kdfSpec,
     };
   }
 

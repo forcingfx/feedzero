@@ -48,6 +48,7 @@ Full-text extraction (user-initiated): click "Extracted" → `/api/page` → `ex
 - **src/utils/result.ts** — `Result<T>` (`ok`/`err`) used everywhere instead of throwing. `andThen` chains; `fromPromise` wraps async.
 - **src/utils/constants.ts** — DB name, crypto params, `LOCAL_STORAGE` keys, default passphrase.
 - **src/core/storage/crypto.ts** — PBKDF2 + AES-GCM + HMAC-SHA256 via Web Crypto API.
+- **src/core/crypto/argon2.ts** — Argon2id wrapper around `hash-wasm`. Memory-hard KDF used to encrypt new sync vaults so a 4-word diceware passphrase (~51.7 bits) is no longer brute-forceable by GPU farms. Production params: 64 MiB / t=3 / p=1 (OWASP). The vault envelope stamps which KDF derived its key (`KdfSpec` in `src/core/sync/types.ts`) so recovery on a new device picks the matching derivation. Legacy PBKDF2 vaults auto-upgrade to Argon2id the first time the user types their passphrase on any device (recovery-step / switchToExistingCloud → `upgradeVaultKdf`).
 - **src/core/storage/db.ts** — Dexie storage. Content AES-GCM encrypted; index fields (url, feedId, guid) HMAC-SHA256 hashed so we can query without exposing plaintext. Call `open(passphrase)` or `openWithKeys(dbKeyJwk, hmacKeyJwk)` first.
 - **src/core/storage/key-material.ts** — `deriveAndStoreKeys`, `loadStoredKeys`, `clearStoredKeys`. Derives DB/HMAC/optional vault keys, persists JWK to localStorage. Raw passphrase is never persisted.
 - **src/core/storage/schema.ts** — `createFeed()` / `createArticle()` factories returning `Result`.
@@ -59,7 +60,7 @@ Full-text extraction (user-initiated): click "Extracted" → `/api/page` → `ex
 - **src/core/extractor/{defuddle-extractor,cleanup,markdown}.ts** — Defuddle impl; HTML cleanup; markdown→HTML via marked + DOMPurify.
 - **src/core/extractor/adapters/** — Site-specific adapters. `SiteAdapter` interface, `AdapterRegistry` (O(1) domain lookup). `github-adapter` extracts README; `default-adapter` uses Defuddle.
 - **src/core/sync/types.ts** — `VaultData`, `EncryptedVault`, `SyncStorageAdapter`.
-- **src/core/sync/vault-crypto.ts** — Deterministic `deriveVaultId` + `deriveVaultKey` via domain-separated PBKDF2; `encryptVault` / `decryptVault`.
+- **src/core/sync/vault-crypto.ts** — Deterministic `deriveVaultId` (PBKDF2, KDF-invariant by design — vault ID is a routing identifier, not a secret) + `deriveVaultKey` (dispatches on `KdfSpec`: legacy PBKDF2 or Argon2id); `encryptVault` / `decryptVault` (`encryptVault` stamps the spec on the envelope so recovery can find the matching KDF). `DEFAULT_NEW_VAULT_KDF` is Argon2id in prod, cheap params under Vitest.
 - **src/core/sync/sync-service.ts** — Client orchestrator: `exportVault`, `importVault`, `pushVault`, `pullVault`.
 - **src/core/sync/sync-handler.ts** — Shared server `Request → Response` handler. GET (pull) / PUT (push) / DELETE.
 - **src/core/sync/adapters/** — `memory`, `filesystem`, `vercel-blob`, `resolve-adapter`.

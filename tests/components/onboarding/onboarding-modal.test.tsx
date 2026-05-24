@@ -15,7 +15,11 @@ vi.mock("@/core/storage/key-manager", () => ({
   destroy: vi.fn().mockResolvedValue(undefined),
   addVaultKeys: vi.fn().mockResolvedValue({
     ok: true,
-    value: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" },
+    value: {
+      vaultId: "mock-vault-id",
+      vaultKey: "mock-vault-key",
+      kdfSpec: { kind: "pbkdf2-600k" },
+    },
   }),
   removeVaultKeys: vi.fn(),
   destroyLocal: vi.fn().mockResolvedValue(undefined),

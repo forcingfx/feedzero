@@ -90,11 +90,49 @@ vi.mock("../../src/core/sync/sync-service.ts", async () => {
       value: { notModified: false, vault: r.value, etag: null },
     };
   };
+  // recoverVault wraps the same vault fixture and pairs it with the
+  // legacy PBKDF2 credentials shape — these tests pre-date the
+  // Argon2id migration and use the legacy KDF as the safe default.
+  // The integration is what's interesting; the spec round-trip is
+  // covered by tests/core/sync/recover-vault.test.ts.
+  const vaultCrypto = await vi.importActual<
+    typeof import("../../src/core/sync/vault-crypto.ts")
+  >("../../src/core/sync/vault-crypto.ts");
+  const recoverCompat = async (passphrase: string) => {
+    const r = await pullVaultMock(passphrase);
+    if (!r.ok) return r;
+    const vid = await vaultCrypto.deriveVaultId(passphrase);
+    const vk = await vaultCrypto.deriveVaultKey(passphrase, {
+      extractable: true,
+      kdfSpec: vaultCrypto.LEGACY_KDF_SPEC,
+    });
+    if (!vid.ok) return vid;
+    if (!vk.ok) return vk;
+    return {
+      ok: true as const,
+      value: {
+        vault: r.value,
+        credentials: {
+          vaultId: vid.value,
+          vaultKey: vk.value,
+          kdfSpec: vaultCrypto.LEGACY_KDF_SPEC,
+        },
+      },
+    };
+  };
   return {
     ...actual,
     pushVault: (...args: unknown[]) => pushVaultMock(...args),
     pullVault: (...args: unknown[]) => pullVaultMock(...args),
     pullVaultIfChanged: pullCompat,
+    recoverVault: recoverCompat,
+    // No-op upgrade: integration tests pre-date the Argon2id rollout
+    // and their fixtures use legacy creds throughout. The real
+    // upgrade path is exercised by tests/core/sync/recover-vault.test.ts.
+    upgradeVaultKdf: async (
+      _passphrase: string,
+      current: unknown,
+    ) => ({ ok: true as const, value: current }),
     deleteVault: (...args: unknown[]) => deleteVaultMock(...args),
   };
 });

@@ -75,7 +75,11 @@ describe("sync: unpushed local rename survives a pull", () => {
     await open("test-passphrase");
     useFeedStore.setState({ feeds: [], feedsLoaded: false });
     useSyncStore.setState({
-      credentials: { vaultId: "vault", vaultKey: {} as CryptoKey },
+      credentials: {
+        vaultId: "vault",
+        vaultKey: {} as CryptoKey,
+        kdfSpec: { kind: "pbkdf2-600k" } as const,
+      },
       status: "synced",
     });
 

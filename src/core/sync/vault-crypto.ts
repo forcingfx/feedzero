@@ -3,7 +3,60 @@ import type { Result } from "../../../packages/core/src/utils/result";
 import { SYNC } from "../../../packages/core/src/utils/constants";
 import { deriveBytes, deriveKey, decrypt } from "../storage/crypto.ts";
 import { uint8ArrayToBase64, base64ToUint8Array } from "../../../packages/core/src/utils/base64";
-import type { VaultData, EncryptedVault } from "./types.ts";
+import {
+  ARGON2ID_PRODUCTION_PARAMS,
+  ARGON2ID_TEST_PARAMS,
+  deriveArgon2idKey,
+} from "../crypto/argon2.ts";
+import type { VaultData, EncryptedVault, KdfSpec } from "./types.ts";
+
+/**
+ * Argon2id parameters used when constructing `DEFAULT_NEW_VAULT_KDF`.
+ * Production always uses the OWASP-recommended cost (64 MiB, t=3, p=1).
+ * The Vitest suite would otherwise pay ~700ms per new-vault derivation
+ * across hundreds of tests — encryption correctness is independent of
+ * cost, so the test path uses cheap params. Mirrors the PBKDF2 test
+ * override in packages/core/src/utils/constants.ts.
+ *
+ * `process` is undefined in the browser bundle, so production and the
+ * Hono server always use the full OWASP floor.
+ */
+const DEFAULT_NEW_VAULT_ARGON2ID_PARAMS =
+  typeof process !== "undefined" && process.env.VITEST
+    ? ARGON2ID_TEST_PARAMS
+    : ARGON2ID_PRODUCTION_PARAMS;
+
+/**
+ * KDF spec used to encrypt every newly-created sync vault. Argon2id is
+ * memory-hard and destroys the GPU/ASIC advantage that makes a 4-word
+ * diceware passphrase brute-forceable offline. The full cost triple is
+ * stamped on the envelope so we can raise this floor without orphaning
+ * vaults written with older settings.
+ */
+export const DEFAULT_NEW_VAULT_KDF: KdfSpec = {
+  kind: "argon2id",
+  memoryKib: DEFAULT_NEW_VAULT_ARGON2ID_PARAMS.memoryKib,
+  iterations: DEFAULT_NEW_VAULT_ARGON2ID_PARAMS.iterations,
+  parallelism: DEFAULT_NEW_VAULT_ARGON2ID_PARAMS.parallelism,
+};
+
+/**
+ * KDF spec assumed for envelopes written before the `kdf` field existed.
+ * Every envelope without an explicit `kdf` was produced by `deriveKey`
+ * (PBKDF2-SHA256 with 600,000 iterations), so the recovery flow uses
+ * this when nothing else is available.
+ */
+export const LEGACY_KDF_SPEC: KdfSpec = { kind: "pbkdf2-600k" };
+
+/**
+ * Read the KDF spec from an envelope, falling back to the PBKDF2
+ * legacy default when the field is absent. Always go through this
+ * helper rather than reading `envelope.kdf` directly — the back-compat
+ * default lives here so existing vaults stay readable.
+ */
+export function readKdfSpec(envelope: EncryptedVault): KdfSpec {
+  return envelope.kdf ?? LEGACY_KDF_SPEC;
+}
 
 /** AES-GCM IV length in bytes. */
 const IV_LENGTH = 12;
@@ -61,16 +114,39 @@ export async function deriveEncryptionSalt(
 }
 
 /**
- * Derive the AES-GCM-256 encryption key from a passphrase.
- * Two-step: derive deterministic salt, then derive key from passphrase + salt.
+ * Derive the AES-GCM-256 vault encryption key from a passphrase.
+ *
+ * The KDF is selected by `kdfSpec`. When unset, defaults to the
+ * legacy PBKDF2 spec so existing callers keep producing the same key
+ * bytes for the same passphrase (recovery on a primary device with a
+ * stored JWK relies on this — a silent switch would orphan the local
+ * encrypted DB). New-signup callers and recovery-after-upgrade
+ * callers should pass `DEFAULT_NEW_VAULT_KDF` or the spec read off
+ * the cloud envelope via `readKdfSpec`.
  */
 export async function deriveVaultKey(
   passphrase: string,
-  options?: { extractable?: boolean },
+  options?: { extractable?: boolean; kdfSpec?: KdfSpec },
 ): Promise<Result<CryptoKey>> {
   const saltResult = await deriveEncryptionSalt(passphrase);
   if (!saltResult.ok) return saltResult;
-  return deriveKey(passphrase, saltResult.value, options);
+
+  const spec = options?.kdfSpec ?? LEGACY_KDF_SPEC;
+  if (spec.kind === "argon2id") {
+    return deriveArgon2idKey(
+      passphrase,
+      saltResult.value,
+      {
+        memoryKib: spec.memoryKib,
+        iterations: spec.iterations,
+        parallelism: spec.parallelism,
+      },
+      { extractable: options?.extractable },
+    );
+  }
+  return deriveKey(passphrase, saltResult.value, {
+    extractable: options?.extractable,
+  });
 }
 
 /**
@@ -83,10 +159,16 @@ export async function deriveVaultKey(
  * + summaries, repeated structural keys — gzip typically shrinks the
  * payload 60–80%. Smaller ciphertext means smaller pushes, smaller
  * pulls, and smaller `padPayload` buckets in sync-service.
+ *
+ * When `kdfSpec` is provided, it is stamped on the envelope so the
+ * recovery flow can pick the matching key-derivation function on a
+ * new device. Omit it only for tests of legacy back-compat — production
+ * callers (`pushVault` and the auto-upgrade path) always pass a spec.
  */
 export async function encryptVault(
   key: CryptoKey,
   vault: VaultData,
+  kdfSpec?: KdfSpec,
 ): Promise<Result<EncryptedVault>> {
   try {
     const json = JSON.stringify(vault);
@@ -100,11 +182,13 @@ export async function encryptVault(
         compressed as BufferSource,
       ),
     );
-    return ok({
+    const envelope: EncryptedVault = {
       version: SYNC.FORMAT_VERSION,
       iv: Array.from(iv),
       ciphertext: uint8ArrayToBase64(ct),
-    });
+    };
+    if (kdfSpec) envelope.kdf = kdfSpec;
+    return ok(envelope);
   } catch (e) {
     return err(`Vault encryption failed: ${(e as Error).message}`);
   }

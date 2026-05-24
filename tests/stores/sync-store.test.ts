@@ -51,6 +51,7 @@ const mockDeleteVault = vi.mocked(deleteVault);
 const mockCredentials = {
   vaultId: "test-vault-id",
   vaultKey: "test-vault-key" as unknown as CryptoKey,
+  kdfSpec: { kind: "pbkdf2-600k" } as const,
 };
 
 const localStorageMock = (() => {
