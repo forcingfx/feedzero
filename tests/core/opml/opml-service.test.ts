@@ -5,7 +5,7 @@ import {
   generateUrlList,
 } from "../../../src/core/opml/opml-service.ts";
 import { isOk, isErr, unwrap } from "@feedzero/core/utils/result";
-import type { Feed } from "@feedzero/core/types";
+import type { Feed, Folder } from "@feedzero/core/types";
 
 // Sample OPML with multiple feeds
 const SAMPLE_OPML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -410,6 +410,158 @@ describe("opml-service", () => {
       const opml = generateOpmlFile(feeds);
       expect(opml).toContain("Example");
       expect(opml).toContain("https://example.com/feed");
+    });
+  });
+
+  describe("generateOpmlFile — Part 3 lossless round-trip", () => {
+    it("writes outline.description / category / created when present on Feed", () => {
+      const feed: Feed = {
+        id: "f-1",
+        url: "https://example.com/feed",
+        title: "Example",
+        description: "A test feed",
+        siteUrl: "https://example.com",
+        tags: ["tech", "news"],
+        createdAt: Date.parse("2014-08-15T09:00:00Z"),
+        updatedAt: Date.now(),
+      };
+      const opml = generateOpmlFile([feed]);
+      expect(opml).toContain('description="A test feed"');
+      expect(opml).toContain('category="tech,news"');
+      // RFC 822-stamped created attribute, derived from the createdAt ms.
+      expect(opml).toContain(
+        `created="${new Date(feed.createdAt).toUTCString()}"`,
+      );
+    });
+
+    it("omits optional outline fields when absent from Feed", () => {
+      const feed: Feed = {
+        id: "f-1",
+        url: "https://example.com/feed",
+        title: "Example",
+        description: "",
+        siteUrl: "",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      const opml = generateOpmlFile([feed]);
+      expect(opml).not.toContain("description=");
+      expect(opml).not.toContain("category=");
+    });
+
+    it("writes head.dateCreated but NEVER ownerName/ownerEmail/ownerId (privacy)", () => {
+      const feed = createMockFeed("https://a.com/feed", "A", "");
+      const opml = generateOpmlFile([feed]);
+      expect(opml).toContain("<dateCreated>");
+      // Privacy invariant — PII never leaves the device on export.
+      expect(opml).not.toContain("<ownerName>");
+      expect(opml).not.toContain("<ownerEmail>");
+      expect(opml).not.toContain("<ownerId>");
+    });
+
+    it("nests folders that have a parentId so the tree round-trips", () => {
+      // Tech > Frontend > React
+      const now = Date.now();
+      const tech: Folder = { id: "fld-tech", name: "Tech", createdAt: now };
+      const frontend: Folder = {
+        id: "fld-fe",
+        name: "Frontend",
+        createdAt: now,
+        parentId: "fld-tech",
+      };
+      const react: Folder = {
+        id: "fld-rx",
+        name: "React",
+        createdAt: now,
+        parentId: "fld-fe",
+      };
+      const reactFeed: Feed = {
+        id: "f-rx",
+        url: "https://reactjs.org/feed",
+        title: "React Blog",
+        description: "",
+        siteUrl: "",
+        folderId: "fld-rx",
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const opml = generateOpmlFile([reactFeed], [tech, frontend, react]);
+      // Reparse and confirm the path survives intact.
+      const result = parseOpmlFile(opml);
+      expect(isOk(result)).toBe(true);
+      const { entries, folders } = unwrap(result);
+      expect(entries[0].folderPath).toEqual(["Tech", "Frontend", "React"]);
+      expect(folders).toEqual([
+        { name: "Tech", parentPath: [] },
+        { name: "Frontend", parentPath: ["Tech"] },
+        { name: "React", parentPath: ["Tech", "Frontend"] },
+      ]);
+    });
+
+    it("prunes empty folders so we don't emit dangling <outline> wrappers", () => {
+      // "EmptyFolder" has no feeds. Should not appear in the export.
+      const now = Date.now();
+      const empty: Folder = {
+        id: "fld-empty",
+        name: "EmptyFolder",
+        createdAt: now,
+      };
+      const tech: Folder = { id: "fld-tech", name: "Tech", createdAt: now };
+      const feed: Feed = {
+        id: "f-1",
+        url: "https://a.example.com/feed",
+        title: "A",
+        description: "",
+        siteUrl: "",
+        folderId: "fld-tech",
+        createdAt: now,
+        updatedAt: now,
+      };
+      const opml = generateOpmlFile([feed], [empty, tech]);
+      expect(opml).not.toContain("EmptyFolder");
+    });
+
+    it("full round-trip: every field we read on import is written on export", () => {
+      // Build a Feed + Folder fixture with every audit-relevant field set,
+      // export it, reparse, and assert the relevant subset survives.
+      const now = Date.parse("2018-03-14T12:00:00Z");
+      const techFolder: Folder = {
+        id: "fld-tech",
+        name: "Tech",
+        createdAt: now,
+      };
+      const feFolder: Folder = {
+        id: "fld-fe",
+        name: "Frontend",
+        createdAt: now,
+        parentId: "fld-tech",
+      };
+      const feed: Feed = {
+        id: "f-1",
+        url: "https://reactjs.org/feed",
+        title: "React Blog",
+        description: "From the React team",
+        siteUrl: "https://reactjs.org",
+        folderId: "fld-fe",
+        tags: ["tech", "react"],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const opml = generateOpmlFile([feed], [techFolder, feFolder]);
+      const parsed = parseOpmlFile(opml);
+      expect(isOk(parsed)).toBe(true);
+      const { entries } = unwrap(parsed);
+      expect(entries).toHaveLength(1);
+      const e = entries[0];
+      expect(e.xmlUrl).toBe(feed.url);
+      expect(e.htmlUrl).toBe(feed.siteUrl);
+      expect(e.title).toBe(feed.title);
+      expect(e.description).toBe(feed.description);
+      expect(e.tags).toEqual(feed.tags);
+      expect(e.createdAt).toBe(now);
+      expect(e.folderPath).toEqual(["Tech", "Frontend"]);
     });
   });
 
