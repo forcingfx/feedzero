@@ -46,6 +46,7 @@ import { CitationsList } from "@/components/briefings/citations-list";
 import { SuggestedFeedsList } from "@/components/briefings/suggested-feeds-list";
 import { NewBriefingDialog } from "@/components/briefings/new-briefing-dialog";
 import { BriefingGeneratingSkeleton } from "@/components/briefings/briefing-generating-skeleton";
+import { SignalTabs } from "@/components/signal/signal-tabs";
 import { goToBriefing } from "@/lib/go-to-briefing";
 import { goToSettings } from "@/lib/go-to-settings";
 import { useBriefingModelPreference } from "@/lib/briefing-model-preference";
@@ -86,31 +87,42 @@ export function BriefingPage() {
 
   // Gate-locked users see the matrix-derived upgrade splash.
   if (!gate.enabled) {
-    return <UpgradeSplash feature="signal-briefings" />;
+    return (
+      <>
+        <SignalTabs active="briefings" />
+        <UpgradeSplash feature="signal-briefings" />
+      </>
+    );
   }
 
   // Index view: no briefingId in the URL.
   if (!briefingId) {
     return (
-      <BriefingIndex
-        briefings={briefings}
-        onPick={(id) => goToBriefing(navigate, id)}
-        onNew={() => setShowNewDialog(true)}
-        isLoading={isLoading}
-        showNewDialog={showNewDialog}
-        setShowNewDialog={setShowNewDialog}
-      />
+      <>
+        <SignalTabs active="briefings" />
+        <BriefingIndex
+          briefings={briefings}
+          onPick={(id) => goToBriefing(navigate, id)}
+          onNew={() => setShowNewDialog(true)}
+          isLoading={isLoading}
+          showNewDialog={showNewDialog}
+          setShowNewDialog={setShowNewDialog}
+        />
+      </>
     );
   }
 
   if (!briefing) {
     return (
-      <div className="mx-auto max-w-2xl space-y-3 p-8 text-center">
-        <p className="text-muted-foreground">Briefing not found.</p>
-        <Button variant="outline" onClick={() => goToBriefing(navigate)}>
-          Back to briefings
-        </Button>
-      </div>
+      <>
+        <SignalTabs active="briefings" />
+        <div className="mx-auto max-w-2xl space-y-3 p-8 text-center">
+          <p className="text-muted-foreground">Briefing not found.</p>
+          <Button variant="outline" onClick={() => goToBriefing(navigate)}>
+            Back to briefings
+          </Button>
+        </div>
+      </>
     );
   }
 
@@ -158,13 +170,15 @@ export function BriefingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <BriefingHeader
-        briefing={briefing}
-        status={status}
-        onRefresh={() => void handleRefresh()}
-        onDelete={() => void handleDelete()}
-      />
+    <>
+      <SignalTabs active="briefings" />
+      <div className="mx-auto max-w-3xl space-y-6 p-6">
+        <BriefingHeader
+          briefing={briefing}
+          status={status}
+          onRefresh={() => void handleRefresh()}
+          onDelete={() => void handleDelete()}
+        />
 
       {status === "loading" && (
         <BriefingGeneratingSkeleton startedAt={loadingStartedAt ?? Date.now()} />
@@ -212,7 +226,8 @@ export function BriefingPage() {
           </p>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

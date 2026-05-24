@@ -65,22 +65,21 @@ describe("AppSidebar All items entry", () => {
     );
     const texts = Array.from(menuButtons).map((btn) => btn.textContent);
 
-    // Ordering invariant: Explore → Signal → Briefings → All items →
-    // feeds. Filters live further down and the per-feed list comes
-    // last; exact positions vary as more entries land, but the head
-    // is stable.
+    // Ordering invariant: Explore → Signal → All items → feeds.
+    // Briefings used to sit between Signal and All items but folded
+    // under /signal as a sub-tab — no longer a sidebar entry. Filters
+    // live further down and the per-feed list comes last; exact
+    // positions vary as more entries land, but the head is stable.
     const exploreIdx = texts.findIndex((t) => t?.includes("Explore"));
-    const signalIdx = texts.findIndex(
-      (t) => t?.includes("Signal") && !t?.includes("Briefings"),
-    );
-    const briefingsIdx = texts.findIndex((t) => t?.includes("Briefings"));
+    const signalIdx = texts.findIndex((t) => t?.includes("Signal"));
     const allItemsIdx = texts.findIndex((t) => t?.includes("All items"));
     const techIdx = texts.findIndex((t) => t?.includes("Tech News"));
     expect(exploreIdx).toBe(0);
     expect(signalIdx).toBe(1);
-    expect(briefingsIdx).toBe(2);
-    expect(allItemsIdx).toBe(3);
+    expect(allItemsIdx).toBe(2);
     expect(techIdx).toBeGreaterThan(allItemsIdx);
+    // No separate Briefings sidebar entry post-fold.
+    expect(texts.some((t) => t?.trim() === "Briefings")).toBe(false);
   });
 
   it("calls onFeedSelect with ALL_FEEDS_ID when clicked", async () => {

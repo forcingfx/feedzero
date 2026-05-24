@@ -1,5 +1,12 @@
 import { useEffect, useState, lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+  Navigate,
+  useParams,
+} from "react-router";
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -103,6 +110,19 @@ function BriefingRoute() {
       </Suspense>
     </StageView>
   );
+}
+
+/**
+ * Legacy redirect: /briefings → /signal/briefings (and /briefings/:id →
+ * /signal/briefings/:id). Briefings moved under Signal as a sub-tab;
+ * the old top-level URLs from in-flight bookmarks redirect cleanly.
+ */
+function BriefingsLegacyRedirect() {
+  const { briefingId } = useParams();
+  const target = briefingId
+    ? `/signal/briefings/${briefingId}`
+    : "/signal/briefings";
+  return <Navigate to={target} replace />;
 }
 
 function AppInit({ children }: { children: React.ReactNode }) {
@@ -298,10 +318,16 @@ export function App() {
               />
               <Route path="/explore" element={<ExploreRoute />} />
               <Route path="/signal" element={<SignalRoute />} />
-              <Route path="/briefings" element={<BriefingRoute />} />
+              <Route path="/signal/briefings" element={<BriefingRoute />} />
+              <Route
+                path="/signal/briefings/:briefingId"
+                element={<BriefingRoute />}
+              />
+              {/* Legacy /briefings URLs from before the sub-tab merge. */}
+              <Route path="/briefings" element={<BriefingsLegacyRedirect />} />
               <Route
                 path="/briefings/:briefingId"
-                element={<BriefingRoute />}
+                element={<BriefingsLegacyRedirect />}
               />
               <Route path="/stats" element={<StatsRoute />} />
               <Route path="/settings" element={<SettingsRoute />} />

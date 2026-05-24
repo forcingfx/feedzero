@@ -14,6 +14,7 @@ import {
 } from "@/core/signal/types.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { StoryRow } from "@/components/signal/story-row.tsx";
+import { SignalTabs } from "@/components/signal/signal-tabs.tsx";
 import { formatRelative } from "@/lib/format-relative.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
@@ -57,26 +58,42 @@ export function SignalPage() {
   }, [loadReport, totalArticles, tierLocked]);
 
   if (tierLocked) {
-    return <UpgradeSplash feature="signal" />;
+    return (
+      <>
+        <SignalTabs active="topics" />
+        <UpgradeSplash feature="signal" />
+      </>
+    );
   }
 
   if (status === "locked") {
-    return <LockedSplash count={corpusSize} />;
+    return (
+      <>
+        <SignalTabs active="topics" />
+        <LockedSplash count={corpusSize} />
+      </>
+    );
   }
 
   if (status === "error") {
     return (
-      <div className="mx-auto max-w-3xl p-6">
-        <p className="text-destructive">Couldn't generate signal: {error}</p>
-      </div>
+      <>
+        <SignalTabs active="topics" />
+        <div className="mx-auto max-w-3xl p-6">
+          <p className="text-destructive">Couldn't generate signal: {error}</p>
+        </div>
+      </>
     );
   }
 
   if (status === "idle" || status === "loading" || !report) {
     return (
-      <div className="mx-auto max-w-3xl p-6 text-muted-foreground">
-        Computing signal…
-      </div>
+      <>
+        <SignalTabs active="topics" />
+        <div className="mx-auto max-w-3xl p-6 text-muted-foreground">
+          Computing signal…
+        </div>
+      </>
     );
   }
 
@@ -172,7 +189,9 @@ function ReadyView({
   const generatedLabel = formatRelative(report.generatedAt);
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto">
+    <>
+      <SignalTabs active="topics" />
+      <div ref={containerRef} className="h-full overflow-y-auto">
       {!isDesktop && pullPx > 0 ? (
         <div
           className="flex items-center justify-center text-xs text-muted-foreground transition-[height]"
@@ -230,7 +249,8 @@ function ReadyView({
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

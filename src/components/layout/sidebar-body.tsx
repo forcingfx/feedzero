@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router";
-import { Compass, FileText, Layers, Sparkles, Star, Plus } from "lucide-react";
+import { Compass, Layers, Sparkles, Star, Plus } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
@@ -51,11 +51,11 @@ export function SidebarBody({
   const smartFilters = useSmartFilterStore((s) => s.filters);
   const openFilterEditor = useSmartFilterStore((s) => s.openEditor);
   const filtersGate = useFeatureGate("filters");
-  const briefingsGate = useFeatureGate("signal-briefings");
   const briefings = useBriefingStore((s) => s.briefings);
   const isExplorePage = pathname === "/explore";
-  const isSignalPage = pathname === "/signal";
-  const isBriefingsPage = pathname.startsWith("/briefings");
+  // /signal AND /signal/briefings both light up the Signal entry since
+  // Briefings is a sub-tab of Signal now.
+  const isSignalPage = pathname === "/signal" || pathname.startsWith("/signal/");
 
   // Show "Starred" once the user has actually starred something; before
   // that, the entry would land on an empty view and feels like clutter.
@@ -75,16 +75,8 @@ export function SidebarBody({
     navigate("/signal");
   }
 
-  function handleBriefings() {
-    onBeforeNavigate?.();
-    if (!briefingsGate.enabled) {
-      briefingsGate.promptUpgrade();
-      return;
-    }
-    navigate("/briefings");
-  }
-
-  // Stale dot when any briefing has unconsumed new matching articles.
+  // Stale dot on the Signal entry when any briefing (sub-tab of
+  // Signal) has unconsumed new matching articles.
   const briefingsStaleCount = briefings.reduce(
     (n, b) => n + (b.staleArticleCount > 0 ? 1 : 0),
     0,
@@ -125,21 +117,6 @@ export function SidebarBody({
         >
           <Sparkles className="size-4" />
           <span>Signal</span>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          isActive={isBriefingsPage}
-          onClick={handleBriefings}
-          tooltip={
-            briefingsGate.enabled
-              ? "Signal Briefings"
-              : "Signal Briefings — upgrade to Pro"
-          }
-          data-testid="sidebar-briefings-link"
-        >
-          <FileText className="size-4" />
-          <span>Briefings</span>
           {briefingsStaleCount > 0 && (
             <span
               aria-label={`${briefingsStaleCount} briefing(s) have new matching articles`}
