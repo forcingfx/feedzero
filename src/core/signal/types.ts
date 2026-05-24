@@ -64,7 +64,7 @@ export const STORY_SIMILARITY = 0.6;
  * discards any cached report tagged with a different version so a stale
  * payload from an older build can't mis-render.
  */
-export const SIGNAL_REPORT_SCHEMA_VERSION = 2;
+export const SIGNAL_REPORT_SCHEMA_VERSION = 3;
 
 /**
  * A group of articles from one or more feeds covering the same story.
@@ -103,6 +103,14 @@ export interface Topic {
   totalArticlesInCluster: number;
   /** Distinct feeds the cluster's articles came from. */
   feedCount: number;
+  /**
+   * Epoch ms of the most recent article in the cluster. Drives the
+   * topic display order (newest activity first) so /signal answers
+   * "what's happening right now" rather than "what's loudest." Topic
+   * *selection* still uses cross-feed term-frequency scoring — only
+   * the final display order changes.
+   */
+  newestActivityAt: number;
 }
 
 export interface SignalReport {

@@ -98,9 +98,45 @@ describe("generateReport — happy path", () => {
     expect(terms).toContain("supreme court");
   });
 
-  it("orders topics by signal strength (OpenAI is loudest)", () => {
+  it("includes OpenAI as a top topic (it's the loudest signal)", () => {
     if (!result.ok) return;
-    expect(result.value.topics[0].term).toBe("openai");
+    // Topic *selection* is signal-strength-based, so the loudest term
+    // (OpenAI in this fixture) must land in the result. Topic *display
+    // order* is recency, asserted separately below — these are
+    // independent invariants and locking them together gave us a brittle
+    // test that broke any time we changed display order.
+    const terms = result.value.topics.map((t) => t.term);
+    expect(terms).toContain("openai");
+  });
+
+  it("orders topics by recency (newest activity first)", () => {
+    if (!result.ok) return;
+    // Stable invariant: each topic's newestActivityAt must be >= the
+    // next one. Catches both ordering regressions and a future
+    // accidental signal-strength sort sneaking back in.
+    const stamps = result.value.topics.map((t) => t.newestActivityAt);
+    for (let i = 1; i < stamps.length; i++) {
+      expect(stamps[i]).toBeLessThanOrEqual(stamps[i - 1]);
+    }
+  });
+
+  it("each topic carries a newestActivityAt that matches its freshest member", () => {
+    if (!result.ok) return;
+    for (const topic of result.value.topics) {
+      const storyMaxes = topic.stories.map((s) =>
+        Math.max(
+          ...s.articleIds.map((id) => {
+            const a = articles.find((art) => art.id === id);
+            return a?.publishedAt ?? 0;
+          }),
+        ),
+      );
+      // newestActivityAt covers all members across all stories AND any
+      // duplicate-group members from `members`, so it must be at least
+      // as large as the max we can see from the public Story shape.
+      const maxFromStories = Math.max(0, ...storyMaxes);
+      expect(topic.newestActivityAt).toBeGreaterThanOrEqual(maxFromStories);
+    }
   });
 
   it("prefers the compound over its constituents", () => {
@@ -153,7 +189,7 @@ describe("generateReport — happy path", () => {
 
   it("reports schema version, corpus stats and chosen window", () => {
     if (!result.ok) return;
-    expect(result.value.schemaVersion).toBe(2);
+    expect(result.value.schemaVersion).toBe(3);
     expect(result.value.corpusSize).toBe(articles.length);
     expect(result.value.corpusInWindow).toBeGreaterThan(0);
     expect(result.value.window).toBe("7d");

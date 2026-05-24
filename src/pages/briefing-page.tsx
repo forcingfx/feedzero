@@ -21,7 +21,6 @@ import {
   Plus,
   KeyRound,
   Sparkles,
-  Loader2,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,6 +45,7 @@ import { BriefingAbstract } from "@/components/briefings/briefing-abstract";
 import { CitationsList } from "@/components/briefings/citations-list";
 import { SuggestedFeedsList } from "@/components/briefings/suggested-feeds-list";
 import { NewBriefingDialog } from "@/components/briefings/new-briefing-dialog";
+import { BriefingGeneratingSkeleton } from "@/components/briefings/briefing-generating-skeleton";
 import { goToBriefing } from "@/lib/go-to-briefing";
 import { goToSettings } from "@/lib/go-to-settings";
 import { useBriefingModelPreference } from "@/lib/briefing-model-preference";
@@ -117,6 +117,17 @@ export function BriefingPage() {
   const status = statusById.get(briefing.id) ?? "idle";
   const error = errorById.get(briefing.id);
   const pendingScore = pendingScoreById.get(briefing.id);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
+
+  // Stamp the start time when we transition INTO loading; clear it when
+  // we leave. The skeleton uses this to drive the elapsed-time counter.
+  useEffect(() => {
+    if (status === "loading" && loadingStartedAt === null) {
+      setLoadingStartedAt(Date.now());
+    } else if (status !== "loading" && loadingStartedAt !== null) {
+      setLoadingStartedAt(null);
+    }
+  }, [status, loadingStartedAt]);
 
   async function handleRefresh() {
     if (!briefing) return;
@@ -156,13 +167,7 @@ export function BriefingPage() {
       />
 
       {status === "loading" && (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-6">
-          <Loader2 className="size-5 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Generating briefing — your articles are being summarized by your
-            Claude key.
-          </p>
-        </div>
+        <BriefingGeneratingSkeleton startedAt={loadingStartedAt ?? Date.now()} />
       )}
 
       {status === "no-api-key" && <NoApiKeySplash />}
