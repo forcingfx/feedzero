@@ -9,6 +9,7 @@ import {
   decryptVault,
   readKdfSpec,
   LEGACY_KDF_SPEC,
+  DEFAULT_NEW_VAULT_KDF,
 } from "./vault-crypto.ts";
 import type { VaultData, EncryptedVault, KdfSpec } from "./types.ts";
 import { syncFetch } from "./sync-fetch.ts";
@@ -374,6 +375,90 @@ export async function recoverVault(
   } catch (e) {
     return err(`Vault recovery failed: ${(e as Error).message}`);
   }
+}
+
+/**
+ * Whether two KDF specs are equivalent (same kind and same params).
+ * Used by `upgradeVaultKdf` to short-circuit no-op upgrades.
+ */
+function kdfSpecsMatch(a: KdfSpec, b: KdfSpec): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "pbkdf2-600k") return true;
+  if (b.kind !== "argon2id") return false;
+  return (
+    a.memoryKib === b.memoryKib &&
+    a.iterations === b.iterations &&
+    a.parallelism === b.parallelism
+  );
+}
+
+/**
+ * Re-encrypt a sync vault with a stronger KDF and push it back to the
+ * same vault ID. Used by the recovery flow to silently upgrade legacy
+ * PBKDF2 vaults to Argon2id the first time the user types their
+ * passphrase on a new device — the "auto-upgrade on next passphrase
+ * entry" migration path.
+ *
+ * The vault ID derivation is intentionally KDF-invariant (always
+ * PBKDF2), so the upgrade is a single PUT to the same vault ID, no
+ * migration of identifiers. Returns the new credentials whose
+ * `vaultKey` corresponds to the new spec — callers MUST persist
+ * these via `updateStoredVaultKey` before they can be used again
+ * on this device.
+ *
+ * Caller-friendly behavior: if `current.kdfSpec` already matches
+ * `targetSpec`, the function returns `current` unchanged without
+ * any network call. If the push fails, the function returns an
+ * error and the caller can fall back to the legacy credentials —
+ * the cloud envelope is unchanged in that case, so a retry on the
+ * next session can complete the upgrade.
+ */
+export async function upgradeVaultKdf(
+  passphrase: string,
+  current: SyncCredentials,
+  vault: VaultData,
+  targetSpec: KdfSpec = DEFAULT_NEW_VAULT_KDF,
+): Promise<Result<SyncCredentials>> {
+  if (kdfSpecsMatch(current.kdfSpec, targetSpec)) {
+    return ok(current);
+  }
+
+  const newKeyResult = await deriveVaultKey(passphrase, {
+    extractable: true,
+    kdfSpec: targetSpec,
+  });
+  if (!newKeyResult.ok) return newKeyResult;
+
+  const encryptedResult = await encryptVault(
+    newKeyResult.value,
+    vault,
+    targetSpec,
+  );
+  if (!encryptedResult.ok) return encryptedResult;
+
+  const body = padPayload(
+    JSON.stringify({
+      vaultId: current.vaultId,
+      vault: encryptedResult.value,
+    }),
+  );
+
+  const response = await syncFetch("/api/sync", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    return err(`KDF upgrade push failed (${response.status}): ${text}`);
+  }
+
+  return ok({
+    vaultId: current.vaultId,
+    vaultKey: newKeyResult.value,
+    kdfSpec: targetSpec,
+  });
 }
 
 /**

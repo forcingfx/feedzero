@@ -4,18 +4,21 @@ import {
   pullVault,
   pullVaultIfChanged,
   recoverVault,
+  upgradeVaultKdf,
   importVault,
   deleteVault,
   exportVault,
   mergeVaults,
 } from "../core/sync/sync-service";
 import type { SyncCredentials } from "../core/sync/sync-service";
+import type { VaultData } from "../core/sync/types.ts";
 import {
   addVaultKeys,
   removeVaultKeys,
   destroyLocal,
   persistDerivedKeysFromOpenDb,
   assertKeyDataCoupling,
+  updateStoredVaultKey,
 } from "../core/storage/key-manager.ts";
 import {
   close,
@@ -23,7 +26,6 @@ import {
   open,
   getPreferencesUpdatedAt,
 } from "../core/storage/db.ts";
-import type { VaultData } from "../core/sync/types.ts";
 import { clearLicenseToken } from "../core/license/license-token-store.ts";
 import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import type { Result } from "@feedzero/core/utils/result";
@@ -403,8 +405,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         return applyResult;
       }
 
-      set({
+      const finalCreds = await autoUpgradeOnPassphraseEntry(
+        passphrase,
         credentials,
+        cloudVault,
+      );
+
+      set({
+        credentials: finalCreds,
         status: "synced",
         lastSyncedAt: Date.now(),
         error: null,
@@ -452,8 +460,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return err(pushResult.error);
     }
 
-    set({
+    const finalCreds = await autoUpgradeOnPassphraseEntry(
+      passphrase,
       credentials,
+      mergeResult.value,
+    );
+
+    set({
+      credentials: finalCreds,
       status: "synced",
       lastSyncedAt: pushResult.value.updatedAt,
       lastVaultEtag: pushResult.value.etag,
@@ -462,6 +476,38 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     return ok(true);
   },
 }));
+
+/**
+ * Auto-upgrade hook for any passphrase-entry flow: when the cloud
+ * envelope is still on the legacy PBKDF2 KDF, derive a fresh Argon2id
+ * key, re-encrypt + push, and persist the new key locally so the
+ * device's stored JWK stays aligned with the cloud's encoding.
+ *
+ * Best-effort by design — failure here MUST NOT break recovery. The
+ * caller continues with the original `current` credentials and the
+ * upgrade can retry on the next passphrase entry.
+ *
+ * See CLAUDE.md "Auto-upgrade on next passphrase entry" — this is
+ * the migration plan for existing PBKDF2 sync users to land on
+ * Argon2id without a UI prompt.
+ */
+async function autoUpgradeOnPassphraseEntry(
+  passphrase: string,
+  current: SyncCredentials,
+  vault: VaultData,
+): Promise<SyncCredentials> {
+  const upgraded = await upgradeVaultKdf(passphrase, current, vault);
+  if (!upgraded.ok || upgraded.value === current) return current;
+  const persistResult = await updateStoredVaultKey(upgraded.value);
+  // If persistence fails, the cloud has been upgraded but local
+  // can't store the new JWK — degrade gracefully: keep using the
+  // old in-memory creds. The local JWK still decrypts what's in
+  // IndexedDB; only future cloud pulls would mismatch, and those
+  // will trigger a recovery flow that will derive the right key
+  // from the envelope's spec.
+  if (!persistResult.ok) return current;
+  return upgraded.value;
+}
 
 /**
  * Apply timestamp last-write-wins to the preferences carried by a pulled

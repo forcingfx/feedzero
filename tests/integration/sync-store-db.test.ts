@@ -126,6 +126,13 @@ vi.mock("../../src/core/sync/sync-service.ts", async () => {
     pullVault: (...args: unknown[]) => pullVaultMock(...args),
     pullVaultIfChanged: pullCompat,
     recoverVault: recoverCompat,
+    // No-op upgrade: integration tests pre-date the Argon2id rollout
+    // and their fixtures use legacy creds throughout. The real
+    // upgrade path is exercised by tests/core/sync/recover-vault.test.ts.
+    upgradeVaultKdf: async (
+      _passphrase: string,
+      current: unknown,
+    ) => ({ ok: true as const, value: current }),
     deleteVault: (...args: unknown[]) => deleteVaultMock(...args),
   };
 });

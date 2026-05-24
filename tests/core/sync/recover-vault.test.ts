@@ -139,6 +139,138 @@ describe("recoverVault", () => {
 });
 
 /**
+ * Auto-upgrade: a recovery-flow caller can upgrade a legacy PBKDF2
+ * vault to Argon2id by deriving a new key, re-encrypting the vault
+ * with that key, and pushing back to the same vault ID. The cloud
+ * envelope is rewritten in place — vault ID derivation is PBKDF2-
+ * only by design, so no migration of identifiers is needed.
+ */
+describe("upgradeVaultKdf", () => {
+  const PASSPHRASE = "carbon mango velvet prism";
+  const TARGET_SPEC = {
+    kind: "argon2id" as const,
+    memoryKib: 256,
+    iterations: 1,
+    parallelism: 1,
+  };
+
+  beforeEach(async () => {
+    const result = await open(PASSPHRASE);
+    if (!result.ok) throw new Error(result.error);
+  });
+
+  afterEach(() => {
+    close();
+    indexedDB.deleteDatabase("feedzero");
+    vi.restoreAllMocks();
+  });
+
+  it("re-encrypts a legacy vault with Argon2id and PUTs to the same vault ID", async () => {
+    const { upgradeVaultKdf } = await import("@/core/sync/sync-service");
+
+    const legacyKey = unwrap(
+      await deriveVaultKey(PASSPHRASE, {
+        extractable: true,
+        kdfSpec: LEGACY_KDF_SPEC,
+      }),
+    );
+    const vaultId = unwrap(await deriveVaultId(PASSPHRASE));
+    const legacyCreds = { vaultId, vaultKey: legacyKey, kdfSpec: LEGACY_KDF_SPEC };
+
+    const vault = unwrap(await exportVault());
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, updatedAt: Date.now() }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await upgradeVaultKdf(
+      PASSPHRASE,
+      legacyCreds,
+      vault,
+      TARGET_SPEC,
+    );
+    expect(isOk(result)).toBe(true);
+    if (!result.ok) return;
+
+    // Returned creds carry the new spec, same vault ID, new vault key
+    expect(result.value.kdfSpec).toEqual(TARGET_SPEC);
+    expect(result.value.vaultId).toBe(vaultId);
+    expect(result.value.vaultKey).not.toBe(legacyKey);
+
+    // The push targets the same vault ID and stamps Argon2id on the envelope
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.vaultId).toBe(vaultId);
+    expect(body.vault.kdf).toEqual(TARGET_SPEC);
+  });
+
+  it("is a no-op when the credentials already use the target spec", async () => {
+    const { upgradeVaultKdf } = await import("@/core/sync/sync-service");
+
+    const argonKey = unwrap(
+      await deriveVaultKey(PASSPHRASE, {
+        extractable: true,
+        kdfSpec: TARGET_SPEC,
+      }),
+    );
+    const vaultId = unwrap(await deriveVaultId(PASSPHRASE));
+    const argonCreds = { vaultId, vaultKey: argonKey, kdfSpec: TARGET_SPEC };
+
+    const vault = unwrap(await exportVault());
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await upgradeVaultKdf(
+      PASSPHRASE,
+      argonCreds,
+      vault,
+      TARGET_SPEC,
+    );
+    expect(isOk(result)).toBe(true);
+    if (!result.ok) return;
+
+    // Same creds returned, no network call
+    expect(result.value).toBe(argonCreds);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns err on push failure (caller falls back to legacy creds)", async () => {
+    const { upgradeVaultKdf } = await import("@/core/sync/sync-service");
+
+    const legacyKey = unwrap(
+      await deriveVaultKey(PASSPHRASE, {
+        extractable: true,
+        kdfSpec: LEGACY_KDF_SPEC,
+      }),
+    );
+    const vaultId = unwrap(await deriveVaultId(PASSPHRASE));
+    const legacyCreds = { vaultId, vaultKey: legacyKey, kdfSpec: LEGACY_KDF_SPEC };
+
+    const vault = unwrap(await exportVault());
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve("Internal error"),
+      }),
+    );
+
+    const result = await upgradeVaultKdf(
+      PASSPHRASE,
+      legacyCreds,
+      vault,
+      TARGET_SPEC,
+    );
+    expect(isErr(result)).toBe(true);
+  });
+});
+
+/**
  * pushVault now stamps the credentials' `kdfSpec` onto the cloud
  * envelope. The signup-time wiring in `addVaultKeys` / `initFresh`
  * passes Argon2id by default, so a recovering device sees the

@@ -10,6 +10,9 @@ import { useSyncStore } from "@/stores/sync-store";
 vi.mock("@/core/storage/key-manager", () => ({
   initFresh: vi.fn(),
   persistDerivedKeysFromOpenDb: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  updateStoredVaultKey: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: undefined }),
 }));
 
 vi.mock("@/core/sync/sync-service", () => ({
@@ -17,6 +20,13 @@ vi.mock("@/core/sync/sync-service", () => ({
   recoverVault: vi
     .fn()
     .mockResolvedValue({ ok: false, error: "Not found" }),
+  // Default: no-op (returns the same creds the caller passed in). The
+  // recovery flow treats `upgradeVaultKdf` as best-effort, so this
+  // covers all tests that don't specifically exercise the upgrade.
+  upgradeVaultKdf: vi.fn().mockImplementation(
+    async (_passphrase: string, current: unknown) =>
+      ({ ok: true, value: current }),
+  ),
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
   checkVaultExists: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));

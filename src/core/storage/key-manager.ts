@@ -337,6 +337,39 @@ export async function addVaultKeys(
 }
 
 /**
+ * Persist an upgraded vault key + spec to localStorage. Called by the
+ * recovery flow after `upgradeVaultKdf` has successfully re-encrypted
+ * the cloud envelope with a stronger KDF — the locally-stored JWK
+ * MUST match what's now encrypting the cloud, or the next pull would
+ * decrypt with the old key and fail. Caller is responsible for
+ * exporting the credentials' `vaultKey` as a JWK before passing the
+ * result through to `restoreSync`.
+ *
+ * Idempotent: if no keys are stored, returns ok without writing
+ * anything (the recovery flow has bigger problems in that case, but
+ * we don't want this best-effort upgrade to be the error vector).
+ */
+export async function updateStoredVaultKey(
+  credentials: SyncCredentials,
+): Promise<Result<void>> {
+  const storedKeys = loadStoredKeys();
+  if (!storedKeys) return ok(undefined);
+
+  try {
+    const material: StoredKeyMaterial = {
+      ...storedKeys,
+      vaultId: credentials.vaultId,
+      vaultKeyJwk: await exportCryptoKey(credentials.vaultKey),
+      vaultKdfSpec: credentials.kdfSpec,
+    };
+    storeKeys(material);
+    return ok(undefined);
+  } catch (e) {
+    return err(`Failed to persist upgraded vault key: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Remove vault keys, keeping DB keys intact.
  * Called when disabling sync after server vault is confirmed deleted.
  */

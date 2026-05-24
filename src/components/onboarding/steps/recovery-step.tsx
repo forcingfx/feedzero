@@ -12,11 +12,12 @@ import {
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
-import { initFresh } from "@/core/storage/key-manager";
+import { initFresh, updateStoredVaultKey } from "@/core/storage/key-manager";
 import {
   checkVaultExists,
   importVault,
   recoverVault,
+  upgradeVaultKdf,
 } from "@/core/sync/sync-service";
 
 type Phase = "idle" | "checking" | "restoring";
@@ -88,7 +89,7 @@ export function RecoveryStep() {
       return;
     }
 
-    const credentials = initResult.value.credentials;
+    let credentials = initResult.value.credentials;
 
     // 4. Import the pulled vault data and restore sync state.
     //    `initFresh` already opened a fresh DB with passphrase-derived
@@ -99,6 +100,20 @@ export function RecoveryStep() {
     //    old extra rekey call masked.
     if (credentials) {
       await importVault(vault);
+
+      // 5. Auto-upgrade the cloud envelope's KDF if it's still on the
+      //    legacy PBKDF2 spec. The decision per CLAUDE.md / migration
+      //    discussion: existing users get bumped to Argon2id the first
+      //    time they type their passphrase on a fresh device. Best-
+      //    effort — a push failure leaves the cloud at legacy, the
+      //    user keeps working with their PBKDF2 credentials, and the
+      //    next recovery attempt re-runs the upgrade.
+      const upgraded = await upgradeVaultKdf(trimmed, credentials, vault);
+      if (upgraded.ok && upgraded.value !== credentials) {
+        await updateStoredVaultKey(upgraded.value);
+        credentials = upgraded.value;
+      }
+
       useSyncStore.getState().restoreSync(credentials);
     }
 

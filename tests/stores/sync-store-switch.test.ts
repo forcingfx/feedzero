@@ -6,6 +6,10 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   pullVault: vi.fn(),
   pullVaultIfChanged: vi.fn(),
   recoverVault: vi.fn(),
+  upgradeVaultKdf: vi.fn().mockImplementation(
+    async (_passphrase: string, current: unknown) =>
+      ({ ok: true, value: current }),
+  ),
   importVault: vi.fn(),
   deleteVault: vi.fn(),
   exportVault: vi.fn(),
@@ -30,6 +34,9 @@ vi.mock("../../src/core/storage/key-manager", () => ({
     .fn()
     .mockResolvedValue({ ok: true, value: {} }),
   assertKeyDataCoupling: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: undefined }),
+  updateStoredVaultKey: vi
     .fn()
     .mockResolvedValue({ ok: true, value: undefined }),
 }));
