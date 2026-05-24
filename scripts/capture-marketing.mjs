@@ -400,12 +400,51 @@ function compressPng(file) {
 // ── Scenes ───────────────────────────────────────────────────────────
 
 async function sceneAnyFeed(page) {
+  // Override the context-level /api/feed stub (304 = clean sidebar)
+  // with a page-level route that serves a small Atom document for the
+  // one URL the user "pastes" in this scene. Page routes are matched
+  // first; subsequent scenes fall back to the context stub once we
+  // `unroute` here. The chip's previewFeed call then hits real
+  // feedsmith parsing and lights up the "Atom" pill.
+  const probeUrl = "https://example.com/blog/feed.xml";
+  const handler = async (route) => {
+    const body = route.request().postData() ?? "";
+    const isProbe = body.includes(probeUrl);
+    if (!isProbe) return route.fulfill({ status: 304, body: "" });
+    return route.fulfill({
+      status: 200,
+      contentType: "application/atom+xml; charset=utf-8",
+      body: `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Blog</title>
+  <subtitle>A synthetic feed for product screenshots</subtitle>
+  <link href="https://example.com/blog" rel="alternate"/>
+  <id>tag:example.com,2026:blog</id>
+  <updated>2026-05-24T20:00:00Z</updated>
+  <entry>
+    <title>Hello world</title>
+    <link href="https://example.com/blog/hello"/>
+    <id>tag:example.com,2026:blog:1</id>
+    <updated>2026-05-24T20:00:00Z</updated>
+    <summary>The first post on the synthetic example feed.</summary>
+  </entry>
+</feed>`,
+    });
+  };
+  await page.route("**/api/feed", handler);
   await gotoAndSettle(page, "/explore");
   const search = page.getByPlaceholder(/Search feeds or paste a URL/i);
   await search.click();
-  await search.fill("https://example.com/blog/feed.xml");
-  await page.waitForTimeout(200);
-  return shoot(page, "feature-any-feed.png");
+  await search.fill(probeUrl);
+  await page
+    .waitForSelector('[data-testid="feed-format-chip"][data-state="found"]', {
+      timeout: 6000,
+    })
+    .catch(() => {});
+  await page.waitForTimeout(300);
+  const result = await shoot(page, "feature-any-feed.png");
+  await page.unroute("**/api/feed", handler).catch(() => {});
+  return result;
 }
 
 async function sceneDiscover(page) {
@@ -427,93 +466,98 @@ async function sceneKeyboard(page) {
 
 async function sceneSync(page) {
   await gotoAndSettle(page, "/settings?tab=sync-and-data");
-  // Generate a passphrase and open SetupWizard via the store directly so
-  // we don't have to click through the chooser dialog.
-  await page.evaluate(async () => {
-    const gen = await import("/src/core/crypto/passphrase-generator.ts");
-    const passphrase = await gen.generatePassphrase();
-    // Stash on a window hook so the dialog driver below reads it.
-    window.__demoPassphrase = passphrase;
-  });
   // Trigger the dialog via the existing UI path: flip the Switch ON.
-  const syncToggle = page.getByRole("switch", { name: /toggle cloud sync/i }).first();
+  const syncToggle = page
+    .getByRole("switch", { name: /toggle cloud sync/i })
+    .first();
   await syncToggle.click();
-  // ChooseSyncFlow appears — pick "Set up new cloud sync".
   await page.getByRole("button", { name: /set up new cloud sync/i }).click();
-  // SetupWizard with the auto-generated passphrase is now visible.
   await page.waitForSelector("text=Your secret key");
-  // Tick "I've saved my secret key" so the Enable button isn't disabled,
-  // but DO NOT click Enable — we want the static passphrase + button state.
   const savedCheckbox = page.getByRole("checkbox").first();
   await savedCheckbox.click().catch(() => {});
+  // Flip the persistent SyncStatusBadge into "synced · just now" so
+  // the floating chip in the top-right corner frames the dialog with
+  // the after-state — converting the headline ("Pick up where you
+  // left off, anywhere") from a promise into a visible artifact. The
+  // wizard hasn't been Enable-clicked yet, but the badge shows what
+  // the next click delivers.
+  await page.evaluate(async () => {
+    const mod = await import("/src/stores/sync-store.ts");
+    mod.useSyncStore.setState({
+      status: "synced",
+      lastSyncedAt: Date.now() - 90 * 1000,
+      error: null,
+    });
+  });
+  await page.waitForSelector(
+    '[data-testid="sync-status-badge"][data-state="synced"]',
+    { timeout: 4000 },
+  );
   await page.waitForTimeout(300);
   return shoot(page, "feature-sync.png");
 }
 
 async function sceneSwitchReaders(page) {
-  // The Import dialog has no "preview tree before import" affordance —
-  // the closest match is the post-import results screen, which carries
-  // the OPML `<head>` provenance line ("Imported from X's <title>")
-  // and the collapsible list of successfully-imported feeds. That
-  // visually delivers "Bring your subscriptions. Folders and all."
-  // better than raw OPML XML in the textarea would.
+  // Drive the new pre-import preview: the user pastes OPML, clicks
+  // "Import feeds", and lands on the folder-tree confirmation step.
+  // That tree IS the screenshot — it converts the landing copy
+  // ("Bring your subscriptions. Folders and all.") from a promise into
+  // an affordance.
   await gotoAndSettle(page, "/settings?tab=sync-and-data");
   await page.waitForTimeout(500);
-  // Synthesise a finished-import state. Driving a real import here
-  // would require the network-blocked /api/feed to work; we'd rather
-  // paint a deterministic, neutral result.
-  await page.evaluate(() => {
-    const seed = async () => {
-      const mod = await import("/src/stores/import-store.ts");
-      const store = mod.useImportStore;
-      const FEED_URLS = [
-        "https://feeds.example.com/tech-weekly.xml",
-        "https://feeds.example.com/dev-notes.xml",
-        "https://feeds.example.com/open-source-digest.xml",
-        "https://feeds.example.com/world-affairs.xml",
-        "https://feeds.example.com/morning-briefing.xml",
-        "https://feeds.example.com/policy-watch.xml",
-        "https://feeds.example.com/the-evening-edit.xml",
-        "https://feeds.example.com/science-now.xml",
-        "https://feeds.example.com/ml-papers-weekly.xml",
-        "https://feeds.example.com/research-roundup.xml",
-        "https://feeds.example.com/design-notes.xml",
-        "https://feeds.example.com/longform-quarterly.xml",
-        "https://feeds.example.com/markets-today.xml",
-        "https://feeds.example.com/founders-letter.xml",
-        "https://feeds.example.com/homelab-journal.xml",
-        "https://feeds.example.com/release-engineer.xml",
-        "https://feeds.example.com/studio-journal.xml",
-      ];
-      store.setState({
-        status: "complete",
-        urls: FEED_URLS,
-        currentIndex: FEED_URLS.length,
-        results: FEED_URLS.map((url) => ({ url, success: true })),
-        error: null,
-        head: {
-          title: "My subscriptions",
-          ownerName: "you",
-          dateCreated: "2026-04-12",
-        },
-      });
-    };
-    return seed();
+  const pasteText = page.getByLabel(/paste text/i).first();
+  await pasteText.waitFor({ state: "visible", timeout: 15000 });
+  await pasteText.click({ force: true });
+  const textarea = page
+    .getByPlaceholder(/Paste OPML XML, Pocket HTML\/CSV/i)
+    .first();
+  const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <head>
+    <title>My subscriptions</title>
+    <ownerName>you</ownerName>
+    <dateCreated>2026-04-12</dateCreated>
+  </head>
+  <body>
+    <outline text="Tech">
+      <outline type="rss" text="Tech Weekly" xmlUrl="https://feeds.example.com/tech-weekly.xml"/>
+      <outline type="rss" text="Developer Notes" xmlUrl="https://feeds.example.com/dev-notes.xml"/>
+      <outline type="rss" text="Open Source Digest" xmlUrl="https://feeds.example.com/open-source-digest.xml"/>
+    </outline>
+    <outline text="News">
+      <outline type="rss" text="World Affairs Daily" xmlUrl="https://feeds.example.com/world-affairs.xml"/>
+      <outline type="rss" text="The Morning Briefing" xmlUrl="https://feeds.example.com/morning-briefing.xml"/>
+      <outline type="rss" text="Policy Watch" xmlUrl="https://feeds.example.com/policy-watch.xml"/>
+    </outline>
+    <outline text="Science">
+      <outline type="rss" text="Science Now" xmlUrl="https://feeds.example.com/science-now.xml"/>
+      <outline type="rss" text="ML Papers Weekly" xmlUrl="https://feeds.example.com/ml-papers-weekly.xml"/>
+    </outline>
+    <outline text="Design">
+      <outline type="rss" text="Design Notes" xmlUrl="https://feeds.example.com/design-notes.xml"/>
+      <outline type="rss" text="Studio Journal" xmlUrl="https://feeds.example.com/studio-journal.xml"/>
+    </outline>
+    <outline type="rss" text="Field Recordings" xmlUrl="https://feeds.example.com/field-recordings.xml"/>
+  </body>
+</opml>`;
+  await textarea.fill(opml);
+  await page.waitForTimeout(200);
+  await page.getByRole("button", { name: /^import feeds$/i }).click();
+  await page.waitForSelector('[data-testid="import-preview"]', {
+    timeout: 6000,
   });
   await page.waitForTimeout(400);
-  // Open the "Successful (N)" collapsible so the feed URLs are visible
-  // — closed by default in the component.
-  const successHeader = page.getByRole("button", { name: /successful \(/i }).first();
-  if (await successHeader.isVisible().catch(() => false)) {
-    await successHeader.click();
-    await page.waitForTimeout(300);
-  }
-  // Scroll the import card into view, then capture the whole viewport
-  // so the PNG matches the 1920×1200 envelope the landing site expects.
   const importCard = page
     .locator("div", { has: page.locator('> h3:has-text("Import")') })
     .first();
   await importCard.scrollIntoViewIfNeeded();
+  // Keep the import card pinned near the top of the viewport so the
+  // 1920×1200 capture frames the preview, not the sync section above.
+  await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="import-preview"]');
+    card?.scrollIntoView({ behavior: "instant", block: "start" });
+    window.scrollBy(0, -80);
+  });
   await page.waitForTimeout(200);
   return shoot(page, "feature-switch-readers.png");
 }

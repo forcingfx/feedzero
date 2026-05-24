@@ -118,7 +118,9 @@ describe("ImportView — placeholder feeds on recoverable fetch failure", () => 
     const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(MIXED_OPML);
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
+    // Confirm the preview screen — see ImportPreview, added 2026-05-24.
+    await user.click(await screen.findByRole("button", { name: /^import \d+ feeds?$/i }));
 
     // The placeholder action was called exactly for the rate-limited URL,
     // with the upstream error message.

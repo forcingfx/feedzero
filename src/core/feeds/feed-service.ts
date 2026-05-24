@@ -1,6 +1,7 @@
 import { ok, err } from "../../../packages/core/src/utils/result";
 import type { Result } from "../../../packages/core/src/utils/result";
 import { parse } from "../parser/parser.ts";
+import type { FeedFormat } from "../parser/parser.ts";
 import { discoverFeed } from "../discovery/discovery.ts";
 import { createFeed, createArticle } from "../storage/schema.ts";
 import {
@@ -343,6 +344,12 @@ interface PreviewResult {
   title: string;
   siteUrl: string;
   articles: PreviewArticle[];
+  /**
+   * Which format the publisher served — surfaced by the discovery chip
+   * under the Explore URL input so the user sees the "we found it"
+   * affordance instead of having to take the success silently on faith.
+   */
+  format: FeedFormat;
 }
 
 /**
@@ -367,10 +374,11 @@ export async function previewFeed(
       return err(friendlyError(parseResult.error));
     }
 
-    const { feed, articles } = parseResult.value;
+    const { feed, articles, format } = parseResult.value;
     return ok({
       title: feed.title,
       siteUrl: feed.siteUrl,
+      format,
       articles: articles.map((a) => ({
         title: a.title,
         link: a.link,

@@ -31,6 +31,7 @@ import { isPaidTierActive } from "@/core/features/paid-tier-active";
 import { checkFeedQuota, quotaErrorMessage } from "@/core/features/quotas";
 import { ImportProgress } from "./import-progress";
 import { ImportResults } from "./import-results";
+import { ImportPreview } from "./import-preview";
 
 type InputMode = "file" | "text";
 
@@ -63,6 +64,10 @@ export function ImportView({ onClose }: ImportViewProps) {
   const [textInput, setTextInput] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    entries: ImportEntry[];
+    preamble?: OpmlPreamble;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const status = useImportStore((s) => s.status);
@@ -150,7 +155,13 @@ export function ImportView({ onClose }: ImportViewProps) {
     [],
   );
 
-  const handleImport = useCallback(async () => {
+  /**
+   * Parse + quota-check the user's input. On success, stash the parsed
+   * shape into `preview` state instead of running the import — the user
+   * sees the structure, then explicitly confirms. The actual import
+   * loop has not changed; see {@link runImport}.
+   */
+  const handleParseAndPreview = useCallback(async () => {
     setParseError(null);
 
     let content: string;
@@ -175,14 +186,12 @@ export function ImportView({ onClose }: ImportViewProps) {
         return;
       }
 
-      const urls = entries.map((e) => e.xmlUrl);
-
-      // Upfront quota check. The feed-store also gates per-URL, but doing
-      // it once here lets us refuse cleanly before kicking off a loop that
-      // would partially succeed and surface N cryptic per-URL failures.
+      // Upfront quota check before showing the preview — refusing now
+      // with a clear error is calmer than letting the user click
+      // "Import 200 feeds" only to get quota-blocked.
       const quota = checkFeedQuota({
         currentCount: useFeedStore.getState().feeds.length,
-        delta: urls.length,
+        delta: entries.length,
         tier: useLicenseStore.getState().tier,
         isSelfHosted: isSelfHosted(),
         paidTierActive: isPaidTierActive(),
@@ -191,6 +200,27 @@ export function ImportView({ onClose }: ImportViewProps) {
         setParseError(quotaErrorMessage(quota));
         return;
       }
+
+      setPreview({ entries, preamble });
+    } catch (err) {
+      setParseError(
+        err instanceof Error ? err.message : "Failed to parse input",
+      );
+    }
+  }, [inputMode, selectedFile, textInput, parseImportContent]);
+
+  /**
+   * Run the actual import loop using a previously-previewed payload.
+   * Pre-2026-05-24 this body lived inline in `handleImport`; splitting
+   * it out lets the parse + preview step run without side effects on
+   * the feed store, which the new {@link ImportPreview} relies on.
+   */
+  const runImport = useCallback(async (
+    entries: ImportEntry[],
+    preamble: OpmlPreamble | undefined,
+  ) => {
+    try {
+      const urls = entries.map((e) => e.xmlUrl);
 
       // Pre-create folders depth-first so a child's parentId is always
       // resolvable when the child is created. Folder paths use `/` as the
@@ -294,10 +324,6 @@ export function ImportView({ onClose }: ImportViewProps) {
       );
     }
   }, [
-    inputMode,
-    selectedFile,
-    textInput,
-    parseImportContent,
     startImport,
     addFeed,
     addPlaceholderFeed,
@@ -306,15 +332,40 @@ export function ImportView({ onClose }: ImportViewProps) {
     recordResult,
   ]);
 
+  const handleConfirmImport = useCallback(async () => {
+    if (!preview) return;
+    await runImport(preview.entries, preview.preamble);
+  }, [preview, runImport]);
+
+  const handleBackToInput = useCallback(() => {
+    setPreview(null);
+    setParseError(null);
+  }, []);
+
   const handleReset = useCallback(() => {
     reset();
     setSelectedFile(null);
     setTextInput("");
     setParseError(null);
+    setPreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }, [reset]);
+
+  // Preview view — between parse-success and the addFeed loop. The
+  // user sees folder/feed structure before committing.
+  if (preview && status === "idle") {
+    return (
+      <ImportPreview
+        entries={preview.entries}
+        head={preview.preamble?.head}
+        isImporting={false}
+        onBack={handleBackToInput}
+        onConfirm={handleConfirmImport}
+      />
+    );
+  }
 
   // Show progress view during import
   if (status === "importing") {
@@ -446,7 +497,7 @@ export function ImportView({ onClose }: ImportViewProps) {
       {parseError && <p className="text-sm text-destructive">{parseError}</p>}
 
       <Button
-        onClick={handleImport}
+        onClick={handleParseAndPreview}
         disabled={inputMode === "file" ? !selectedFile : !textInput.trim()}
         className="w-full"
       >

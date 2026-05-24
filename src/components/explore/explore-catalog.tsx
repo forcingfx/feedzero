@@ -20,6 +20,7 @@ import { FeaturedTab } from "@/components/explore/featured-tab.tsx";
 import { TopicsTab } from "@/components/explore/topics-tab.tsx";
 import { CountriesTab } from "@/components/explore/countries-tab.tsx";
 import { SearchResultsView } from "@/components/explore/search-results-view.tsx";
+import { FeedFormatChip } from "@/components/explore/feed-format-chip.tsx";
 
 /**
  * Available tabs in the explore surface. New tabs (use-case packs,
@@ -234,9 +235,7 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
           )}
         </div>
         {isUrlInput && searchQuery.trim() ? (
-          <p className="text-sm text-muted-foreground mt-2">
-            Press Enter to add this feed
-          </p>
+          <FeedFormatChip url={searchQuery.trim()} />
         ) : searchFocused && (
           <p className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
             <span><Kbd>↓</Kbd> or <Kbd>Tab</Kbd> to browse</span>

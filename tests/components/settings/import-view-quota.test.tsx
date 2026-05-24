@@ -78,7 +78,9 @@ describe("ImportView quota refusal", () => {
     await user.click(textarea);
     await user.paste(thirtyFive);
 
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    // Quota refusal short-circuits BEFORE the preview screen is shown
+    // — surfaces the error inline on the input panel, no preview click.
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
 
     // Tolerant of "exceed", "limit", "50"; what matters is that the user is
     // told why and no addFeed call sneaks through.
@@ -103,7 +105,11 @@ describe("ImportView quota refusal", () => {
     await user.click(textarea);
     await user.paste(four);
 
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
+
+    // Confirm the preview screen — see ImportPreview, added 2026-05-24.
+
+    await user.click(await screen.findByRole("button", { name: /^import \d+ feeds?$/i }));
 
     // 20 + 4 = 24, under the 50 cap — addFeed runs for each URL.
     expect(addFeedMock).toHaveBeenCalledTimes(4);
@@ -125,7 +131,11 @@ describe("ImportView quota refusal", () => {
     await user.click(textarea);
     await user.paste(fifty);
 
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
+
+    // Confirm the preview screen — see ImportPreview, added 2026-05-24.
+
+    await user.click(await screen.findByRole("button", { name: /^import \d+ feeds?$/i }));
 
     expect(addFeedMock).toHaveBeenCalledTimes(50);
   });
@@ -149,7 +159,11 @@ describe("ImportView quota refusal", () => {
     await user.click(textarea);
     await user.paste(fifty);
 
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
+
+    // Confirm the preview screen — see ImportPreview, added 2026-05-24.
+
+    await user.click(await screen.findByRole("button", { name: /^import \d+ feeds?$/i }));
 
     // 20 + 50 = 70, well over the 50 cap — but the paid tier hasn't launched,
     // so there's no upgrade path to point users at. Allow the import.
