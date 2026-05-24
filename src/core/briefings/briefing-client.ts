@@ -1,49 +1,39 @@
 /**
- * Thin client over @anthropic-ai/sdk for Signal Briefings.
+ * Browser client for Signal Briefings.
  *
- * Browser-direct (the user supplies their own key via Settings), so we
- * pass `dangerouslyAllowBrowser: true`. The FeedZero server never sees
- * the prompt, the articles, or the resulting briefing — the only network
- * call is from the user's browser straight to `api.anthropic.com`,
- * authenticated with the key the user supplied. See ADR 019.
+ * Routes through `/api/briefing` — a same-origin relay that forwards
+ * the request to `api.anthropic.com/v1/messages` with the user's own
+ * key. This used to be a direct call from the browser to Anthropic
+ * (BYO key, never touched the server), but iOS Safari + every other
+ * WebKit browser blocked the cross-origin response, so the feature
+ * was unreachable on iPad/iPhone. The relay restores reach at the
+ * cost of letting the API key + payload transit the FeedZero server
+ * per refresh; the relay doesn't log or persist either. See ADR 024
+ * for the full reasoning.
  *
- * Structured output via tool-use: we declare a single `submit_briefing`
- * tool and force it with `tool_choice`. This is sturdier than asking
- * the model to emit JSON and parsing free text — the SDK validates the
- * tool input against our `input_schema` before it gets back to us, and
- * we defensively re-check shape here in case a future model returns
- * something the SDK accepted but we can't render.
+ * We no longer depend on `@anthropic-ai/sdk` — the relay is a dumb
+ * pipe and the request/response shapes are stable across SDK
+ * versions. Hand-building the body is ~20 lines and shaves ~130KB
+ * gzip off the bundle.
  *
- * The system prompt enforces: only cite articles from the provided
- * corpus, never invent facts, refuse to confabulate if the corpus
- * doesn't support the briefing prompt. Citations carry both the article
- * id (so the UI can deep-link to the reader) and a short quote (so the
- * citations sidebar has supporting evidence visible without an extra
- * fetch).
+ * Structured output via tool-use: a single `submit_briefing` tool
+ * forced via `tool_choice`. System prompt enforces: only cite
+ * articles from the provided corpus, never invent facts, refuse to
+ * confabulate if the corpus doesn't support the briefing prompt.
  *
- * Errors are mapped to friendly `Result.err` strings so the UI can
- * render specific guidance — "your key is invalid, paste a new one in
- * Settings" reads better than the raw SDK stacktrace.
+ * Errors are mapped to friendly Result.err strings so the UI can
+ * render specific guidance — "your key is invalid, paste a fresh
+ * one" reads better than the raw HTTP status.
  */
 
-// NOTE: @anthropic-ai/sdk is dynamically imported inside generateBriefing
-// so the ~500KB vendor bundle never loads on app boot — only when the
-// user actually clicks Refresh on a briefing. Static-importing pulls in
-// the SDK's optional `tools/agent-toolset/*` submodules that reach for
-// `node:fs/promises`, `node:readline`, etc.; Vite externalises those for
-// browser compatibility but the externalised stubs blow up the app at
-// boot once the chunk actually loads.
-//
-// We deliberately do NOT static-import the SDK error classes either —
-// resolving them eagerly defeats the lazy split. Errors come back as
-// real instances of the SDK's classes; we match on `name` + status to
-// dispatch to friendly messages without needing instanceof.
 import type { Article, BriefingReport } from "@feedzero/core/types";
 import { BRIEFING_REPORT_SCHEMA_VERSION } from "@feedzero/core/utils/constants";
 import { err, ok } from "../../../packages/core/src/utils/result";
 import type { Result } from "../../../packages/core/src/utils/result";
 import type { BriefingModelId } from "./models";
 
+const RELAY_URL = "/api/briefing";
+const ANTHROPIC_VERSION = "2023-06-01";
 const SUGGESTED_FEED_CAP = 5;
 const MAX_TOKENS = 4096;
 /** How much of each article body to send. Long enough for context, short enough to control cost. */
@@ -147,27 +137,14 @@ interface ToolPayload {
   suggestedFeeds: Array<{ candidateUrl: string; rationale: string }>;
 }
 
-/**
- * Call Claude to produce a briefing for `prompt` against `articles`.
- * The articles are the corpus the model is allowed to draw from — the
- * matcher already pre-filtered them down to the top-K most relevant.
- */
+interface AnthropicResponse {
+  content?: Array<{ type: string; input?: unknown }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
 export async function generateBriefing(
   input: GenerateBriefingInput,
 ): Promise<Result<BriefingReport>> {
-  let sdk: typeof import("@anthropic-ai/sdk");
-  try {
-    sdk = await import("@anthropic-ai/sdk");
-  } catch (e) {
-    return err(
-      `Couldn't load the Anthropic SDK: ${e instanceof Error ? e.message : String(e)}`,
-    );
-  }
-  const client = new sdk.default({
-    apiKey: input.apiKey,
-    dangerouslyAllowBrowser: true,
-  });
-
   const corpusText = renderCorpus(input.articles);
   const userMessage = [
     `Briefing prompt: ${input.prompt}`,
@@ -176,32 +153,52 @@ export async function generateBriefing(
     corpusText,
   ].join("\n");
 
-  let response;
-  try {
-    response = await client.messages.create(
+  const requestBody = {
+    model: input.modelId,
+    max_tokens: MAX_TOKENS,
+    system: SYSTEM_PROMPT,
+    tools: [SUBMIT_BRIEFING_TOOL],
+    tool_choice: { type: "tool", name: "submit_briefing" },
+    messages: [
       {
-        model: input.modelId,
-        max_tokens: MAX_TOKENS,
-        system: SYSTEM_PROMPT,
-        tools: [SUBMIT_BRIEFING_TOOL],
-        tool_choice: { type: "tool", name: "submit_briefing" },
-        messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: userMessage }],
-          },
-        ],
+        role: "user",
+        content: [{ type: "text", text: userMessage }],
       },
-      { signal: input.signal },
-    );
+    ],
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(RELAY_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": input.apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify(requestBody),
+      signal: input.signal,
+    });
   } catch (e) {
-    return err(mapSdkError(e, sdk));
+    return err(mapFetchError(e));
   }
 
-  const toolBlock = (response.content ?? []).find(
-    (block: { type: string }) => block.type === "tool_use",
-  ) as { type: "tool_use"; input: unknown } | undefined;
+  if (!response.ok) {
+    return err(await mapHttpError(response));
+  }
 
+  let parsed: AnthropicResponse;
+  try {
+    parsed = (await response.json()) as AnthropicResponse;
+  } catch {
+    return err(
+      "Anthropic returned a response we couldn't parse as JSON. Try refreshing again.",
+    );
+  }
+
+  const toolBlock = (parsed.content ?? []).find(
+    (block) => block.type === "tool_use",
+  );
   if (!toolBlock) {
     return err(
       "The model did not produce a structured briefing. Try refreshing again or switching to a different model.",
@@ -212,7 +209,7 @@ export async function generateBriefing(
   if (!validated.ok) return validated;
 
   const matchedArticleIds = input.articles.map((a) => a.id);
-  const usage = response.usage ?? { input_tokens: 0, output_tokens: 0 };
+  const usage = parsed.usage ?? {};
 
   const report: BriefingReport = {
     schemaVersion: BRIEFING_REPORT_SCHEMA_VERSION,
@@ -231,7 +228,10 @@ export async function generateBriefing(
       })),
     matchedArticleIds,
     modelId: input.modelId,
-    tokenUsage: { input: usage.input_tokens, output: usage.output_tokens },
+    tokenUsage: {
+      input: usage.input_tokens ?? 0,
+      output: usage.output_tokens ?? 0,
+    },
     generatedAt: Date.now(),
   };
 
@@ -315,52 +315,47 @@ function validateToolPayload(input: unknown): Result<ToolPayload> {
   });
 }
 
-/**
- * Map an SDK error to a one-line message the UI can render verbatim.
- *
- * Dispatches via `instanceof` against the dynamically-loaded SDK module
- * passed in by the caller. We can't static-import the error classes
- * (that would re-eagerly pull the SDK into the boot bundle and defeat
- * the lazy split), and we can't rely on `error.name` because the SDK
- * classes don't explicitly set `this.name` — under production
- * minification `error.name` resolves to a single-letter mangled class
- * identifier and every name comparison misses.
- *
- * The SDK module is already in memory by the time we land in this
- * function (we used it to construct the client and call create), so
- * instanceof against `sdk.APIConnectionError` etc. is both robust and
- * minification-proof.
- *
- * Connection errors surface the underlying message (and `cause.message`
- * when present) since "Connection error." alone gives the user no
- * actionable signal — usually a CORS preflight rejection, the user's
- * network blocking api.anthropic.com, or a browser extension
- * intercepting the request.
- */
-function mapSdkError(
-  e: unknown,
-  sdk: typeof import("@anthropic-ai/sdk"),
-): string {
-  if (!(e instanceof Error)) return `Briefing failed: ${String(e)}`;
-
-  if (e instanceof sdk.APIUserAbortError) {
+/** Network-layer error (fetch threw before getting a response). */
+function mapFetchError(e: unknown): string {
+  if (e instanceof Error && e.name === "AbortError") {
     return "Briefing refresh cancelled.";
   }
-  if (e instanceof sdk.AuthenticationError) {
+  const message = e instanceof Error ? e.message : String(e);
+  return `Couldn't reach the briefing relay: ${message}`;
+}
+
+/**
+ * HTTP error mapping. The relay forwards Anthropic's status verbatim,
+ * so 401/429/etc. carry the same meaning as a direct call. Status takes
+ * precedence over body shape because the body might be empty (Anthropic
+ * 5xx) or non-JSON (relay 502 wrapped in its own JSON envelope).
+ */
+async function mapHttpError(response: Response): Promise<string> {
+  if (response.status === 401) {
     return "Anthropic rejected the API key. Paste a fresh key in Settings — invalid or revoked keys can't generate briefings.";
   }
-  if (e instanceof sdk.RateLimitError) {
-    return "Anthropic rate limit hit. Wait a minute and try again, or upgrade your Anthropic plan.";
+  if (response.status === 429) {
+    const retryAfter = response.headers.get("retry-after");
+    return retryAfter
+      ? `Anthropic rate limit hit. Try again in ${retryAfter}s, or upgrade your Anthropic plan.`
+      : "Anthropic rate limit hit. Wait a minute and try again, or upgrade your Anthropic plan.";
   }
-  if (
-    e instanceof sdk.APIConnectionTimeoutError ||
-    e instanceof sdk.APIConnectionError
-  ) {
-    const cause = (e as { cause?: unknown }).cause;
-    const detail = cause instanceof Error ? cause.message : undefined;
-    return `Couldn't reach Anthropic from your browser. This is usually a CORS preflight failure, a network block on api.anthropic.com, or a browser extension intercepting the request. ${
-      detail ? `Underlying error: ${detail}` : `Underlying error: ${e.message}`
-    }`;
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    // 502 from our relay (couldn't reach Anthropic) or 5xx from
+    // Anthropic itself — same UX message either way.
+    return "Couldn't reach Anthropic. Check your network or try again in a minute.";
   }
-  return `Briefing failed: ${e.message}`;
+  // Try to pull an error message from the response body before falling back.
+  let detail: string | undefined;
+  try {
+    const body = (await response.json()) as { error?: { message?: string } | string };
+    if (typeof body.error === "string") {
+      detail = body.error;
+    } else if (body.error && typeof body.error.message === "string") {
+      detail = body.error.message;
+    }
+  } catch {
+    /* body wasn't JSON or empty — fall through */
+  }
+  return `Briefing failed (HTTP ${response.status})${detail ? `: ${detail}` : ""}.`;
 }

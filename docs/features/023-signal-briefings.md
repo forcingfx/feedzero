@@ -10,10 +10,12 @@ Signal Briefings let a Personal+ user create a standing prompt (e.g. "EU
 AI Act enforcement actions"), save it like a feed, and on demand
 generate an AI-written briefing with citations drawn from their own
 subscribed feeds. The user supplies their own Anthropic API key
-(BYO — see ADR 024); the FeedZero server never sees the prompt, the
-articles, or the resulting briefing. Briefings auto-flag "refresh
-available" when new matching articles arrive (auto-bumped stale
-counter), but the LLM call only fires on an explicit user click.
+(BYO — see ADR 024). On Refresh, the key + payload transit
+`POST /api/briefing` (a same-origin relay forced on us by iOS Safari's
+cross-origin policy) on the way to Anthropic — the relay does not log,
+persist, or inspect either. Briefings auto-flag "refresh available"
+when new matching articles arrive (auto-bumped stale counter), but the
+LLM call only fires on an explicit user click.
 
 ## Behaviour
 

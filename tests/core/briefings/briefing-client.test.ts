@@ -1,58 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Article } from "@feedzero/core/types";
-
-// Mock the Anthropic SDK before importing the client. vi.mock is hoisted
-// to the top of the file, so anything it references must be hoisted too —
-// vi.hoisted() lets the test file share state with the mock factory.
-const mocks = vi.hoisted(() => {
-  const createMock = vi.fn();
-  // Mirror the real SDK shape: each error class sets its own `name`,
-  // since the client maps errors by name (not instanceof) so the
-  // dynamic SDK import stays out of the boot bundle.
-  class MockAuthenticationError extends Error {
-    name = "AuthenticationError";
-    status = 401;
-  }
-  class MockRateLimitError extends Error {
-    name = "RateLimitError";
-    status = 429;
-  }
-  class MockAPIConnectionError extends Error {
-    name = "APIConnectionError";
-  }
-  class MockAPIUserAbortError extends Error {
-    name = "APIUserAbortError";
-  }
-  return {
-    createMock,
-    MockAuthenticationError,
-    MockRateLimitError,
-    MockAPIConnectionError,
-    MockAPIUserAbortError,
-  };
-});
-
-const { createMock } = mocks;
-const {
-  MockAuthenticationError,
-  MockRateLimitError,
-  MockAPIUserAbortError,
-} = mocks;
-
-vi.mock("@anthropic-ai/sdk", () => {
-  return {
-    default: class MockAnthropic {
-      messages = { create: mocks.createMock };
-      constructor(public opts: { apiKey: string; dangerouslyAllowBrowser?: boolean }) {}
-    },
-    AuthenticationError: mocks.MockAuthenticationError,
-    RateLimitError: mocks.MockRateLimitError,
-    APIConnectionError: mocks.MockAPIConnectionError,
-    APIUserAbortError: mocks.MockAPIUserAbortError,
-  };
-});
-
 import { generateBriefing } from "@/core/briefings/briefing-client";
+
+const fetchMock = vi.fn();
+
+beforeEach(() => {
+  fetchMock.mockReset();
+  vi.stubGlobal("fetch", fetchMock);
+});
 
 function article(overrides: Partial<Article> = {}): Article {
   return {
@@ -71,32 +26,41 @@ function article(overrides: Partial<Article> = {}): Article {
   };
 }
 
-function toolUseResponse(input: unknown) {
-  return {
-    content: [
-      {
-        type: "tool_use",
-        id: "tool-1",
-        name: "submit_briefing",
-        input,
-      },
-    ],
-    usage: { input_tokens: 1024, output_tokens: 320 },
-    stop_reason: "tool_use",
-  };
+function relayResponse(input: unknown, status = 200) {
+  return new Response(
+    JSON.stringify({
+      content: [
+        {
+          type: "tool_use",
+          id: "tool-1",
+          name: "submit_briefing",
+          input,
+        },
+      ],
+      usage: { input_tokens: 1024, output_tokens: 320 },
+      stop_reason: "tool_use",
+    }),
+    {
+      status,
+      headers: { "content-type": "application/json" },
+    },
+  );
+}
+
+function errorResponse(status: number, body: unknown = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 describe("generateBriefing", () => {
-  beforeEach(() => {
-    createMock.mockReset();
-  });
-
-  it("returns a parsed BriefingReport when the model emits the tool", async () => {
+  it("returns a parsed BriefingReport when the relay returns a tool_use block", async () => {
     const a1 = article({ id: "a1", title: "EU AI Act enters force" });
     const a2 = article({ id: "a2", title: "Commission opens AI inquiry" });
 
-    createMock.mockResolvedValueOnce(
-      toolUseResponse({
+    fetchMock.mockResolvedValueOnce(
+      relayResponse({
         abstract: "Key developments [A1] [A2].",
         citations: [
           { articleId: "a1", quote: "Act enters force." },
@@ -133,13 +97,30 @@ describe("generateBriefing", () => {
     expect(result.value.schemaVersion).toBe(1);
   });
 
+  it("POSTs to /api/briefing with the API key in the x-api-key header (never in the body)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      relayResponse({ abstract: "x", citations: [], suggestedFeeds: [] }),
+    );
+
+    await generateBriefing({
+      prompt: "anything",
+      articles: [article({ id: "a1", title: "x" })],
+      apiKey: "sk-ant-secret",
+      modelId: "claude-opus-4-7",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/briefing");
+    expect(init.method).toBe("POST");
+    expect(init.headers["x-api-key"]).toBe("sk-ant-secret");
+    expect(init.headers["anthropic-version"]).toBe("2023-06-01");
+    expect(init.body).not.toContain("sk-ant-secret"); // key never in body
+  });
+
   it("sends the configured model id, system prompt, and submit_briefing tool", async () => {
-    createMock.mockResolvedValueOnce(
-      toolUseResponse({
-        abstract: "x",
-        citations: [],
-        suggestedFeeds: [],
-      }),
+    fetchMock.mockResolvedValueOnce(
+      relayResponse({ abstract: "x", citations: [], suggestedFeeds: [] }),
     );
 
     await generateBriefing({
@@ -149,23 +130,20 @@ describe("generateBriefing", () => {
       modelId: "claude-opus-4-7",
     });
 
-    expect(createMock).toHaveBeenCalledTimes(1);
-    const call = createMock.mock.calls[0][0];
-    expect(call.model).toBe("claude-opus-4-7");
-    expect(typeof call.system).toBe("string");
-    expect(call.tools).toHaveLength(1);
-    expect(call.tools[0].name).toBe("submit_briefing");
-    expect(call.tool_choice).toEqual({ type: "tool", name: "submit_briefing" });
-    // The user message must include the prompt verbatim
-    const userMsg = call.messages[0];
-    expect(userMsg.role).toBe("user");
-    const text = JSON.stringify(userMsg.content);
-    expect(text).toContain("anything");
+    const init = fetchMock.mock.calls[0][1];
+    const body = JSON.parse(init.body);
+    expect(body.model).toBe("claude-opus-4-7");
+    expect(typeof body.system).toBe("string");
+    expect(body.tools).toHaveLength(1);
+    expect(body.tools[0].name).toBe("submit_briefing");
+    expect(body.tool_choice).toEqual({ type: "tool", name: "submit_briefing" });
+    expect(body.messages[0].role).toBe("user");
+    expect(JSON.stringify(body.messages[0].content)).toContain("anything");
   });
 
-  it("forwards the AbortSignal to the SDK", async () => {
-    createMock.mockResolvedValueOnce(
-      toolUseResponse({ abstract: "x", citations: [], suggestedFeeds: [] }),
+  it("forwards the AbortSignal to fetch", async () => {
+    fetchMock.mockResolvedValueOnce(
+      relayResponse({ abstract: "x", citations: [], suggestedFeeds: [] }),
     );
     const controller = new AbortController();
     await generateBriefing({
@@ -175,12 +153,12 @@ describe("generateBriefing", () => {
       modelId: "claude-sonnet-4-6",
       signal: controller.signal,
     });
-    const opts = createMock.mock.calls[0][1];
-    expect(opts.signal).toBe(controller.signal);
+    const init = fetchMock.mock.calls[0][1];
+    expect(init.signal).toBe(controller.signal);
   });
 
-  it("maps authentication errors to a friendly Result.err", async () => {
-    createMock.mockRejectedValueOnce(new MockAuthenticationError("bad key"));
+  it("maps a 401 from the relay (invalid key) to actionable copy pointing at Settings", async () => {
+    fetchMock.mockResolvedValueOnce(errorResponse(401));
     const result = await generateBriefing({
       prompt: "x",
       articles: [article()],
@@ -190,10 +168,13 @@ describe("generateBriefing", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.toLowerCase()).toContain("invalid");
+    expect(result.error.toLowerCase()).toContain("settings");
   });
 
-  it("maps rate-limit errors to a Result.err that the UI can show", async () => {
-    createMock.mockRejectedValueOnce(new MockRateLimitError("rate limited"));
+  it("maps a 429 (rate limit) and surfaces Retry-After when present", async () => {
+    const res = errorResponse(429);
+    res.headers.set("retry-after", "30");
+    fetchMock.mockResolvedValueOnce(res);
     const result = await generateBriefing({
       prompt: "x",
       articles: [article()],
@@ -203,10 +184,40 @@ describe("generateBriefing", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.toLowerCase()).toContain("rate");
+    expect(result.error).toContain("30s");
   });
 
-  it("maps user aborts to a Result.err with an abort marker", async () => {
-    createMock.mockRejectedValueOnce(new MockAPIUserAbortError("aborted"));
+  it("maps a 502 (relay couldn't reach Anthropic) to the 'couldn't reach' message", async () => {
+    fetchMock.mockResolvedValueOnce(errorResponse(502, { error: "upstream timeout" }));
+    const result = await generateBriefing({
+      prompt: "x",
+      articles: [article()],
+      apiKey: "sk-ant-test",
+      modelId: "claude-sonnet-4-6",
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.toLowerCase()).toContain("couldn't reach");
+  });
+
+  it("maps a network failure (fetch threw) with the underlying message", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const result = await generateBriefing({
+      prompt: "x",
+      articles: [article()],
+      apiKey: "sk-ant-test",
+      modelId: "claude-sonnet-4-6",
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.toLowerCase()).toContain("relay");
+    expect(result.error.toLowerCase()).toContain("failed to fetch");
+  });
+
+  it("maps an AbortError from fetch to the cancelled message", async () => {
+    const abortErr = new Error("aborted");
+    abortErr.name = "AbortError";
+    fetchMock.mockRejectedValueOnce(abortErr);
     const result = await generateBriefing({
       prompt: "x",
       articles: [article()],
@@ -219,11 +230,15 @@ describe("generateBriefing", () => {
   });
 
   it("returns an error when the response has no tool_use block (model went off-script)", async () => {
-    createMock.mockResolvedValueOnce({
-      content: [{ type: "text", text: "Hi I cannot do that" }],
-      usage: { input_tokens: 10, output_tokens: 5 },
-      stop_reason: "end_turn",
-    });
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "I cannot do that" }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
     const result = await generateBriefing({
       prompt: "x",
       articles: [article()],
@@ -233,13 +248,9 @@ describe("generateBriefing", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("returns an error when the tool input fails schema validation", async () => {
-    createMock.mockResolvedValueOnce(
-      toolUseResponse({
-        // missing abstract; should fail validation
-        citations: [],
-        suggestedFeeds: [],
-      }),
+  it("returns an error when the tool input fails schema validation (missing abstract)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      relayResponse({ citations: [], suggestedFeeds: [] }),
     );
     const result = await generateBriefing({
       prompt: "x",
@@ -251,8 +262,8 @@ describe("generateBriefing", () => {
   });
 
   it("caps suggestedFeeds at 5 (defensive trim if the model overshoots)", async () => {
-    createMock.mockResolvedValueOnce(
-      toolUseResponse({
+    fetchMock.mockResolvedValueOnce(
+      relayResponse({
         abstract: "x",
         citations: [],
         suggestedFeeds: Array.from({ length: 12 }, (_, i) => ({

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted (2026-05-24).
+Accepted (2026-05-24). Amended (2026-05-24) to relay through
+`/api/briefing` after browser-direct calls failed in iOS Safari — see
+"Amendment: WebKit forced a relay" at the end.
 
 ## Context
 
@@ -151,10 +153,81 @@ won't trust.
   vault is zero-knowledge; the only realistic compromise is the user's
   passphrase, which is also what compromises every other piece of their
   data. Risk is bounded by the same control as the rest of the product.
-- **`@anthropic-ai/sdk` lands in the SPA bundle** (~50KB gzipped). It's
-  imported only by the briefing-client module, which is itself imported
-  only via the route-split briefing-page chunk, so it doesn't load
-  until the user navigates to `/briefings`.
+- ~~**`@anthropic-ai/sdk` lands in the SPA bundle** (~50KB gzipped).~~
+  Obsolete; see amendment below. The SDK is no longer a dependency.
+
+## Amendment: WebKit forced a relay
+
+**Date:** 2026-05-24 (same day as the original ADR, after first user
+test on iPad Safari.)
+
+### What broke
+
+The browser-direct architecture failed in WebKit. Every iOS browser
+(Safari + every iOS Chrome/Firefox/Brave, all WebKit by Apple
+mandate), and desktop Safari, rejected the fetch to
+`api.anthropic.com/v1/messages` with the generic "Load failed" — no
+JS-level detail, but the pattern fingerprints clearly:
+
+- Anthropic returns `access-control-allow-origin: *` AND
+  `access-control-allow-credentials: true` AND sets a Cloudflare
+  `_cfuvid` cookie on the response. The first two together are a
+  CORS-spec violation (the spec rejects `*` when credentials are
+  involved), and Safari is stricter about enforcing it than Chrome.
+- Even when the SDK doesn't ask for credentials, Safari's ITP
+  classifies the third-party cookie + permissive CORS combo as
+  cross-site tracking and silently blocks the response.
+
+This isn't a bug we can fix — the failure is between Anthropic's CORS
+config and WebKit's tracking-prevention policy.
+
+### What we changed
+
+Added `POST /api/briefing` as a same-origin relay that forwards the
+browser's request to Anthropic verbatim. The user's API key transits
+the relay as the `x-api-key` header and Anthropic's response flows
+back unchanged. Same-origin sidesteps CORS entirely.
+
+### Privacy delta
+
+Original promise: "FeedZero never sees your key, your prompts, or
+your articles."
+
+New promise: "FeedZero's relay forwards your key + briefing payload
+on every Refresh. The relay does not persist, log, or inspect the
+payload — body bytes flow upstream, response bytes flow back, neither
+is touched."
+
+This is materially weaker. The user has to trust the operator not to
+log. The same trust model already applies to `/api/feedback` (text
+forwarded to GitHub), but the value-at-stake is higher here (an API
+key with billable usage). The trade-off is reach: without the relay
+the entire iOS audience can't use Briefings; with it everyone can.
+
+Self-hosters can audit the handler at
+`src/core/briefings/briefing-proxy-handler.ts` — it's ~80 lines, no
+logging, fetch-and-forward only.
+
+### Why not the alternatives
+
+- **"Ship desktop-only with a 'not yet supported on iOS' splash."**
+  Considered. FeedZero's mobile audience is overwhelmingly iPad and
+  iPhone for the privacy-conscious persona — desktop-only would
+  exclude the bullseye user. Rejected.
+- **"Add a CORS proxy as a separate service."** Same trust model as
+  the relay we built, more moving parts, no win.
+- **"Convince Anthropic to fix their CORS config."** Out of our
+  control, no ETA, and ITP would likely still flag the response.
+
+### Code consequences
+
+- `@anthropic-ai/sdk` removed as a dependency. The relay is a dumb
+  pipe and the SDK was only useful for the constructor-and-class shape
+  the relay path doesn't need. Hand-built request body is ~20 lines
+  and the request/response shapes are stable.
+- ~130KB (34KB gzip) gone from the bundle.
+- The "lazy-load the SDK so it doesn't blank the app at boot" gymnastics
+  in the previous fix are obsolete; there's no SDK to lazy-load.
 
 ## Future work
 

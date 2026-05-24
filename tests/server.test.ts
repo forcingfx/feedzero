@@ -4,6 +4,7 @@ import { SUPPORTED_METHODS } from "../src/core/sync/sync-handler";
 import { SUPPORTED_METHODS as PROXY_SUPPORTED_METHODS } from "../src/core/proxy/proxy-handler";
 import { SUPPORTED_METHODS as CATALOG_SUPPORTED_METHODS } from "../src/core/catalog/catalog-handler";
 import { SUPPORTED_METHODS as FEEDBACK_SUPPORTED_METHODS } from "../src/core/feedback/feedback-handler";
+import { SUPPORTED_METHODS as BRIEFING_SUPPORTED_METHODS } from "../src/core/briefings/briefing-proxy-handler";
 import { SUPPORTED_METHODS as HEALTH_SUPPORTED_METHODS } from "../src/core/health/health-handler";
 import { SUPPORTED_METHODS as STRIPE_SUPPORTED_METHODS } from "../src/core/stripe/webhook-handler";
 import { SUPPORTED_METHODS as LICENSE_VERIFY_SUPPORTED_METHODS } from "../src/core/license/verify-handler";
@@ -18,6 +19,7 @@ import * as vercelFeedExports from "../api/feed";
 import * as vercelPageExports from "../api/page";
 import * as vercelCatalogExports from "../api/catalog";
 import * as vercelFeedbackExports from "../api/feedback";
+import * as vercelBriefingExports from "../api/briefing";
 import * as vercelHealthExports from "../api/health";
 import * as vercelStripeWebhookExports from "../api/stripe/webhook";
 // /api/license/{verify,issue,retrieve} resolve to the same Vercel dynamic-route
@@ -607,6 +609,62 @@ describe("server", () => {
       });
       // Endpoint is registered: status is whatever the handler returns,
       // not 404 (route missing) or 405 (method not allowed).
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(405);
+    });
+  });
+
+  describe("briefing relay routing contract", () => {
+    it("BRIEFING_SUPPORTED_METHODS lists POST only", () => {
+      expect(BRIEFING_SUPPORTED_METHODS).toEqual(["POST"]);
+    });
+
+    it("Vercel api/briefing.ts exports a handler for every supported method", () => {
+      for (const method of BRIEFING_SUPPORTED_METHODS) {
+        expect(
+          vercelBriefingExports,
+          `api/briefing.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelBriefingExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/briefing.ts does not export unsupported methods", () => {
+      const allHttpMethods = [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+      ];
+      const unsupported = allHttpMethods.filter(
+        (m) => !BRIEFING_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelBriefingExports,
+          `api/briefing.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts POST /api/briefing (route registered)", async () => {
+      const app = createApp();
+      const res = await app.request("/api/briefing", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": "sk-ant-test",
+        },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", messages: [] }),
+      });
+      // Endpoint is registered — status is whatever the handler returns
+      // (likely 502 since we mocked nothing), not 404 (route missing)
+      // or 405 (method not allowed).
       expect(res.status).not.toBe(404);
       expect(res.status).not.toBe(405);
     });
