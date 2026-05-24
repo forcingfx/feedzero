@@ -121,12 +121,15 @@ describe("ImportView — placeholder feeds on recoverable fetch failure", () => 
     await user.click(screen.getByRole("button", { name: /import feeds/i }));
 
     // The placeholder action was called exactly for the rate-limited URL,
-    // with the upstream error message.
+    // with the upstream error message. Issue #117 follow-up: the
+    // OPML-importer-shaped options bag (titleOverride / etc.) rides
+    // along too — undefined here because this fixture's outline has
+    // no OPML metadata beyond folder context.
     expect(addPlaceholderFeedMock).toHaveBeenCalledTimes(1);
-    expect(addPlaceholderFeedMock).toHaveBeenCalledWith(
+    expect(addPlaceholderFeedMock.mock.calls[0][0]).toBe(
       "https://rl.example.com/feed/",
-      "HTTP 429",
     );
+    expect(addPlaceholderFeedMock.mock.calls[0][1]).toBe("HTTP 429");
 
     // Both the OK feed AND the placeholder ended up in the Tech folder.
     // The "Not a valid feed" row stays rejected and is not moved.

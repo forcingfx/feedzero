@@ -581,6 +581,96 @@ describe("feed-service", () => {
       expect(isErr(result)).toBe(true);
       expect(result.error).toMatch(/already exists/i);
     });
+
+    // OPML-imported placeholders: the importer can supply the user's
+    // chosen outline metadata so the placeholder isn't a blank "host
+    // name only" row for days while the user retries.
+    it("accepts titleOverride / descriptionFallback / tags / createdAtOverride", async () => {
+      const opmlCreated = Date.parse("2014-08-15T09:00:00Z");
+      const result = await addPlaceholderFeed(
+        "https://cnbc.example.com/feed",
+        "HTTP 429",
+        {
+          titleOverride: "CNBC",
+          descriptionFallback: "World news from CNBC",
+          tags: ["news", "business"],
+          createdAtOverride: opmlCreated,
+        },
+      );
+      expect(isOk(result)).toBe(true);
+      const feed = unwrap(result);
+      expect(feed.title).toBe("CNBC");
+      expect(feed.description).toBe("World news from CNBC");
+      expect(feed.tags).toEqual(["news", "business"]);
+      expect(feed.createdAt).toBe(opmlCreated);
+      expect(feed.lastError).toBe("HTTP 429");
+      expect(feed.lastSuccessfulFetchAt).toBeUndefined();
+    });
+
+    it("falls back to URL-derived title when titleOverride is empty", async () => {
+      const result = await addPlaceholderFeed(
+        "https://news.example.com/feed.xml",
+        "boom",
+        { titleOverride: "   " },
+      );
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result).title).toBe("news.example.com");
+    });
+  });
+
+  // Issue #117 follow-up: when a placeholder's first refresh succeeds,
+  // the title-backfill must NOT clobber a user-chosen title. Same for
+  // description / siteUrl — backfill only when the field is still its
+  // derived/default value.
+  describe("refreshFeed — first-success backfill preserves user-set fields", () => {
+    it("backfills title only when the current title equals the URL host (derived default)", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      // Placeholder with URL-derived title — backfill should overwrite.
+      const placeholder = await addPlaceholderFeed(
+        "https://example.com/feed",
+        "HTTP 429",
+      );
+      expect(isOk(placeholder)).toBe(true);
+      const phFeed = unwrap(placeholder);
+      const refreshed = await refreshFeed(phFeed);
+      expect(isOk(refreshed)).toBe(true);
+      expect(phFeed.title).toBe("Example Feed"); // parsed wins
+
+      // Reset DB and try again with a user-chosen title (OPML-imported placeholder).
+      db._reset();
+      const withTitle = await addPlaceholderFeed(
+        "https://example.com/feed",
+        "HTTP 429",
+        { titleOverride: "CNBC" },
+      );
+      expect(isOk(withTitle)).toBe(true);
+      const userFeed = unwrap(withTitle);
+      const refreshed2 = await refreshFeed(userFeed);
+      expect(isOk(refreshed2)).toBe(true);
+      // OPML-chosen title survives the first-success backfill.
+      expect(userFeed.title).toBe("CNBC");
+    });
+
+    it("backfills description only when current description is empty", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      const placeholder = await addPlaceholderFeed(
+        "https://example.com/feed",
+        "HTTP 429",
+        { descriptionFallback: "From OPML" },
+      );
+      const feed = unwrap(placeholder);
+      await refreshFeed(feed);
+      // Description was already set from OPML; parsed feed's subtitle
+      // ("A test feed") must NOT clobber it on the first refresh.
+      expect(feed.description).toBe("From OPML");
+    });
   });
 });
 
