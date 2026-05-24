@@ -103,6 +103,59 @@ describe("vault-crypto", () => {
       expect(isOk(decrypted)).toBe(true);
       expect(unwrap(decrypted).feeds[0].title).toBe("Example Feed");
     });
+
+    it("defaults to the legacy PBKDF2 KDF when no spec is given", async () => {
+      // Locks in that pre-existing callers (no spec arg) keep PBKDF2 —
+      // any silent switch to Argon2id here would mean a primary-device
+      // user's stored JWK no longer matches what `deriveVaultKey`
+      // produces on a passphrase re-entry, breaking recovery.
+      const legacy = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const explicit = unwrap(
+        await deriveVaultKey("carbon mango velvet prism", {
+          kdfSpec: LEGACY_KDF_SPEC,
+        }),
+      );
+      const encrypted = unwrap(await encryptVault(legacy, makeVault()));
+      const decrypted = await decryptVault(explicit, encrypted);
+      expect(isOk(decrypted)).toBe(true);
+    });
+
+    it("derives via Argon2id when given an argon2id spec", async () => {
+      const spec: KdfSpec = {
+        kind: "argon2id",
+        memoryKib: 256,
+        iterations: 1,
+        parallelism: 1,
+      };
+      const key = unwrap(
+        await deriveVaultKey("carbon mango velvet prism", { kdfSpec: spec }),
+      );
+      const sameKey = unwrap(
+        await deriveVaultKey("carbon mango velvet prism", { kdfSpec: spec }),
+      );
+      const vault = makeVault();
+      const encrypted = unwrap(await encryptVault(key, vault, spec));
+      const decrypted = unwrap(await decryptVault(sameKey, encrypted));
+      expect(decrypted.feeds[0].title).toBe("Example Feed");
+      expect(encrypted.kdf).toEqual(spec);
+    });
+
+    it("Argon2id and PBKDF2 keys are NOT interchangeable for the same passphrase", async () => {
+      const argon = unwrap(
+        await deriveVaultKey("carbon mango velvet prism", {
+          kdfSpec: {
+            kind: "argon2id",
+            memoryKib: 256,
+            iterations: 1,
+            parallelism: 1,
+          },
+        }),
+      );
+      const pbkdf2 = unwrap(await deriveVaultKey("carbon mango velvet prism"));
+      const encrypted = unwrap(await encryptVault(argon, makeVault()));
+      const decrypted = await decryptVault(pbkdf2, encrypted);
+      expect(isErr(decrypted)).toBe(true);
+    });
   });
 
   describe("encryptVault / decryptVault", () => {

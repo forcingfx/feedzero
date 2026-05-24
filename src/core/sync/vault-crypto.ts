@@ -3,7 +3,25 @@ import type { Result } from "../../../packages/core/src/utils/result";
 import { SYNC } from "../../../packages/core/src/utils/constants";
 import { deriveBytes, deriveKey, decrypt } from "../storage/crypto.ts";
 import { uint8ArrayToBase64, base64ToUint8Array } from "../../../packages/core/src/utils/base64";
+import {
+  ARGON2ID_PRODUCTION_PARAMS,
+  deriveArgon2idKey,
+} from "../crypto/argon2.ts";
 import type { VaultData, EncryptedVault, KdfSpec } from "./types.ts";
+
+/**
+ * KDF spec used to encrypt every newly-created sync vault. Argon2id at
+ * the OWASP-recommended cost destroys the GPU/ASIC advantage that
+ * makes a 4-word diceware passphrase brute-forceable offline. The full
+ * cost triple is stamped on the envelope so we can raise this floor
+ * without orphaning vaults written with older settings.
+ */
+export const DEFAULT_NEW_VAULT_KDF: KdfSpec = {
+  kind: "argon2id",
+  memoryKib: ARGON2ID_PRODUCTION_PARAMS.memoryKib,
+  iterations: ARGON2ID_PRODUCTION_PARAMS.iterations,
+  parallelism: ARGON2ID_PRODUCTION_PARAMS.parallelism,
+};
 
 /**
  * KDF spec assumed for envelopes written before the `kdf` field existed.
@@ -79,16 +97,39 @@ export async function deriveEncryptionSalt(
 }
 
 /**
- * Derive the AES-GCM-256 encryption key from a passphrase.
- * Two-step: derive deterministic salt, then derive key from passphrase + salt.
+ * Derive the AES-GCM-256 vault encryption key from a passphrase.
+ *
+ * The KDF is selected by `kdfSpec`. When unset, defaults to the
+ * legacy PBKDF2 spec so existing callers keep producing the same key
+ * bytes for the same passphrase (recovery on a primary device with a
+ * stored JWK relies on this — a silent switch would orphan the local
+ * encrypted DB). New-signup callers and recovery-after-upgrade
+ * callers should pass `DEFAULT_NEW_VAULT_KDF` or the spec read off
+ * the cloud envelope via `readKdfSpec`.
  */
 export async function deriveVaultKey(
   passphrase: string,
-  options?: { extractable?: boolean },
+  options?: { extractable?: boolean; kdfSpec?: KdfSpec },
 ): Promise<Result<CryptoKey>> {
   const saltResult = await deriveEncryptionSalt(passphrase);
   if (!saltResult.ok) return saltResult;
-  return deriveKey(passphrase, saltResult.value, options);
+
+  const spec = options?.kdfSpec ?? LEGACY_KDF_SPEC;
+  if (spec.kind === "argon2id") {
+    return deriveArgon2idKey(
+      passphrase,
+      saltResult.value,
+      {
+        memoryKib: spec.memoryKib,
+        iterations: spec.iterations,
+        parallelism: spec.parallelism,
+      },
+      { extractable: options?.extractable },
+    );
+  }
+  return deriveKey(passphrase, saltResult.value, {
+    extractable: options?.extractable,
+  });
 }
 
 /**
