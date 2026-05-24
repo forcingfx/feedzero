@@ -118,17 +118,42 @@ export function fromFilterFeedId(feedId: string): string | null {
 }
 
 /**
+ * Prefix applied to a tag name to form an aggregated "tag feed" id.
+ * Mirrors `FOLDER_FEED_PREFIX`. Tag names are free-form strings (from
+ * OPML outline[category]), so the prefix is what distinguishes a
+ * tag-aggregated view from a concrete feed id.
+ */
+export const TAG_FEED_PREFIX = "tag:";
+
+/** Build a tag-aggregated feed id from a tag name. */
+export function toTagFeedId(tag: string): string {
+  return `${TAG_FEED_PREFIX}${tag}`;
+}
+
+/** Whether the given feed id represents a tag-aggregated view. */
+export function isTagFeedId(feedId: string): boolean {
+  return feedId.startsWith(TAG_FEED_PREFIX);
+}
+
+/** Extract the tag name from a tag-feed id, or null if not a tag feed. */
+export function fromTagFeedId(feedId: string): string | null {
+  return isTagFeedId(feedId) ? feedId.slice(TAG_FEED_PREFIX.length) : null;
+}
+
+/**
  * Whether the given feed id represents an aggregated view across multiple
- * feeds (global "All items", a folder feed, the starred view, or a smart
- * filter). Used by components that must show per-article provenance
- * (feed title + favicon) when multiple feeds are displayed together.
+ * feeds (global "All items", a folder feed, the starred view, a smart
+ * filter, or a tag). Used by components that must show per-article
+ * provenance (feed title + favicon) when multiple feeds are displayed
+ * together.
  */
 export function isAggregatedFeedId(feedId: string): boolean {
   return (
     feedId === ALL_FEEDS_ID ||
     isFolderFeedId(feedId) ||
     isStarredFeedId(feedId) ||
-    isFilterFeedId(feedId)
+    isFilterFeedId(feedId) ||
+    isTagFeedId(feedId)
   );
 }
 

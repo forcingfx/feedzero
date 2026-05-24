@@ -409,9 +409,13 @@ describe("feed-store", () => {
         .getState()
         .addPlaceholderFeed("https://rate-limited.example.com", "HTTP 429");
 
+      // Direct store call without options forwards undefined as the
+      // 3rd arg (OPML import optionally fills it; see issue #117
+      // follow-up). Assert on the meaningful first two args.
       expect(addPlaceholderFeed).toHaveBeenCalledWith(
         "https://rate-limited.example.com",
         "HTTP 429",
+        undefined,
       );
       expect(result.ok).toBe(true);
       expect(useFeedStore.getState().feeds).toContainEqual(placeholder);
@@ -985,6 +989,80 @@ describe("feed-store", () => {
       await useFeedStore.getState().moveFeedToFolder("f1", null);
 
       expect(updateFeed).toHaveBeenCalledWith(expect.objectContaining({ folderId: undefined }));
+    });
+  });
+
+  describe("moveFolderToParent", () => {
+    it("reparents a folder by setting parentId", async () => {
+      const folders = [
+        { id: "p", name: "Parent", createdAt: 0 },
+        { id: "c", name: "Child", createdAt: 0 },
+      ];
+      useFeedStore.setState({ folders });
+      vi.mocked(updateFolder).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFolders).mockResolvedValue({
+        ok: true,
+        value: [{ ...folders[0] }, { ...folders[1], parentId: "p" }],
+      });
+
+      const result = await useFeedStore
+        .getState()
+        .moveFolderToParent("c", "p");
+
+      expect(result.ok).toBe(true);
+      expect(updateFolder).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "c", parentId: "p" }),
+      );
+    });
+
+    it("un-nests a folder when parentId is null", async () => {
+      const folders = [
+        { id: "p", name: "Parent", createdAt: 0 },
+        { id: "c", name: "Child", createdAt: 0, parentId: "p" },
+      ];
+      useFeedStore.setState({ folders });
+      vi.mocked(updateFolder).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFolders).mockResolvedValue({
+        ok: true,
+        value: [folders[0], { ...folders[1], parentId: undefined }],
+      });
+
+      const result = await useFeedStore
+        .getState()
+        .moveFolderToParent("c", null);
+
+      expect(result.ok).toBe(true);
+      expect(updateFolder).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "c", parentId: undefined }),
+      );
+    });
+
+    it("rejects when the new parent is a descendant (cycle prevention)", async () => {
+      const folders = [
+        { id: "a", name: "A", createdAt: 0 },
+        { id: "b", name: "B", createdAt: 0, parentId: "a" },
+        { id: "c", name: "C", createdAt: 0, parentId: "b" },
+      ];
+      useFeedStore.setState({ folders });
+
+      // Trying to make A a child of C (its grandchild) — must reject.
+      const result = await useFeedStore
+        .getState()
+        .moveFolderToParent("a", "c");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/cannot move/i);
+      }
+      expect(updateFolder).not.toHaveBeenCalled();
+    });
+
+    it("rejects when an unknown folder id is given", async () => {
+      useFeedStore.setState({ folders: [] });
+      const result = await useFeedStore
+        .getState()
+        .moveFolderToParent("ghost", "any");
+      expect(result.ok).toBe(false);
     });
   });
 
