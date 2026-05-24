@@ -155,15 +155,15 @@ interface ToolPayload {
 export async function generateBriefing(
   input: GenerateBriefingInput,
 ): Promise<Result<BriefingReport>> {
-  let Anthropic: typeof import("@anthropic-ai/sdk").default;
+  let sdk: typeof import("@anthropic-ai/sdk");
   try {
-    Anthropic = (await import("@anthropic-ai/sdk")).default;
+    sdk = await import("@anthropic-ai/sdk");
   } catch (e) {
     return err(
       `Couldn't load the Anthropic SDK: ${e instanceof Error ? e.message : String(e)}`,
     );
   }
-  const client = new Anthropic({
+  const client = new sdk.default({
     apiKey: input.apiKey,
     dangerouslyAllowBrowser: true,
   });
@@ -195,7 +195,7 @@ export async function generateBriefing(
       { signal: input.signal },
     );
   } catch (e) {
-    return err(mapSdkError(e));
+    return err(mapSdkError(e, sdk));
   }
 
   const toolBlock = (response.content ?? []).find(
@@ -318,32 +318,49 @@ function validateToolPayload(input: unknown): Result<ToolPayload> {
 /**
  * Map an SDK error to a one-line message the UI can render verbatim.
  *
- * We dispatch on `error.name` + `error.status` rather than `instanceof`
- * because the SDK is dynamic-imported — keeping the static-import-only
- * error classes for instanceof checks would re-eagerly pull the SDK
- * back into the boot bundle and defeat the lazy split. The SDK gives
- * every error class a stable `name`, and HTTP-derived errors carry an
- * HTTP `status`, so name/status matching is just as reliable as
- * instanceof here.
+ * Dispatches via `instanceof` against the dynamically-loaded SDK module
+ * passed in by the caller. We can't static-import the error classes
+ * (that would re-eagerly pull the SDK into the boot bundle and defeat
+ * the lazy split), and we can't rely on `error.name` because the SDK
+ * classes don't explicitly set `this.name` — under production
+ * minification `error.name` resolves to a single-letter mangled class
+ * identifier and every name comparison misses.
+ *
+ * The SDK module is already in memory by the time we land in this
+ * function (we used it to construct the client and call create), so
+ * instanceof against `sdk.APIConnectionError` etc. is both robust and
+ * minification-proof.
+ *
+ * Connection errors surface the underlying message (and `cause.message`
+ * when present) since "Connection error." alone gives the user no
+ * actionable signal — usually a CORS preflight rejection, the user's
+ * network blocking api.anthropic.com, or a browser extension
+ * intercepting the request.
  */
-function mapSdkError(e: unknown): string {
+function mapSdkError(
+  e: unknown,
+  sdk: typeof import("@anthropic-ai/sdk"),
+): string {
   if (!(e instanceof Error)) return `Briefing failed: ${String(e)}`;
 
-  const name = e.name;
-  const rawStatus = (e as unknown as { status?: unknown }).status;
-  const status = typeof rawStatus === "number" ? rawStatus : undefined;
-
-  if (name === "APIUserAbortError" || (e as { type?: string }).type === "abort") {
+  if (e instanceof sdk.APIUserAbortError) {
     return "Briefing refresh cancelled.";
   }
-  if (name === "AuthenticationError" || status === 401) {
+  if (e instanceof sdk.AuthenticationError) {
     return "Anthropic rejected the API key. Paste a fresh key in Settings — invalid or revoked keys can't generate briefings.";
   }
-  if (name === "RateLimitError" || status === 429) {
+  if (e instanceof sdk.RateLimitError) {
     return "Anthropic rate limit hit. Wait a minute and try again, or upgrade your Anthropic plan.";
   }
-  if (name === "APIConnectionError" || name === "APIConnectionTimeoutError") {
-    return "Couldn't reach Anthropic. Check your network and try again.";
+  if (
+    e instanceof sdk.APIConnectionTimeoutError ||
+    e instanceof sdk.APIConnectionError
+  ) {
+    const cause = (e as { cause?: unknown }).cause;
+    const detail = cause instanceof Error ? cause.message : undefined;
+    return `Couldn't reach Anthropic from your browser. This is usually a CORS preflight failure, a network block on api.anthropic.com, or a browser extension intercepting the request. ${
+      detail ? `Underlying error: ${detail}` : `Underlying error: ${e.message}`
+    }`;
   }
   return `Briefing failed: ${e.message}`;
 }
