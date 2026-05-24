@@ -121,6 +121,16 @@ export function evaluateCondition(
       }
       return evalMembership(feed.folderId, condition.op, condition.value);
     }
+    case "tag": {
+      // Match if ANY of the article's feed tags is in the operand list.
+      // Tags ride on `Feed.tags` (populated from OPML
+      // outline[category]). Missing feed or empty tags is treated as
+      // "no tags": `not-in` is vacuously true, `in` is vacuously false.
+      const feed = ctx.feedsById[article.feedId];
+      const tags = feed?.tags ?? [];
+      const hit = tags.some((t) => condition.value.includes(t));
+      return condition.op === "in" ? hit : !hit;
+    }
     case "publishedAt":
       return evalDate(article.publishedAt, condition, ctx.now);
     case "read":

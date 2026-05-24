@@ -146,12 +146,22 @@ function fetchFailure(message: string): AddFeedFlowResult {
  * Returns AddFeedFlowResult with user-friendly error messages. On a
  * recoverable failure the err branch carries `reason: "fetch-failure"`.
  *
- * `options.titleOverride` (issue #117): when set to a non-empty string,
- * wins over the parsed feed body's `<title>`. The OPML importer threads
- * the user's outline `title="…"` (or `text="…"` fallback) through here so
- * a feed they renamed in their previous reader keeps that name on import,
- * instead of being silently reverted to whatever the publisher's feed
- * advertises. Empty / whitespace-only values are ignored.
+ * OPML-importer-shaped options (all optional):
+ *
+ *   - `titleOverride` (issue #117): non-empty wins over the parsed feed
+ *     body's `<title>`. Preserves the user's outline title across reader
+ *     migrations. Whitespace-only is ignored.
+ *
+ *   - `descriptionFallback`: used ONLY when the parsed feed body's
+ *     description is empty. Surfaces the OPML's stored blurb for feeds
+ *     whose publishers stopped sending a description.
+ *
+ *   - `tags`: free-form labels parsed from `outline[category]`. Stored
+ *     on `Feed.tags`; queryable via the `tag` filter Condition.
+ *
+ *   - `createdAtOverride`: Unix-epoch ms for `Feed.createdAt`.
+ *     Preserves "subscribed since 2014" through migrations. A
+ *     non-positive value falls back to `Date.now()` in `createFeed`.
  */
 export async function addFeedFlow(
   rawUrl: string,
@@ -159,6 +169,9 @@ export async function addFeedFlow(
     prefetchedContent?: string;
     bridgesEnabled?: boolean;
     titleOverride?: string;
+    descriptionFallback?: string;
+    tags?: string[];
+    createdAtOverride?: number;
   },
 ): Promise<AddFeedFlowResult> {
   const url = normalizeUrl(rawUrl);
@@ -216,13 +229,20 @@ export async function addFeedFlow(
 
     // Create and store feed (use discovered URL if feed was found via discovery).
     // OPML-supplied title wins over the parsed feed's <title>; see options
-    // docstring above for the issue #117 rationale.
+    // docstring above for the issue #117 rationale. Description falls back
+    // to the OPML's only when the parsed feed body has none.
     const overrideTitle = options?.titleOverride?.trim();
+    const descriptionFromFeed = (feedData.description ?? "").trim();
+    const descriptionFallback = options?.descriptionFallback?.trim();
     const feedResult = createFeed({
       url: discoveredUrl,
       title: overrideTitle ? overrideTitle : feedData.title,
-      description: feedData.description,
+      description: descriptionFromFeed
+        ? feedData.description
+        : descriptionFallback ?? "",
       siteUrl: feedData.siteUrl,
+      tags: options?.tags && options.tags.length > 0 ? options.tags : undefined,
+      createdAt: options?.createdAtOverride,
     });
     if (!feedResult.ok) return feedResult;
 

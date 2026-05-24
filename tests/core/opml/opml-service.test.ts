@@ -60,60 +60,64 @@ describe("opml-service", () => {
       const result = parseOpmlFile(SAMPLE_OPML);
       expect(isOk(result)).toBe(true);
 
-      const feeds = unwrap(result);
-      expect(feeds).toHaveLength(3);
+      const { entries } = unwrap(result);
+      expect(entries).toHaveLength(3);
 
-      expect(feeds[0]).toEqual({
+      expect(entries[0]).toEqual({
         title: "TechCrunch",
         xmlUrl: "https://techcrunch.com/feed/",
         htmlUrl: "https://techcrunch.com/",
       });
 
-      expect(feeds[1]).toEqual({
+      expect(entries[1]).toEqual({
         title: "Hacker News",
         xmlUrl: "https://news.ycombinator.com/rss",
         htmlUrl: "https://news.ycombinator.com/",
       });
 
       // The Verge only has text, no title
-      expect(feeds[2]).toEqual({
+      expect(entries[2]).toEqual({
         title: "The Verge",
         xmlUrl: "https://www.theverge.com/rss/index.xml",
         htmlUrl: undefined,
       });
     });
 
-    it("should PRESERVE folder structure (PR E) — feeds carry their parent folder name", () => {
-      // Was: parser flattened nested folders, dropping the organization the
-      // user had spent years building in their previous reader. PR E
-      // captures the immediate parent <outline>'s text/title as folderName
-      // so the importer can recreate folders on the destination side.
+    it("PRESERVES folder structure — feeds carry their full folder path", () => {
+      // Part 2 of the OPML field audit: instead of flattening to the
+      // outermost parent name, we preserve the full ancestor path so
+      // the importer can materialize nested folders via
+      // `Folder.parentId`.
       const result = parseOpmlFile(NESTED_OPML);
       expect(isOk(result)).toBe(true);
 
-      const feeds = unwrap(result);
-      expect(feeds).toHaveLength(3);
+      const { entries, folders } = unwrap(result);
+      expect(entries).toHaveLength(3);
 
-      const techcrunch = feeds.find(
+      const techcrunch = entries.find(
         (f) => f.xmlUrl === "https://techcrunch.com/feed/",
       );
-      const ars = feeds.find(
+      const ars = entries.find(
         (f) => f.xmlUrl === "https://feeds.arstechnica.com/arstechnica/features",
       );
-      const bbc = feeds.find(
+      const bbc = entries.find(
         (f) => f.xmlUrl === "https://feeds.bbci.co.uk/news/rss.xml",
       );
-      expect(techcrunch?.folderName).toBe("Tech");
-      expect(ars?.folderName).toBe("Tech");
-      expect(bbc?.folderName).toBe("News");
+      expect(techcrunch?.folderPath).toEqual(["Tech"]);
+      expect(ars?.folderPath).toEqual(["Tech"]);
+      expect(bbc?.folderPath).toEqual(["News"]);
+
+      // Folder preamble: each folder appears exactly once, depth-first.
+      const folderNames = folders.map((f) => f.name);
+      expect(folderNames).toEqual(["Tech", "News"]);
     });
 
-    it("top-level (unfiled) feeds get folderName=undefined", () => {
+    it("top-level (unfiled) feeds get folderPath=undefined", () => {
       const result = parseOpmlFile(SAMPLE_OPML);
       expect(isOk(result)).toBe(true);
-      const feeds = unwrap(result);
-      for (const f of feeds) {
-        expect(f.folderName).toBeUndefined();
+      const { entries } = unwrap(result);
+      for (const f of entries) {
+        expect(f.folderPath).toBeUndefined();
       }
     });
 
@@ -127,7 +131,7 @@ describe("opml-service", () => {
       expect(isErr(result)).toBe(true);
     });
 
-    it("should return empty array for OPML with no feeds", () => {
+    it("should return empty entries for OPML with no feeds", () => {
       const emptyOpml = `<?xml version="1.0"?>
 <opml version="2.0">
   <head><title>Empty</title></head>
@@ -135,7 +139,9 @@ describe("opml-service", () => {
 </opml>`;
       const result = parseOpmlFile(emptyOpml);
       expect(isOk(result)).toBe(true);
-      expect(unwrap(result)).toHaveLength(0);
+      const doc = unwrap(result);
+      expect(doc.entries).toHaveLength(0);
+      expect(doc.folders).toHaveLength(0);
     });
 
     it("should skip outlines without xmlUrl", () => {
@@ -149,9 +155,9 @@ describe("opml-service", () => {
       const result = parseOpmlFile(opmlWithFolders);
       expect(isOk(result)).toBe(true);
 
-      const feeds = unwrap(result);
-      expect(feeds).toHaveLength(1);
-      expect(feeds[0].xmlUrl).toBe("https://example.com/feed");
+      const { entries } = unwrap(result);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].xmlUrl).toBe("https://example.com/feed");
     });
 
     describe("spec correctness — outlines we must skip per OPML 2.0", () => {
@@ -169,9 +175,9 @@ describe("opml-service", () => {
 </opml>`;
         const result = parseOpmlFile(opml);
         expect(isOk(result)).toBe(true);
-        const feeds = unwrap(result);
-        expect(feeds).toHaveLength(1);
-        expect(feeds[0].xmlUrl).toBe("https://active.example.com/feed");
+        const { entries } = unwrap(result);
+        expect(entries).toHaveLength(1);
+        expect(entries[0].xmlUrl).toBe("https://active.example.com/feed");
       });
 
       // Per OPML 2.0: type="link" is a hyperlink reference (blogroll-style),
@@ -189,9 +195,9 @@ describe("opml-service", () => {
 </opml>`;
           const result = parseOpmlFile(opml);
           expect(isOk(result)).toBe(true);
-          const feeds = unwrap(result);
-          expect(feeds).toHaveLength(1);
-          expect(feeds[0].xmlUrl).toBe("https://feed.example.com/rss");
+          const { entries } = unwrap(result);
+          expect(entries).toHaveLength(1);
+          expect(entries[0].xmlUrl).toBe("https://feed.example.com/rss");
         },
       );
 
@@ -210,9 +216,110 @@ describe("opml-service", () => {
 </opml>`;
           const result = parseOpmlFile(opml);
           expect(isOk(result)).toBe(true);
-          expect(unwrap(result)).toHaveLength(1);
+          expect(unwrap(result).entries).toHaveLength(1);
         },
       );
+    });
+
+    describe("Part 2 — full outline field harvesting", () => {
+      it("threads outline.description into entry.description", () => {
+        const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <body>
+    <outline type="rss" text="A" xmlUrl="https://a.example.com/feed" description="Daily roundup of A news"/>
+    <outline type="rss" text="B" xmlUrl="https://b.example.com/feed"/>
+  </body>
+</opml>`;
+        const result = parseOpmlFile(opml);
+        expect(isOk(result)).toBe(true);
+        const { entries } = unwrap(result);
+        expect(entries[0].description).toBe("Daily roundup of A news");
+        expect(entries[1].description).toBeUndefined();
+      });
+
+      it("splits outline.category on ',' into entry.tags (trimmed, deduped, empties dropped)", () => {
+        const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <body>
+    <outline type="rss" text="A" xmlUrl="https://a.example.com/feed" category="tech, news, tech, ,frontend"/>
+    <outline type="rss" text="B" xmlUrl="https://b.example.com/feed"/>
+  </body>
+</opml>`;
+        const result = parseOpmlFile(opml);
+        expect(isOk(result)).toBe(true);
+        const { entries } = unwrap(result);
+        expect(entries[0].tags).toEqual(["tech", "news", "frontend"]);
+        expect(entries[1].tags).toBeUndefined();
+      });
+
+      it("parses outline.created (RFC 822 or ISO 8601) into entry.createdAt ms", () => {
+        const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <body>
+    <outline type="rss" text="A" xmlUrl="https://a.example.com/feed" created="Mon, 31 Oct 2016 12:00:00 GMT"/>
+    <outline type="rss" text="B" xmlUrl="https://b.example.com/feed" created="2014-08-15T09:00:00Z"/>
+    <outline type="rss" text="C" xmlUrl="https://c.example.com/feed" created="not a date"/>
+    <outline type="rss" text="D" xmlUrl="https://d.example.com/feed"/>
+  </body>
+</opml>`;
+        const result = parseOpmlFile(opml);
+        expect(isOk(result)).toBe(true);
+        const { entries } = unwrap(result);
+        // RFC 822 / ISO 8601 both parse to a positive epoch ms
+        expect(entries[0].createdAt).toBe(Date.parse("Mon, 31 Oct 2016 12:00:00 GMT"));
+        expect(entries[1].createdAt).toBe(Date.parse("2014-08-15T09:00:00Z"));
+        // Malformed date → falls back to undefined (factory uses Date.now())
+        expect(entries[2].createdAt).toBeUndefined();
+        expect(entries[3].createdAt).toBeUndefined();
+      });
+
+      it("preserves deep nested folder paths and emits folders in depth-first order", () => {
+        const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <body>
+    <outline text="Tech">
+      <outline text="Frontend">
+        <outline type="rss" text="React" xmlUrl="https://reactjs.org/feed"/>
+      </outline>
+      <outline type="rss" text="HN" xmlUrl="https://news.ycombinator.com/rss"/>
+    </outline>
+  </body>
+</opml>`;
+        const result = parseOpmlFile(opml);
+        expect(isOk(result)).toBe(true);
+        const { entries, folders } = unwrap(result);
+        const react = entries.find((e) => e.xmlUrl === "https://reactjs.org/feed");
+        const hn = entries.find((e) => e.xmlUrl === "https://news.ycombinator.com/rss");
+        expect(react?.folderPath).toEqual(["Tech", "Frontend"]);
+        expect(hn?.folderPath).toEqual(["Tech"]);
+        // Folders preamble: parents before children, no duplicates.
+        expect(folders).toEqual([
+          { name: "Tech", parentPath: [] },
+          { name: "Frontend", parentPath: ["Tech"] },
+        ]);
+      });
+
+      it("harvests <head> title / dateCreated / ownerName for ImportResults", () => {
+        const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <head>
+    <title>My Subscriptions</title>
+    <dateCreated>Fri, 24 May 2026 10:00:00 GMT</dateCreated>
+    <ownerName>Maciek</ownerName>
+  </head>
+  <body>
+    <outline type="rss" text="A" xmlUrl="https://a.example.com/feed"/>
+  </body>
+</opml>`;
+        const result = parseOpmlFile(opml);
+        expect(isOk(result)).toBe(true);
+        const { head } = unwrap(result);
+        expect(head.title).toBe("My Subscriptions");
+        expect(head.ownerName).toBe("Maciek");
+        // dateCreated is stringified (any representation feedsmith gives
+        // us is fine for display; the importer doesn't act on it).
+        expect(head.dateCreated).toBeDefined();
+      });
     });
   });
 
@@ -285,9 +392,9 @@ describe("opml-service", () => {
       const opml = generateOpmlFile(feeds, folders);
       const reparsed = parseOpmlFile(opml);
       expect(isOk(reparsed)).toBe(true);
-      const entries = unwrap(reparsed);
+      const { entries } = unwrap(reparsed);
       expect(entries).toHaveLength(1);
-      expect(entries[0].folderName).toBe("Tech");
+      expect(entries[0].folderPath).toEqual(["Tech"]);
       expect(entries[0].xmlUrl).toBe("https://techcrunch.com/feed/");
     });
 
@@ -387,7 +494,7 @@ describe("opml-service", () => {
       const parseResult = parseOpmlFile(opml);
 
       expect(isOk(parseResult)).toBe(true);
-      const parsed = unwrap(parseResult);
+      const { entries: parsed } = unwrap(parseResult);
       expect(parsed).toHaveLength(1);
       expect(parsed[0].xmlUrl).toBe("https://example.com/feed");
       expect(parsed[0].title).toBe("Example Feed");

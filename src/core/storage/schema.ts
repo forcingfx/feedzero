@@ -17,18 +17,40 @@ export { SCHEMA_VERSION };
 
 /**
  * Create a new feed object with defaults.
+ *
+ * `createdAt` defaults to `Date.now()`; OPML imports may pass a parsed
+ * `outline[created]` to preserve subscription provenance. A non-positive
+ * value (NaN, 0, negative) is rejected silently — the factory falls back
+ * to `Date.now()` rather than persisting a nonsensical stamp.
+ *
+ * `tags` defaults to omitted; OPML's `outline[category]` flows through
+ * here.
  */
-export function createFeed({ url, title, description = "", siteUrl = "" }: CreateFeedInput): Result<Feed> {
+export function createFeed({
+  url,
+  title,
+  description = "",
+  siteUrl = "",
+  tags,
+  createdAt,
+}: CreateFeedInput): Result<Feed> {
   if (!url || !title) return err("Feed requires url and title");
-  return ok({
+  const now = Date.now();
+  const stamp =
+    typeof createdAt === "number" && Number.isFinite(createdAt) && createdAt > 0
+      ? createdAt
+      : now;
+  const feed: Feed = {
     id: crypto.randomUUID(),
     url,
     title,
     description,
     siteUrl,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  });
+    createdAt: stamp,
+    updatedAt: now,
+  };
+  if (tags && tags.length > 0) feed.tags = tags;
+  return ok(feed);
 }
 
 /**

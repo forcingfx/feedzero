@@ -57,6 +57,18 @@ export function validateCondition(condition: Condition): Result<void> {
       }
       return ok(undefined);
 
+    case "tag":
+      // Tags are free-form strings from `Feed.tags` (populated from
+      // OPML outline[category]). Reject empty / whitespace-only entries
+      // so a malformed filter doesn't match every untagged feed.
+      if (!Array.isArray(condition.value) || condition.value.length === 0) {
+        return err("tag requires at least one value");
+      }
+      if (condition.value.some((v) => typeof v !== "string" || !v.trim())) {
+        return err("tag values must be non-empty strings");
+      }
+      return ok(undefined);
+
     case "publishedAt":
       if (condition.op === "in-last-days" || condition.op === "in-last-hours") {
         if (typeof condition.value !== "number" || condition.value <= 0) {

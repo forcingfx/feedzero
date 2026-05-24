@@ -63,6 +63,7 @@ export function ConditionRow({
         <option value="content">Content</option>
         <option value="feed">Feed</option>
         <option value="folder">Folder</option>
+        <option value="tag">Tag</option>
         <option value="publishedAt">Date</option>
         <option value="read">Read</option>
         <option value="starred">Starred</option>
@@ -160,6 +161,30 @@ function ValueWidget({
           condition.op === "matches" ? "regex pattern" : "search text"
         }
         className="h-8 w-48"
+        aria-label="Value"
+      />
+    );
+  }
+
+  // Free-form comma-separated input for tags. Unlike feed/folder we
+  // don't pick from a list — tags are free-form strings (`Feed.tags`,
+  // populated from OPML outline[category]) and the user typically
+  // matches against the same labels they saw in their previous reader.
+  if (condition.kind === "tag") {
+    return (
+      <Input
+        value={condition.value.join(", ")}
+        placeholder="tech, news"
+        onChange={(e) =>
+          onChange({
+            ...condition,
+            value: e.target.value
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+          })
+        }
+        className="h-8 min-w-40"
         aria-label="Value"
       />
     );
@@ -348,6 +373,7 @@ function operatorsFor(kind: Condition["kind"]): OperatorOption[] {
       ];
     case "feed":
     case "folder":
+    case "tag":
       return [
         { value: "in", label: "is any of" },
         { value: "not-in", label: "is none of" },
@@ -382,6 +408,7 @@ function defaultConditionFor(kind: Condition["kind"]): Condition {
       return { kind, op: "contains", value: "" };
     case "feed":
     case "folder":
+    case "tag":
       return { kind, op: "in", value: [] };
     case "publishedAt":
       return { kind, op: "in-last-days", value: 7 };
