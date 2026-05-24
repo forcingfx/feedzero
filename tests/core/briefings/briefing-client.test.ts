@@ -6,10 +6,23 @@ import type { Article } from "@feedzero/core/types";
 // vi.hoisted() lets the test file share state with the mock factory.
 const mocks = vi.hoisted(() => {
   const createMock = vi.fn();
-  class MockAuthenticationError extends Error {}
-  class MockRateLimitError extends Error {}
-  class MockAPIConnectionError extends Error {}
-  class MockAPIUserAbortError extends Error {}
+  // Mirror the real SDK shape: each error class sets its own `name`,
+  // since the client maps errors by name (not instanceof) so the
+  // dynamic SDK import stays out of the boot bundle.
+  class MockAuthenticationError extends Error {
+    name = "AuthenticationError";
+    status = 401;
+  }
+  class MockRateLimitError extends Error {
+    name = "RateLimitError";
+    status = 429;
+  }
+  class MockAPIConnectionError extends Error {
+    name = "APIConnectionError";
+  }
+  class MockAPIUserAbortError extends Error {
+    name = "APIUserAbortError";
+  }
   return {
     createMock,
     MockAuthenticationError,

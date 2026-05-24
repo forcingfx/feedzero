@@ -26,12 +26,18 @@
  * Settings" reads better than the raw SDK stacktrace.
  */
 
-import Anthropic, {
-  AuthenticationError,
-  RateLimitError,
-  APIConnectionError,
-  APIUserAbortError,
-} from "@anthropic-ai/sdk";
+// NOTE: @anthropic-ai/sdk is dynamically imported inside generateBriefing
+// so the ~500KB vendor bundle never loads on app boot — only when the
+// user actually clicks Refresh on a briefing. Static-importing pulls in
+// the SDK's optional `tools/agent-toolset/*` submodules that reach for
+// `node:fs/promises`, `node:readline`, etc.; Vite externalises those for
+// browser compatibility but the externalised stubs blow up the app at
+// boot once the chunk actually loads.
+//
+// We deliberately do NOT static-import the SDK error classes either —
+// resolving them eagerly defeats the lazy split. Errors come back as
+// real instances of the SDK's classes; we match on `name` + status to
+// dispatch to friendly messages without needing instanceof.
 import type { Article, BriefingReport } from "@feedzero/core/types";
 import { BRIEFING_REPORT_SCHEMA_VERSION } from "@feedzero/core/utils/constants";
 import { err, ok } from "../../../packages/core/src/utils/result";
@@ -149,6 +155,14 @@ interface ToolPayload {
 export async function generateBriefing(
   input: GenerateBriefingInput,
 ): Promise<Result<BriefingReport>> {
+  let Anthropic: typeof import("@anthropic-ai/sdk").default;
+  try {
+    Anthropic = (await import("@anthropic-ai/sdk")).default;
+  } catch (e) {
+    return err(
+      `Couldn't load the Anthropic SDK: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
   const client = new Anthropic({
     apiKey: input.apiKey,
     dangerouslyAllowBrowser: true,
@@ -301,20 +315,35 @@ function validateToolPayload(input: unknown): Result<ToolPayload> {
   });
 }
 
-/** Map an SDK error to a one-line message the UI can render verbatim. */
+/**
+ * Map an SDK error to a one-line message the UI can render verbatim.
+ *
+ * We dispatch on `error.name` + `error.status` rather than `instanceof`
+ * because the SDK is dynamic-imported — keeping the static-import-only
+ * error classes for instanceof checks would re-eagerly pull the SDK
+ * back into the boot bundle and defeat the lazy split. The SDK gives
+ * every error class a stable `name`, and HTTP-derived errors carry an
+ * HTTP `status`, so name/status matching is just as reliable as
+ * instanceof here.
+ */
 function mapSdkError(e: unknown): string {
-  if (e instanceof APIUserAbortError) {
+  if (!(e instanceof Error)) return `Briefing failed: ${String(e)}`;
+
+  const name = e.name;
+  const rawStatus = (e as unknown as { status?: unknown }).status;
+  const status = typeof rawStatus === "number" ? rawStatus : undefined;
+
+  if (name === "APIUserAbortError" || (e as { type?: string }).type === "abort") {
     return "Briefing refresh cancelled.";
   }
-  if (e instanceof AuthenticationError) {
+  if (name === "AuthenticationError" || status === 401) {
     return "Anthropic rejected the API key. Paste a fresh key in Settings — invalid or revoked keys can't generate briefings.";
   }
-  if (e instanceof RateLimitError) {
+  if (name === "RateLimitError" || status === 429) {
     return "Anthropic rate limit hit. Wait a minute and try again, or upgrade your Anthropic plan.";
   }
-  if (e instanceof APIConnectionError) {
+  if (name === "APIConnectionError" || name === "APIConnectionTimeoutError") {
     return "Couldn't reach Anthropic. Check your network and try again.";
   }
-  const message = e instanceof Error ? e.message : String(e);
-  return `Briefing failed: ${message}`;
+  return `Briefing failed: ${e.message}`;
 }

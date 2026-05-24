@@ -473,6 +473,20 @@ export default defineConfig({
           if (id.includes("/node_modules/@dnd-kit/")) {
             return "vendor-dnd";
           }
+          // Anthropic SDK — only imported by briefing-client via
+          // `await import("@anthropic-ai/sdk")`. Its
+          // `tools/agent-toolset/*` and `lib/credentials/*` submodules
+          // reach for `node:fs`, `node:readline`, etc., which Vite
+          // externalises for browser compat. Those externalised stubs
+          // are inert as long as the SDK chunk only loads on-demand —
+          // but the catch-all `vendor` bucket below would mix it into
+          // a chunk that main statically imports, blanking the app at
+          // boot. Returning `undefined` here defers to rolldown's
+          // default chunking, which respects the dynamic-import
+          // boundary and produces an async-only SDK chunk.
+          if (id.includes("/node_modules/@anthropic-ai/")) {
+            return undefined;
+          }
           // Everything else falls into the default vendor bucket so we
           // don't fragment into dozens of tiny chunks.
           return "vendor";
