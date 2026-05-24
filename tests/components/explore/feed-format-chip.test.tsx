@@ -28,7 +28,7 @@ describe("FeedFormatChip", () => {
   });
 
   it("renders three format pills when probing", async () => {
-    vi.spyOn(feedService, "previewFeed").mockImplementation(
+    vi.spyOn(feedService, "previewWithDiscovery").mockImplementation(
       () => new Promise(() => {}),
     );
     render(<FeedFormatChip url="https://example.com/feed.xml" />);
@@ -44,7 +44,7 @@ describe("FeedFormatChip", () => {
   });
 
   it("highlights the matched format when a feed is found", async () => {
-    vi.spyOn(feedService, "previewFeed").mockResolvedValue({
+    vi.spyOn(feedService, "previewWithDiscovery").mockResolvedValue({
       ok: true,
       value: { title: "Atom Site", siteUrl: "", format: "atom", articles: [] },
     });
@@ -65,7 +65,7 @@ describe("FeedFormatChip", () => {
   });
 
   it("celebrates the discovery with the format name and feed title", async () => {
-    vi.spyOn(feedService, "previewFeed").mockResolvedValue({
+    vi.spyOn(feedService, "previewWithDiscovery").mockResolvedValue({
       ok: true,
       value: {
         title: "Example Blog",
@@ -84,7 +84,7 @@ describe("FeedFormatChip", () => {
   });
 
   it("renders a clickable 'Add feed' button when a feed is found", async () => {
-    vi.spyOn(feedService, "previewFeed").mockResolvedValue({
+    vi.spyOn(feedService, "previewWithDiscovery").mockResolvedValue({
       ok: true,
       value: { title: "Atom Site", siteUrl: "", format: "atom", articles: [] },
     });
@@ -97,25 +97,51 @@ describe("FeedFormatChip", () => {
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
 
-  it("does not render the Add button while probing or when no feed found", async () => {
-    vi.spyOn(feedService, "previewFeed").mockResolvedValue({
+  it("still offers a 'Try anyway' Add button in the not-found state", async () => {
+    // When our probe says no feed was found, Enter can still work
+    // because addFeed runs its own full discovery cascade. Keeping
+    // the Add affordance visible (just muted) means the user always
+    // has a path forward instead of being told "give up".
+    vi.spyOn(feedService, "previewWithDiscovery").mockResolvedValue({
       ok: false,
       error: "nope",
     });
-    render(<FeedFormatChip url="https://example.com/feed.xml" onAdd={vi.fn()} />);
+    const onAdd = vi.fn();
+    render(
+      <FeedFormatChip url="https://example.com/feed.xml" onAdd={onAdd} />,
+    );
     await waitFor(() =>
       expect(screen.getByTestId("feed-format-chip")).toHaveAttribute(
         "data-state",
         "not-found",
       ),
     );
+    const tryAnyway = screen.getByRole("button", { name: /try anyway/i });
+    expect(tryAnyway).toBeInTheDocument();
+    await userEvent.setup().click(tryAnyway);
+    expect(onAdd).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders no Add button while probing", async () => {
+    vi.spyOn(feedService, "previewWithDiscovery").mockImplementation(
+      () => new Promise(() => {}),
+    );
+    render(
+      <FeedFormatChip url="https://example.com/feed.xml" onAdd={vi.fn()} />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("feed-format-chip")).toHaveAttribute(
+        "data-state",
+        "probing",
+      ),
+    );
     expect(
-      screen.queryByRole("button", { name: /add feed/i }),
+      screen.queryByRole("button", { name: /add feed|try anyway/i }),
     ).not.toBeInTheDocument();
   });
 
   it("falls back to a 'no feed yet' state on failure", async () => {
-    vi.spyOn(feedService, "previewFeed").mockResolvedValue({
+    vi.spyOn(feedService, "previewWithDiscovery").mockResolvedValue({
       ok: false,
       error: "nope",
     });
@@ -137,7 +163,7 @@ describe("FeedFormatChip", () => {
     const firstPromise = new Promise((r) => {
       resolveFirst = r;
     });
-    vi.spyOn(feedService, "previewFeed")
+    vi.spyOn(feedService, "previewWithDiscovery")
       .mockImplementationOnce(() => firstPromise as never)
       .mockResolvedValueOnce({
         ok: true,

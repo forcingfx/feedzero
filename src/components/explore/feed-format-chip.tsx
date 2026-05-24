@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Rss, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Kbd } from "@/components/ui/kbd";
-import { previewFeed } from "@/core/feeds/feed-service";
+import { previewWithDiscovery } from "@/core/feeds/feed-service";
 import type { FeedFormat } from "@/core/parser/parser";
 
 /**
@@ -64,7 +64,13 @@ export function FeedFormatChip({ url, onAdd, isAdding }: FeedFormatChipProps) {
     const generation = ++generationRef.current;
     const timer = setTimeout(async () => {
       setState({ kind: "probing" });
-      const result = await previewFeed(trimmed);
+      // previewWithDiscovery runs the full addFeed cascade — direct
+      // parse first, then HTML autodiscovery + well-known paths — so
+      // the chip's verdict matches what Enter would actually do.
+      // Without this the chip would say "no feed found" for
+      // https://www.nytimes.com even though pressing Enter happily
+      // resolves nytimes.com → its HomePage.xml.
+      const result = await previewWithDiscovery(trimmed);
       if (generation !== generationRef.current) return; // stale probe
       if (result.ok) {
         setState({
@@ -173,6 +179,35 @@ export function FeedFormatChip({ url, onAdd, isAdding }: FeedFormatChipProps) {
           <Kbd className="ml-0.5 bg-background/15 text-background/90 border-background/20">
             Enter
           </Kbd>
+        </button>
+      )}
+
+      {notFound && onAdd && (
+        // The probe couldn't find a feed, but addFeed runs its own
+        // discovery cascade — sometimes it finds one when we don't
+        // (server-side cookies, bridges, JS-redirected homepages).
+        // Keep the affordance visible so the user always has a path
+        // forward instead of staring at a dead-end "no feed found".
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={isAdding}
+          data-testid="feed-format-chip-add"
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+            "border-border bg-background text-foreground shadow-sm transition-all",
+            "hover:bg-muted active:scale-[0.98]",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+          )}
+          aria-label="Try anyway: run full discovery and add this URL"
+        >
+          {isAdding ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <Rss className="size-3 text-muted-foreground" />
+          )}
+          <span>Try anyway</span>
+          <Kbd className="ml-0.5">Enter</Kbd>
         </button>
       )}
     </div>

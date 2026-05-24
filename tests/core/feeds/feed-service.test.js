@@ -1183,6 +1183,94 @@ describe("previewFeed", () => {
   });
 });
 
+// --- previewWithDiscovery tests ---
+
+describe("previewWithDiscovery", () => {
+  it("falls back to autodiscovery when the URL is a homepage, not a feed", async () => {
+    const NYT_HTML = `<!doctype html><html><head>
+      <link rel="alternate" type="application/rss+xml" title="HomePage" href="https://www.nytimes.com/services/xml/rss/nyt/HomePage.xml">
+    </head><body></body></html>`;
+    const ATOM_FEED = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>The New York Times</title>
+  <link href="https://www.nytimes.com" rel="alternate"/>
+  <entry>
+    <title>Headline</title>
+    <link href="https://nytimes.com/1" rel="alternate"/>
+    <id>tag:nyt,1</id>
+  </entry>
+</feed>`;
+    globalThis.fetch = vi
+      .fn()
+      // First call: previewFeed → /api/feed for nytimes.com returns HTML
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(NYT_HTML),
+      })
+      // Then discovery's /api/page returns the same HTML
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(NYT_HTML),
+        headers: new Headers(),
+      })
+      // Then discovery's /api/feed for the discovered URL returns Atom
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(ATOM_FEED),
+      });
+
+    const { previewWithDiscovery } = await import(
+      "../../../src/core/feeds/feed-service.ts"
+    );
+    const result = await previewWithDiscovery("https://www.nytimes.com");
+    expect(isOk(result)).toBe(true);
+    const value = unwrap(result);
+    expect(value.format).toBe("atom");
+    expect(value.title).toBe("The New York Times");
+    expect(value.discoveredUrl).toContain("HomePage.xml");
+  });
+
+  it("returns the same payload as previewFeed when the URL is itself a feed", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(ATOM_XML),
+    });
+    const { previewWithDiscovery } = await import(
+      "../../../src/core/feeds/feed-service.ts"
+    );
+    const result = await previewWithDiscovery("https://example.com/feed.xml");
+    expect(isOk(result)).toBe(true);
+    const value = unwrap(result);
+    expect(value.format).toBe("atom");
+    // discoveredUrl is undefined when the URL was the feed directly.
+    expect(value.discoveredUrl).toBeUndefined();
+  });
+
+  it("returns err when neither parsing nor discovery finds a feed", async () => {
+    const PLAIN_HTML = `<!doctype html><html><body>nothing here</body></html>`;
+    globalThis.fetch = vi
+      .fn()
+      // previewFeed → HTML, not a feed
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(PLAIN_HTML),
+      })
+      // discovery /api/page → HTML
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(PLAIN_HTML),
+        headers: new Headers(),
+      })
+      // discovery's well-known probes will all 404
+      .mockResolvedValue({ ok: false, status: 404 });
+    const { previewWithDiscovery } = await import(
+      "../../../src/core/feeds/feed-service.ts"
+    );
+    const result = await previewWithDiscovery("https://no-feeds.example");
+    expect(isErr(result)).toBe(true);
+  });
+});
+
 // --- reloadFeed tests ---
 
 describe("reloadFeed", () => {

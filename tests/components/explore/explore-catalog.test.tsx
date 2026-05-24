@@ -30,10 +30,11 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
   }),
   refreshFeed: vi.fn(),
   refreshAllFeeds: vi.fn(),
-  // FeedFormatChip probes via previewFeed; the catalog tests don't
-  // assert on the chip's resolved state, only that it appears for
-  // URL-like input, so a never-resolving stub is enough.
+  // FeedFormatChip probes via previewWithDiscovery; the catalog
+  // tests don't assert on the chip's resolved state, only that it
+  // appears for URL-like input, so a never-resolving stub is enough.
   previewFeed: vi.fn(() => new Promise(() => {})),
+  previewWithDiscovery: vi.fn(() => new Promise(() => {})),
 }));
 
 function resetStore() {
