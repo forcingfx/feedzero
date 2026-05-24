@@ -94,6 +94,23 @@ describe("tier-matrix — currently shipped gated features", () => {
     expect(getEntry("signal").tiers.personal.available).toBe(true);
     expect(getEntry("signal").tiers.pro.available).toBe(true);
   });
+
+  it("signal-briefings is Pro-only, shipped, with a 10-briefing cap", () => {
+    const entry = getEntry("signal-briefings");
+    expect(entry.status).toBe("shipped");
+    expect(getRequiredTier("signal-briefings")).toBe("pro");
+    expect(entry.tiers.free).toEqual({ available: false });
+    expect(entry.tiers.personal).toEqual({ available: false });
+    expect(entry.tiers.pro).toEqual({
+      available: true,
+      limit: 10,
+      limitUnit: "briefings",
+    });
+  });
+
+  it("signal-briefings is listed in GATED_FEATURE_IDS so Feature union narrows", () => {
+    expect(GATED_FEATURE_IDS).toContain("signal-briefings");
+  });
 });
 
 describe("tier-matrix — coming-soon features", () => {

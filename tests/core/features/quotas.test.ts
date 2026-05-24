@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   FREE_FEED_LIMIT,
+  BRIEFINGS_LIMIT_PRO,
   checkFeedQuota,
+  checkBriefingQuota,
+  briefingQuotaErrorMessage,
   quotaErrorMessage,
 } from "@/core/features/quotas";
 
@@ -180,6 +183,112 @@ describe("checkFeedQuota", () => {
       });
       expect(result.ok).toBe(true);
     });
+  });
+});
+
+describe("BRIEFINGS_LIMIT_PRO", () => {
+  it("is sourced from the matrix entry's pro slot", () => {
+    expect(BRIEFINGS_LIMIT_PRO).toBe(10);
+  });
+});
+
+describe("checkBriefingQuota", () => {
+  describe("pro tier (hosted)", () => {
+    it("allows creates when under the limit", () => {
+      const result = checkBriefingQuota({
+        currentCount: 3,
+        tier: "pro",
+        isSelfHosted: false,
+        paidTierActive: true,
+      });
+      expect(result.ok).toBe(true);
+    });
+
+    it("allows the exact boundary create (9 → 10)", () => {
+      const result = checkBriefingQuota({
+        currentCount: BRIEFINGS_LIMIT_PRO - 1,
+        tier: "pro",
+        isSelfHosted: false,
+        paidTierActive: true,
+      });
+      expect(result.ok).toBe(true);
+    });
+
+    it("blocks the create that would cross the limit (10 → 11)", () => {
+      const result = checkBriefingQuota({
+        currentCount: BRIEFINGS_LIMIT_PRO,
+        tier: "pro",
+        isSelfHosted: false,
+        paidTierActive: true,
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe("pro-quota-exceeded");
+        expect(result.limit).toBe(BRIEFINGS_LIMIT_PRO);
+        expect(result.current).toBe(BRIEFINGS_LIMIT_PRO);
+        expect(result.delta).toBe(1);
+      }
+    });
+  });
+
+  describe("non-pro tiers (feature gate handles these upstream)", () => {
+    it("returns ok for free — feature gate blocks them before quota is reached", () => {
+      const result = checkBriefingQuota({
+        currentCount: 0,
+        tier: "free",
+        isSelfHosted: false,
+        paidTierActive: true,
+      });
+      expect(result.ok).toBe(true);
+    });
+
+    it("returns ok for personal — feature gate blocks them before quota is reached", () => {
+      const result = checkBriefingQuota({
+        currentCount: 0,
+        tier: "personal",
+        isSelfHosted: false,
+        paidTierActive: true,
+      });
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  describe("self-hosted bypass", () => {
+    it("allows unlimited briefings when self-hosted", () => {
+      const result = checkBriefingQuota({
+        currentCount: 999,
+        tier: "pro",
+        isSelfHosted: true,
+        paidTierActive: true,
+      });
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  describe("paid-tier-inactive bypass", () => {
+    it("allows creates when paid tier is dormant (pre-launch)", () => {
+      const result = checkBriefingQuota({
+        currentCount: 999,
+        tier: "pro",
+        isSelfHosted: false,
+        paidTierActive: false,
+      });
+      expect(result.ok).toBe(true);
+    });
+  });
+});
+
+describe("briefingQuotaErrorMessage", () => {
+  it("names the Pro briefing cap and points to upgrade or self-host", () => {
+    const msg = briefingQuotaErrorMessage({
+      ok: false,
+      reason: "pro-quota-exceeded",
+      limit: BRIEFINGS_LIMIT_PRO,
+      current: BRIEFINGS_LIMIT_PRO,
+      delta: 1,
+    });
+    expect(msg).toContain("10 briefings");
+    expect(msg).toContain("self-host");
   });
 });
 
