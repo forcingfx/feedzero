@@ -29,7 +29,7 @@ const STRATEGIES: FaviconStrategy[] = [
     type: "endpoint",
     buildUrl: (origin) => {
       const host = new URL(origin).host;
-      return `/api/favicon?domain=${encodeURIComponent(host)}`;
+      return `/api/icon?domain=${encodeURIComponent(host)}`;
     },
   },
   { type: "path", path: "/favicon.ico" },
@@ -70,7 +70,7 @@ export function FeedFavicon({
     // Only restart resolution when THIS origin's cached strategy changed.
     // Successful favicons share the generation bump but shouldn't drop their
     // loaded state — otherwise a single cleared failure elsewhere makes every
-    // mounted favicon flash to the RSS placeholder and re-hit /api/favicon on
+    // mounted favicon flash to the RSS placeholder and re-hit /api/icon on
     // each refresh-all. See issue #117.
     const next = origin ? getFaviconStrategyIndex(origin) : 0;
     if (next !== pathIndex) {

@@ -97,7 +97,7 @@ describe("HeaderBreadcrumbs", () => {
     const img = container.querySelector("img");
     expect(img).not.toBeNull();
     expect(img!.getAttribute("src")).toBe(
-      "/api/favicon?domain=example.com",
+      "/api/icon?domain=example.com",
     );
   });
 

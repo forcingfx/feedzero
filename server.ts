@@ -213,10 +213,17 @@ export function createApp(
   app.on(["GET", "POST"], "/api/page", (c) =>
     handleProxyRequest(c.req.raw, "text/html", proxyOpts),
   );
-  app.get("/api/icon", (c) =>
-    handleProxyRequest(c.req.raw, "image/x-icon", { cache: feedCache }),
-  );
-  app.get("/api/favicon", (c) => handleFaviconRequest(c.req.raw));
+  // /api/icon dispatches on query-param shape so we stay under Vercel's
+  // 12-function Hobby cap: ?domain=… → resolve the site's favicon;
+  // anything else → proxy a known image URL with SSRF guards. The Vercel
+  // wrapper at api/icon.ts applies the same dispatch.
+  app.get("/api/icon", (c) => {
+    const url = new URL(c.req.url);
+    if (url.searchParams.get("domain")) {
+      return handleFaviconRequest(c.req.raw);
+    }
+    return handleProxyRequest(c.req.raw, "image/x-icon", { cache: feedCache });
+  });
   // Cloud sync is a Free-tier feature — the handler runs without licenseAuth.
   // The `licenseAuth` option is still exported by sync-handler.ts for any
   // future gate that needs it; this wiring layer simply never sets it.

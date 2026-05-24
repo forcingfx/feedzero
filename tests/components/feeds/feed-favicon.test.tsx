@@ -17,7 +17,7 @@ describe("FeedFavicon", () => {
     const img = container.querySelector("img");
     expect(img).toBeTruthy();
     expect(img!.getAttribute("src")).toBe(
-      "/api/favicon?domain=example.com",
+      "/api/icon?domain=example.com",
     );
   });
 
@@ -137,13 +137,13 @@ describe("FeedFavicon", () => {
 
     const img = container.querySelector("img");
     expect(img).toBeTruthy();
-    expect(img!.getAttribute("src")).toBe("/api/favicon?domain=example.com");
+    expect(img!.getAttribute("src")).toBe("/api/icon?domain=example.com");
   });
 
   // Regression: refresh-all clears another origin's failure entry, which used
   // to bump the global generation and force EVERY mounted favicon to drop its
   // `loaded` state — making working favicons flash to the RSS placeholder and
-  // re-hit /api/favicon on every refresh. See issue #117.
+  // re-hit /api/icon on every refresh. See issue #117.
   it("keeps an already-loaded favicon visible when an unrelated origin's failure is cleared", () => {
     // Site A: loads successfully.
     const { container } = render(<FeedFavicon siteUrl="https://a.example.com" />);

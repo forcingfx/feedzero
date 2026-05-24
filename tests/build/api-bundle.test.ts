@@ -45,7 +45,7 @@ describe("API bundle contract", () => {
       "sync.ts",
       "feedback.ts",
       "icon.ts",
-      "favicon.ts",
+      "briefing.ts",
       "catalog.ts",
       "stats-sync.ts",
     ];

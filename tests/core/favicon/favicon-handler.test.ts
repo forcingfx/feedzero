@@ -17,7 +17,7 @@ describe("handleFaviconRequest", () => {
 
   it("returns 400 when domain query param is missing", async () => {
     const res = await handleFaviconRequest(
-      new Request("http://localhost/api/favicon"),
+      new Request("http://localhost/api/icon"),
     );
     expect(res.status).toBe(400);
     expect(await res.text()).toMatch(/domain/i);
@@ -25,7 +25,7 @@ describe("handleFaviconRequest", () => {
 
   it("returns 400 when domain fails SSRF validation (private IP)", async () => {
     const res = await handleFaviconRequest(
-      new Request("http://localhost/api/favicon?domain=127.0.0.1"),
+      new Request("http://localhost/api/icon?domain=127.0.0.1"),
     );
     expect(res.status).toBe(400);
   });
@@ -43,7 +43,7 @@ describe("handleFaviconRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const res = await handleFaviconRequest(
-      new Request("http://localhost/api/favicon?domain=example.com"),
+      new Request("http://localhost/api/icon?domain=example.com"),
     );
 
     expect(res.status).toBe(200);
@@ -69,7 +69,7 @@ describe("handleFaviconRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const res = await handleFaviconRequest(
-      new Request("http://localhost/api/favicon?domain=example.com"),
+      new Request("http://localhost/api/icon?domain=example.com"),
     );
     expect(res.headers.get("content-type")).toBe("image/x-icon");
   });
@@ -82,7 +82,7 @@ describe("handleFaviconRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const res = await handleFaviconRequest(
-      new Request("http://localhost/api/favicon?domain=example.com"),
+      new Request("http://localhost/api/icon?domain=example.com"),
     );
     expect(res.status).toBe(404);
   });
@@ -95,7 +95,7 @@ describe("handleFaviconRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const res = await handleFaviconRequest(
-      new Request("http://localhost/api/favicon?domain=example.com"),
+      new Request("http://localhost/api/icon?domain=example.com"),
     );
     expect(res.status).toBe(502);
     expect(await res.text()).toMatch(/failed/i);
