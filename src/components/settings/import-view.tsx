@@ -22,6 +22,7 @@ import {
   selectPlaceholderCount,
   selectFailureCount,
   selectCurrentUrl,
+  type ImportHeadInfo,
 } from "@/stores/import-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { useLicenseStore } from "@/stores/license-store";
@@ -32,6 +33,26 @@ import { ImportProgress } from "./import-progress";
 import { ImportResults } from "./import-results";
 
 type InputMode = "file" | "text";
+
+/**
+ * Internal entry shape the import loop consumes. Mirrors the rich
+ * `OpmlFeedEntry` plus the non-OPML formats (URL lists, Pocket,
+ * Omnivore), where every OPML-specific field is just absent.
+ */
+interface ImportEntry {
+  xmlUrl: string;
+  title?: string;
+  folderPath?: string[];
+  description?: string;
+  tags?: string[];
+  createdAt?: number;
+}
+
+/** Pre-pass result: what to materialize before kicking off addFeed. */
+interface OpmlPreamble {
+  folders: { name: string; parentPath: string[] }[];
+  head: ImportHeadInfo;
+}
 
 interface ImportViewProps {
   onClose: () => void;
@@ -75,47 +96,56 @@ export function ImportView({ onClose }: ImportViewProps) {
   }, []);
 
   /**
-   * Parse the import content into rich entries that carry folder context.
-   * Shutdown-migration formats (Pocket HTML, Pocket CSV, Omnivore JSON)
-   * have folderName=undefined; OPML imports carry the parent group name
-   * when one exists (PR E).
+   * Parse the import content. OPML imports carry the full outline
+   * metadata (title, htmlUrl, description, tags, createdAt, folderPath)
+   * plus folder-tree + head-metadata preamble. Other formats yield
+   * URL-only entries; the importer falls back to whatever the feed body
+   * advertises for them.
    *
    * Specific-format detection runs before the URL-list fallback because
    * each format would otherwise be misread as a URL list and silently
    * produce garbage.
    */
-  const extractEntries = useCallback(
-    async (
+  const parseImportContent = useCallback(
+    (
       content: string,
-    ): Promise<Array<{ xmlUrl: string; folderName?: string }>> => {
+    ): { entries: ImportEntry[]; preamble?: OpmlPreamble } => {
       if (isPocketCsvExport(content)) {
         const result = parsePocketCsvExport(content);
         if (!result.ok) throw new Error(result.error);
-        return result.value.map((url) => ({ xmlUrl: url }));
+        return { entries: result.value.map((url) => ({ xmlUrl: url })) };
       }
       if (isOmnivoreExport(content)) {
         const result = parseOmnivoreExport(content);
         if (!result.ok) throw new Error(result.error);
-        return result.value.map((url) => ({ xmlUrl: url }));
+        return { entries: result.value.map((url) => ({ xmlUrl: url })) };
       }
       if (isPocketExport(content)) {
         const result = parsePocketExport(content);
         if (!result.ok) throw new Error(result.error);
         // addFeedFlow runs origins through discoverFeed, so an origin like
         // https://nytimes.com becomes a subscription to the site's RSS.
-        return result.value.map((url) => ({ xmlUrl: url }));
+        return { entries: result.value.map((url) => ({ xmlUrl: url })) };
       }
       if (isOpmlFormat(content)) {
         const result = parseOpmlFile(content);
         if (!result.ok) throw new Error(result.error);
-        return result.value.map((entry) => ({
-          xmlUrl: entry.xmlUrl,
-          folderName: entry.folderName,
-        }));
+        const doc = result.value;
+        return {
+          entries: doc.entries.map((entry) => ({
+            xmlUrl: entry.xmlUrl,
+            title: entry.title,
+            folderPath: entry.folderPath,
+            description: entry.description,
+            tags: entry.tags,
+            createdAt: entry.createdAt,
+          })),
+          preamble: { folders: doc.folders, head: doc.head },
+        };
       }
       const result = parseUrlList(content);
       if (!result.ok) throw new Error(result.error);
-      return result.value.map((url) => ({ xmlUrl: url }));
+      return { entries: result.value.map((url) => ({ xmlUrl: url })) };
     },
     [],
   );
@@ -139,7 +169,7 @@ export function ImportView({ onClose }: ImportViewProps) {
         content = textInput;
       }
 
-      const entries = await extractEntries(content);
+      const { entries, preamble } = parseImportContent(content);
       if (entries.length === 0) {
         setParseError("No valid feed URLs found");
         return;
@@ -162,33 +192,36 @@ export function ImportView({ onClose }: ImportViewProps) {
         return;
       }
 
-      // Pre-create one folder per unique folderName so per-feed assignment
-      // afterward is a cheap lookup, and we don't pay createFolder cost on
-      // every loop iteration. PR E.
-      const folderNames = Array.from(
-        new Set(
-          entries
-            .map((e) => e.folderName)
-            .filter((n): n is string => typeof n === "string" && n.length > 0),
-        ),
-      );
-      for (const name of folderNames) {
-        await createFolder(name);
-      }
-      const folderIdByName = new Map<string, string>();
-      for (const f of useFeedStore.getState().folders ?? []) {
-        if (folderNames.includes(f.name)) folderIdByName.set(f.name, f.id);
+      // Pre-create folders depth-first so a child's parentId is always
+      // resolvable when the child is created. Folder paths use `/` as the
+      // separator since OPML folder names cannot themselves contain `/`
+      // (the XML attribute string would survive but Folder.name would
+      // need escaping — out of scope; conflicts get filed under the
+      // existing same-name folder, which matches the legacy behavior).
+      const folderIdByPath = new Map<string, string>();
+      const opmlFolders = preamble?.folders ?? [];
+      for (const folder of opmlFolders) {
+        const parentKey = folder.parentPath.join("/");
+        const parentId = parentKey ? folderIdByPath.get(parentKey) : undefined;
+        await createFolder(folder.name, parentId);
+        // Snapshot the just-created folder's id by name lookup against
+        // siblings under the same parent. Multiple folders with the same
+        // name under different parents are kept distinct by `parentKey`.
+        const fullKey = [...folder.parentPath, folder.name].join("/");
+        const justCreated = useFeedStore
+          .getState()
+          .folders.find(
+            (f) => f.name === folder.name && (f.parentId ?? "") === (parentId ?? ""),
+          );
+        if (justCreated) folderIdByPath.set(fullKey, justCreated.id);
       }
 
       // Best-effort folder placement for a just-added feed (real or
       // placeholder). A missing folder or feed lookup leaves the
       // subscription unfiled, which is the safe fallback.
-      const placeFeedIntoFolder = async (entry: {
-        xmlUrl: string;
-        folderName?: string;
-      }) => {
-        if (!entry.folderName) return;
-        const folderId = folderIdByName.get(entry.folderName);
+      const placeFeedIntoFolder = async (entry: ImportEntry) => {
+        if (!entry.folderPath || entry.folderPath.length === 0) return;
+        const folderId = folderIdByPath.get(entry.folderPath.join("/"));
         const addedFeed = useFeedStore
           .getState()
           .feeds.find((f) => f.url === entry.xmlUrl);
@@ -197,8 +230,9 @@ export function ImportView({ onClose }: ImportViewProps) {
         }
       };
 
-      // Start import process
-      startImport(urls);
+      // Start import process; thread the OPML head info so ImportResults
+      // can show "Imported from {ownerName}'s OPML, created {dateCreated}".
+      startImport(urls, preamble?.head);
 
       // Process each entry sequentially. Three outcomes per URL:
       //   * ok            → fully imported; move to folder, record success
@@ -206,8 +240,14 @@ export function ImportView({ onClose }: ImportViewProps) {
       //                     same folder placement, recorded as placeholder
       //   * other err     → permanent (parse / discovery / duplicate /
       //                     quota); record failure, no row created
+      //
+      // OPML metadata threading: title (issue #117), description fallback,
+      // tags, and createdAt all flow into addFeed so the user's outline
+      // metadata survives a reader migration intact.
       for (const entry of entries) {
-        const result = await addFeed(entry.xmlUrl);
+        const titleOverride = entry.title?.trim();
+        const opts = buildAddFeedOptions(entry, titleOverride);
+        const result = await addFeed(entry.xmlUrl, opts);
 
         if (result.ok) {
           await placeFeedIntoFolder(entry);
@@ -257,7 +297,7 @@ export function ImportView({ onClose }: ImportViewProps) {
     inputMode,
     selectedFile,
     textInput,
-    extractEntries,
+    parseImportContent,
     startImport,
     addFeed,
     addPlaceholderFeed,
@@ -297,6 +337,7 @@ export function ImportView({ onClose }: ImportViewProps) {
         placeholderCount={selectPlaceholderCount(state)}
         failureCount={selectFailureCount(state)}
         results={state.results}
+        head={state.head}
         onDone={() => {
           handleReset();
           onClose();
@@ -413,4 +454,27 @@ export function ImportView({ onClose }: ImportViewProps) {
       </Button>
     </div>
   );
+}
+
+/**
+ * Compose the `addFeed` options bag from a parsed entry. Returns
+ * undefined when nothing OPML-specific is set so non-OPML imports keep
+ * the lean call shape.
+ */
+function buildAddFeedOptions(
+  entry: ImportEntry,
+  titleOverride: string | undefined,
+): Parameters<ReturnType<typeof useFeedStore.getState>["addFeed"]>[1] {
+  const has =
+    titleOverride ||
+    entry.description ||
+    (entry.tags && entry.tags.length > 0) ||
+    entry.createdAt !== undefined;
+  if (!has) return undefined;
+  return {
+    titleOverride: titleOverride || undefined,
+    descriptionFallback: entry.description,
+    tags: entry.tags,
+    createdAtOverride: entry.createdAt,
+  };
 }

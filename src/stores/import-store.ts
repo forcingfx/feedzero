@@ -14,6 +14,17 @@ export interface ImportResult {
   placeholder?: boolean;
 }
 
+/**
+ * Provenance metadata harvested from the OPML `<head>` element. Surfaced
+ * in `ImportResults` so the user can confirm "yes this is the OPML I
+ * exported from Feedly on 2024-08-12" — all fields optional.
+ */
+export interface ImportHeadInfo {
+  title?: string;
+  dateCreated?: string;
+  ownerName?: string;
+}
+
 /** Import status state machine: idle → importing → complete | error */
 export type ImportStatus = "idle" | "importing" | "complete" | "error";
 
@@ -24,9 +35,11 @@ interface ImportStore {
   currentIndex: number;
   results: ImportResult[];
   error: string | null;
+  /** Head metadata from the OPML being imported, when present. */
+  head: ImportHeadInfo | null;
 
   // Actions
-  startImport: (urls: string[]) => void;
+  startImport: (urls: string[], head?: ImportHeadInfo) => void;
   recordResult: (result: ImportResult) => void;
   setError: (error: string) => void;
   reset: () => void;
@@ -38,12 +51,13 @@ const initialState = {
   currentIndex: 0,
   results: [] as ImportResult[],
   error: null as string | null,
+  head: null as ImportHeadInfo | null,
 };
 
 export const useImportStore = create<ImportStore>((set, get) => ({
   ...initialState,
 
-  startImport: (urls) => {
+  startImport: (urls, head) => {
     if (urls.length === 0) {
       set({ status: "error", error: "No URLs to import" });
       return;
@@ -54,6 +68,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       currentIndex: 0,
       results: [],
       error: null,
+      head: head ?? null,
     });
   },
 

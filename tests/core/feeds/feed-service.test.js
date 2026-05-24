@@ -408,6 +408,134 @@ describe("feed-service", () => {
       const { feed } = unwrap(result);
       expect(feed.title).toBe("Example Feed");
     });
+
+    // Issue #117 (2026-05-23): an OPML outline with `title="CNBC"` was being
+    // overridden by the feed body's <title> ("International: Top News And
+    // Analysis"). The fix: the importer threads the outline's title into
+    // addFeedFlow as an override that wins over the parsed feed's title.
+    // The user picked the OPML title — respect it.
+    it("uses options.titleOverride instead of the parsed feed's <title>", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        titleOverride: "CNBC",
+      });
+      expect(isOk(result)).toBe(true);
+      const { feed } = unwrap(result);
+      // Parsed feed says "Example Feed"; OPML override wins.
+      expect(feed.title).toBe("CNBC");
+    });
+
+    it("ignores empty / whitespace-only titleOverride and uses the parsed title", async () => {
+      // An OPML outline with no `title` attr and no `text` attr produces
+      // an empty extracted title. Empty must fall through to the parsed
+      // feed's <title> rather than overwriting it with "".
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        titleOverride: "   ",
+      });
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result).feed.title).toBe("Example Feed");
+    });
+
+    // Part 2: addFeedFlow accepts the full OPML metadata bag. Each
+    // field is independently testable.
+
+    it("uses options.createdAtOverride for Feed.createdAt (provenance)", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      const opmlCreated = Date.parse("2014-08-15T09:00:00Z");
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        createdAtOverride: opmlCreated,
+      });
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result).feed.createdAt).toBe(opmlCreated);
+    });
+
+    it("falls back to Date.now() when createdAtOverride is invalid (NaN / 0 / negative)", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      const before = Date.now();
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        createdAtOverride: NaN,
+      });
+      const after = Date.now();
+      expect(isOk(result)).toBe(true);
+      const ts = unwrap(result).feed.createdAt;
+      expect(ts).toBeGreaterThanOrEqual(before);
+      expect(ts).toBeLessThanOrEqual(after);
+    });
+
+    it("uses options.descriptionFallback ONLY when the parsed feed has no description", async () => {
+      // ATOM_XML has subtitle "A test feed" — not empty.
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        descriptionFallback: "From OPML",
+      });
+      expect(isOk(result)).toBe(true);
+      // Parsed description wins because it's non-empty.
+      expect(unwrap(result).feed.description).toBe("A test feed");
+    });
+
+    it("uses descriptionFallback when parsed feed description is empty", async () => {
+      const noDescAtom = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Feed</title>
+  <link href="https://example.com" rel="alternate"/>
+  <entry>
+    <title>P</title>
+    <link href="https://example.com/p" rel="alternate"/>
+    <id>id-p</id>
+    <published>2024-01-15T12:00:00Z</published>
+    <content type="html">&lt;p&gt;c&lt;/p&gt;</content>
+  </entry>
+</feed>`;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(noDescAtom),
+      });
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        descriptionFallback: "From OPML",
+      });
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result).feed.description).toBe("From OPML");
+    });
+
+    it("threads options.tags into Feed.tags", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        tags: ["tech", "frontend"],
+      });
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result).feed.tags).toEqual(["tech", "frontend"]);
+    });
+
+    it("omits Feed.tags when no tags are supplied", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+      const result = await addFeedFlow("https://example.com/feed.xml");
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result).feed.tags).toBeUndefined();
+    });
   });
 
   describe("addPlaceholderFeed", () => {

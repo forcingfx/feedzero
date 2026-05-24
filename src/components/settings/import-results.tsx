@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import type { ImportResult } from "@/stores/import-store";
+import type { ImportResult, ImportHeadInfo } from "@/stores/import-store";
 
 interface ImportResultsProps {
   successCount: number;
@@ -13,8 +13,31 @@ interface ImportResultsProps {
   placeholderCount: number;
   failureCount: number;
   results: ImportResult[];
+  /**
+   * OPML `<head>` provenance — title, dateCreated, ownerName. Null
+   * for non-OPML imports (URL lists, Pocket, Omnivore). When present,
+   * surfaced as a small attribution line so users can confirm "yes this
+   * is the OPML I expected to import".
+   */
+  head?: ImportHeadInfo | null;
   onDone: () => void;
   onImportMore: () => void;
+}
+
+/**
+ * Compose an "Imported from {ownerName}'s OPML, created {dateCreated}"
+ * line. Returns null when no head metadata is present so the UI has
+ * nothing to render. Each field is optional so we degrade gracefully:
+ * just a title becomes "OPML: <title>", just an owner becomes
+ * "Imported from <owner>", etc.
+ */
+function formatHeadLine(head: ImportHeadInfo): string | null {
+  const parts: string[] = [];
+  if (head.ownerName) parts.push(`from ${head.ownerName}`);
+  if (head.title) parts.push(`"${head.title}"`);
+  if (head.dateCreated) parts.push(`(${head.dateCreated})`);
+  if (parts.length === 0) return null;
+  return `Imported ${parts.join(" ")}`;
 }
 
 /**
@@ -34,12 +57,14 @@ export function ImportResults({
   placeholderCount,
   failureCount,
   results,
+  head,
   onDone,
   onImportMore,
 }: ImportResultsProps) {
   const successes = results.filter((r) => r.success && !r.placeholder);
   const placeholders = results.filter((r) => r.success && r.placeholder);
   const failures = results.filter((r) => !r.success);
+  const headLine = head ? formatHeadLine(head) : null;
 
   return (
     <div className="space-y-4">
@@ -62,6 +87,14 @@ export function ImportResults({
         <p className="font-medium">
           {summary(successCount, placeholderCount, failureCount)}
         </p>
+        {headLine && (
+          <p
+            className="mt-1 text-xs text-muted-foreground"
+            data-testid="opml-head-line"
+          >
+            {headLine}
+          </p>
+        )}
         {placeholderCount > 0 && (
           <p className="mt-1 text-xs text-muted-foreground">
             Queued feeds appear in the sidebar — press <kbd>r</kbd> or

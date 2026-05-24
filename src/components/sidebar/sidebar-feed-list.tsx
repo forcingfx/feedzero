@@ -100,6 +100,26 @@ export function SidebarFeedList({
     }
     return map;
   }, [feeds, folders]);
+  /**
+   * Folder children index keyed by parentId. Top-level folders (no
+   * parent) live under the empty-string key. Built from the full
+   * folders list — OPML imports preserve nested structure via
+   * `Folder.parentId`, and we render that as a tree below.
+   */
+  const childFoldersByParent = useMemo(() => {
+    const map = new Map<string, typeof folders>();
+    const validIds = new Set(folders.map((f) => f.id));
+    for (const f of folders) {
+      // An orphaned parent reference (folder whose parentId points at a
+      // folder that isn't on this device) falls through to top-level
+      // instead of vanishing — same defensive principle as unfiledFeeds.
+      const key = f.parentId && validIds.has(f.parentId) ? f.parentId : "";
+      const list = map.get(key);
+      if (list) list.push(f);
+      else map.set(key, [f]);
+    }
+    return map;
+  }, [folders]);
 
   const sortedUnfiledFeeds = useMemo(() => {
     if (feedSortMode === "count") {
@@ -115,9 +135,20 @@ export function SidebarFeedList({
     return unfiledFeeds;
   }, [unfiledFeeds, feedSortMode, feedCustomOrder, articlesByFeedId]);
 
+  /**
+   * Top-level folders only — child folders are rendered recursively
+   * inside their parent's collapsible. DnD reordering currently
+   * operates on this top-level slice; nested-folder reorder is a
+   * follow-up (move-via-menu still works through `moveFolderToParent`).
+   */
+  const topLevelFolders = useMemo(
+    () => childFoldersByParent.get("") ?? [],
+    [childFoldersByParent],
+  );
+
   const sortedFolders = useMemo(() => {
     if (feedSortMode === "count") {
-      return [...folders].sort((a, b) => {
+      return [...topLevelFolders].sort((a, b) => {
         const aFeeds = feedsByFolder.get(a.id) ?? [];
         const bFeeds = feedsByFolder.get(b.id) ?? [];
         const aCount = aFeeds.reduce((sum, f) => sum + selectUnreadCount({ articlesByFeedId }, f.id), 0);
@@ -126,10 +157,10 @@ export function SidebarFeedList({
       });
     }
     if (feedSortMode === "custom") {
-      return applyCustomOrder(folders, folderCustomOrder);
+      return applyCustomOrder(topLevelFolders, folderCustomOrder);
     }
-    return folders;
-  }, [folders, feedSortMode, folderCustomOrder, feedsByFolder, articlesByFeedId]);
+    return topLevelFolders;
+  }, [topLevelFolders, feedSortMode, folderCustomOrder, feedsByFolder, articlesByFeedId]);
 
   const folderIds = useMemo(() => new Set(folders.map((f) => f.id)), [folders]);
 
@@ -230,35 +261,17 @@ export function SidebarFeedList({
         </SortableContext>
 
         <SortableContext items={folderSortableIds} strategy={verticalListSortingStrategy}>
-          {sortedFolders.map((folder) => {
-            const folderFeeds = feedsByFolder.get(folder.id) ?? [];
-            const sortedFolderFeeds = feedSortMode === "count"
-              ? [...folderFeeds].sort(
-                  (a, b) =>
-                    selectUnreadCount({ articlesByFeedId }, b.id) -
-                    selectUnreadCount({ articlesByFeedId }, a.id),
-                )
-              : folderFeeds;
-            return (
-              <FolderItem
-                key={folder.id}
-                folder={folder}
-                sortable={isCustomMode}
-                isSelected={selectedFeedId === toFolderFeedId(folder.id)}
-                onSelect={() => onFeedSelect(toFolderFeedId(folder.id))}
-              >
-                {sortedFolderFeeds.map((feed) => (
-                  <FeedItem
-                    key={feed.id}
-                    feed={feed}
-                    isSelected={feed.id === selectedFeedId}
-                    inFolder
-                    onSelect={() => onFeedSelect(feed.id)}
-                  />
-                ))}
-              </FolderItem>
-            );
-          })}
+          {sortedFolders.map((folder) =>
+            renderFolderNode(folder, {
+              childFoldersByParent,
+              feedsByFolder,
+              feedSortMode,
+              articlesByFeedId,
+              selectedFeedId,
+              onFeedSelect,
+              isCustomMode,
+            }),
+          )}
         </SortableContext>
 
         <DragOverlay>
@@ -278,5 +291,58 @@ export function SidebarFeedList({
       )}
 
     </>
+  );
+}
+
+interface RenderCtx {
+  childFoldersByParent: Map<string, import("@feedzero/core/types").Folder[]>;
+  feedsByFolder: Map<string, Feed[]>;
+  feedSortMode: string;
+  articlesByFeedId: Record<string, import("@feedzero/core/types").Article[]>;
+  selectedFeedId: string | null;
+  onFeedSelect: (feedId: string) => void;
+  isCustomMode: boolean;
+}
+
+/**
+ * Recursively render a folder + its descendants. Nested folders
+ * (preserved through OPML import via `Folder.parentId`) render inside
+ * the parent's collapsible, indented one level per depth via the
+ * native shadcn FolderItem layout. DnD reorder only applies at the
+ * top level for now; nested-folder reorder lands in a follow-up.
+ */
+function renderFolderNode(
+  folder: import("@feedzero/core/types").Folder,
+  ctx: RenderCtx,
+) {
+  const folderFeeds = ctx.feedsByFolder.get(folder.id) ?? [];
+  const sortedFolderFeeds =
+    ctx.feedSortMode === "count"
+      ? [...folderFeeds].sort(
+          (a, b) =>
+            selectUnreadCount({ articlesByFeedId: ctx.articlesByFeedId }, b.id) -
+            selectUnreadCount({ articlesByFeedId: ctx.articlesByFeedId }, a.id),
+        )
+      : folderFeeds;
+  const childFolders = ctx.childFoldersByParent.get(folder.id) ?? [];
+  return (
+    <FolderItem
+      key={folder.id}
+      folder={folder}
+      sortable={ctx.isCustomMode}
+      isSelected={ctx.selectedFeedId === toFolderFeedId(folder.id)}
+      onSelect={() => ctx.onFeedSelect(toFolderFeedId(folder.id))}
+    >
+      {childFolders.map((child) => renderFolderNode(child, ctx))}
+      {sortedFolderFeeds.map((feed) => (
+        <FeedItem
+          key={feed.id}
+          feed={feed}
+          isSelected={feed.id === ctx.selectedFeedId}
+          inFolder
+          onSelect={() => ctx.onFeedSelect(feed.id)}
+        />
+      ))}
+    </FolderItem>
   );
 }

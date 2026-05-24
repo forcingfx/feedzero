@@ -271,6 +271,76 @@ describe("evaluateCondition — feed + folder", () => {
   });
 });
 
+// --- condition: tag (Part 2 — OPML outline[category] → Feed.tags) -----------
+
+describe("evaluateCondition — tag", () => {
+  it("tag in [...] matches when ANY feed tag is in the operand list", () => {
+    const tagged = feed({ id: "feed-1", tags: ["tech", "frontend"] });
+    const a = article({ feedId: "feed-1" });
+    expect(
+      evaluateCondition(
+        { kind: "tag", op: "in", value: ["frontend", "news"] },
+        a,
+        ctxWith([tagged]),
+      ),
+    ).toBe(true);
+  });
+
+  it("tag in [...] is false when no feed tag matches", () => {
+    const tagged = feed({ id: "feed-1", tags: ["tech"] });
+    const a = article({ feedId: "feed-1" });
+    expect(
+      evaluateCondition(
+        { kind: "tag", op: "in", value: ["sports"] },
+        a,
+        ctxWith([tagged]),
+      ),
+    ).toBe(false);
+  });
+
+  it("tag not-in is the inverse — true when no overlap", () => {
+    const tagged = feed({ id: "feed-1", tags: ["tech"] });
+    const a = article({ feedId: "feed-1" });
+    expect(
+      evaluateCondition(
+        { kind: "tag", op: "not-in", value: ["sports"] },
+        a,
+        ctxWith([tagged]),
+      ),
+    ).toBe(true);
+  });
+
+  it("untagged feed: `in` is vacuously false, `not-in` is vacuously true", () => {
+    const untagged = feed({ id: "feed-1" /* no tags */ });
+    const a = article({ feedId: "feed-1" });
+    expect(
+      evaluateCondition(
+        { kind: "tag", op: "in", value: ["tech"] },
+        a,
+        ctxWith([untagged]),
+      ),
+    ).toBe(false);
+    expect(
+      evaluateCondition(
+        { kind: "tag", op: "not-in", value: ["tech"] },
+        a,
+        ctxWith([untagged]),
+      ),
+    ).toBe(true);
+  });
+
+  it("unknown feed (deleted / desync) is treated as untagged", () => {
+    const a = article({ feedId: "missing" });
+    expect(
+      evaluateCondition(
+        { kind: "tag", op: "in", value: ["tech"] },
+        a,
+        ctxWith([feed({ id: "other" })]),
+      ),
+    ).toBe(false);
+  });
+});
+
 // --- condition: publishedAt --------------------------------------------------
 
 describe("evaluateCondition — publishedAt", () => {

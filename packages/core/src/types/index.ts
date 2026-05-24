@@ -58,6 +58,15 @@ export interface Feed {
    * Cleared on any non-304 response.
    */
   consecutive304Count?: number;
+  /**
+   * Free-form tags. Populated from OPML `outline[category="a,b"]` on
+   * import (comma-split, trimmed, deduped) and round-tripped on export.
+   * Honor-system organization concept: filters can scope by tag via the
+   * `tag` Condition variant; the sidebar doesn't render a top-level
+   * "browse by tag" surface yet. Empty array is the absence value;
+   * older vaults without this field continue to work (treated as []).
+   */
+  tags?: string[];
 }
 
 export interface Folder {
@@ -65,6 +74,18 @@ export interface Folder {
   name: string;
   color?: string;
   createdAt: number;
+  /**
+   * Parent folder id when this folder is nested. Undefined / missing
+   * means "top level". OPML imports preserve arbitrary depth (NetNewsWire
+   * and Reeder exports routinely go 2–3 deep, e.g. Tech > Frontend >
+   * React); the sidebar renders recursively. Older vaults without this
+   * field continue to work (every folder is implicitly top-level).
+   *
+   * Cycle prevention is the responsibility of mutators —
+   * `moveFolderToParent` rejects an assignment whose new parent is a
+   * descendant of the moved folder. See `src/core/feeds/folder-tree.ts`.
+   */
+  parentId?: string;
 }
 
 export interface Article {
@@ -119,6 +140,16 @@ export interface CreateFeedInput {
   title: string;
   description?: string;
   siteUrl?: string;
+  /** See {@link Feed.tags}. Empty/undefined → no tags. */
+  tags?: string[];
+  /**
+   * Override the default `Date.now()` stamp. Used by OPML import to
+   * preserve `outline[created="…"]` so a feed the user subscribed to in
+   * 2014 doesn't appear "added today" on every migration. Must be a
+   * positive Unix-epoch ms timestamp; otherwise the factory falls back
+   * to `Date.now()` rather than persisting a nonsensical value.
+   */
+  createdAt?: number;
 }
 
 export type FeedSortMode = "name" | "count" | "custom";
@@ -237,6 +268,7 @@ export type Condition =
   | { kind: "content";      op: "contains" | "not-contains" | "matches"; value: string }
   | { kind: "feed";         op: "in" | "not-in"; value: string[] }
   | { kind: "folder";       op: "in" | "not-in"; value: string[] }
+  | { kind: "tag";          op: "in" | "not-in"; value: string[] }
   | { kind: "publishedAt";  op: "in-last-days" | "in-last-hours" | "before" | "after" | "between"; value: number | [number, number] }
   | { kind: "read";         op: "is"; value: boolean }
   | { kind: "starred";      op: "is"; value: boolean }

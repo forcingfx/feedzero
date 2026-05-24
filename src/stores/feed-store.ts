@@ -111,7 +111,21 @@ interface FeedStore {
    *  with an empty store before the DB is read. */
   feedsLoaded: boolean;
   loadFeeds: () => Promise<void>;
-  addFeed: (url: string) => Promise<AddFeedResult>;
+  /**
+   * Subscribe to a feed. The optional `options` carry OPML-imported
+   * metadata through `addFeedFlow` so the user's outline title, blurb,
+   * tags, and original subscription date survive a reader migration.
+   * Other call sites (Explore, Add-Feed dialog, …) can omit it.
+   */
+  addFeed: (
+    url: string,
+    options?: {
+      titleOverride?: string;
+      descriptionFallback?: string;
+      tags?: string[];
+      createdAtOverride?: number;
+    },
+  ) => Promise<AddFeedResult>;
   /**
    * Persist a placeholder feed for a URL whose initial fetch failed
    * (HTTP / network error). Used by bulk import so rate-limited URLs
@@ -152,7 +166,13 @@ interface FeedStore {
    */
   refreshView: (feedId: string) => Promise<void>;
   refreshSingleFeed: (feedId: string) => Promise<void>;
-  createFolder: (name: string) => Promise<void>;
+  /**
+   * Create a folder. `parentId` nests under another folder when set
+   * (OPML imports preserve arbitrary depth — see {@link Folder.parentId}).
+   * Caller is responsible for cycle prevention; OPML imports always
+   * pass a parent that was just created in the same pass.
+   */
+  createFolder: (name: string, parentId?: string) => Promise<void>;
   renameFolder: (folderId: string, name: string) => Promise<void>;
   updateFolderColor: (folderId: string, color: string | undefined) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
@@ -458,7 +478,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     });
   },
 
-  addFeed: async (url) => {
+  addFeed: async (url, options) => {
     // Free hosted users are capped at 50 feed subscriptions (ADR 013).
     // Personal/Pro and self-hosted bypass. Check BEFORE touching the
     // ingestion pipeline so we don't half-add a feed then fail late.
@@ -482,7 +502,13 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     // Resolve the bridges gate here (store layer owns license/self-host
     // state) and pass it down as a plain boolean — core stays store-agnostic.
     const bridgesEnabled = isFeatureEnabled("bridges");
-    const result = await addFeedFlow(url, { bridgesEnabled });
+    const result = await addFeedFlow(url, {
+      bridgesEnabled,
+      titleOverride: options?.titleOverride,
+      descriptionFallback: options?.descriptionFallback,
+      tags: options?.tags,
+      createdAtOverride: options?.createdAtOverride,
+    });
     if (!result.ok) {
       set({ isLoading: false, error: result.error });
       // Preserve the reason discriminator so import-side callers can
@@ -697,9 +723,15 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
   },
 
-  createFolder: async (name) => {
+  createFolder: async (name, parentId) => {
     const color = pickNextFolderColor(get().folders.map((f) => f.color));
-    const folder: Folder = { id: crypto.randomUUID(), name, color, createdAt: Date.now() };
+    const folder: Folder = {
+      id: crypto.randomUUID(),
+      name,
+      color,
+      createdAt: Date.now(),
+    };
+    if (parentId) folder.parentId = parentId;
     await dbAddFolder(folder);
     await reloadFolders(set);
     schedulePush();
