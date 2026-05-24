@@ -246,6 +246,15 @@ interface FeedStore {
   folderSettingsDialogId: string | null;
   openFolderSettings: (folderId: string) => void;
   closeFolderSettings: () => void;
+  /**
+   * Quick-tag dialog (⌘K → Tag, or `t` keybinding). Lightweight modal
+   * hosting the TagPicker against a single feed — distinct from the
+   * full feed-settings dialog so the user can tag without losing
+   * context. Same id-shape as the other dialogs.
+   */
+  tagQuickDialogFeedId: string | null;
+  openTagQuickDialog: (feedId: string) => void;
+  closeTagQuickDialog: () => void;
 }
 
 function readSortMode(): FeedSortMode {
@@ -494,6 +503,10 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   folderSettingsDialogId: null,
   openFolderSettings: (folderId) => set({ folderSettingsDialogId: folderId }),
   closeFolderSettings: () => set({ folderSettingsDialogId: null }),
+
+  tagQuickDialogFeedId: null,
+  openTagQuickDialog: (feedId) => set({ tagQuickDialogFeedId: feedId }),
+  closeTagQuickDialog: () => set({ tagQuickDialogFeedId: null }),
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);

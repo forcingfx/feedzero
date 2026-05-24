@@ -202,35 +202,43 @@ describe("FeedSettingsDialog", () => {
     expect(moveFeedToFolder).toHaveBeenCalledWith("f-tech", null);
   });
 
-  it("Tags input shows the feed's existing tags as a comma-separated string", () => {
+  it("Tags section renders each existing tag as a pill", () => {
     useFeedStore.setState({
       feeds: [feed({ tags: ["tech", "news"] })],
       feedSettingsDialogId: "f-tech",
     });
     renderDialog();
-    expect(screen.getByTestId("feed-settings-tags-input")).toHaveValue(
-      "tech, news",
-    );
+    expect(screen.getByTestId("tag-pill-tech")).toBeInTheDocument();
+    expect(screen.getByTestId("tag-pill-news")).toBeInTheDocument();
   });
 
-  it("Tags input saves via setFeedTags (comma-split, trimmed) when Save is clicked", async () => {
+  it("Tags picker save persists the current pill list via setFeedTags", async () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
     renderDialog();
 
-    const input = screen.getByTestId("feed-settings-tags-input");
-    await user.clear(input);
-    await user.type(input, " tech ,  frontend, , react");
+    const input = screen.getByTestId("feed-settings-tags-input-input");
+    await user.type(input, "tech,frontend,");
     await user.click(screen.getByTestId("feed-settings-tags-save"));
 
-    expect(setFeedTags).toHaveBeenCalledWith("f-tech", [
-      "tech",
-      "frontend",
-      "react",
-    ]);
+    expect(setFeedTags).toHaveBeenCalledWith("f-tech", ["tech", "frontend"]);
   });
 
-  it("Tags input saves an empty array when the input is cleared", async () => {
+  it("Removing a pill enables Save and persists the trimmed list", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [feed({ tags: ["tech", "news"] })],
+      feedSettingsDialogId: "f-tech",
+    });
+    renderDialog();
+
+    await user.click(screen.getByLabelText("Remove news"));
+    await user.click(screen.getByTestId("feed-settings-tags-save"));
+
+    expect(setFeedTags).toHaveBeenCalledWith("f-tech", ["tech"]);
+  });
+
+  it("Removing every pill and saving clears the tag list (empty array)", async () => {
     const user = userEvent.setup();
     useFeedStore.setState({
       feeds: [feed({ tags: ["tech"] })],
@@ -238,8 +246,7 @@ describe("FeedSettingsDialog", () => {
     });
     renderDialog();
 
-    const input = screen.getByTestId("feed-settings-tags-input");
-    await user.clear(input);
+    await user.click(screen.getByLabelText("Remove tech"));
     await user.click(screen.getByTestId("feed-settings-tags-save"));
 
     expect(setFeedTags).toHaveBeenCalledWith("f-tech", []);

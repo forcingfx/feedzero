@@ -14,12 +14,14 @@ import {
   Sun,
   Moon,
   Monitor,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
 import type { NavigateFunction } from "react-router";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
+import { isAggregatedFeedId } from "@feedzero/core/utils/constants";
 
 /**
  * A single command palette entry.
@@ -122,6 +124,25 @@ export function buildCommandActions(ctx: ActionContext): CommandAction[] {
       keywords: ["reload", "fetch", "sync"],
       run: () => {
         void useFeedStore.getState().refreshAll();
+      },
+    },
+    {
+      id: "tag-this-feed",
+      label: "Tag this feed…",
+      group: "Feeds",
+      icon: Tag,
+      shortcut: "T",
+      keywords: ["label", "category", "pill", "tags"],
+      // Opens the quick-tag dialog against the currently-selected
+      // concrete feed. The dialog stays unopened when the selection
+      // is an aggregated view (folder / tag / starred / smart filter)
+      // — those have no single feed to tag. The same UX as the `t`
+      // keyboard shortcut; both paths route through the same store
+      // action so the two stay in lockstep.
+      run: () => {
+        const id = useFeedStore.getState().selectedFeedId;
+        if (!id || isAggregatedFeedId(id)) return;
+        useFeedStore.getState().openTagQuickDialog(id);
       },
     },
 

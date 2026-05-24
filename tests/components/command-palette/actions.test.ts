@@ -74,6 +74,47 @@ describe("buildCommandActions", () => {
       findAction("refresh-all")?.run();
       expect(refreshAll).toHaveBeenCalledTimes(1);
     });
+
+    describe("tag-this-feed", () => {
+      it("opens the quick-tag dialog against the currently-selected concrete feed", () => {
+        const openTagQuickDialog = vi.fn();
+        useFeedStore.setState({
+          selectedFeedId: "f-tech",
+          openTagQuickDialog,
+        } as never);
+        findAction("tag-this-feed")?.run();
+        expect(openTagQuickDialog).toHaveBeenCalledWith("f-tech");
+      });
+
+      it("is a no-op when nothing is selected", () => {
+        const openTagQuickDialog = vi.fn();
+        useFeedStore.setState({
+          selectedFeedId: null,
+          openTagQuickDialog,
+        } as never);
+        findAction("tag-this-feed")?.run();
+        expect(openTagQuickDialog).not.toHaveBeenCalled();
+      });
+
+      it("is a no-op when the selection is an aggregated view (folder/tag/starred/filter)", () => {
+        const openTagQuickDialog = vi.fn();
+        for (const id of ["folder:abc", "tag:tech", "starred", "filter:xyz"]) {
+          openTagQuickDialog.mockReset();
+          useFeedStore.setState({
+            selectedFeedId: id,
+            openTagQuickDialog,
+          } as never);
+          findAction("tag-this-feed")?.run();
+          expect(openTagQuickDialog).not.toHaveBeenCalled();
+        }
+      });
+
+      it("declares the T shortcut and Tag icon", () => {
+        const action = findAction("tag-this-feed");
+        expect(action?.shortcut).toBe("T");
+        expect(action?.group).toBe("Feeds");
+      });
+    });
   });
 
   describe("read actions", () => {

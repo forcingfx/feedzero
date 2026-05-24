@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/sonner.tsx";
 import { SmartFilterEditorDialog } from "@/components/smart-filters/smart-filter-editor-dialog.tsx";
 import { RulesEditorDialog } from "@/components/rules/rules-editor-dialog.tsx";
 import { FeedSettingsDialog } from "@/components/feeds/feed-settings-dialog.tsx";
+import { TagQuickDialog } from "@/components/feeds/tag-quick-dialog.tsx";
 import { FolderSettingsDialog } from "@/components/folders/folder-settings-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { CommandPalette } from "@/components/command-palette/command-palette.tsx";
@@ -301,6 +302,7 @@ export function App() {
         <RulesEditorDialog />
         <FeedSettingsDialog />
         <FolderSettingsDialog />
+        <TagQuickDialog />
         <CommandPalette />
         <Toaster position="bottom-center" />
       </BrowserRouter>

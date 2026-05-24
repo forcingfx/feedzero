@@ -47,6 +47,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import { TierLockBadge } from "@/components/features/tier-lock-badge.tsx";
+import { TagPicker } from "./tag-picker.tsx";
 import type { Feature } from "@/core/features/feature-gates.ts";
 import type { Feed } from "@feedzero/core/types";
 
@@ -255,36 +256,34 @@ function FolderSection({ feed }: { feed: Feed }) {
 }
 
 /**
- * Tags editor. Comma-separated free-form input mirroring the smart-
- * filter "Tag" condition row. Save normalizes (trim + dedupe + drop
- * empties) inside the store; the dialog just forwards the parsed
- * array. Tags are populated initially by OPML import; this surface
- * is the in-app CRUD entry point.
+ * Tags editor. Backed by <TagPicker> — pills + autocomplete from
+ * existing tags + free-form add. Initial draft tracks `feed.tags`
+ * via key reset on the parent so external sync updates pull through;
+ * Save persists via `setFeedTags`, which normalizes (trim + dedupe
+ * + drop empties) and clears the field when the result is empty.
+ *
+ * The same picker mounts in the quick-tag dialog (⌘K → Tag, or `t`)
+ * so the two surfaces share keyboard semantics and autocomplete.
  */
 function TagsSection({ feed }: { feed: Feed }) {
   const setFeedTags = useFeedStore((s) => s.setFeedTags);
-  const initial = (feed.tags ?? []).join(", ");
-  const [draft, setDraft] = useState(initial);
+  const [draft, setDraft] = useState<string[]>(feed.tags ?? []);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setDraft((feed.tags ?? []).join(", "));
+    setDraft(feed.tags ?? []);
   }, [feed.tags]);
 
-  // Compare the parsed-then-normalized draft to the current tags so
-  // a save is only enabled when the change is meaningful (round-
-  // trips through "tech,news" === "tech, news").
-  const parsed = parseTagInput(draft);
   const current = feed.tags ?? [];
   const dirty =
-    parsed.length !== current.length ||
-    parsed.some((t, i) => t !== current[i]);
+    draft.length !== current.length ||
+    draft.some((t, i) => t !== current[i]);
 
   async function save() {
     if (!dirty) return;
     setSaving(true);
     try {
-      await setFeedTags(feed.id, parsed);
+      await setFeedTags(feed.id, draft);
     } finally {
       setSaving(false);
     }
@@ -293,17 +292,16 @@ function TagsSection({ feed }: { feed: Feed }) {
   return (
     <section className="space-y-2">
       <Label htmlFor="feed-settings-tags">Tags</Label>
-      <div className="flex items-center gap-2">
-        <Input
-          id="feed-settings-tags"
-          data-testid="feed-settings-tags-input"
-          value={draft}
-          placeholder="tech, news"
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") save();
-          }}
-        />
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <TagPicker
+            id="feed-settings-tags"
+            value={draft}
+            onChange={setDraft}
+            size="sm"
+            data-testid="feed-settings-tags-input"
+          />
+        </div>
         <Button
           type="button"
           variant="outline"
@@ -316,23 +314,11 @@ function TagsSection({ feed }: { feed: Feed }) {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Comma-separated. Tags appear as a section in the sidebar and
-        can be matched in smart filters.
+        Tags appear as a section in the sidebar and can be matched in
+        smart filters. Type to add; arrow-down picks from existing.
       </p>
     </section>
   );
-}
-
-function parseTagInput(raw: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const part of raw.split(",")) {
-    const trimmed = part.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    out.push(trimmed);
-  }
-  return out;
 }
 
 function RulesSection({ feed }: { feed: Feed }) {
