@@ -4,6 +4,8 @@ import { useSyncStore } from "../../src/stores/sync-store";
 vi.mock("../../src/core/sync/sync-service", () => ({
   pushVault: vi.fn(),
   pullVault: vi.fn(),
+  pullVaultIfChanged: vi.fn(),
+  recoverVault: vi.fn(),
   importVault: vi.fn(),
   deleteVault: vi.fn(),
   exportVault: vi.fn(),
@@ -58,17 +60,37 @@ vi.mock("../../src/stores/preferences-store", () => ({
 
 import {
   pushVault,
-  pullVault,
+  recoverVault,
   importVault,
   exportVault,
   mergeVaults,
 } from "../../src/core/sync/sync-service";
 
 const mockPushVault = vi.mocked(pushVault);
-const mockPullVault = vi.mocked(pullVault);
+const mockRecoverVault = vi.mocked(recoverVault);
 const mockImportVault = vi.mocked(importVault);
 const mockExportVault = vi.mocked(exportVault);
 const mockMergeVaults = vi.mocked(mergeVaults);
+
+const RECOVERED_CREDENTIALS = {
+  vaultId: "mock-vault-id",
+  vaultKey: "mock-vault-key" as unknown as CryptoKey,
+  kdfSpec: { kind: "pbkdf2-600k" } as const,
+};
+
+/**
+ * Helper for the new recoverVault shape. The production code calls
+ * `recoverVault(passphrase)` and receives `{vault, credentials}` —
+ * tests that previously mocked `pullVault` returning the vault
+ * directly use this to express the same intent without dragging in
+ * the credentials' construction at every site.
+ */
+function mockRecoveredOk(vault: ReturnType<typeof makeVaultData>) {
+  return {
+    ok: true as const,
+    value: { vault, credentials: RECOVERED_CREDENTIALS },
+  };
+}
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -125,7 +147,7 @@ describe("sync-store switchToExistingCloud", () => {
   describe("replace mode", () => {
     it("pulls cloud vault and imports it (replacing local data)", async () => {
       const cloudVault = makeVaultData(3);
-      mockPullVault.mockResolvedValue({ ok: true, value: cloudVault });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(cloudVault));
       mockImportVault.mockResolvedValue({ ok: true, value: true });
 
       await useSyncStore
@@ -137,7 +159,7 @@ describe("sync-store switchToExistingCloud", () => {
 
     it("transitions to synced state on success", async () => {
       const cloudVault = makeVaultData(2);
-      mockPullVault.mockResolvedValue({ ok: true, value: cloudVault });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(cloudVault));
       mockImportVault.mockResolvedValue({ ok: true, value: true });
 
       await useSyncStore
@@ -157,7 +179,7 @@ describe("sync-store switchToExistingCloud", () => {
       // anything. Previously, importVault ran first (under stale local
       // keys), then a rekey wrote NEW keys to localStorage — leaving
       // key/data drift that nuked the server vault on next reload.
-      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(makeVaultData()));
       mockImportVault.mockResolvedValue({ ok: true, value: true });
 
       const db = await import("../../src/core/storage/db");
@@ -183,15 +205,15 @@ describe("sync-store switchToExistingCloud", () => {
       expect(vi.mocked(db.open)).toHaveBeenCalledWith("cloud-passphrase");
       expect(keyManager.persistDerivedKeysFromOpenDb).toHaveBeenCalledWith(
         "cloud-passphrase",
-        { sync: true },
+        { sync: true, vaultKdfSpec: RECOVERED_CREDENTIALS.kdfSpec },
       );
     });
 
     it("sets status to syncing during operation", async () => {
       let capturedStatus: string | null = null;
-      mockPullVault.mockImplementation(async () => {
+      mockRecoverVault.mockImplementation(async () => {
         capturedStatus = useSyncStore.getState().status;
-        return { ok: true, value: makeVaultData() };
+        return mockRecoveredOk(makeVaultData());
       });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
 
@@ -203,7 +225,7 @@ describe("sync-store switchToExistingCloud", () => {
     });
 
     it("returns error when pull fails", async () => {
-      mockPullVault.mockResolvedValue({ ok: false, error: "Vault not found" });
+      mockRecoverVault.mockResolvedValue({ ok: false, error: "Vault not found" });
 
       const result = await useSyncStore
         .getState()
@@ -218,7 +240,7 @@ describe("sync-store switchToExistingCloud", () => {
     });
 
     it("returns error when import fails", async () => {
-      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(makeVaultData()));
       mockImportVault.mockResolvedValue({ ok: false, error: "Import failed" });
 
       const result = await useSyncStore
@@ -230,7 +252,7 @@ describe("sync-store switchToExistingCloud", () => {
     });
 
     it("does not push after replace (cloud already has data)", async () => {
-      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(makeVaultData()));
       mockImportVault.mockResolvedValue({ ok: true, value: true });
 
       await useSyncStore
@@ -248,7 +270,7 @@ describe("sync-store switchToExistingCloud", () => {
       const mergedVault = makeVaultData(5);
 
       mockExportVault.mockResolvedValue({ ok: true, value: localVault });
-      mockPullVault.mockResolvedValue({ ok: true, value: cloudVault });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(cloudVault));
       mockMergeVaults.mockReturnValue({ ok: true, value: mergedVault });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
       mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null } });
@@ -267,7 +289,7 @@ describe("sync-store switchToExistingCloud", () => {
       const mergedVault = makeVaultData(5);
 
       mockExportVault.mockResolvedValue({ ok: true, value: localVault });
-      mockPullVault.mockResolvedValue({ ok: true, value: cloudVault });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(cloudVault));
       mockMergeVaults.mockReturnValue({ ok: true, value: mergedVault });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
       mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null } });
@@ -282,7 +304,7 @@ describe("sync-store switchToExistingCloud", () => {
 
     it("transitions to synced state on success", async () => {
       mockExportVault.mockResolvedValue({ ok: true, value: makeVaultData(1) });
-      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData(2) });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(makeVaultData(2)));
       mockMergeVaults.mockReturnValue({ ok: true, value: makeVaultData(3) });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
       mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null } });
@@ -305,12 +327,12 @@ describe("sync-store switchToExistingCloud", () => {
 
       expect(result.ok).toBe(false);
       expect(useSyncStore.getState().status).toBe("error");
-      expect(mockPullVault).not.toHaveBeenCalled();
+      expect(mockRecoverVault).not.toHaveBeenCalled();
     });
 
     it("returns error when pull fails", async () => {
       mockExportVault.mockResolvedValue({ ok: true, value: makeVaultData(1) });
-      mockPullVault.mockResolvedValue({ ok: false, error: "Pull failed" });
+      mockRecoverVault.mockResolvedValue({ ok: false, error: "Pull failed" });
 
       const result = await useSyncStore
         .getState()
@@ -323,7 +345,7 @@ describe("sync-store switchToExistingCloud", () => {
 
     it("returns error when merge fails", async () => {
       mockExportVault.mockResolvedValue({ ok: true, value: makeVaultData(1) });
-      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData(2) });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(makeVaultData(2)));
       mockMergeVaults.mockReturnValue({ ok: false, error: "Merge failed" });
 
       const result = await useSyncStore
@@ -338,7 +360,7 @@ describe("sync-store switchToExistingCloud", () => {
     it("returns error when push fails (but keeps local merged data)", async () => {
       const mergedVault = makeVaultData(3);
       mockExportVault.mockResolvedValue({ ok: true, value: makeVaultData(1) });
-      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData(2) });
+      mockRecoverVault.mockResolvedValue(mockRecoveredOk(makeVaultData(2)));
       mockMergeVaults.mockReturnValue({ ok: true, value: mergedVault });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
       mockPushVault.mockResolvedValue({ ok: false, error: "Push failed" });

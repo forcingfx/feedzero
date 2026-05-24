@@ -5,22 +5,39 @@ import { deriveBytes, deriveKey, decrypt } from "../storage/crypto.ts";
 import { uint8ArrayToBase64, base64ToUint8Array } from "../../../packages/core/src/utils/base64";
 import {
   ARGON2ID_PRODUCTION_PARAMS,
+  ARGON2ID_TEST_PARAMS,
   deriveArgon2idKey,
 } from "../crypto/argon2.ts";
 import type { VaultData, EncryptedVault, KdfSpec } from "./types.ts";
 
 /**
- * KDF spec used to encrypt every newly-created sync vault. Argon2id at
- * the OWASP-recommended cost destroys the GPU/ASIC advantage that
- * makes a 4-word diceware passphrase brute-forceable offline. The full
- * cost triple is stamped on the envelope so we can raise this floor
- * without orphaning vaults written with older settings.
+ * Argon2id parameters used when constructing `DEFAULT_NEW_VAULT_KDF`.
+ * Production always uses the OWASP-recommended cost (64 MiB, t=3, p=1).
+ * The Vitest suite would otherwise pay ~700ms per new-vault derivation
+ * across hundreds of tests — encryption correctness is independent of
+ * cost, so the test path uses cheap params. Mirrors the PBKDF2 test
+ * override in packages/core/src/utils/constants.ts.
+ *
+ * `process` is undefined in the browser bundle, so production and the
+ * Hono server always use the full OWASP floor.
+ */
+const DEFAULT_NEW_VAULT_ARGON2ID_PARAMS =
+  typeof process !== "undefined" && process.env.VITEST
+    ? ARGON2ID_TEST_PARAMS
+    : ARGON2ID_PRODUCTION_PARAMS;
+
+/**
+ * KDF spec used to encrypt every newly-created sync vault. Argon2id is
+ * memory-hard and destroys the GPU/ASIC advantage that makes a 4-word
+ * diceware passphrase brute-forceable offline. The full cost triple is
+ * stamped on the envelope so we can raise this floor without orphaning
+ * vaults written with older settings.
  */
 export const DEFAULT_NEW_VAULT_KDF: KdfSpec = {
   kind: "argon2id",
-  memoryKib: ARGON2ID_PRODUCTION_PARAMS.memoryKib,
-  iterations: ARGON2ID_PRODUCTION_PARAMS.iterations,
-  parallelism: ARGON2ID_PRODUCTION_PARAMS.parallelism,
+  memoryKib: DEFAULT_NEW_VAULT_ARGON2ID_PARAMS.memoryKib,
+  iterations: DEFAULT_NEW_VAULT_ARGON2ID_PARAMS.iterations,
+  parallelism: DEFAULT_NEW_VAULT_ARGON2ID_PARAMS.parallelism,
 };
 
 /**

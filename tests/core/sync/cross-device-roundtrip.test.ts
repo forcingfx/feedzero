@@ -215,7 +215,7 @@ describe("cross-device sync round-trip via openWithKeys", () => {
       name: CRYPTO.ALGORITHM,
       length: CRYPTO.KEY_LENGTH,
     });
-    const credentials = { vaultId: stored.vaultId!, vaultKey };
+    const credentials = { vaultId: stored.vaultId!, vaultKey, kdfSpec: stored.vaultKdfSpec ?? { kind: "pbkdf2-600k" as const } };
 
     // Device A: open via JWKs, add feeds, push via sync-service
     unwrap(await openWithKeys(stored.dbKeyJwk, stored.hmacKeyJwk));
@@ -270,7 +270,7 @@ describe("cross-device sync round-trip via openWithKeys", () => {
       name: CRYPTO.ALGORITHM,
       length: CRYPTO.KEY_LENGTH,
     });
-    const credentials = { vaultId: stored.vaultId!, vaultKey };
+    const credentials = { vaultId: stored.vaultId!, vaultKey, kdfSpec: stored.vaultKdfSpec ?? { kind: "pbkdf2-600k" as const } };
 
     // Device A: push a 100-feed vault.
     unwrap(await openWithKeys(stored.dbKeyJwk, stored.hmacKeyJwk));

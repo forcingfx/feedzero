@@ -7,14 +7,22 @@ import {
   deriveVaultKey,
   encryptVault,
   decryptVault,
+  readKdfSpec,
+  LEGACY_KDF_SPEC,
 } from "./vault-crypto.ts";
-import type { VaultData, EncryptedVault } from "./types.ts";
+import type { VaultData, EncryptedVault, KdfSpec } from "./types.ts";
 import { syncFetch } from "./sync-fetch.ts";
 
-/** Pre-derived sync credentials, avoiding the need to store the raw passphrase. */
+/**
+ * Pre-derived sync credentials, avoiding the need to store the raw
+ * passphrase. `kdfSpec` records which KDF produced `vaultKey` so
+ * `pushVault` can stamp the matching field on the envelope — a
+ * recovering device reads that field to re-derive the right key.
+ */
 export interface SyncCredentials {
   vaultId: string;
   vaultKey: CryptoKey;
+  kdfSpec: KdfSpec;
 }
 
 const MIN_BUCKET = 64 * 1024;
@@ -58,17 +66,32 @@ function nextPowerOf2(size: number, min: number): number {
 
 type SyncAuth = string | SyncCredentials;
 
+/**
+ * Resolve a passphrase-or-credentials union to full credentials.
+ *
+ * The string-auth path derives the legacy PBKDF2 pair (vault ID +
+ * vault key). It is intentionally NOT spec-aware — calling this with
+ * a passphrase against a vault encrypted with Argon2id would decrypt
+ * silently against the wrong key and fail with a confusing error.
+ * Production recovery flows MUST use `recoverVault` (which reads the
+ * envelope's KDF stamp); this path remains for test convenience
+ * against vaults written by the same string-auth path.
+ */
 async function resolveCredentials(
   auth: SyncAuth,
 ): Promise<Result<SyncCredentials>> {
   if (typeof auth !== "string") return ok(auth);
   const [vaultIdResult, vaultKeyResult] = await Promise.all([
     deriveVaultId(auth),
-    deriveVaultKey(auth),
+    deriveVaultKey(auth, { extractable: true, kdfSpec: LEGACY_KDF_SPEC }),
   ]);
   if (!vaultIdResult.ok) return vaultIdResult;
   if (!vaultKeyResult.ok) return vaultKeyResult;
-  return ok({ vaultId: vaultIdResult.value, vaultKey: vaultKeyResult.value });
+  return ok({
+    vaultId: vaultIdResult.value,
+    vaultKey: vaultKeyResult.value,
+    kdfSpec: LEGACY_KDF_SPEC,
+  });
 }
 
 async function resolveVaultId(auth: SyncAuth): Promise<Result<string>> {
@@ -143,7 +166,11 @@ export async function pushVault(
     if (!vaultResult.ok) return vaultResult;
     const { vaultId, vaultKey } = credsResult.value;
 
-    const encryptedResult = await encryptVault(vaultKey, vaultResult.value);
+    const encryptedResult = await encryptVault(
+      vaultKey,
+      vaultResult.value,
+      credsResult.value.kdfSpec,
+    );
     if (!encryptedResult.ok) return encryptedResult;
 
     const body = padPayload(
@@ -284,6 +311,68 @@ export async function pullVaultIfChanged(
     });
   } catch (e) {
     return err(`Sync pull failed: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Recover a vault on a new device from a passphrase alone.
+ *
+ * Derives the vault ID via PBKDF2 (the routing identifier — unchanged
+ * across KDF migrations), pulls the encrypted envelope, reads its
+ * stamped `kdf` field, derives the matching vault key, and decrypts.
+ *
+ * Returns full credentials whose `kdfSpec` matches what the cloud
+ * envelope was encrypted with — so subsequent pushes from this
+ * device stamp the same spec, preserving the cloud encoding. Use
+ * this from any flow that holds only the passphrase (recovery-step,
+ * switchToExistingCloud). The plain `pullVault(passphrase)` path
+ * cannot decrypt Argon2id envelopes — it assumes legacy KDF.
+ */
+export async function recoverVault(
+  passphrase: string,
+): Promise<Result<{ vault: VaultData; credentials: SyncCredentials }>> {
+  const vaultIdResult = await deriveVaultId(passphrase);
+  if (!vaultIdResult.ok) return vaultIdResult;
+  const vaultId = vaultIdResult.value;
+
+  try {
+    const response = await syncFetch(`/api/sync?vaultId=${vaultId}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return err(
+          "No cloud vault was found for this passphrase. " +
+            "If this is your first device, push from there first. " +
+            "If you're restoring on a new device, double-check the passphrase — " +
+            "every word matters and order matters.",
+        );
+      }
+      const text = await response.text();
+      return err(`Sync pull failed (${response.status}): ${text}`);
+    }
+
+    const data = await response.json();
+    if (!data.vault) return err("Server returned no vault data");
+
+    const envelope = data.vault as EncryptedVault;
+    const kdfSpec = readKdfSpec(envelope);
+
+    const vaultKeyResult = await deriveVaultKey(passphrase, {
+      extractable: true,
+      kdfSpec,
+    });
+    if (!vaultKeyResult.ok) return vaultKeyResult;
+    const vaultKey = vaultKeyResult.value;
+
+    const decryptResult = await decryptVault(vaultKey, envelope);
+    if (!decryptResult.ok) return decryptResult;
+
+    return ok({
+      vault: decryptResult.value,
+      credentials: { vaultId, vaultKey, kdfSpec },
+    });
+  } catch (e) {
+    return err(`Vault recovery failed: ${(e as Error).message}`);
   }
 }
 

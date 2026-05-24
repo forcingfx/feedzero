@@ -14,13 +14,25 @@ vi.mock("@/core/storage/key-manager", () => ({
 
 vi.mock("@/core/sync/sync-service", () => ({
   pushVault: vi.fn().mockResolvedValue({ ok: true, value: Date.now() }),
-  pullVault: vi.fn().mockResolvedValue({ ok: false, error: "Not found" }),
+  recoverVault: vi
+    .fn()
+    .mockResolvedValue({ ok: false, error: "Not found" }),
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
   checkVaultExists: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
 import { initFresh } from "@/core/storage/key-manager";
-import { pullVault, importVault, checkVaultExists } from "@/core/sync/sync-service";
+import {
+  recoverVault,
+  importVault,
+  checkVaultExists,
+} from "@/core/sync/sync-service";
+
+const FAKE_RECOVERED_CREDENTIALS = {
+  vaultId: "mock-vault-id",
+  vaultKey: "mock-vault-key" as unknown as CryptoKey,
+  kdfSpec: { kind: "pbkdf2-600k" } as const,
+};
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -108,9 +120,9 @@ describe("RecoveryStep", () => {
 
   it("shows error when db open fails", async () => {
     const user = userEvent.setup();
-    vi.mocked(pullVault).mockResolvedValue({
+    vi.mocked(recoverVault).mockResolvedValue({
       ok: true,
-      value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
     });
     vi.mocked(initFresh).mockResolvedValue({
       ok: false,
@@ -132,14 +144,14 @@ describe("RecoveryStep", () => {
 
   it("completes onboarding when passphrase is valid and vault exists", async () => {
     const user = userEvent.setup();
-    vi.mocked(pullVault).mockResolvedValue({
+    vi.mocked(recoverVault).mockResolvedValue({
       ok: true,
-      value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
     });
     vi.mocked(initFresh).mockResolvedValue({
       ok: true,
       value: {
-        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
       },
     });
     vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
@@ -159,14 +171,14 @@ describe("RecoveryStep", () => {
 
   it("stores derived keys on recovery", async () => {
     const user = userEvent.setup();
-    vi.mocked(pullVault).mockResolvedValue({
+    vi.mocked(recoverVault).mockResolvedValue({
       ok: true,
-      value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+      value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
     });
     vi.mocked(initFresh).mockResolvedValue({
       ok: true,
       value: {
-        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
       },
     });
     vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
@@ -185,7 +197,7 @@ describe("RecoveryStep", () => {
 
     expect(initFresh).toHaveBeenCalledWith(
       "carbon mango velvet prism",
-      { sync: true, skipServerCleanup: true },
+      { sync: true, skipServerCleanup: true, vaultKdfSpec: FAKE_RECOVERED_CREDENTIALS.kdfSpec },
     );
   });
 
@@ -220,10 +232,10 @@ describe("RecoveryStep", () => {
       vi.mocked(initFresh).mockResolvedValue({
       ok: true,
       value: {
-        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
       },
     });
-      vi.mocked(pullVault).mockResolvedValue({ ok: true, value: vaultData });
+      vi.mocked(recoverVault).mockResolvedValue({ ok: true, value: { vault: vaultData, credentials: FAKE_RECOVERED_CREDENTIALS } });
       vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
 
       renderInDialog(<RecoveryStep />);
@@ -239,7 +251,7 @@ describe("RecoveryStep", () => {
       });
 
       // pullVault is called with derived credentials (not raw passphrase)
-      expect(pullVault).toHaveBeenCalled();
+      expect(recoverVault).toHaveBeenCalled();
       expect(importVault).toHaveBeenCalledWith(vaultData);
     });
 
@@ -248,12 +260,12 @@ describe("RecoveryStep", () => {
       vi.mocked(initFresh).mockResolvedValue({
       ok: true,
       value: {
-        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
       },
     });
-      vi.mocked(pullVault).mockResolvedValue({
+      vi.mocked(recoverVault).mockResolvedValue({
         ok: true,
-        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+        value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
       });
       vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
 
@@ -274,11 +286,11 @@ describe("RecoveryStep", () => {
     it("pulls vault BEFORE calling initFresh (no destructive ops before read)", async () => {
       const user = userEvent.setup();
       const callOrder: string[] = [];
-      vi.mocked(pullVault).mockImplementation(async () => {
-        callOrder.push("pullVault");
+      vi.mocked(recoverVault).mockImplementation(async () => {
+        callOrder.push("recoverVault");
         return {
           ok: true,
-          value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+          value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
         };
       });
       vi.mocked(initFresh).mockImplementation(async () => {
@@ -286,7 +298,7 @@ describe("RecoveryStep", () => {
         return {
           ok: true,
           value: {
-            credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+            credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
           },
         };
       });
@@ -304,19 +316,19 @@ describe("RecoveryStep", () => {
         expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
       });
 
-      expect(callOrder).toEqual(["pullVault", "initFresh"]);
+      expect(callOrder).toEqual(["recoverVault", "initFresh"]);
     });
 
     it("calls initFresh with skipServerCleanup during recovery", async () => {
       const user = userEvent.setup();
-      vi.mocked(pullVault).mockResolvedValue({
+      vi.mocked(recoverVault).mockResolvedValue({
         ok: true,
-        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+        value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
       });
       vi.mocked(initFresh).mockResolvedValue({
         ok: true,
         value: {
-          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
         },
       });
       vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
@@ -332,7 +344,7 @@ describe("RecoveryStep", () => {
       await waitFor(() => {
         expect(initFresh).toHaveBeenCalledWith(
           "carbon mango velvet prism",
-          { sync: true, skipServerCleanup: true },
+          { sync: true, skipServerCleanup: true, vaultKdfSpec: FAKE_RECOVERED_CREDENTIALS.kdfSpec },
         );
       });
     });
@@ -342,12 +354,12 @@ describe("RecoveryStep", () => {
       vi.mocked(initFresh).mockResolvedValue({
         ok: true,
         value: {
-          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
         },
       });
-      vi.mocked(pullVault).mockResolvedValue({
+      vi.mocked(recoverVault).mockResolvedValue({
         ok: true,
-        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+        value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
       });
       vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
 
@@ -362,7 +374,7 @@ describe("RecoveryStep", () => {
       await waitFor(() => {
         expect(initFresh).toHaveBeenCalledWith(
           "carbon mango velvet prism",
-          { sync: true, skipServerCleanup: true },
+          { sync: true, skipServerCleanup: true, vaultKdfSpec: FAKE_RECOVERED_CREDENTIALS.kdfSpec },
         );
       });
     });
@@ -375,14 +387,14 @@ describe("RecoveryStep", () => {
 
     it("submits on Enter key in input field", async () => {
       const user = userEvent.setup();
-      vi.mocked(pullVault).mockResolvedValue({
+      vi.mocked(recoverVault).mockResolvedValue({
         ok: true,
-        value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+        value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
       });
       vi.mocked(initFresh).mockResolvedValue({
         ok: true,
         value: {
-          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+          credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
         },
       });
       vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
@@ -401,7 +413,7 @@ describe("RecoveryStep", () => {
 
     it("shows error and does not complete onboarding when pull fails", async () => {
       const user = userEvent.setup();
-      vi.mocked(pullVault).mockResolvedValue({
+      vi.mocked(recoverVault).mockResolvedValue({
         ok: false,
         error: "Sync pull failed (404): Not found",
       });
@@ -435,11 +447,11 @@ describe("RecoveryStep", () => {
         callOrder.push("checkVaultExists");
         return { ok: true, value: true };
       });
-      vi.mocked(pullVault).mockImplementation(async () => {
-        callOrder.push("pullVault");
+      vi.mocked(recoverVault).mockImplementation(async () => {
+        callOrder.push("recoverVault");
         return {
           ok: true,
-          value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
+          value: { vault: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] }, credentials: FAKE_RECOVERED_CREDENTIALS },
         };
       });
       vi.mocked(initFresh).mockResolvedValue({
@@ -448,6 +460,7 @@ describe("RecoveryStep", () => {
           credentials: {
             vaultId: "v",
             vaultKey: "k" as unknown as CryptoKey,
+            kdfSpec: { kind: "pbkdf2-600k" } as const,
           },
         },
       });
@@ -464,7 +477,7 @@ describe("RecoveryStep", () => {
       });
       // HEAD before GET — cheaper failure when the passphrase is wrong,
       // and lets the UI distinguish "checking" from "restoring."
-      expect(callOrder).toEqual(["checkVaultExists", "pullVault"]);
+      expect(callOrder).toEqual(["checkVaultExists", "recoverVault"]);
     });
 
     it("short-circuits when checkVaultExists returns false — no pullVault, no initFresh", async () => {
@@ -488,7 +501,7 @@ describe("RecoveryStep", () => {
       });
 
       // The whole point: bail before the destructive flow.
-      expect(pullVault).not.toHaveBeenCalled();
+      expect(recoverVault).not.toHaveBeenCalled();
       expect(initFresh).not.toHaveBeenCalled();
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
     });
@@ -513,7 +526,7 @@ describe("RecoveryStep", () => {
       await waitFor(() => {
         expect(screen.getByText(/backend overloaded/i)).toBeInTheDocument();
       });
-      expect(pullVault).not.toHaveBeenCalled();
+      expect(recoverVault).not.toHaveBeenCalled();
       expect(initFresh).not.toHaveBeenCalled();
     });
   });
