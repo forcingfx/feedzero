@@ -48,6 +48,11 @@ const SignalPage = lazy(() =>
     default: m.SignalPage,
   })),
 );
+const BriefingPage = lazy(() =>
+  import("@/pages/briefing-page.tsx").then((m) => ({
+    default: m.BriefingPage,
+  })),
+);
 
 function ExploreRoute() {
   const navigate = useNavigate();
@@ -85,6 +90,16 @@ function SignalRoute() {
     <StageView>
       <Suspense>
         <SignalPage />
+      </Suspense>
+    </StageView>
+  );
+}
+
+function BriefingRoute() {
+  return (
+    <StageView>
+      <Suspense>
+        <BriefingPage />
       </Suspense>
     </StageView>
   );
@@ -283,6 +298,11 @@ export function App() {
               />
               <Route path="/explore" element={<ExploreRoute />} />
               <Route path="/signal" element={<SignalRoute />} />
+              <Route path="/briefings" element={<BriefingRoute />} />
+              <Route
+                path="/briefings/:briefingId"
+                element={<BriefingRoute />}
+              />
               <Route path="/stats" element={<StatsRoute />} />
               <Route path="/settings" element={<SettingsRoute />} />
             </Route>

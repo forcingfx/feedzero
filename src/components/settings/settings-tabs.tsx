@@ -19,6 +19,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SubscriptionTab } from "./tabs/subscription-tab";
 import { SyncAndDataTab } from "./tabs/sync-and-data-tab";
 import { ReadingTab } from "./tabs/reading-tab";
+import { BriefingsTab } from "./tabs/briefings-tab";
 import { HelpTab } from "./tabs/help-tab";
 import { useWhatsNew } from "@/hooks/use-whats-new";
 import { isSelfHosted } from "@/core/features/self-hosted";
@@ -52,6 +53,9 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
         <ToggleGroupItem value="reading" aria-label="Reading">
           Reading
         </ToggleGroupItem>
+        <ToggleGroupItem value="briefings" aria-label="Briefings">
+          Briefings
+        </ToggleGroupItem>
         <ToggleGroupItem value="help" aria-label="Help">
           Help
         </ToggleGroupItem>
@@ -60,6 +64,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
       {activeTab === "subscription" && showSubscription && <SubscriptionTab />}
       {activeTab === "sync-and-data" && <SyncAndDataTab />}
       {activeTab === "reading" && <ReadingTab />}
+      {activeTab === "briefings" && <BriefingsTab />}
       {activeTab === "help" && <HelpTab onWhatsNew={() => void whatsNew()} />}
     </div>
   );
