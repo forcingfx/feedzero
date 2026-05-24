@@ -3,7 +3,25 @@ import type { Result } from "../../../packages/core/src/utils/result";
 import { SYNC } from "../../../packages/core/src/utils/constants";
 import { deriveBytes, deriveKey, decrypt } from "../storage/crypto.ts";
 import { uint8ArrayToBase64, base64ToUint8Array } from "../../../packages/core/src/utils/base64";
-import type { VaultData, EncryptedVault } from "./types.ts";
+import type { VaultData, EncryptedVault, KdfSpec } from "./types.ts";
+
+/**
+ * KDF spec assumed for envelopes written before the `kdf` field existed.
+ * Every envelope without an explicit `kdf` was produced by `deriveKey`
+ * (PBKDF2-SHA256 with 600,000 iterations), so the recovery flow uses
+ * this when nothing else is available.
+ */
+export const LEGACY_KDF_SPEC: KdfSpec = { kind: "pbkdf2-600k" };
+
+/**
+ * Read the KDF spec from an envelope, falling back to the PBKDF2
+ * legacy default when the field is absent. Always go through this
+ * helper rather than reading `envelope.kdf` directly — the back-compat
+ * default lives here so existing vaults stay readable.
+ */
+export function readKdfSpec(envelope: EncryptedVault): KdfSpec {
+  return envelope.kdf ?? LEGACY_KDF_SPEC;
+}
 
 /** AES-GCM IV length in bytes. */
 const IV_LENGTH = 12;
@@ -83,10 +101,16 @@ export async function deriveVaultKey(
  * + summaries, repeated structural keys — gzip typically shrinks the
  * payload 60–80%. Smaller ciphertext means smaller pushes, smaller
  * pulls, and smaller `padPayload` buckets in sync-service.
+ *
+ * When `kdfSpec` is provided, it is stamped on the envelope so the
+ * recovery flow can pick the matching key-derivation function on a
+ * new device. Omit it only for tests of legacy back-compat — production
+ * callers (`pushVault` and the auto-upgrade path) always pass a spec.
  */
 export async function encryptVault(
   key: CryptoKey,
   vault: VaultData,
+  kdfSpec?: KdfSpec,
 ): Promise<Result<EncryptedVault>> {
   try {
     const json = JSON.stringify(vault);
@@ -100,11 +124,13 @@ export async function encryptVault(
         compressed as BufferSource,
       ),
     );
-    return ok({
+    const envelope: EncryptedVault = {
       version: SYNC.FORMAT_VERSION,
       iv: Array.from(iv),
       ciphertext: uint8ArrayToBase64(ct),
-    });
+    };
+    if (kdfSpec) envelope.kdf = kdfSpec;
+    return ok(envelope);
   } catch (e) {
     return err(`Vault encryption failed: ${(e as Error).message}`);
   }

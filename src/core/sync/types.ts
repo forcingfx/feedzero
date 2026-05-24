@@ -41,11 +41,41 @@ export interface VaultData {
   preferencesUpdatedAt?: number;
 }
 
+/**
+ * Identifies which key-derivation function was used to derive the AES key
+ * that encrypted a vault's ciphertext. Stamped on the envelope so a vault
+ * written with one KDF can be opened on a device whose default has since
+ * moved on — the recovery flow reads this field and picks the matching
+ * derivation function.
+ *
+ * `pbkdf2-600k` is the legacy default for envelopes written before this
+ * field existed; `readKdfSpec(envelope)` returns it when the field is
+ * absent. Argon2id carries its full cost triple so we can change the
+ * production default without orphaning older vaults.
+ */
+export type KdfSpec =
+  | { kind: "pbkdf2-600k" }
+  | {
+      kind: "argon2id";
+      /** Memory cost in KiB (65536 = 64 MiB). */
+      memoryKib: number;
+      /** Number of passes over the memory. */
+      iterations: number;
+      /** Number of parallel lanes. */
+      parallelism: number;
+    };
+
 /** Encrypted vault as stored on the server. */
 export interface EncryptedVault {
   version: number;
   iv: number[];
   ciphertext: string;
+  /**
+   * Which KDF derived the encryption key. Absent on envelopes written
+   * before this field existed; consumers must default to PBKDF2 via
+   * `readKdfSpec()` rather than reading the field directly.
+   */
+  kdf?: KdfSpec;
 }
 
 /** Server response shape for sync API. */
