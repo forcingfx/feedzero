@@ -39,15 +39,32 @@ export function parseOpmlFile(xml: string): Result<OpmlFeedEntry[]> {
 interface OpmlOutline {
   text?: string;
   title?: string;
+  type?: string;
   xmlUrl?: string;
   htmlUrl?: string;
+  isComment?: boolean;
   outlines?: unknown[];
 }
+
+/**
+ * OPML 2.0 `type` values that are NOT feed subscriptions. Per spec:
+ * `link` is a blogroll-style hyperlink, `include` references an external
+ * OPML, `directory` is a listing. Even when these carry an `xmlUrl`,
+ * subscribing the user to them is wrong. Comparison is case-insensitive.
+ * Other values (undefined, "rss", "atom", "feed", anything custom) keep
+ * the existing subscribe behavior — Feedly omits `type` entirely on some
+ * exports, so absence MUST NOT mean "skip".
+ */
+const NON_SUBSCRIBABLE_TYPES = new Set(["link", "include", "directory"]);
 
 /**
  * Recursively extract feed entries from OPML outlines, threading the
  * current folder context through the walk. An outline WITHOUT xmlUrl
  * (i.e. a folder) becomes the new folderName for its children.
+ *
+ * Skips outlines flagged `isComment="true"` (per OPML 2.0: inert; many
+ * readers use them to track unsubscribed-but-remembered feeds) and
+ * outlines whose `type` is non-subscribable (link / include / directory).
  */
 function extractFeeds(
   outlines: OpmlOutline[],
@@ -56,7 +73,12 @@ function extractFeeds(
   const feeds: OpmlFeedEntry[] = [];
 
   for (const outline of outlines) {
-    if (outline.xmlUrl) {
+    if (outline.isComment === true) continue;
+
+    const isSubscribable =
+      !outline.type || !NON_SUBSCRIBABLE_TYPES.has(outline.type.toLowerCase());
+
+    if (outline.xmlUrl && isSubscribable) {
       feeds.push({
         title: outline.title || outline.text || "",
         xmlUrl: outline.xmlUrl,

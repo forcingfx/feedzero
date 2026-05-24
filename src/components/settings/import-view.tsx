@@ -75,10 +75,13 @@ export function ImportView({ onClose }: ImportViewProps) {
   }, []);
 
   /**
-   * Parse the import content into rich entries that carry folder context.
-   * Shutdown-migration formats (Pocket HTML, Pocket CSV, Omnivore JSON)
-   * have folderName=undefined; OPML imports carry the parent group name
-   * when one exists (PR E).
+   * Parse the import content into rich entries that carry folder context
+   * and (for OPML) the user's outline title. Shutdown-migration formats
+   * (Pocket HTML, Pocket CSV, Omnivore JSON) have folderName=undefined
+   * and no title — the importer falls back to whatever the feed body
+   * advertises. OPML imports carry the parent group name when one
+   * exists (PR E) and the outline's `title`/`text` so a feed renamed in
+   * the previous reader keeps its label (issue #117).
    *
    * Specific-format detection runs before the URL-list fallback because
    * each format would otherwise be misread as a URL list and silently
@@ -87,7 +90,9 @@ export function ImportView({ onClose }: ImportViewProps) {
   const extractEntries = useCallback(
     async (
       content: string,
-    ): Promise<Array<{ xmlUrl: string; folderName?: string }>> => {
+    ): Promise<
+      Array<{ xmlUrl: string; folderName?: string; title?: string }>
+    > => {
       if (isPocketCsvExport(content)) {
         const result = parsePocketCsvExport(content);
         if (!result.ok) throw new Error(result.error);
@@ -111,6 +116,7 @@ export function ImportView({ onClose }: ImportViewProps) {
         return result.value.map((entry) => ({
           xmlUrl: entry.xmlUrl,
           folderName: entry.folderName,
+          title: entry.title,
         }));
       }
       const result = parseUrlList(content);
@@ -206,8 +212,16 @@ export function ImportView({ onClose }: ImportViewProps) {
       //                     same folder placement, recorded as placeholder
       //   * other err     → permanent (parse / discovery / duplicate /
       //                     quota); record failure, no row created
+      //
+      // Title threading (issue #117): when the OPML outline supplies a
+      // non-empty title, pass it as `titleOverride` so the user's chosen
+      // name wins over the feed body's <title>.
       for (const entry of entries) {
-        const result = await addFeed(entry.xmlUrl);
+        const titleOverride = entry.title?.trim();
+        const result = await addFeed(
+          entry.xmlUrl,
+          titleOverride ? { titleOverride } : undefined,
+        );
 
         if (result.ok) {
           await placeFeedIntoFolder(entry);

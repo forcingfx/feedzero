@@ -111,7 +111,16 @@ interface FeedStore {
    *  with an empty store before the DB is read. */
   feedsLoaded: boolean;
   loadFeeds: () => Promise<void>;
-  addFeed: (url: string) => Promise<AddFeedResult>;
+  /**
+   * Subscribe to a feed. `options.titleOverride` (issue #117): a
+   * non-empty value wins over the parsed feed body's `<title>`. The
+   * OPML importer uses this so the user's outline title is preserved
+   * across reader migrations. Other call sites can omit it.
+   */
+  addFeed: (
+    url: string,
+    options?: { titleOverride?: string },
+  ) => Promise<AddFeedResult>;
   /**
    * Persist a placeholder feed for a URL whose initial fetch failed
    * (HTTP / network error). Used by bulk import so rate-limited URLs
@@ -458,7 +467,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     });
   },
 
-  addFeed: async (url) => {
+  addFeed: async (url, options) => {
     // Free hosted users are capped at 50 feed subscriptions (ADR 013).
     // Personal/Pro and self-hosted bypass. Check BEFORE touching the
     // ingestion pipeline so we don't half-add a feed then fail late.
@@ -482,7 +491,10 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     // Resolve the bridges gate here (store layer owns license/self-host
     // state) and pass it down as a plain boolean — core stays store-agnostic.
     const bridgesEnabled = isFeatureEnabled("bridges");
-    const result = await addFeedFlow(url, { bridgesEnabled });
+    const result = await addFeedFlow(url, {
+      bridgesEnabled,
+      titleOverride: options?.titleOverride,
+    });
     if (!result.ok) {
       set({ isLoading: false, error: result.error });
       // Preserve the reason discriminator so import-side callers can

@@ -153,6 +153,67 @@ describe("opml-service", () => {
       expect(feeds).toHaveLength(1);
       expect(feeds[0].xmlUrl).toBe("https://example.com/feed");
     });
+
+    describe("spec correctness — outlines we must skip per OPML 2.0", () => {
+      // The OPML 2.0 spec says isComment="true" outlines are inert. Many
+      // readers (NetNewsWire, ReadKit) use them to track unsubscribed-but-
+      // remembered feeds. Importing them silently re-subscribes the user
+      // every time they migrate readers — pure regression.
+      it("skips outlines with isComment=\"true\"", () => {
+        const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <body>
+    <outline type="rss" text="Active" xmlUrl="https://active.example.com/feed"/>
+    <outline type="rss" text="Unsubscribed" xmlUrl="https://muted.example.com/feed" isComment="true"/>
+  </body>
+</opml>`;
+        const result = parseOpmlFile(opml);
+        expect(isOk(result)).toBe(true);
+        const feeds = unwrap(result);
+        expect(feeds).toHaveLength(1);
+        expect(feeds[0].xmlUrl).toBe("https://active.example.com/feed");
+      });
+
+      // Per OPML 2.0: type="link" is a hyperlink reference (blogroll-style),
+      // type="include" references an external OPML, type="directory" is a
+      // listing. None are feed subscriptions; subscribing to them is wrong.
+      it.each(["link", "include", "directory", "LINK", "Link"])(
+        "skips outlines with type=%j",
+        (typeValue) => {
+          const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <body>
+    <outline type="rss" text="Subscribe" xmlUrl="https://feed.example.com/rss"/>
+    <outline type="${typeValue}" text="Reference" xmlUrl="https://ref.example.com/page"/>
+  </body>
+</opml>`;
+          const result = parseOpmlFile(opml);
+          expect(isOk(result)).toBe(true);
+          const feeds = unwrap(result);
+          expect(feeds).toHaveLength(1);
+          expect(feeds[0].xmlUrl).toBe("https://feed.example.com/rss");
+        },
+      );
+
+      // Belt-and-braces: type-undefined and uncommon types (e.g. "atom") are
+      // STILL subscribed. Feedly omits `type` entirely on some exports; we
+      // can't make them invisible just because the attribute is missing.
+      it.each([undefined, "rss", "atom", "feed", "anything-custom"])(
+        "still subscribes when type=%j",
+        (typeValue) => {
+          const typeAttr = typeValue === undefined ? "" : ` type="${typeValue}"`;
+          const opml = `<?xml version="1.0"?>
+<opml version="2.0">
+  <body>
+    <outline${typeAttr} text="A" xmlUrl="https://a.example.com/feed"/>
+  </body>
+</opml>`;
+          const result = parseOpmlFile(opml);
+          expect(isOk(result)).toBe(true);
+          expect(unwrap(result)).toHaveLength(1);
+        },
+      );
+    });
   });
 
   describe("generateOpmlFile — folder grouping (PR E)", () => {

@@ -408,6 +408,42 @@ describe("feed-service", () => {
       const { feed } = unwrap(result);
       expect(feed.title).toBe("Example Feed");
     });
+
+    // Issue #117 (2026-05-23): an OPML outline with `title="CNBC"` was being
+    // overridden by the feed body's <title> ("International: Top News And
+    // Analysis"). The fix: the importer threads the outline's title into
+    // addFeedFlow as an override that wins over the parsed feed's title.
+    // The user picked the OPML title — respect it.
+    it("uses options.titleOverride instead of the parsed feed's <title>", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        titleOverride: "CNBC",
+      });
+      expect(isOk(result)).toBe(true);
+      const { feed } = unwrap(result);
+      // Parsed feed says "Example Feed"; OPML override wins.
+      expect(feed.title).toBe("CNBC");
+    });
+
+    it("ignores empty / whitespace-only titleOverride and uses the parsed title", async () => {
+      // An OPML outline with no `title` attr and no `text` attr produces
+      // an empty extracted title. Empty must fall through to the parsed
+      // feed's <title> rather than overwriting it with "".
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      const result = await addFeedFlow("https://example.com/feed.xml", {
+        titleOverride: "   ",
+      });
+      expect(isOk(result)).toBe(true);
+      expect(unwrap(result).feed.title).toBe("Example Feed");
+    });
   });
 
   describe("addPlaceholderFeed", () => {

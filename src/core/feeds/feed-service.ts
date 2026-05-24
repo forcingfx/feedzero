@@ -145,10 +145,21 @@ function fetchFailure(message: string): AddFeedFlowResult {
  * Full add-feed flow: check duplicate → fetch → parse → store.
  * Returns AddFeedFlowResult with user-friendly error messages. On a
  * recoverable failure the err branch carries `reason: "fetch-failure"`.
+ *
+ * `options.titleOverride` (issue #117): when set to a non-empty string,
+ * wins over the parsed feed body's `<title>`. The OPML importer threads
+ * the user's outline `title="…"` (or `text="…"` fallback) through here so
+ * a feed they renamed in their previous reader keeps that name on import,
+ * instead of being silently reverted to whatever the publisher's feed
+ * advertises. Empty / whitespace-only values are ignored.
  */
 export async function addFeedFlow(
   rawUrl: string,
-  options?: { prefetchedContent?: string; bridgesEnabled?: boolean },
+  options?: {
+    prefetchedContent?: string;
+    bridgesEnabled?: boolean;
+    titleOverride?: string;
+  },
 ): Promise<AddFeedFlowResult> {
   const url = normalizeUrl(rawUrl);
   try {
@@ -203,10 +214,13 @@ export async function addFeedFlow(
       discoveredUrl = discovery.value.feedUrl;
     }
 
-    // Create and store feed (use discovered URL if feed was found via discovery)
+    // Create and store feed (use discovered URL if feed was found via discovery).
+    // OPML-supplied title wins over the parsed feed's <title>; see options
+    // docstring above for the issue #117 rationale.
+    const overrideTitle = options?.titleOverride?.trim();
     const feedResult = createFeed({
       url: discoveredUrl,
-      title: feedData.title,
+      title: overrideTitle ? overrideTitle : feedData.title,
       description: feedData.description,
       siteUrl: feedData.siteUrl,
     });
