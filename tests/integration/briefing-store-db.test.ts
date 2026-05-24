@@ -277,20 +277,26 @@ describe("briefing-store ↔ db.ts integration", () => {
       .createBriefing({ name: "EU AI", prompt: "EU AI Act" });
     if (!created.ok) throw new Error("create failed");
 
-    // Articles ingested after createdAt should count as stale.
-    const now = Date.now();
+    // Articles ingested AFTER the briefing's createdAt count as stale.
+    // refreshStaleCounts filters with strict `>`, so the article timestamps
+    // must be strictly greater than briefing.createdAt — Date.now() twice in
+    // the same millisecond (common under coverage instrumentation on a fast
+    // box) lands at equality and silently excludes the articles. Anchor
+    // off the created briefing's stamp + a 1s offset so the comparison is
+    // unambiguous regardless of clock resolution.
+    const ingestAt = created.value.createdAt + 1000;
     const newArticles: Article[] = [
       {
         ...article("feed-1", 0, "EU AI Act ruling"),
-        createdAt: now,
+        createdAt: ingestAt,
       },
       {
         ...article("feed-2", 0, "EU AI Act commission update"),
-        createdAt: now,
+        createdAt: ingestAt,
       },
       {
         ...article("feed-3", 0, "sourdough recipes"),
-        createdAt: now,
+        createdAt: ingestAt,
       },
     ];
 
