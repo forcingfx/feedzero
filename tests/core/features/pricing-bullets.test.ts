@@ -58,9 +58,9 @@ describe("pricingBullets — pricing cards derived from the matrix", () => {
     expect(pricingBullets("pro").some((b) => b.id === "search")).toBe(true);
   });
 
-  it("Signal Briefings is a Pro-card bullet (headline Pro feature)", () => {
-    expect(pricingBullets("pro").some((b) => b.id === "signal-briefings")).toBe(true);
-    expect(pricingBullets("personal").some((b) => b.id === "signal-briefings")).toBe(false);
+  it("Signal Briefings lands on the Personal card (its lowest unlock tier)", () => {
+    expect(pricingBullets("personal").some((b) => b.id === "signal-briefings")).toBe(true);
+    expect(pricingBullets("pro").some((b) => b.id === "signal-briefings")).toBe(false);
     expect(pricingBullets("free").some((b) => b.id === "signal-briefings")).toBe(false);
   });
 

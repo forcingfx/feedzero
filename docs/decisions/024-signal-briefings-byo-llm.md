@@ -50,7 +50,11 @@ We ship **Option B: bring-your-own Claude API key, browser-direct.**
   auto-refresh hook bumps a `staleArticleCount` so the sidebar can
   show a "refresh available" dot, but it never invokes the LLM.
 
-Gated to Pro tier via the canonical tier matrix (`signal-briefings` entry).
+Gated to Personal+ tier via the canonical tier matrix (`signal-briefings`
+entry). The original plan landed at Pro; we moved it down because Pro
+currently has no other shipped exclusive features and the friction is
+worth eating to get the AI surface in front of more paying users. See
+"Why Personal, not Pro" below.
 
 ### Why not server-proxied (Option A)
 
@@ -76,6 +80,27 @@ sends data to FeedZero, another doesn't), and means the privacy
 disclosure has to be conditional on a runtime path the user can't see.
 The BYO architecture is defensible on its own terms; adding a server
 fallback is a v2 question.
+
+### Why Personal, not Pro
+
+Briefings was designed with a B2B persona in mind (legal, policy,
+competitive intelligence) and the original tiering put it on Pro to
+match. We moved it down to Personal before shipping for two reasons:
+
+1. **Pro currently has no shipped exclusive features.** Search,
+   send-to-kindle, authenticated-fetchers, and themes-commercial are
+   all coming-soon. Briefings was going to be the only present-value
+   reason to choose Pro, which makes Pro hard to sell ("pay more for
+   the same things plus a roadmap").
+2. **Discovery beats segmentation.** BYO-key is already friction; the
+   most useful thing for the feature is exposure to users who'll
+   actually try it. Personal-tier hobbyists with a Claude account are
+   a real cohort, and a Personal user who finds Briefings indispensable
+   is a natural Pro upgrade later when Pro has its own anchor features.
+
+The cap (10 saved briefings) and the BYO-key requirement are the same
+on both tiers; if the two tiers later diverge here, the matrix carries
+the per-tier limit and `checkBriefingQuota` reads it directly.
 
 ### Privacy disclosure
 

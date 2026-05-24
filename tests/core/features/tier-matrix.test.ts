@@ -95,12 +95,16 @@ describe("tier-matrix — currently shipped gated features", () => {
     expect(getEntry("signal").tiers.pro.available).toBe(true);
   });
 
-  it("signal-briefings is Pro-only, shipped, with a 10-briefing cap", () => {
+  it("signal-briefings is Personal+, shipped, with a 10-briefing cap", () => {
     const entry = getEntry("signal-briefings");
     expect(entry.status).toBe("shipped");
-    expect(getRequiredTier("signal-briefings")).toBe("pro");
+    expect(getRequiredTier("signal-briefings")).toBe("personal");
     expect(entry.tiers.free).toEqual({ available: false });
-    expect(entry.tiers.personal).toEqual({ available: false });
+    expect(entry.tiers.personal).toEqual({
+      available: true,
+      limit: 10,
+      limitUnit: "briefings",
+    });
     expect(entry.tiers.pro).toEqual({
       available: true,
       limit: 10,

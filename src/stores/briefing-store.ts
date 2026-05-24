@@ -8,9 +8,9 @@
  *
  * Defense-in-depth: every gated action (create, refresh) re-checks
  * `enforceFeature("signal-briefings")` even though the page-level
- * `useFeatureGate` already gates the UI. A Pro-revoked user who keeps
- * a tab open is blocked here too. The `create` action additionally
- * enforces the BRIEFINGS_LIMIT_PRO cap from quotas.ts.
+ * `useFeatureGate` already gates the UI. A user whose paid tier
+ * lapses with a tab open is blocked here too. The `create` action
+ * additionally enforces the BRIEFINGS_LIMIT cap from quotas.ts.
  *
  * The store doesn't load articles itself — it accepts them from the
  * caller (the briefing page or the auto-refresh hook), which already
@@ -98,7 +98,7 @@ interface BriefingStore {
 
 function rejectIfGateClosed(): { ok: false; error: string } | null {
   if (enforceFeature("signal-briefings")) return null;
-  return { ok: false, error: "Signal Briefings requires the Pro tier" };
+  return { ok: false, error: "Signal Briefings is a paid feature" };
 }
 
 async function reload(
@@ -168,7 +168,7 @@ export const useBriefingStore = create<BriefingStore>((set, get) => ({
     });
     if (!quota.ok) {
       return err(
-        `You've reached the Pro limit of ${quota.limit} briefings. Delete one to create another, or self-host.`,
+        `You've reached the limit of ${quota.limit} briefings. Delete one to create another, or self-host.`,
       );
     }
 

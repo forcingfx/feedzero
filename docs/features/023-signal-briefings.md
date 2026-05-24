@@ -6,7 +6,7 @@ Implemented (2026-05-24).
 
 ## Summary
 
-Signal Briefings let a Pro-tier user create a standing prompt (e.g. "EU
+Signal Briefings let a Personal+ user create a standing prompt (e.g. "EU
 AI Act enforcement actions"), save it like a feed, and on demand
 generate an AI-written briefing with citations drawn from their own
 subscribed feeds. The user supplies their own Anthropic API key
@@ -20,8 +20,8 @@ counter), but the LLM call only fires on an explicit user click.
 ```gherkin
 Feature: Signal Briefings
 
-  Scenario: Create and refresh a briefing as a Pro user with an API key
-    Given I am on the Pro tier
+  Scenario: Create and refresh a briefing as a Personal+ user with an API key
+    Given I am on the Personal tier
     And I have pasted my Anthropic API key in Settings → Briefings
     And my feeds cover the topic strongly enough (signal score ≥ 15)
     When I open the New briefing dialog and submit a name + prompt
@@ -38,15 +38,15 @@ Feature: Signal Briefings
     Then I see the matrix-derived UpgradeSplash for signal-briefings
     And no briefings store call is made
 
-  Scenario: Pro user without an API key
-    Given I am on the Pro tier
+  Scenario: Personal+ user without an API key
+    Given I am on the Personal tier
     And no Anthropic key is stored
     When I click Refresh on a briefing
     Then status becomes "no-api-key" with a Settings link
     And no LLM call is made
 
-  Scenario: Pro user with a thin corpus
-    Given I am on the Pro tier and have an API key
+  Scenario: Personal+ user with a thin corpus
+    Given I am on the Personal tier and have an API key
     But my feeds only cover the topic with one article on one feed
     When I click Refresh
     Then status becomes "not-enough-evidence" with the local score shown
@@ -75,7 +75,7 @@ Create:
 2. The dialog runs `matchArticles` + `computeSignalScore` against the
    current corpus to preview the signal band before save.
 3. `useBriefingStore.createBriefing` enforces the feature gate
-   + `checkBriefingQuota` (cap 10 on Pro), calls `db.addBriefing`,
+   + `checkBriefingQuota` (cap 10 on every paid tier), calls `db.addBriefing`,
    reloads + `scheduleSyncPush`.
 4. Navigate to `/briefings/:newId`.
 
@@ -124,7 +124,7 @@ Auto-stale tracking (no LLM):
 | `src/core/storage/secrets.ts` | Typed Anthropic-key accessors |
 | `src/core/sync/types.ts::VaultData` | Extended with `briefings` + `secrets` |
 | `src/core/sync/sync-service.ts` | exportVault/importVault/mergeVaults extended |
-| `src/core/features/tier-matrix.ts` | `signal-briefings` matrix entry (Pro, cap 10) |
+| `src/core/features/tier-matrix.ts` | `signal-briefings` matrix entry (Personal+, cap 10) |
 | `src/core/features/quotas.ts` | `BRIEFINGS_LIMIT_PRO` + `checkBriefingQuota` |
 | `src/stores/briefing-store.ts` | CRUD + refresh + auto-stale |
 | `src/hooks/use-briefing-auto-refresh.ts` | Stale-counter hook |
@@ -139,7 +139,7 @@ Auto-stale tracking (no LLM):
 
 | File | Coverage |
 |------|----------|
-| `tests/core/features/tier-matrix.test.ts` | Matrix shape, Pro-tier, cap |
+| `tests/core/features/tier-matrix.test.ts` | Matrix shape, Personal+, cap |
 | `tests/core/features/quotas.test.ts` | Briefing quota boundary + bypasses |
 | `tests/core/storage/briefing-schema.test.ts` | Factory validation |
 | `tests/core/storage/briefing-db.test.ts` | Encrypted CRUD round-trip |

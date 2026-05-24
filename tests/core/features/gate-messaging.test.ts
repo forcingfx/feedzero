@@ -53,11 +53,11 @@ describe("gate messaging — derived entirely from the tier matrix", () => {
     }
   });
 
-  it("signal-briefings reads 'Subscribe to Pro to unlock Signal Briefings.'", () => {
+  it("signal-briefings reads 'Subscribe to Personal to unlock Signal Briefings.'", () => {
     expect(featureName("signal-briefings")).toBe("Signal Briefings");
-    expect(requiredTierLabel("signal-briefings")).toBe("Pro");
+    expect(requiredTierLabel("signal-briefings")).toBe("Personal");
     expect(gateToast("signal-briefings")).toBe(
-      "Subscribe to Pro to unlock Signal Briefings.",
+      "Subscribe to Personal to unlock Signal Briefings.",
     );
   });
 });

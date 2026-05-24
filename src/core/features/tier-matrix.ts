@@ -312,12 +312,12 @@ export const TIER_MATRIX = {
     status: "shipped",
     tiers: {
       free: UNAVAILABLE,
-      personal: UNAVAILABLE,
+      personal: { available: true, limit: 10, limitUnit: "briefings" },
       pro: { available: true, limit: 10, limitUnit: "briefings" },
     },
     marketing: {
       blurb: "Signal Briefings — standing AI briefs from your feeds, with citations",
-      rank: 25,
+      rank: 19,
     },
   },
 
