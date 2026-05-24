@@ -127,3 +127,23 @@ export interface SignalReport {
   /** Unix epoch ms when this report was generated. */
   generatedAt: number;
 }
+
+/**
+ * AI-generated Signal report. Same topic shape as the ML report so the
+ * existing TopicSection / StoryRow rendering works for both modes —
+ * Claude does the clustering + naming instead of the frequency engine,
+ * and each topic carries a one-line summary the model wrote.
+ *
+ * Mode is opt-in (off by default) so Signal's "fully local, no LLM"
+ * default claim stays accurate for users who don't enable it.
+ */
+export interface AISignalReport extends SignalReport {
+  /** Always "ai" — discriminator vs the ML report shape. */
+  source: "ai";
+  /** Per-topic one-line summary produced by the model. */
+  summaries: Record<string, string>;
+  /** Model id used (e.g. "claude-sonnet-4-6"). */
+  modelId: string;
+  /** Input/output token counts so the UI can surface "your bill" transparency. */
+  tokenUsage: { input: number; output: number };
+}

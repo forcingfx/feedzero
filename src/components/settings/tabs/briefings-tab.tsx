@@ -21,6 +21,8 @@ import {
   clearAnthropicKey,
 } from "@/core/storage/secrets";
 import { useBriefingModelPreference } from "@/lib/briefing-model-preference";
+import { useSignalAIHidden } from "@/lib/signal-mode-preference";
+import { Switch } from "@/components/ui/switch";
 import {
   BRIEFING_MODELS,
   isBriefingModelId,
@@ -160,6 +162,32 @@ export function BriefingsTab() {
             </label>
           ))}
         </div>
+      </div>
+
+      <SignalAIHiddenPanel />
+    </div>
+  );
+}
+
+function SignalAIHiddenPanel() {
+  const [hidden, setHidden] = useSignalAIHidden();
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Hide AI Signal mode</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Removes the AI/Local toggle from the Signal page. Use this if
+            you only want the on-device frequency engine ever — no LLM,
+            no Anthropic calls. Flipping this on also forces the current
+            mode back to Local.
+          </p>
+        </div>
+        <Switch
+          checked={hidden}
+          onCheckedChange={setHidden}
+          aria-label="Hide AI Signal mode"
+        />
       </div>
     </div>
   );
