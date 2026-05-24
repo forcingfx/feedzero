@@ -158,16 +158,6 @@ export function BriefingPage() {
     goToBriefing(navigate);
   }
 
-  function handleCitationClick(articleId: string) {
-    const article = collectAllArticles(articlesByFeedId).find(
-      (a) => a.id === articleId,
-    );
-    if (article) {
-      navigate(`/feeds/${article.feedId}/articles/${article.id}`);
-    } else {
-      toast.error("That article is no longer in your cache.");
-    }
-  }
 
   return (
     <>
@@ -211,10 +201,7 @@ export function BriefingPage() {
       )}
 
       {briefing.lastReport && (status === "ready" || status === "idle" || status === "error") && (
-        <BriefingReadyView
-          briefing={briefing}
-          onCitationClick={handleCitationClick}
-        />
+        <BriefingReadyView briefing={briefing} />
       )}
 
       {!briefing.lastReport && status === "idle" && (
@@ -380,13 +367,7 @@ function BriefingHeader({
   );
 }
 
-function BriefingReadyView({
-  briefing,
-  onCitationClick,
-}: {
-  briefing: Briefing;
-  onCitationClick: (articleId: string) => void;
-}) {
+function BriefingReadyView({ briefing }: { briefing: Briefing }) {
   const report = briefing.lastReport;
   if (!report) return null;
   return (
@@ -401,17 +382,13 @@ function BriefingReadyView({
         <BriefingAbstract
           abstract={report.abstract}
           citations={report.citations}
-          onCitationClick={onCitationClick}
         />
       </section>
       <section className="space-y-3">
         <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Citations
         </h2>
-        <CitationsList
-          citations={report.citations}
-          onOpenInReader={onCitationClick}
-        />
+        <CitationsList citations={report.citations} />
       </section>
       <section className="space-y-3">
         <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
