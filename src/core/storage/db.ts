@@ -24,6 +24,7 @@ import type {
   Folder,
   SmartFilter,
   UserPreferences,
+  Briefing,
 } from "../../../packages/core/src/types";
 import { mergeDuplicateArticles } from "./dedupe-articles.ts";
 
@@ -65,6 +66,7 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
       folders: "id",
       smartFilters: "id",
       preferences: "id",
+      briefings: "id",
       meta: "key",
     });
 
@@ -109,6 +111,7 @@ export async function openWithKeys(
       folders: "id",
       smartFilters: "id",
       preferences: "id",
+      briefings: "id",
       meta: "key",
     });
 
@@ -725,6 +728,30 @@ export async function removeSmartFilter(
   }
 }
 
+// --- Signal Briefings (encrypted, synced) ---
+
+export async function addBriefing(briefing: Briefing): Promise<Result<boolean>> {
+  return putEncrypted("briefings", briefing.id, briefing);
+}
+
+export async function getBriefings(): Promise<Result<Briefing[]>> {
+  return getAllDecrypted<Briefing>("briefings");
+}
+
+export async function updateBriefing(briefing: Briefing): Promise<Result<boolean>> {
+  return putEncrypted("briefings", briefing.id, briefing);
+}
+
+export async function removeBriefing(id: string): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    await ctx.db.table("briefings").delete(id);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove briefing: ${(e as Error).message}`);
+  }
+}
+
 // --- Preferences (single-row, synced) ---
 
 /**
@@ -795,7 +822,7 @@ export async function setPreferencesUpdatedAt(
 
 /** Encrypt an array of records into Dexie-ready objects with HMAC-hashed indexes. */
 async function encryptRecords(
-  items: Array<Feed | Article | Folder | SmartFilter>,
+  items: Array<Feed | Article | Folder | SmartFilter | Briefing>,
 ): Promise<DexieRecord[]> {
   const ctx = requireOpen();
   const records: DexieRecord[] = [];
