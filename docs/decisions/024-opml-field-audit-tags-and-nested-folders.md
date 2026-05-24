@@ -59,11 +59,20 @@ Collapsing categories to "first one becomes the folder" lost the
 multiplicity, and using all of them produced impossible folder
 membership.
 
-No top-level "browse by tag" sidebar surface in this push. Tags are
-visible via the filter row and the feed-detail dialog; a richer
-surface lands when a user asks. Tag CRUD (rename, merge, delete)
-also deferred — the source of truth is the per-feed metadata and the
-feed-edit dialog already covers it.
+No top-level "browse by tag" sidebar surface in this push — landed
+in the follow-up PR #189 ("Tags" section below folders).
+
+In-app tag editing ALSO landed in the #189 follow-up: a Tags input
+in the feed-settings dialog (comma-separated, normalize on save via
+the new `setFeedTags(feedId, tags)` store action). The original
+draft of this ADR claimed the feed-edit dialog "already covered it"
+— that was wrong; the field had no UI surface until #189 added it.
+
+Tag rename / merge / delete across multiple feeds (bulk operations)
+remain out of scope. They're conceivable once we know how users
+actually use tags; until then per-feed editing covers the
+foreseeable case (correcting an OPML-imported typo, adding a tag to
+one feed).
 
 ### `Folder.parentId`
 

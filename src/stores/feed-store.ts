@@ -28,6 +28,7 @@ import { useArticleStore } from "./article-store.ts";
 import { useLicenseStore } from "./license-store.ts";
 import { isSelfHosted } from "../core/features/self-hosted.ts";
 import { retryFailedFavicons } from "../core/favicon/favicon-cache.ts";
+import { isDescendantOf } from "../core/feeds/folder-tree.ts";
 import { isPaidTierActive } from "../core/features/paid-tier-active.ts";
 import { checkFeedQuota, quotaErrorMessage } from "../core/features/quotas.ts";
 import { isFeatureEnabled, enforceFeature } from "./enforce-feature.ts";
@@ -132,7 +133,16 @@ interface FeedStore {
    * aren't dropped — the user can hit refresh later to recover them.
    * Returns Result<Feed> so callers can chain folder placement.
    */
-  addPlaceholderFeed: (url: string, error: string) => Promise<Result<Feed>>;
+  addPlaceholderFeed: (
+    url: string,
+    error: string,
+    options?: {
+      titleOverride?: string;
+      descriptionFallback?: string;
+      tags?: string[];
+      createdAtOverride?: number;
+    },
+  ) => Promise<Result<Feed>>;
   removeFeed: (feedId: string) => Promise<void>;
   renameFeed: (feedId: string, newTitle: string) => Promise<void>;
   setFeedPreferFullText: (feedId: string, value: boolean) => Promise<void>;
@@ -177,6 +187,23 @@ interface FeedStore {
   updateFolderColor: (folderId: string, color: string | undefined) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveFeedToFolder: (feedId: string, folderId: string | null) => Promise<void>;
+  /**
+   * Replace this feed's tag list. Input is normalized (trim, drop
+   * empties, dedupe) before persistence. An empty result clears
+   * `Feed.tags` to undefined so the sync vault doesn't carry an
+   * empty-array noise.
+   */
+  setFeedTags: (feedId: string, tags: string[]) => Promise<void>;
+  /**
+   * Reparent a folder. `parentId` is the new parent's id, or null to
+   * un-nest to the top level. Rejects (Result.err) if `parentId` is
+   * the folder itself or one of its descendants — preserves the tree
+   * invariant. Cycle check runs against the in-memory `folders` slice.
+   */
+  moveFolderToParent: (
+    folderId: string,
+    parentId: string | null,
+  ) => Promise<Result<void>>;
   applyAutoOrganize: (
     plan: { folderName: string; feedIds: string[] }[],
   ) => Promise<void>;
@@ -219,6 +246,15 @@ interface FeedStore {
   folderSettingsDialogId: string | null;
   openFolderSettings: (folderId: string) => void;
   closeFolderSettings: () => void;
+  /**
+   * Quick-tag dialog (⌘K → Tag, or `t` keybinding). Lightweight modal
+   * hosting the TagPicker against a single feed — distinct from the
+   * full feed-settings dialog so the user can tag without losing
+   * context. Same id-shape as the other dialogs.
+   */
+  tagQuickDialogFeedId: string | null;
+  openTagQuickDialog: (feedId: string) => void;
+  closeTagQuickDialog: () => void;
 }
 
 function readSortMode(): FeedSortMode {
@@ -468,6 +504,10 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   openFolderSettings: (folderId) => set({ folderSettingsDialogId: folderId }),
   closeFolderSettings: () => set({ folderSettingsDialogId: null }),
 
+  tagQuickDialogFeedId: null,
+  openTagQuickDialog: (feedId) => set({ tagQuickDialogFeedId: feedId }),
+  closeTagQuickDialog: () => set({ tagQuickDialogFeedId: null }),
+
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
     set({
@@ -535,8 +575,8 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     return { ok: true, value: undefined } as const;
   },
 
-  addPlaceholderFeed: async (url, error) => {
-    const result = await addPlaceholderFeedCore(url, error);
+  addPlaceholderFeed: async (url, error, options) => {
+    const result = await addPlaceholderFeedCore(url, error, options);
     if (!result.ok) return result;
     await reloadFeeds(set);
     schedulePush();
@@ -770,6 +810,51 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     await dbUpdateFeed({ ...feedResult.value, folderId: folderId ?? undefined, updatedAt: Date.now() });
     await reloadFeeds(set);
     schedulePush();
+  },
+
+  setFeedTags: async (feedId, tags) => {
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return;
+    // Normalize: trim every entry, drop empties, dedupe in encounter
+    // order. Case-sensitive — "News" and "news" stay distinct (matches
+    // the OPML import semantics and what the user typed).
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    for (const raw of tags) {
+      const trimmed = typeof raw === "string" ? raw.trim() : "";
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      normalized.push(trimmed);
+    }
+    // Empty result clears the field rather than persisting [] — keeps
+    // the sync payload lean and matches `createFeed`'s "omit when empty".
+    const next: Feed = { ...feedResult.value, updatedAt: Date.now() };
+    if (normalized.length > 0) next.tags = normalized;
+    else delete next.tags;
+    await dbUpdateFeed(next);
+    await reloadFeeds(set);
+    schedulePush();
+  },
+
+  moveFolderToParent: async (folderId, parentId) => {
+    const folder = get().folders.find((f) => f.id === folderId);
+    if (!folder) return err("Folder not found");
+
+    if (parentId !== null) {
+      // Cycle prevention: the new parent must not be the folder itself
+      // or a descendant of the folder. `isDescendantOf` is depth-capped
+      // so even a malformed cycle in stored data resolves safely.
+      if (isDescendantOf(parentId, folderId, get().folders)) {
+        return err("Cannot move a folder into itself or its descendants");
+      }
+    }
+
+    const next = { ...folder, parentId: parentId ?? undefined };
+    // Persist; reload to pick up the new shape.
+    await dbUpdateFolder(next);
+    await reloadFolders(set);
+    schedulePush();
+    return ok(undefined);
   },
 
   setFeedSortMode: (mode) => {

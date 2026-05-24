@@ -299,10 +299,23 @@ function deriveTitleFromUrl(url: string): string {
  * first successful refresh upgrades the row to a normal feed in place
  * (clears `lastError`, backfills title/description/siteUrl from the
  * parsed payload).
+ *
+ * `options` (OPML-importer-shaped, all optional): when the OPML
+ * supplied the user's outline metadata, propagate it onto the
+ * placeholder so the row isn't a blank "host name" until refresh
+ * recovers it. The first-success backfill in `refreshFeed` is
+ * field-by-field conditional on the value still being its derived
+ * default, so a user-chosen title/description survives.
  */
 export async function addPlaceholderFeed(
   rawUrl: string,
   error: string,
+  options?: {
+    titleOverride?: string;
+    descriptionFallback?: string;
+    tags?: string[];
+    createdAtOverride?: number;
+  },
 ): Promise<Result<Feed>> {
   const url = normalizeUrl(rawUrl);
 
@@ -314,9 +327,14 @@ export async function addPlaceholderFeed(
     await removeFeedsByUrl(url);
   }
 
+  const overrideTitle = options?.titleOverride?.trim();
   const created = createFeed({
     url,
-    title: deriveTitleFromUrl(url),
+    title: overrideTitle ? overrideTitle : deriveTitleFromUrl(url),
+    description: options?.descriptionFallback?.trim() || "",
+    tags:
+      options?.tags && options.tags.length > 0 ? options.tags : undefined,
+    createdAt: options?.createdAtOverride,
   });
   if (!created.ok) return created;
 
@@ -533,12 +551,26 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
     // import after a fetch failure): backfill title/description/siteUrl
     // from the parsed payload so the sidebar gets a real label. Skipped
     // on subsequent successes so a user's rename is never clobbered.
+    //
+    // Each field is backfilled ONLY if it's still its derived/default
+    // value. A user-chosen title (set via OPML import's titleOverride)
+    // is recognizable because it differs from `deriveTitleFromUrl`; an
+    // OPML-supplied description is recognizable because the field is
+    // already non-empty. This preserves OPML-imported placeholder
+    // metadata across the first successful refresh (issue #117 follow-up).
     const isFirstSuccess = feed.lastSuccessfulFetchAt === undefined;
     if (isFirstSuccess) {
       const parsedFeed = parseResult.value.feed;
-      if (parsedFeed.title) feed.title = parsedFeed.title;
-      if (parsedFeed.description) feed.description = parsedFeed.description;
-      if (parsedFeed.siteUrl) feed.siteUrl = parsedFeed.siteUrl;
+      const derivedTitle = deriveTitleFromUrl(feed.url);
+      if (parsedFeed.title && feed.title === derivedTitle) {
+        feed.title = parsedFeed.title;
+      }
+      if (parsedFeed.description && !feed.description) {
+        feed.description = parsedFeed.description;
+      }
+      if (parsedFeed.siteUrl && !feed.siteUrl) {
+        feed.siteUrl = parsedFeed.siteUrl;
+      }
     }
 
     // Capture the upstream's cache validators so the next refresh can

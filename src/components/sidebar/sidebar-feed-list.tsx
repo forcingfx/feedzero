@@ -5,8 +5,9 @@ import { useDroppable } from "@dnd-kit/core";
 import { ArrowUpDown, Check } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
-import { toFolderFeedId } from "@feedzero/core/utils/constants";
+import { toFolderFeedId, toTagFeedId, isTagFeedId, fromTagFeedId } from "@feedzero/core/utils/constants";
 import { SidebarSeparator } from "@/components/ui/sidebar.tsx";
+import { TagItem } from "./tag-item.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +65,7 @@ export function SidebarFeedList({
   const folders = useFeedStore((s) => s.folders);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
+  const moveFolderToParent = useFeedStore((s) => s.moveFolderToParent);
   const feedSortMode = useFeedStore((s) => s.feedSortMode);
   const feedCustomOrder = useFeedStore((s) => s.feedCustomOrder);
   const folderCustomOrder = useFeedStore((s) => s.folderCustomOrder);
@@ -106,6 +108,24 @@ export function SidebarFeedList({
    * folders list — OPML imports preserve nested structure via
    * `Folder.parentId`, and we render that as a tree below.
    */
+  /**
+   * Distinct tags across every loaded feed, sorted alphabetically.
+   * Mirrors the folder section's pattern; sidebar renders one row per
+   * tag with an aggregated unread count. Tags come from `Feed.tags`
+   * (populated from OPML outline[category]).
+   */
+  const distinctTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of feeds) {
+      for (const t of f.tags ?? []) if (t) set.add(t);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [feeds]);
+
+  const selectedTag = selectedFeedId && isTagFeedId(selectedFeedId)
+    ? fromTagFeedId(selectedFeedId)
+    : null;
+
   const childFoldersByParent = useMemo(() => {
     const map = new Map<string, typeof folders>();
     const validIds = new Set(folders.map((f) => f.id));
@@ -173,16 +193,43 @@ export function SidebarFeedList({
     const draggedIsFolder = folderIds.has(draggedId);
     const overIsFolder = folderIds.has(overId);
 
-    // Custom mode: reorder folders when both sides of the drag are folders.
-    // Must be checked BEFORE the feed→folder branch below, otherwise dragging
-    // folder A over folder B would file folder A inside folder B.
-    if (feedSortMode === "custom" && draggedIsFolder && overIsFolder) {
-      const currentOrder = sortedFolders.map((f) => f.id);
-      const oldIdx = currentOrder.indexOf(draggedId);
-      const newIdx = currentOrder.indexOf(overId);
-      if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
-        reorderFolders(arrayMove(currentOrder, oldIdx, newIdx));
+    // Folder-over-folder: three cases per the Item 4 plan.
+    //   1. Same parent → reorder siblings (custom mode only — needs an
+    //      explicit ordering source of truth).
+    //   2. Different parent, target is not a descendant → reparent.
+    //   3. Target IS a descendant of dragged → ignore (cycle).
+    if (draggedIsFolder && overIsFolder) {
+      const dragged = folders.find((f) => f.id === draggedId);
+      const target = folders.find((f) => f.id === overId);
+      if (!dragged || !target) return;
+      const sameParent = (dragged.parentId ?? "") === (target.parentId ?? "");
+      if (sameParent) {
+        // Reorder among siblings. Top-level uses the existing
+        // folderCustomOrder; nested reorder is purely a parentId
+        // operation today (no per-parent order yet — render order
+        // matches folders array order, which the OPML import
+        // already provides depth-first).
+        if (
+          feedSortMode === "custom" &&
+          (dragged.parentId ?? "") === ""
+        ) {
+          const currentOrder = sortedFolders.map((f) => f.id);
+          const oldIdx = currentOrder.indexOf(draggedId);
+          const newIdx = currentOrder.indexOf(overId);
+          if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
+            reorderFolders(arrayMove(currentOrder, oldIdx, newIdx));
+          }
+        }
+        return;
       }
+      // Different parent → reparent (cycle check inside store action).
+      void moveFolderToParent(draggedId, overId);
+      return;
+    }
+
+    // Folder dragged over the unfiled drop zone → un-nest to top level.
+    if (draggedIsFolder && overId === "unfiled") {
+      void moveFolderToParent(draggedId, null);
       return;
     }
 
@@ -273,6 +320,26 @@ export function SidebarFeedList({
             }),
           )}
         </SortableContext>
+
+        {distinctTags.length > 0 && (
+          <>
+            <SidebarSeparator className="mx-0 my-1" />
+            <div
+              className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/70"
+              data-testid="sidebar-tags-heading"
+            >
+              Tags
+            </div>
+            {distinctTags.map((tag) => (
+              <TagItem
+                key={tag}
+                tag={tag}
+                isSelected={selectedTag === tag}
+                onSelect={() => onFeedSelect(toTagFeedId(tag))}
+              />
+            ))}
+          </>
+        )}
 
         <DragOverlay>
           {activeDragId ? (

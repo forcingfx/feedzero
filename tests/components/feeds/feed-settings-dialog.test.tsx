@@ -79,6 +79,7 @@ describe("FeedSettingsDialog", () => {
   let setFeedPreferFullText: ReturnType<typeof vi.fn>;
   let setFeedPrefetchEnabled: ReturnType<typeof vi.fn>;
   let moveFeedToFolder: ReturnType<typeof vi.fn>;
+  let setFeedTags: ReturnType<typeof vi.fn>;
   let refreshSingleFeed: ReturnType<typeof vi.fn>;
   let reloadSingleFeed: ReturnType<typeof vi.fn>;
   let removeFeed: ReturnType<typeof vi.fn>;
@@ -89,6 +90,7 @@ describe("FeedSettingsDialog", () => {
     setFeedPreferFullText = vi.fn().mockResolvedValue(undefined);
     setFeedPrefetchEnabled = vi.fn().mockResolvedValue(undefined);
     moveFeedToFolder = vi.fn().mockResolvedValue(undefined);
+    setFeedTags = vi.fn().mockResolvedValue(undefined);
     refreshSingleFeed = vi.fn().mockResolvedValue(undefined);
     reloadSingleFeed = vi.fn().mockResolvedValue(undefined);
     removeFeed = vi.fn().mockResolvedValue(undefined);
@@ -102,6 +104,7 @@ describe("FeedSettingsDialog", () => {
       setFeedPreferFullText,
       setFeedPrefetchEnabled,
       moveFeedToFolder,
+      setFeedTags,
       refreshSingleFeed,
       reloadSingleFeed,
       removeFeed,
@@ -197,6 +200,56 @@ describe("FeedSettingsDialog", () => {
     const select = screen.getByTestId("feed-settings-folder");
     await user.selectOptions(select, "");
     expect(moveFeedToFolder).toHaveBeenCalledWith("f-tech", null);
+  });
+
+  it("Tags section renders each existing tag as a pill", () => {
+    useFeedStore.setState({
+      feeds: [feed({ tags: ["tech", "news"] })],
+      feedSettingsDialogId: "f-tech",
+    });
+    renderDialog();
+    expect(screen.getByTestId("tag-pill-tech")).toBeInTheDocument();
+    expect(screen.getByTestId("tag-pill-news")).toBeInTheDocument();
+  });
+
+  it("Tags picker save persists the current pill list via setFeedTags", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+    renderDialog();
+
+    const input = screen.getByTestId("feed-settings-tags-input-input");
+    await user.type(input, "tech,frontend,");
+    await user.click(screen.getByTestId("feed-settings-tags-save"));
+
+    expect(setFeedTags).toHaveBeenCalledWith("f-tech", ["tech", "frontend"]);
+  });
+
+  it("Removing a pill enables Save and persists the trimmed list", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [feed({ tags: ["tech", "news"] })],
+      feedSettingsDialogId: "f-tech",
+    });
+    renderDialog();
+
+    await user.click(screen.getByLabelText("Remove news"));
+    await user.click(screen.getByTestId("feed-settings-tags-save"));
+
+    expect(setFeedTags).toHaveBeenCalledWith("f-tech", ["tech"]);
+  });
+
+  it("Removing every pill and saving clears the tag list (empty array)", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [feed({ tags: ["tech"] })],
+      feedSettingsDialogId: "f-tech",
+    });
+    renderDialog();
+
+    await user.click(screen.getByLabelText("Remove tech"));
+    await user.click(screen.getByTestId("feed-settings-tags-save"));
+
+    expect(setFeedTags).toHaveBeenCalledWith("f-tech", []);
   });
 
   it("Manage rules button calls openRulesEditor with the feed id", async () => {

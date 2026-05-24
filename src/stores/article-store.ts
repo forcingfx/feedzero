@@ -10,6 +10,8 @@ import {
   ALL_FEEDS_ID,
   LOCAL_STORAGE,
   isFolderFeedId,
+  isTagFeedId,
+  fromTagFeedId,
   isAggregatedFeedId,
   isStarredFeedId,
   isFilterFeedId,
@@ -226,6 +228,21 @@ function deriveVisibleArticles(
     }
     return sortArticles(flat, sortMode);
   }
+  if (isTagFeedId(feedId)) {
+    // Tag-aggregated view: every article from a feed tagged with `tag`.
+    // Tags ride on Feed.tags (populated from OPML outline[category]).
+    const tag = fromTagFeedId(feedId)!;
+    const feeds = useFeedStore.getState().feeds;
+    const taggedFeedIds = new Set(
+      feeds.filter((f) => (f.tags ?? []).includes(tag)).map((f) => f.id),
+    );
+    const flat: Article[] = [];
+    for (const [fid, list] of Object.entries(articlesByFeedId)) {
+      if (!taggedFeedIds.has(fid)) continue;
+      for (const a of list) if (dropMuted(a)) flat.push(a);
+    }
+    return sortArticles(flat, sortMode);
+  }
   const list = articlesByFeedId[feedId] ?? [];
   return sortArticles(list.filter(dropMuted), sortMode);
 }
@@ -275,7 +292,8 @@ function mergeFetchedArticles(
     feedId === ALL_FEEDS_ID ||
     isStarredFeedId(feedId) ||
     isFilterFeedId(feedId) ||
-    isFolderFeedId(feedId)
+    isFolderFeedId(feedId) ||
+    isTagFeedId(feedId)
   ) {
     // Bulk paths return articles from many feeds — replace each feed's
     // bucket with its slice of the fetch so per-feed state matches the DB.
@@ -348,6 +366,18 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
         useFeedStore
           .getState()
           .feeds.filter((f) => f.folderId === folderId)
+          .map((f) => f.id),
+      );
+      const result = await getAllArticles();
+      fetched = result.ok
+        ? result.value.filter((a) => memberIds.has(a.feedId))
+        : [];
+    } else if (isTagFeedId(feedId)) {
+      const tag = fromTagFeedId(feedId)!;
+      const memberIds = new Set(
+        useFeedStore
+          .getState()
+          .feeds.filter((f) => (f.tags ?? []).includes(tag))
           .map((f) => f.id),
       );
       const result = await getAllArticles();

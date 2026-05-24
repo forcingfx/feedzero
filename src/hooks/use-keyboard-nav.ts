@@ -4,7 +4,7 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { useCommandPaletteStore } from "@/stores/command-palette-store.ts";
-import { toFolderFeedId } from "@feedzero/core/utils/constants";
+import { toFolderFeedId, isAggregatedFeedId } from "@feedzero/core/utils/constants";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 
 /**
@@ -92,6 +92,9 @@ export function useKeyboardNav() {
         break;
       case "r":
         refreshAllFeeds();
+        break;
+      case "t":
+        openTagQuickForCurrentFeed();
         break;
       default:
         return;
@@ -243,4 +246,15 @@ function toggleSidebar() {
 
 function refreshAllFeeds() {
   useFeedStore.getState().refreshAll();
+}
+
+/**
+ * Open the quick-tag dialog against the currently-selected feed.
+ * No-ops when the current selection is an aggregated view (folder,
+ * tag, starred, smart filter) — those have no single feed to tag.
+ */
+function openTagQuickForCurrentFeed() {
+  const id = useFeedStore.getState().selectedFeedId;
+  if (!id || isAggregatedFeedId(id)) return;
+  useFeedStore.getState().openTagQuickDialog(id);
 }

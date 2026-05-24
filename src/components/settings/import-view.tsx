@@ -265,10 +265,13 @@ export function ImportView({ onClose }: ImportViewProps) {
         }
 
         // Recoverable fetch failure — persist a placeholder so the user
-        // can hit refresh later to recover the feed.
+        // can hit refresh later to recover the feed. Carry the OPML
+        // metadata onto the placeholder so it isn't a blank "host
+        // name only" row while the user retries.
         const placeholder = await addPlaceholderFeed(
           entry.xmlUrl,
           result.error,
+          opts,
         );
         if (!placeholder.ok) {
           // Placeholder creation itself failed (e.g. duplicate URL in

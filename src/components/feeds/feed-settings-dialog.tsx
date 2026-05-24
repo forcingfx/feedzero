@@ -47,6 +47,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import { TierLockBadge } from "@/components/features/tier-lock-badge.tsx";
+import { TagPicker } from "./tag-picker.tsx";
 import type { Feature } from "@/core/features/feature-gates.ts";
 import type { Feed } from "@feedzero/core/types";
 
@@ -95,6 +96,7 @@ function Body({ feed, onClose }: { feed: Feed; onClose: () => void }) {
         <NameSection feed={feed} />
         <DisplaySection feed={feed} />
         <FolderSection feed={feed} />
+        <TagsSection feed={feed} />
         <RulesSection feed={feed} />
         <ActionsSection feed={feed} />
       </div>
@@ -249,6 +251,72 @@ function FolderSection({ feed }: { feed: Feed }) {
           </option>
         ))}
       </select>
+    </section>
+  );
+}
+
+/**
+ * Tags editor. Backed by <TagPicker> — pills + autocomplete from
+ * existing tags + free-form add. Initial draft tracks `feed.tags`
+ * via key reset on the parent so external sync updates pull through;
+ * Save persists via `setFeedTags`, which normalizes (trim + dedupe
+ * + drop empties) and clears the field when the result is empty.
+ *
+ * The same picker mounts in the quick-tag dialog (⌘K → Tag, or `t`)
+ * so the two surfaces share keyboard semantics and autocomplete.
+ */
+function TagsSection({ feed }: { feed: Feed }) {
+  const setFeedTags = useFeedStore((s) => s.setFeedTags);
+  const [draft, setDraft] = useState<string[]>(feed.tags ?? []);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraft(feed.tags ?? []);
+  }, [feed.tags]);
+
+  const current = feed.tags ?? [];
+  const dirty =
+    draft.length !== current.length ||
+    draft.some((t, i) => t !== current[i]);
+
+  async function save() {
+    if (!dirty) return;
+    setSaving(true);
+    try {
+      await setFeedTags(feed.id, draft);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <Label htmlFor="feed-settings-tags">Tags</Label>
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <TagPicker
+            id="feed-settings-tags"
+            value={draft}
+            onChange={setDraft}
+            size="sm"
+            data-testid="feed-settings-tags-input"
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={save}
+          disabled={!dirty || saving}
+          data-testid="feed-settings-tags-save"
+        >
+          Save
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Tags appear as a section in the sidebar and can be matched in
+        smart filters. Type to add; arrow-down picks from existing.
+      </p>
     </section>
   );
 }

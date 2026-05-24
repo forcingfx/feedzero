@@ -609,6 +609,45 @@ describe("useKeyboardNav", () => {
     });
   });
 
+  describe("tag this feed (t)", () => {
+    it("opens the quick-tag dialog for the currently-selected concrete feed", () => {
+      const openTagQuickDialog = vi.fn();
+      useFeedStore.setState({
+        selectedFeedId: "f-tech",
+        openTagQuickDialog,
+      } as never);
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      const event = pressKey("t");
+      expect(event.defaultPrevented).toBe(true);
+      expect(openTagQuickDialog).toHaveBeenCalledWith("f-tech");
+    });
+
+    it("is a no-op when nothing is selected (key still consumed)", () => {
+      const openTagQuickDialog = vi.fn();
+      useFeedStore.setState({
+        selectedFeedId: null,
+        openTagQuickDialog,
+      } as never);
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      pressKey("t");
+      expect(openTagQuickDialog).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op when the selection is an aggregated view", () => {
+      const openTagQuickDialog = vi.fn();
+      useFeedStore.setState({
+        selectedFeedId: "folder:abc",
+        openTagQuickDialog,
+      } as never);
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      pressKey("t");
+      expect(openTagQuickDialog).not.toHaveBeenCalled();
+    });
+  });
+
   describe("open settings (Cmd/Ctrl + ,)", () => {
     it("navigates to /settings", async () => {
       // We can't easily inspect the resulting URL from a bare renderHook,
