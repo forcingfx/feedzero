@@ -75,6 +75,7 @@ export function BriefingPage() {
   const feeds = useFeedStore((s) => s.feeds);
   const [preferredModel] = useBriefingModelPreference();
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
     void loadBriefings();
@@ -84,6 +85,29 @@ export function BriefingPage() {
     () => briefings.find((b) => b.id === briefingId) ?? null,
     [briefings, briefingId],
   );
+
+  // Derive per-briefing UI status. Falls back to "idle" + undefined
+  // when briefing isn't loaded yet so the hooks below stay
+  // unconditional — Rules of Hooks require every hook (and every
+  // hook-derived value used by the next hook) to run on every render.
+  // Without this, the early returns lower down skip hooks on the
+  // first render and then call them on the second, which React
+  // detects and surfaces as a blank-screen crash.
+  const status = briefing ? (statusById.get(briefing.id) ?? "idle") : "idle";
+  const error = briefing ? errorById.get(briefing.id) : undefined;
+  const pendingScore = briefing
+    ? pendingScoreById.get(briefing.id)
+    : undefined;
+
+  // Stamp the start time when we transition INTO loading; clear it when
+  // we leave. The skeleton uses this to drive the elapsed-time counter.
+  useEffect(() => {
+    if (status === "loading" && loadingStartedAt === null) {
+      setLoadingStartedAt(Date.now());
+    } else if (status !== "loading" && loadingStartedAt !== null) {
+      setLoadingStartedAt(null);
+    }
+  }, [status, loadingStartedAt]);
 
   // Gate-locked users see the matrix-derived upgrade splash.
   if (!gate.enabled) {
@@ -125,21 +149,6 @@ export function BriefingPage() {
       </>
     );
   }
-
-  const status = statusById.get(briefing.id) ?? "idle";
-  const error = errorById.get(briefing.id);
-  const pendingScore = pendingScoreById.get(briefing.id);
-  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
-
-  // Stamp the start time when we transition INTO loading; clear it when
-  // we leave. The skeleton uses this to drive the elapsed-time counter.
-  useEffect(() => {
-    if (status === "loading" && loadingStartedAt === null) {
-      setLoadingStartedAt(Date.now());
-    } else if (status !== "loading" && loadingStartedAt !== null) {
-      setLoadingStartedAt(null);
-    }
-  }, [status, loadingStartedAt]);
 
   async function handleRefresh() {
     if (!briefing) return;
