@@ -229,6 +229,50 @@ logging, fetch-and-forward only.
 - The "lazy-load the SDK so it doesn't blank the app at boot" gymnastics
   in the previous fix are obsolete; there's no SDK to lazy-load.
 
+## Amendment 2: web-search verified feed suggestions
+
+**Date:** 2026-05-24.
+
+### What changed
+
+The "suggest feeds that could strengthen this briefing" output used to
+be model-imagined: Claude wrote URLs from its training-data memory of
+publishers, and we ran each through `discoverFeed()` to catch the dead
+ones. In practice the discover step rejected most of them — Claude's
+guesses at feed paths (`/feed`, `/rss`, `/atom.xml`) are wrong as often
+as they're right, and "site X publishes Y" lookups were stale.
+
+Now the model can use Anthropic's server-side `web_search` tool while
+generating the briefing, with `max_uses: 5`. The system prompt requires:
+
+> Use web_search to find candidate sources … then verify each candidate
+> feed URL with a second targeted search if needed. Do NOT suggest any
+> URL you haven't surfaced via web_search; do NOT guess feed paths from
+> a model-known site name. If web_search returns nothing usable for a
+> particular topic, return FEWER suggestions rather than padding with
+> unverified guesses.
+
+The Anthropic backend handles the searches; results stream back into the
+same response. We still pipe each candidate through `discoverFeed()` as
+defense in depth, but the discovery step now mostly confirms what the
+model already verified.
+
+### Cost delta
+
+`web_search` adds ~1¢ per search at current Anthropic pricing; capped at
+5 uses per refresh that's 5¢/refresh on top of the ~5¢ base briefing
+cost. Paid by the user (BYO key). The structural-section briefing
+template forces concise output so token counts don't balloon.
+
+### Why this works with multi-step tool use
+
+`tool_choice` flipped from `{type: "tool", name: "submit_briefing"}` to
+`{type: "auto"}` so the model can interleave web_search calls before
+the final structured submission. Response parsing now looks for the
+`tool_use` block with `name === "submit_briefing"` specifically (rather
+than the first `tool_use`) since the response also contains
+`server_tool_use` blocks for each search.
+
 ## Future work
 
 - **Operator-paid trial.** A future ADR could enable a server-proxied

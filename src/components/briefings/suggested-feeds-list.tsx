@@ -26,7 +26,8 @@ export function SuggestedFeedsList({ suggestions }: Props) {
   if (suggestions.length === 0) {
     return (
       <p className="text-sm text-muted-foreground italic">
-        The model didn&apos;t suggest any additional feeds for this briefing.
+        The model didn&apos;t surface any web-search-verified feeds for
+        this briefing.
       </p>
     );
   }

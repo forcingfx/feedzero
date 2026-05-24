@@ -134,9 +134,19 @@ describe("generateBriefing", () => {
     const body = JSON.parse(init.body);
     expect(body.model).toBe("claude-opus-4-7");
     expect(typeof body.system).toBe("string");
-    expect(body.tools).toHaveLength(1);
-    expect(body.tools[0].name).toBe("submit_briefing");
-    expect(body.tool_choice).toEqual({ type: "tool", name: "submit_briefing" });
+    // web_search + submit_briefing — two tools so the model can verify
+    // feeds before suggesting them.
+    expect(body.tools).toHaveLength(2);
+    expect(body.tools.map((t: { name: string }) => t.name)).toContain(
+      "submit_briefing",
+    );
+    expect(body.tools.map((t: { name: string }) => t.name)).toContain(
+      "web_search",
+    );
+    // tool_choice is "auto" so the model can run web_search before the
+    // mandatory submit_briefing call; the prompt + response shape
+    // contract forces submit_briefing to be the final block.
+    expect(body.tool_choice).toEqual({ type: "auto" });
     expect(body.messages[0].role).toBe("user");
     expect(JSON.stringify(body.messages[0].content)).toContain("anything");
   });
@@ -281,5 +291,59 @@ describe("generateBriefing", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.suggestedFeeds).toHaveLength(5);
+  });
+
+  it("picks the submit_briefing block out of a multi-step web_search response", async () => {
+    // Simulates a response where the model ran web_search a couple
+    // times before calling submit_briefing. We must find the
+    // submit_briefing block specifically — not just the first tool_use.
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          content: [
+            { type: "text", text: "I'll search for current sources." },
+            {
+              type: "server_tool_use",
+              id: "ws-1",
+              name: "web_search",
+              input: { query: "EU AI Act enforcement RSS" },
+            },
+            {
+              type: "web_search_tool_result",
+              tool_use_id: "ws-1",
+              content: [{ type: "web_search_result", url: "https://x.example", title: "X" }],
+            },
+            {
+              type: "tool_use",
+              id: "submit-1",
+              name: "submit_briefing",
+              input: {
+                abstract: "Summary [A1].",
+                citations: [{ articleId: "a1", quote: "q" }],
+                suggestedFeeds: [
+                  {
+                    candidateUrl: "https://x.example/feed.xml",
+                    rationale: "Verified via web_search.",
+                  },
+                ],
+              },
+            },
+          ],
+          usage: { input_tokens: 2048, output_tokens: 512 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    const result = await generateBriefing({
+      prompt: "x",
+      articles: [article({ id: "a1", title: "x" })],
+      apiKey: "sk-ant-test",
+      modelId: "claude-sonnet-4-6",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.suggestedFeeds[0].candidateUrl).toBe(
+      "https://x.example/feed.xml",
+    );
   });
 });

@@ -35,7 +35,11 @@ import type { BriefingModelId } from "./models";
 const RELAY_URL = "/api/briefing";
 const ANTHROPIC_VERSION = "2023-06-01";
 const SUGGESTED_FEED_CAP = 5;
-const MAX_TOKENS = 4096;
+// Bumped from 4096 because web_search results inflate the running
+// context — the model needs room to issue several searches and still
+// produce the structured briefing.
+const MAX_TOKENS = 8192;
+const WEB_SEARCH_MAX_USES = 5;
 /** How much of each article body to send. Long enough for context, short enough to control cost. */
 const ARTICLE_EXCERPT_CHARS = 1500;
 
@@ -92,14 +96,40 @@ const SYSTEM_PROMPT = [
   "   (`-`), and **bold** as specified above. Do not use blockquotes,",
   "   tables, code blocks, or images — none of those render in the",
   "   briefing surface.",
-  "5. Suggest up to 5 feed URLs or sites that could strengthen the",
-  "   briefing. Prefer authoritative primary sources. Do NOT suggest",
-  "   sources already in the user's corpus (you'll see the source URLs",
-  "   in each article block). For each suggestion, give one short",
-  "   sentence of rationale.",
+  "5. Suggest up to 5 RSS / Atom feed URLs that could strengthen the",
+  "   briefing — but you MUST verify each one is real and currently",
+  "   active before suggesting it. Use the web_search tool to find",
+  "   candidate sources (search queries like `<topic> RSS feed site:`",
+  "   or `<publisher> Atom URL` work well), then verify each candidate",
+  "   feed URL with a second targeted search if needed. Do NOT suggest",
+  "   any URL you haven't surfaced via web_search; do NOT guess feed",
+  "   paths like `/feed` or `/rss` from a model-known site name —",
+  "   those guesses are wrong as often as they're right. Prefer",
+  "   authoritative primary sources. Do NOT suggest sources already in",
+  "   the user's corpus (you'll see the source URLs in each article",
+  "   block). For each suggestion, give one short sentence of rationale.",
+  "   If web_search returns nothing usable for a particular topic, return",
+  "   FEWER suggestions rather than padding with unverified guesses.",
   "6. Submit your entire output via the submit_briefing tool. Do not",
   "   produce any free text outside the tool call.",
 ].join("\n");
+
+/**
+ * Anthropic's server-side web search. The model issues queries, the
+ * Anthropic backend runs them, and the model receives the results
+ * inline — no client-side fetches, no SSRF concerns, no roundtrips
+ * through our relay beyond the initial request.
+ *
+ * `max_uses` caps how many searches the model can run on a single
+ * request; we set it to 5 (covers a few rounds of "find a publisher"
+ * + "verify each candidate feed URL"). Costs ~1¢/search at Anthropic's
+ * current rates, paid by the user since they brought their own key.
+ */
+const WEB_SEARCH_TOOL = {
+  type: "web_search_20250305",
+  name: "web_search",
+  max_uses: WEB_SEARCH_MAX_USES,
+} as const;
 
 const SUBMIT_BRIEFING_TOOL = {
   name: "submit_briefing",
@@ -167,7 +197,7 @@ interface ToolPayload {
 }
 
 interface AnthropicResponse {
-  content?: Array<{ type: string; input?: unknown }>;
+  content?: Array<{ type: string; name?: string; input?: unknown }>;
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
@@ -186,8 +216,12 @@ export async function generateBriefing(
     model: input.modelId,
     max_tokens: MAX_TOKENS,
     system: SYSTEM_PROMPT,
-    tools: [SUBMIT_BRIEFING_TOOL],
-    tool_choice: { type: "tool", name: "submit_briefing" },
+    tools: [WEB_SEARCH_TOOL, SUBMIT_BRIEFING_TOOL],
+    // `auto` (not `{type: "tool", name: ...}`) so the model can run
+    // web_search before submit_briefing. The system prompt requires
+    // submit_briefing as the final step; if a model returns text
+    // without it, validateToolPayload below surfaces a clear error.
+    tool_choice: { type: "auto" },
     messages: [
       {
         role: "user",
@@ -225,8 +259,14 @@ export async function generateBriefing(
     );
   }
 
+  // Multi-step responses (when web_search is enabled) interleave
+  // `server_tool_use` blocks for the searches with text blocks for
+  // model reasoning and a final `tool_use` block for submit_briefing.
+  // Pick the submit_briefing call specifically — defaulting to the
+  // first `tool_use` would still work today but breaks the moment
+  // we add another client-side tool.
   const toolBlock = (parsed.content ?? []).find(
-    (block) => block.type === "tool_use",
+    (block) => block.type === "tool_use" && block.name === "submit_briefing",
   );
   if (!toolBlock) {
     return err(
