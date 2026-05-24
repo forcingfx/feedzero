@@ -4,6 +4,7 @@ import type {
   Folder,
   SmartFilter,
   UserPreferences,
+  Briefing,
 } from "../../../packages/core/src/types";
 import type { Result } from "../../../packages/core/src/utils/result";
 
@@ -14,20 +15,25 @@ import type { Result } from "../../../packages/core/src/utils/result";
  * tolerate older shapes — see the back-compat rule below):
  *  1 — feeds + articles only.
  *  2 — adds optional `folders` + `smartFilters`.
- *  3 — adds optional `preferences` + `preferencesUpdatedAt` (this version).
+ *  3 — adds optional `preferences` + `preferencesUpdatedAt`.
+ *  4 — adds optional `briefings` (Signal Briefings) + `secrets`
+ *      (user-supplied API keys, e.g. Anthropic). The on-wire format
+ *      version (SYNC.FORMAT_VERSION) was already bumped to 4 for
+ *      gzip; this is the schema layer's v4.
  *
  * Back-compat rule (importVault, mergeVaults, importAll): a vault that
- * OMITS `folders`, `smartFilters`, or `preferences` keys must NOT wipe the
- * local rows. `undefined` = "no opinion from the source"; `[]` = "the
- * source has zero rows" and is distinct from undefined. Without this the
- * first push from an older client would silently delete a newer client's
- * organisational data.
+ * OMITS `folders`, `smartFilters`, `preferences`, `briefings`, or `secrets`
+ * keys must NOT wipe the local rows. `undefined` = "no opinion from the
+ * source"; `[]` = "the source has zero rows" and is distinct from
+ * undefined. Without this the first push from an older client would
+ * silently delete a newer client's data.
  *
- * Conflict model: `feeds`/`articles`/`folders`/`smartFilters` are id-keyed
- * collections merged by id/url (local wins on collision). `preferences` is
- * a scalar record, so it CANNOT use that rule — a single object would never
- * propagate from another device. It uses timestamp last-write-wins via
- * `preferencesUpdatedAt` instead (newer wins; ties favor local).
+ * Conflict model: id-keyed collections (`feeds`, `articles`, `folders`,
+ * `smartFilters`, `briefings`) merge by id (local wins on collision).
+ * Scalar records (`preferences`, `secrets`) CANNOT use that rule — a
+ * single object would never propagate from another device. They use
+ * timestamp last-write-wins (preferences) or "take whichever side has a
+ * value, local wins on collision" (secrets).
  */
 export interface VaultData {
   version: number;
@@ -39,6 +45,20 @@ export interface VaultData {
   preferences?: UserPreferences;
   /** Epoch ms of the last preferences write; drives the LWW merge. */
   preferencesUpdatedAt?: number;
+  briefings?: Briefing[];
+  /**
+   * User-supplied secrets (currently only the Anthropic API key used by
+   * Signal Briefings). Stored in the encrypted vault so the user
+   * doesn't have to re-paste their key on every device. Merged
+   * "non-empty side wins, local on collision" — a user who actively
+   * deletes the key locally re-syncs an empty value, while a passive
+   * mismatch picks up the other side's value.
+   */
+  secrets?: VaultSecrets;
+}
+
+export interface VaultSecrets {
+  anthropicKey?: string;
 }
 
 /** Encrypted vault as stored on the server. */

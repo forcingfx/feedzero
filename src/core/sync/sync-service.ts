@@ -99,6 +99,11 @@ export async function exportVault(): Promise<Result<VaultData>> {
     smartFilters: result.value.smartFilters,
     preferences: result.value.preferences ?? undefined,
     preferencesUpdatedAt: result.value.preferencesUpdatedAt ?? undefined,
+    briefings: result.value.briefings,
+    secrets:
+      result.value.anthropicKey !== null
+        ? { anthropicKey: result.value.anthropicKey }
+        : undefined,
   });
 }
 
@@ -116,6 +121,8 @@ export async function importVault(vault: VaultData): Promise<Result<boolean>> {
     smartFilters: vault.smartFilters,
     preferences: vault.preferences,
     preferencesUpdatedAt: vault.preferencesUpdatedAt,
+    briefings: vault.briefings,
+    anthropicKey: vault.secrets?.anthropicKey,
   });
 }
 
@@ -361,9 +368,9 @@ export function mergeVaults(
     }
   }
 
-  // Folders + smartFilters: dedup by id, local wins on collision.
-  // Mirrors the feeds-by-URL rule. A v1 cloud vault omits both keys, in
-  // which case the local set survives untouched.
+  // Folders + smartFilters + briefings: dedup by id, local wins on
+  // collision. Mirrors the feeds-by-URL rule. A pre-v4 cloud vault
+  // omits briefings, in which case the local set survives untouched.
   const mergedFolders = mergeByIdLocalWins(
     localVault.folders,
     cloudVault.folders,
@@ -372,6 +379,10 @@ export function mergeVaults(
     localVault.smartFilters,
     cloudVault.smartFilters,
   );
+  const mergedBriefings = mergeByIdLocalWins(
+    localVault.briefings,
+    cloudVault.briefings,
+  );
 
   // Preferences are a scalar record, not an id-keyed collection — pick the
   // side written most recently (ties favor local). Whichever side is taken,
@@ -379,6 +390,15 @@ export function mergeVaults(
   const { preferences, preferencesUpdatedAt } = mergePreferencesLatestWins(
     localVault,
     cloudVault,
+  );
+
+  // Secrets: take whichever side has a value, local wins on collision.
+  // A user actively clearing their key locally re-syncs that empty
+  // state; a passive mismatch picks up the other side's value so the
+  // user doesn't have to re-paste their key after a fresh install.
+  const mergedSecrets = mergeSecretsLocalWins(
+    localVault.secrets,
+    cloudVault.secrets,
   );
 
   return ok({
@@ -390,6 +410,8 @@ export function mergeVaults(
     smartFilters: mergedSmartFilters,
     preferences,
     preferencesUpdatedAt,
+    briefings: mergedBriefings,
+    secrets: mergedSecrets,
   });
 }
 
@@ -438,6 +460,22 @@ function mergePreferencesLatestWins(
  * when both inputs are `undefined`, so the v1-cloud case doesn't lose
  * the local set.
  */
+/**
+ * Merge secrets across vaults: local non-empty values win, otherwise
+ * take the cloud value. An undefined `secrets` block on either side is
+ * "no opinion"; both undefined leaves the result undefined so the
+ * back-compat "no opinion" contract holds for old clients.
+ */
+function mergeSecretsLocalWins(
+  local: VaultData["secrets"],
+  cloud: VaultData["secrets"],
+): VaultData["secrets"] {
+  if (local === undefined && cloud === undefined) return undefined;
+  const anthropicKey = local?.anthropicKey || cloud?.anthropicKey;
+  if (!anthropicKey) return {};
+  return { anthropicKey };
+}
+
 function mergeByIdLocalWins<T extends { id: string }>(
   local: T[] | undefined,
   cloud: T[] | undefined,
