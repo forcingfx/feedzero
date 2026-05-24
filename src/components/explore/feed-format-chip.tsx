@@ -1,30 +1,33 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Rss, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Kbd } from "@/components/ui/kbd";
 import { previewFeed } from "@/core/feeds/feed-service";
 import type { FeedFormat } from "@/core/parser/parser";
 
 /**
- * The discovery chip that lives under the Explore URL input.
+ * Discovery chip under the Explore URL input.
  *
- * When the user pastes (or types) a URL, we silently probe it via
- * `previewFeed` after a brief debounce. The chip shows three format
- * pills — RSS, Atom, JSON Feed — and lights up the one feedsmith
- * actually identified. While probing, all three pills animate to
- * communicate "we're checking every format the publisher might be
- * serving".
+ * Lifecycle:
+ *   user types/pastes  →  400ms debounce  →  previewFeed() probe  →
+ *     · `found <fmt>`  — matched pill highlights; feed title appears;
+ *                        a clickable "Add feed" button (= Enter) shows
+ *     · `probing`      — spinner + "Checking…" while the probe runs
+ *     · `not-found`    — gentle "We couldn't find a feed there" copy
  *
- * This is the affordance the landing-page copy ("Paste any URL.
- * FeedZero finds the feed.") had been claiming with nothing visible
- * to back it up.
+ * The chip is the affordance the landing copy ("Paste any URL.
+ * FeedZero finds the feed.") implied; the Add button on success makes
+ * the headline action discoverable without keyboard knowledge.
  *
- * Tier note: bridges are off here — discovery against an arbitrary URL
- * is cheap, but the bridge cascade (YouTube/Reddit/Mastodon) is gated
- * to Personal and runs inside `addFeed` proper. The chip is a preview;
- * the headline action is still Enter → add.
+ * The `onAdd` callback is optional — when omitted the chip is a pure
+ * status indicator (the form still submits on Enter via its parent).
+ * When provided, clicking the button runs the same code path.
  */
 interface FeedFormatChipProps {
   url: string;
+  onAdd?: () => void;
+  /** Disable the Add button while an outer add-feed call is in flight. */
+  isAdding?: boolean;
 }
 
 type ChipState =
@@ -41,7 +44,14 @@ const FORMAT_LABELS: { format: FeedFormat; label: string }[] = [
   { format: "json", label: "JSON Feed" },
 ];
 
-export function FeedFormatChip({ url }: FeedFormatChipProps) {
+/** Format name for the celebratory headline ("Atom feed found"). */
+function formatHeadline(format: FeedFormat): string {
+  if (format === "rss") return "RSS";
+  if (format === "atom") return "Atom";
+  return "JSON";
+}
+
+export function FeedFormatChip({ url, onAdd, isAdding }: FeedFormatChipProps) {
   const [state, setState] = useState<ChipState>({ kind: "idle" });
   const generationRef = useRef(0);
 
@@ -60,7 +70,7 @@ export function FeedFormatChip({ url }: FeedFormatChipProps) {
         setState({
           kind: "found",
           format: result.value.format,
-          title: result.value.title,
+          title: result.value.title || trimmed,
         });
       } else {
         setState({ kind: "not-found" });
@@ -80,14 +90,8 @@ export function FeedFormatChip({ url }: FeedFormatChipProps) {
       data-testid="feed-format-chip"
       data-state={state.kind}
       data-format={found ? state.format : undefined}
-      className="mt-2 flex items-center gap-2 text-xs"
+      className="mt-2 flex items-center gap-3 text-xs"
     >
-      {probing && (
-        <Loader2 className="size-3 animate-spin text-muted-foreground" />
-      )}
-      {found && (
-        <Check className="size-3.5 text-emerald-600 dark:text-emerald-500" />
-      )}
       <div className="flex items-center gap-1.5">
         {FORMAT_LABELS.map(({ format, label }) => {
           const active = found && state.format === format;
@@ -99,12 +103,12 @@ export function FeedFormatChip({ url }: FeedFormatChipProps) {
               className={cn(
                 "inline-flex items-center rounded-full border px-2 py-0.5 font-medium transition-all duration-300",
                 active &&
-                  "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                  "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-[0_0_0_3px_var(--tw-shadow-color)] shadow-emerald-500/10",
                 !active &&
                   found &&
-                  "border-border bg-transparent text-muted-foreground/60",
+                  "border-border bg-transparent text-muted-foreground/50",
                 probing &&
-                  "border-border bg-transparent text-muted-foreground animate-pulse",
+                  "border-border bg-transparent text-muted-foreground/70 animate-pulse",
                 notFound && "border-border bg-transparent text-muted-foreground/40",
               )}
             >
@@ -113,18 +117,64 @@ export function FeedFormatChip({ url }: FeedFormatChipProps) {
           );
         })}
       </div>
-      <span className="ml-auto text-muted-foreground">
-        {probing && "Checking every format…"}
-        {found && (
+
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        {probing && (
           <>
-            <span className="text-foreground">{state.title}</span>
-            <span className="ml-1.5 text-muted-foreground">
-              · Press Enter to add
+            <Loader2 className="size-3 shrink-0 animate-spin text-muted-foreground" />
+            <span className="truncate text-muted-foreground">
+              Looking for a feed…
             </span>
           </>
         )}
-        {notFound && "No feed found at that URL yet"}
-      </span>
+        {found && (
+          <>
+            <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-500" />
+            <span className="truncate">
+              <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                {formatHeadline(state.format)} feed found
+              </span>
+              <span className="mx-1.5 text-muted-foreground">·</span>
+              <span className="text-foreground">{state.title}</span>
+            </span>
+          </>
+        )}
+        {notFound && (
+          <>
+            <X className="size-3.5 shrink-0 text-muted-foreground/60" />
+            <span className="truncate text-muted-foreground">
+              We couldn&apos;t find a feed there. Try the homepage URL — we&apos;ll
+              autodiscover.
+            </span>
+          </>
+        )}
+      </div>
+
+      {found && onAdd && (
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={isAdding}
+          data-testid="feed-format-chip-add"
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+            "bg-foreground text-background shadow-sm transition-all",
+            "hover:brightness-110 active:scale-[0.98]",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+          )}
+          aria-label={`Add feed: ${state.title}`}
+        >
+          {isAdding ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <Rss className="size-3" />
+          )}
+          <span>Add feed</span>
+          <Kbd className="ml-0.5 bg-background/15 text-background/90 border-background/20">
+            Enter
+          </Kbd>
+        </button>
+      )}
     </div>
   );
 }

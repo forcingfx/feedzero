@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { FeedFormatChip } from "@/components/explore/feed-format-chip";
 import * as feedService from "@/core/feeds/feed-service";
 
@@ -61,6 +62,56 @@ describe("FeedFormatChip", () => {
       "data-active",
       "false",
     );
+  });
+
+  it("celebrates the discovery with the format name and feed title", async () => {
+    vi.spyOn(feedService, "previewFeed").mockResolvedValue({
+      ok: true,
+      value: {
+        title: "Example Blog",
+        siteUrl: "",
+        format: "atom",
+        articles: [],
+      },
+    });
+    render(<FeedFormatChip url="https://example.com/feed.xml" />);
+    const chip = await screen.findByTestId("feed-format-chip");
+    await waitFor(() =>
+      expect(chip).toHaveAttribute("data-state", "found"),
+    );
+    expect(chip).toHaveTextContent(/atom feed found/i);
+    expect(chip).toHaveTextContent(/Example Blog/);
+  });
+
+  it("renders a clickable 'Add feed' button when a feed is found", async () => {
+    vi.spyOn(feedService, "previewFeed").mockResolvedValue({
+      ok: true,
+      value: { title: "Atom Site", siteUrl: "", format: "atom", articles: [] },
+    });
+    const onAdd = vi.fn();
+    render(
+      <FeedFormatChip url="https://example.com/feed.xml" onAdd={onAdd} />,
+    );
+    const addBtn = await screen.findByRole("button", { name: /add feed/i });
+    await userEvent.setup().click(addBtn);
+    expect(onAdd).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not render the Add button while probing or when no feed found", async () => {
+    vi.spyOn(feedService, "previewFeed").mockResolvedValue({
+      ok: false,
+      error: "nope",
+    });
+    render(<FeedFormatChip url="https://example.com/feed.xml" onAdd={vi.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("feed-format-chip")).toHaveAttribute(
+        "data-state",
+        "not-found",
+      ),
+    );
+    expect(
+      screen.queryByRole("button", { name: /add feed/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("falls back to a 'no feed yet' state on failure", async () => {
