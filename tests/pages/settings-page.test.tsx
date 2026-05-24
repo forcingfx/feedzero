@@ -20,6 +20,9 @@ vi.mock("@/components/settings/tabs/sync-and-data-tab", () => ({
 vi.mock("@/components/settings/tabs/reading-tab", () => ({
   ReadingTab: () => <div data-testid="reading-tab" />,
 }));
+vi.mock("@/components/settings/tabs/briefings-tab", () => ({
+  BriefingsTab: () => <div data-testid="briefings-tab" />,
+}));
 vi.mock("@/components/settings/tabs/help-tab", () => ({
   HelpTab: () => <div data-testid="help-tab" />,
 }));
@@ -83,12 +86,24 @@ describe("<SettingsPage>", () => {
     expect(screen.getByTestId("sync-and-data-tab")).toBeInTheDocument();
   });
 
-  it("renders all four user-facing tabs (Subscription, Sync & Data, Reading, Help)", () => {
+  it("renders all five user-facing tabs (Subscription, Sync & Data, Reading, Briefings, Help)", () => {
     renderAt("/settings");
     expect(screen.getByLabelText(/subscription/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/sync and data/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^reading$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^briefings$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^help$/i)).toBeInTheDocument();
+  });
+
+  it("reads ?tab=briefings and renders the Briefings tab content", () => {
+    renderAt("/settings?tab=briefings");
+    expect(screen.getByTestId("briefings-tab")).toBeInTheDocument();
+  });
+
+  it("clicking the Briefings tab swaps to its content (URL ↔ rendered content stay in sync)", () => {
+    renderAt("/settings");
+    fireEvent.click(screen.getByLabelText(/^briefings$/i));
+    expect(screen.getByTestId("briefings-tab")).toBeInTheDocument();
   });
 
   it("does not render a Recovery tab anymore (license recovery moved into Subscription)", () => {
