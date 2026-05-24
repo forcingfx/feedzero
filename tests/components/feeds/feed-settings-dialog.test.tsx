@@ -79,6 +79,7 @@ describe("FeedSettingsDialog", () => {
   let setFeedPreferFullText: ReturnType<typeof vi.fn>;
   let setFeedPrefetchEnabled: ReturnType<typeof vi.fn>;
   let moveFeedToFolder: ReturnType<typeof vi.fn>;
+  let setFeedTags: ReturnType<typeof vi.fn>;
   let refreshSingleFeed: ReturnType<typeof vi.fn>;
   let reloadSingleFeed: ReturnType<typeof vi.fn>;
   let removeFeed: ReturnType<typeof vi.fn>;
@@ -89,6 +90,7 @@ describe("FeedSettingsDialog", () => {
     setFeedPreferFullText = vi.fn().mockResolvedValue(undefined);
     setFeedPrefetchEnabled = vi.fn().mockResolvedValue(undefined);
     moveFeedToFolder = vi.fn().mockResolvedValue(undefined);
+    setFeedTags = vi.fn().mockResolvedValue(undefined);
     refreshSingleFeed = vi.fn().mockResolvedValue(undefined);
     reloadSingleFeed = vi.fn().mockResolvedValue(undefined);
     removeFeed = vi.fn().mockResolvedValue(undefined);
@@ -102,6 +104,7 @@ describe("FeedSettingsDialog", () => {
       setFeedPreferFullText,
       setFeedPrefetchEnabled,
       moveFeedToFolder,
+      setFeedTags,
       refreshSingleFeed,
       reloadSingleFeed,
       removeFeed,
@@ -197,6 +200,49 @@ describe("FeedSettingsDialog", () => {
     const select = screen.getByTestId("feed-settings-folder");
     await user.selectOptions(select, "");
     expect(moveFeedToFolder).toHaveBeenCalledWith("f-tech", null);
+  });
+
+  it("Tags input shows the feed's existing tags as a comma-separated string", () => {
+    useFeedStore.setState({
+      feeds: [feed({ tags: ["tech", "news"] })],
+      feedSettingsDialogId: "f-tech",
+    });
+    renderDialog();
+    expect(screen.getByTestId("feed-settings-tags-input")).toHaveValue(
+      "tech, news",
+    );
+  });
+
+  it("Tags input saves via setFeedTags (comma-split, trimmed) when Save is clicked", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
+    renderDialog();
+
+    const input = screen.getByTestId("feed-settings-tags-input");
+    await user.clear(input);
+    await user.type(input, " tech ,  frontend, , react");
+    await user.click(screen.getByTestId("feed-settings-tags-save"));
+
+    expect(setFeedTags).toHaveBeenCalledWith("f-tech", [
+      "tech",
+      "frontend",
+      "react",
+    ]);
+  });
+
+  it("Tags input saves an empty array when the input is cleared", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [feed({ tags: ["tech"] })],
+      feedSettingsDialogId: "f-tech",
+    });
+    renderDialog();
+
+    const input = screen.getByTestId("feed-settings-tags-input");
+    await user.clear(input);
+    await user.click(screen.getByTestId("feed-settings-tags-save"));
+
+    expect(setFeedTags).toHaveBeenCalledWith("f-tech", []);
   });
 
   it("Manage rules button calls openRulesEditor with the feed id", async () => {

@@ -95,6 +95,7 @@ function Body({ feed, onClose }: { feed: Feed; onClose: () => void }) {
         <NameSection feed={feed} />
         <DisplaySection feed={feed} />
         <FolderSection feed={feed} />
+        <TagsSection feed={feed} />
         <RulesSection feed={feed} />
         <ActionsSection feed={feed} />
       </div>
@@ -251,6 +252,87 @@ function FolderSection({ feed }: { feed: Feed }) {
       </select>
     </section>
   );
+}
+
+/**
+ * Tags editor. Comma-separated free-form input mirroring the smart-
+ * filter "Tag" condition row. Save normalizes (trim + dedupe + drop
+ * empties) inside the store; the dialog just forwards the parsed
+ * array. Tags are populated initially by OPML import; this surface
+ * is the in-app CRUD entry point.
+ */
+function TagsSection({ feed }: { feed: Feed }) {
+  const setFeedTags = useFeedStore((s) => s.setFeedTags);
+  const initial = (feed.tags ?? []).join(", ");
+  const [draft, setDraft] = useState(initial);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraft((feed.tags ?? []).join(", "));
+  }, [feed.tags]);
+
+  // Compare the parsed-then-normalized draft to the current tags so
+  // a save is only enabled when the change is meaningful (round-
+  // trips through "tech,news" === "tech, news").
+  const parsed = parseTagInput(draft);
+  const current = feed.tags ?? [];
+  const dirty =
+    parsed.length !== current.length ||
+    parsed.some((t, i) => t !== current[i]);
+
+  async function save() {
+    if (!dirty) return;
+    setSaving(true);
+    try {
+      await setFeedTags(feed.id, parsed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <Label htmlFor="feed-settings-tags">Tags</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          id="feed-settings-tags"
+          data-testid="feed-settings-tags-input"
+          value={draft}
+          placeholder="tech, news"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={save}
+          disabled={!dirty || saving}
+          data-testid="feed-settings-tags-save"
+        >
+          Save
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Comma-separated. Tags appear as a section in the sidebar and
+        can be matched in smart filters.
+      </p>
+    </section>
+  );
+}
+
+function parseTagInput(raw: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
 }
 
 function RulesSection({ feed }: { feed: Feed }) {

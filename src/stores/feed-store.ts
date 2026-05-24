@@ -188,6 +188,13 @@ interface FeedStore {
   deleteFolder: (folderId: string) => Promise<void>;
   moveFeedToFolder: (feedId: string, folderId: string | null) => Promise<void>;
   /**
+   * Replace this feed's tag list. Input is normalized (trim, drop
+   * empties, dedupe) before persistence. An empty result clears
+   * `Feed.tags` to undefined so the sync vault doesn't carry an
+   * empty-array noise.
+   */
+  setFeedTags: (feedId: string, tags: string[]) => Promise<void>;
+  /**
    * Reparent a folder. `parentId` is the new parent's id, or null to
    * un-nest to the top level. Rejects (Result.err) if `parentId` is
    * the folder itself or one of its descendants — preserves the tree
@@ -788,6 +795,30 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const feedResult = await getFeed(feedId);
     if (!feedResult.ok) return;
     await dbUpdateFeed({ ...feedResult.value, folderId: folderId ?? undefined, updatedAt: Date.now() });
+    await reloadFeeds(set);
+    schedulePush();
+  },
+
+  setFeedTags: async (feedId, tags) => {
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return;
+    // Normalize: trim every entry, drop empties, dedupe in encounter
+    // order. Case-sensitive — "News" and "news" stay distinct (matches
+    // the OPML import semantics and what the user typed).
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    for (const raw of tags) {
+      const trimmed = typeof raw === "string" ? raw.trim() : "";
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      normalized.push(trimmed);
+    }
+    // Empty result clears the field rather than persisting [] — keeps
+    // the sync payload lean and matches `createFeed`'s "omit when empty".
+    const next: Feed = { ...feedResult.value, updatedAt: Date.now() };
+    if (normalized.length > 0) next.tags = normalized;
+    else delete next.tags;
+    await dbUpdateFeed(next);
     await reloadFeeds(set);
     schedulePush();
   },

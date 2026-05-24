@@ -509,6 +509,51 @@ describe("feed-store", () => {
     });
   });
 
+  describe("setFeedTags", () => {
+    it("normalizes (trim + dedupe + drop empties) and persists via updateFeed", async () => {
+      const feed = mockFeed("f1", "Example");
+      useFeedStore.setState({ feeds: [feed] });
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: true,
+        value: [{ ...feed, tags: ["tech", "news"] }],
+      });
+
+      await useFeedStore
+        .getState()
+        .setFeedTags("f1", ["  tech  ", "news", "tech", "", "  "]);
+
+      expect(updateFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "f1", tags: ["tech", "news"] }),
+      );
+    });
+
+    it("clears the tags field entirely when given an empty array", async () => {
+      const feed = { ...mockFeed("f1", "Example"), tags: ["old"] };
+      useFeedStore.setState({ feeds: [feed] });
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({
+        ok: true,
+        value: [{ ...feed, tags: undefined }],
+      });
+
+      await useFeedStore.getState().setFeedTags("f1", []);
+
+      // tags field is removed (undefined), not kept as an empty array,
+      // so the sync vault doesn't carry redundant noise.
+      const call = vi.mocked(updateFeed).mock.calls[0][0];
+      expect(call.tags).toBeUndefined();
+    });
+
+    it("no-ops when the feed cannot be found", async () => {
+      vi.mocked(getFeed).mockResolvedValue({ ok: false, error: "not found" });
+      await useFeedStore.getState().setFeedTags("missing", ["tech"]);
+      expect(updateFeed).not.toHaveBeenCalled();
+    });
+  });
+
   describe("selectFeed", () => {
     it("sets selectedFeedId", () => {
       useFeedStore.getState().selectFeed("abc");
