@@ -67,6 +67,7 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
       smartFilters: "id",
       preferences: "id",
       briefings: "id",
+      secrets: "id",
       meta: "key",
     });
 
@@ -112,6 +113,7 @@ export async function openWithKeys(
       smartFilters: "id",
       preferences: "id",
       briefings: "id",
+      secrets: "id",
       meta: "key",
     });
 
@@ -725,6 +727,66 @@ export async function removeSmartFilter(
     return ok(true);
   } catch (e) {
     return err(`Failed to remove smart filter: ${(e as Error).message}`);
+  }
+}
+
+// --- Secrets (encrypted, synced — user-supplied API keys etc.) ---
+//
+// Keyed by a stable name (e.g. "anthropic-api-key"). The stored value is
+// the raw string, encrypted at rest under the same vault key as every
+// other row, so the secret survives a tab close, sync push, and pull on
+// another device. The wrapper module `secrets.ts` exposes typed accessors
+// for each named secret so call sites don't depend on the key naming
+// convention.
+
+/** Read a single secret by name. Returns ok(null) when no row exists. */
+export async function getSecret(name: string): Promise<Result<string | null>> {
+  try {
+    const ctx = requireOpen();
+    const raw: DexieRecord | undefined = await ctx.db.table("secrets").get(name);
+    if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
+    const result = await decrypt(
+      ctx.cryptoKey,
+      new Uint8Array(raw.iv),
+      new Uint8Array(raw.ciphertext),
+    );
+    if (!result.ok) return result;
+    const decoded = result.value as { value: string };
+    return ok(decoded.value);
+  } catch (e) {
+    return err(`Failed to read secret: ${(e as Error).message}`);
+  }
+}
+
+/** Store a single secret by name (overwrites any existing value). */
+export async function putSecret(
+  name: string,
+  value: string,
+): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    const encResult = await encrypt(ctx.cryptoKey, { value });
+    if (!encResult.ok) return encResult;
+    const { iv, ciphertext } = encResult.value;
+    await ctx.db.table("secrets").put({
+      id: name,
+      iv: Array.from(iv),
+      ciphertext: Array.from(ciphertext),
+    });
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to store secret: ${(e as Error).message}`);
+  }
+}
+
+/** Remove a single secret by name. No-op if it doesn't exist. */
+export async function removeSecret(name: string): Promise<Result<boolean>> {
+  try {
+    const ctx = requireOpen();
+    await ctx.db.table("secrets").delete(name);
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove secret: ${(e as Error).message}`);
   }
 }
 
