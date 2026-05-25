@@ -291,7 +291,7 @@ Schema migrations are handled by Dexie's `version().stores()` API.
 | User IP leaked via favicons | Favicons proxied through the CORS proxy, not loaded directly from publisher servers |
 | Timing analysis of sync patterns | 0-30s random jitter added after debounce; vault payloads padded to power-of-2 bucket sizes |
 | IndexedDB metadata leakage | Index fields (url, feedId, guid) are HMAC-SHA256 hashed — deterministic for queries but non-reversible |
-| User-Agent fingerprinting via proxy | Fixed `User-Agent: FeedZero/1.0` on all outbound proxy requests |
+| User-Agent fingerprinting via proxy | Fixed `User-Agent: FeedZero/1.0` on feed-fetch proxy requests; article-page fetches (`/api/page`) use a fixed browser UA so the FeedZero identifier doesn't get blocked by WAFs and silently break extraction. Both UAs are constants — no per-user fingerprint. |
 | Data persistence after logout | "Delete all data" removes IndexedDB, localStorage (including derived keys), and cloud blob |
 
 ### What FeedZero does NOT protect against

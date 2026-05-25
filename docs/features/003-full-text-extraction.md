@@ -66,6 +66,7 @@ Feature: Full-text extraction (user-initiated)
 
 ## Design Decisions
 
+- **Browser User-Agent on `/api/page`** — Article-page fetches use a Firefox UA, not the `FeedZero/1.0 (RSS Reader)` identifier used for feed fetches. Cloudflare-class WAFs block bot-looking UAs on article URLs (where bot traffic isn't expected) while allowing them on feed URLs (where it is). Without the split, extraction on widely-deployed sites — kottke.org, zeit.de, others — fails silently because the upstream serves a challenge page that Defuddle can't extract. Policy lives in `src/core/proxy/pick-user-agent.ts`; the handler reads it via `options.routeKind` in `proxy-handler.ts`.
 - **Auto-detect, don't always extract** — Feeds that provide full content (like Spyglass) already have excellent HTML. Running extraction over it would strip author-intended elements and degrade quality.
 - **500-char threshold** — Articles with content shorter than 500 chars where content equals summary are treated as teasers. Genuinely short articles with distinct content are left alone.
 - **User-initiated extraction** — Extraction is triggered by clicking "Extracted" in the content view toggle, not automatically on add/refresh. This is faster and avoids surprises with discussion sites or PDFs.

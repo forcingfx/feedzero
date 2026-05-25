@@ -2,7 +2,7 @@ import { validateProxyUrl } from "./validate-url.ts";
 import type { FeedCache } from "./feed-cache.ts";
 import type { CatalogStorageAdapter } from "../catalog/catalog-types.ts";
 import { cleanFeedContent } from "../cleaner/cleaner.ts";
-import { pickUserAgent } from "./pick-user-agent.ts";
+import { pickUserAgent, type ProxyRouteKind } from "./pick-user-agent.ts";
 import { logError } from "../../../packages/core/src/utils/log-error";
 import { newTraceId } from "../../../packages/core/src/utils/trace-id";
 
@@ -48,6 +48,13 @@ export interface ProxyOptions {
    * an Upstash-backed limiter).
    */
   rateLimit?: ProxyRateLimit;
+  /**
+   * Which kind of route is calling — feed (`/api/feed`) or page
+   * (`/api/page`). Routes through to `pickUserAgent` so article-page
+   * fetches send a browser-like UA (the FeedZero identifier is blocked
+   * by WAFs on article URLs). Defaults to `feed` for back-compat.
+   */
+  routeKind?: ProxyRouteKind;
 }
 
 /**
@@ -113,7 +120,7 @@ export async function handleProxyRequest(
   // as a free 304 instead of a full re-download of every item.
   const validators = await extractValidators(req);
   const upstreamHeaders: Record<string, string> = {
-    "User-Agent": pickUserAgent(process.env),
+    "User-Agent": pickUserAgent(process.env, options?.routeKind),
   };
   if (validators.etag) upstreamHeaders["If-None-Match"] = validators.etag;
   if (validators.lastModified)

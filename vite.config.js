@@ -76,7 +76,10 @@ function apiProxyPlugin() {
       server.middlewares.use("/api/page", async (req, res) => {
         const handler = await ensureProxyHandler();
         const webReq = await toWebRequest(req);
-        const webRes = await handler(webReq, "text/html", proxyOpts());
+        const webRes = await handler(webReq, "text/html", {
+          ...proxyOpts(),
+          routeKind: "page",
+        });
         await sendWebResponse(webRes, res);
       });
 

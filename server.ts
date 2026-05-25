@@ -211,7 +211,10 @@ export function createApp(
     handleProxyRequest(c.req.raw, "text/xml", proxyOpts),
   );
   app.on(["GET", "POST"], "/api/page", (c) =>
-    handleProxyRequest(c.req.raw, "text/html", proxyOpts),
+    handleProxyRequest(c.req.raw, "text/html", {
+      ...proxyOpts,
+      routeKind: "page",
+    }),
   );
   // /api/icon dispatches on query-param shape so we stay under Vercel's
   // 12-function Hobby cap: ?domain=… → resolve the site's favicon;
