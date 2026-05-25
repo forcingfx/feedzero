@@ -1,6 +1,7 @@
 import { ok, err } from "../../../packages/core/src/utils/result";
 import type { Result } from "../../../packages/core/src/utils/result";
 import { parse } from "../parser/parser.ts";
+import type { FeedFormat } from "../parser/parser.ts";
 import { discoverFeed } from "../discovery/discovery.ts";
 import { createFeed, createArticle } from "../storage/schema.ts";
 import {
@@ -343,6 +344,22 @@ interface PreviewResult {
   title: string;
   siteUrl: string;
   articles: PreviewArticle[];
+  /**
+   * Which format the publisher served — surfaced by the discovery chip
+   * under the Explore URL input so the user sees the "we found it"
+   * affordance instead of having to take the success silently on faith.
+   */
+  format: FeedFormat;
+}
+
+/**
+ * Discovery-aware variant of {@link PreviewResult}. `discoveredUrl` is
+ * the actual feed URL we resolved to — `undefined` when the user's
+ * URL pointed directly at a feed, set when we had to follow the page's
+ * `<link rel="alternate">` or a well-known path to get there.
+ */
+interface PreviewWithDiscoveryResult extends PreviewResult {
+  discoveredUrl?: string;
 }
 
 /**
@@ -367,10 +384,63 @@ export async function previewFeed(
       return err(friendlyError(parseResult.error));
     }
 
-    const { feed, articles } = parseResult.value;
+    const { feed, articles, format } = parseResult.value;
     return ok({
       title: feed.title,
       siteUrl: feed.siteUrl,
+      format,
+      articles: articles.map((a) => ({
+        title: a.title,
+        link: a.link,
+        summary: a.summary || a.content.replace(/<[^>]*>/g, "").slice(0, 200),
+        publishedAt: a.publishedAt,
+      })),
+    });
+  } catch {
+    return err(
+      "The feed could not be reached. Please check your connection and try again.",
+    );
+  }
+}
+
+/**
+ * Preview a URL the user pasted into the Explore input, mirroring the
+ * `addFeedFlow` discovery cascade so the chip's "found / not found"
+ * answer matches what pressing Enter would actually do.
+ *
+ * Two-step probe (same as `addFeedFlow`'s first decision):
+ *   1. Try parsing the URL as a feed directly (fast path — handles
+ *      `https://feeds.example.com/atom.xml` and friends).
+ *   2. If that fails, run the full `discoverFeed` cascade:
+ *      HTML `<link rel="alternate">` autodiscovery → well-known
+ *      paths → anchor link scan. This is what makes
+ *      `https://www.nytimes.com` resolve to the actual RSS URL.
+ *
+ * Without this, the chip's `previewFeed`-only probe falsely reported
+ * "no feed found" for any homepage URL, even when pressing Enter
+ * would have happily added it (because addFeed runs discovery). The
+ * UX mismatch was an actively misleading affordance.
+ *
+ * Bridges (YouTube/Reddit/Mastodon) stay off here — they're gated
+ * to Personal and run inside `addFeed` proper.
+ */
+export async function previewWithDiscovery(
+  rawUrl: string,
+): Promise<Result<PreviewWithDiscoveryResult>> {
+  const direct = await previewFeed(rawUrl);
+  if (direct.ok) return ok({ ...direct.value, discoveredUrl: undefined });
+
+  const url = normalizeUrl(rawUrl);
+  try {
+    const discovery = await discoverFeed(url);
+    if (!discovery.ok) return err(discovery.error);
+
+    const { feed, articles, format, feedUrl } = discovery.value;
+    return ok({
+      title: feed.title,
+      siteUrl: feed.siteUrl,
+      format,
+      discoveredUrl: feedUrl,
       articles: articles.map((a) => ({
         title: a.title,
         link: a.link,

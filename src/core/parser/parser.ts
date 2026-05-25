@@ -21,9 +21,22 @@ export interface ParsedArticle {
   guid: string;
 }
 
+/**
+ * Discriminator on the underlying feed format. Used by UI affordances
+ * that want to celebrate which format actually parsed (e.g. the
+ * discovery chip under the Explore URL input).
+ *
+ * RDF is RSS 1.0; from a user-facing standpoint it's still "RSS", so
+ * we normalise it to `rss` rather than exposing a separate `rdf` label
+ * that no one outside the W3C remembers.
+ */
+export type FeedFormat = "rss" | "atom" | "json";
+
 export interface ParseResult {
   feed: ParsedFeed;
   articles: ParsedArticle[];
+  /** Which format feedsmith identified. See {@link FeedFormat}. */
+  format: FeedFormat;
 }
 
 /**
@@ -64,20 +77,27 @@ function mapToParseResult(
   const { format, feed: rawFeed } = result;
 
   if (format === "rss" || format === "rdf") {
-    return mapRssFeed(rawFeed, feedUrl);
+    return attachFormat(mapRssFeed(rawFeed, feedUrl), "rss");
   } else if (format === "atom") {
-    return mapAtomFeed(rawFeed, feedUrl);
+    return attachFormat(mapAtomFeed(rawFeed, feedUrl), "atom");
   } else if (format === "json") {
-    return mapJsonFeed(rawFeed, feedUrl);
+    return attachFormat(mapJsonFeed(rawFeed, feedUrl), "json");
   }
 
   return err(`Unsupported feed format: ${format}`);
 }
 
+function attachFormat(
+  inner: Result<Omit<ParseResult, "format">>,
+  format: FeedFormat,
+): Result<ParseResult> {
+  return inner.ok ? ok({ ...inner.value, format }) : inner;
+}
+
 function mapRssFeed(
   feed: FeedsmithResult["feed"],
   feedUrl: string,
-): Result<ParseResult> {
+): Result<Omit<ParseResult, "format">> {
   const rssFeed = feed as Extract<FeedsmithResult, { format: "rss" }>["feed"];
 
   const parsedFeed: ParsedFeed = {
@@ -122,7 +142,7 @@ function mapRssFeed(
 function mapAtomFeed(
   feed: FeedsmithResult["feed"],
   feedUrl: string,
-): Result<ParseResult> {
+): Result<Omit<ParseResult, "format">> {
   const atomFeed = feed as Extract<FeedsmithResult, { format: "atom" }>["feed"];
 
   const parsedFeed: ParsedFeed = {
@@ -151,7 +171,7 @@ function mapAtomFeed(
 function mapJsonFeed(
   feed: FeedsmithResult["feed"],
   feedUrl: string,
-): Result<ParseResult> {
+): Result<Omit<ParseResult, "format">> {
   // feedsmith preserves JSON Feed's snake_case field names
   const jsonFeed = feed as Record<string, unknown>;
 

@@ -8,10 +8,10 @@ URLs from `main`, so any changes here ship live on the next deploy.
 
 | Filename                       | Depicts                                                                                  |
 | ------------------------------ | ---------------------------------------------------------------------------------------- |
-| `feature-any-feed.png`         | Explore catalog with a URL pasted into the search field — "Press Enter to add this feed" |
-| `feature-sync.png`             | Cloud-sync setup dialog showing the four-word recovery passphrase                        |
+| `feature-any-feed.png`         | Explore URL input with the discovery chip — RSS / **Atom** / JSON Feed pills + "Example Blog · Press Enter to add" |
+| `feature-sync.png`             | SetupWizard with the four-word passphrase + the persistent "Synced · 1 min ago" pill in the top-right corner |
 | `feature-keyboard.png`         | Settings → Help, keyboard-shortcuts card with `j` `k` `u` `o` …                          |
-| `feature-switch-readers.png`   | Settings → Sync & Data, post-import results with OPML head provenance line               |
+| `feature-switch-readers.png`   | Pre-import preview tree — folders with feed counts, OPML provenance ("Imported from you 'My subscriptions'") and the "Import 11 feeds" confirmation |
 | `feature-starring.png`         | Sidebar "Starred" selected, list of starred articles, filled-star reader                 |
 | `feature-auto-organize.png`    | Sidebar after Auto-organize — Business / Culture / Lifestyle / News colour-coded folders |
 | `feature-smart-filters.png`    | Smart-filter editor dialog with three stacked conditions and a live match count          |

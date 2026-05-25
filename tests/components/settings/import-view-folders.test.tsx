@@ -86,7 +86,9 @@ describe("ImportView — preserves OPML folder structure (PR E)", () => {
     const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(FOLDERED_OPML);
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
+    // Confirm the preview screen — see ImportPreview, added 2026-05-24.
+    await user.click(await screen.findByRole("button", { name: /^import \d+ feeds?$/i }));
 
     // Three feeds inside folders + one unfiled
     expect(addFeedMock).toHaveBeenCalledTimes(4);

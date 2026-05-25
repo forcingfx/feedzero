@@ -20,6 +20,7 @@ import { FeaturedTab } from "@/components/explore/featured-tab.tsx";
 import { TopicsTab } from "@/components/explore/topics-tab.tsx";
 import { CountriesTab } from "@/components/explore/countries-tab.tsx";
 import { SearchResultsView } from "@/components/explore/search-results-view.tsx";
+import { FeedFormatChip } from "@/components/explore/feed-format-chip.tsx";
 
 /**
  * Available tabs in the explore surface. New tabs (use-case packs,
@@ -72,8 +73,12 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
 
   const isUrlInput = looksLikeUrl(searchQuery);
 
-  async function handleUrlSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  /**
+   * Add the URL currently in the search input. Used by both Enter
+   * submission (`<form onSubmit>`) and the explicit "Add feed" button
+   * inside the discovery chip — same code path either way.
+   */
+  const submitUrl = useCallback(async () => {
     if (!isUrlInput) return;
     const url = searchQuery.trim();
     if (!url) return;
@@ -93,6 +98,11 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
     } else {
       toast.error(result.error || "Failed to add feed", { id: toastId });
     }
+  }, [isUrlInput, searchQuery, addFeed, navigate, onFeedAdded]);
+
+  async function handleUrlSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await submitUrl();
   }
 
   // Keyboard shortcuts for explore
@@ -234,9 +244,11 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
           )}
         </div>
         {isUrlInput && searchQuery.trim() ? (
-          <p className="text-sm text-muted-foreground mt-2">
-            Press Enter to add this feed
-          </p>
+          <FeedFormatChip
+            url={searchQuery.trim()}
+            onAdd={submitUrl}
+            isAdding={isAddingFeed}
+          />
         ) : searchFocused && (
           <p className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
             <span><Kbd>↓</Kbd> or <Kbd>Tab</Kbd> to browse</span>

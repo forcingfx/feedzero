@@ -90,6 +90,18 @@ const ATOM_DOUBLE_ENCODED = `<?xml version="1.0" encoding="UTF-8"?>
 </feed>`;
 
 describe("Parser", () => {
+  describe("format detection", () => {
+    it("reports `rss` for an RSS 2.0 feed", () => {
+      const { format } = unwrap(parse(RSS_FEED, "https://example.com/feed"));
+      expect(format).toBe("rss");
+    });
+
+    it("reports `atom` for an Atom feed", () => {
+      const { format } = unwrap(parse(ATOM_FEED, "https://example.com/feed"));
+      expect(format).toBe("atom");
+    });
+  });
+
   describe("RSS 2.0", () => {
     it("should parse feed metadata", () => {
       const result = parse(RSS_FEED, "https://example.com/feed");
@@ -270,6 +282,13 @@ describe("Parser", () => {
       expect(feed.description).toBe("A test JSON feed");
       expect(feed.siteUrl).toBe("https://example.com");
       expect(feed.url).toBe("https://example.com/feed.json");
+    });
+
+    it("reports `json` as the parsed format", () => {
+      const { format } = unwrap(
+        parse(JSON_FEED, "https://example.com/feed.json"),
+      );
+      expect(format).toBe("json");
     });
 
     it("should parse items", () => {

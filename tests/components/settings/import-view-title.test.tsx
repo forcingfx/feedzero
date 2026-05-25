@@ -79,7 +79,9 @@ describe("ImportView — preserves OPML outline.title (issue #117)", () => {
     const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(TITLE_OPML);
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
+    // Confirm the preview screen — see ImportPreview, added 2026-05-24.
+    await user.click(await screen.findByRole("button", { name: /^import \d+ feeds?$/i }));
 
     expect(addFeedMock).toHaveBeenCalledTimes(2);
 

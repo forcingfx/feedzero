@@ -30,6 +30,11 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
   }),
   refreshFeed: vi.fn(),
   refreshAllFeeds: vi.fn(),
+  // FeedFormatChip probes via previewWithDiscovery; the catalog
+  // tests don't assert on the chip's resolved state, only that it
+  // appears for URL-like input, so a never-resolving stub is enough.
+  previewFeed: vi.fn(() => new Promise(() => {})),
+  previewWithDiscovery: vi.fn(() => new Promise(() => {})),
 }));
 
 function resetStore() {
@@ -137,28 +142,29 @@ describe("ExploreCatalog", () => {
   });
 
 
-  it("shows hint when input looks like a URL", async () => {
+  it("shows the discovery chip when input looks like a URL", async () => {
     const user = userEvent.setup();
     renderCatalog();
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
     await user.type(input, "example.com/feed");
 
+    // The chip mounts immediately once we recognise a URL; its
+    // network-driven inner state takes longer but the wrapper element
+    // appears synchronously with the format pills.
     expect(
-      screen.getByText(/press enter to add this feed/i),
+      await screen.findByTestId("format-pill-rss"),
     ).toBeInTheDocument();
   });
 
-  it("does not show hint for regular search text", async () => {
+  it("does not show the discovery chip for regular search text", async () => {
     const user = userEvent.setup();
     renderCatalog();
 
     const input = screen.getByPlaceholderText(/search feeds or paste/i);
     await user.type(input, "technology");
 
-    expect(
-      screen.queryByText(/press enter to add this feed/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("format-pill-rss")).not.toBeInTheDocument();
   });
 
   it("calls addFeed on Enter when input is a URL", async () => {

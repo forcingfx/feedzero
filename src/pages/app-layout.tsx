@@ -19,6 +19,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer.tsx";
 import { MobileHeaderPills } from "@/components/articles/article-list-controls.tsx";
+import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
 
 /**
  * Listens for the feedzero:toggle-sidebar event and toggles the sidebar.
@@ -107,6 +108,7 @@ export function AppLayout() {
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 z-10 bg-background">
           <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
           <MobileHeaderPills />
+          <SyncStatusBadge />
         </header>
         <Outlet />
         <MobileNavDrawer onFeedSelect={handleFeedSelect} />
@@ -114,7 +116,35 @@ export function AppLayout() {
     );
   }
 
-  return <DesktopShell onFeedSelect={handleFeedSelect} />;
+  return (
+    <>
+      <DesktopShell onFeedSelect={handleFeedSelect} />
+      <FloatingSyncBadge />
+    </>
+  );
+}
+
+/**
+ * Floating sync-status pill, pinned to the top-right of the viewport
+ * on every route. Lives outside the ResizablePanelGroup so it never
+ * triggers a panel-children-changed remount (ADR 013).
+ *
+ * z-index sits ABOVE Radix dialogs (z-50) so the badge stays visible
+ * even when a modal is open — same role as a macOS menu-bar status
+ * icon. The pointer-events-none on the outer wrapper means it never
+ * blocks clicks except on the badge itself.
+ */
+function FloatingSyncBadge() {
+  return (
+    <div
+      className="pointer-events-none fixed right-4 top-3 z-[60]"
+      data-testid="floating-sync-badge"
+    >
+      <div className="pointer-events-auto">
+        <SyncStatusBadge />
+      </div>
+    </div>
+  );
 }
 
 function DesktopShell({ onFeedSelect }: { onFeedSelect: (id: string) => void }) {

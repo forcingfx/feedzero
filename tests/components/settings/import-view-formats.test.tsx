@@ -47,7 +47,9 @@ describe("ImportView — shutdown-migration formats", () => {
     const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(csv);
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
+    // Confirm the preview screen — see ImportPreview, added 2026-05-24.
+    await user.click(await screen.findByRole("button", { name: /^import \d+ feeds?$/i }));
 
     // Two unique origins: nytimes.com (dedup'd) + theguardian.com
     expect(addFeedMock).toHaveBeenCalledTimes(2);
@@ -72,7 +74,9 @@ describe("ImportView — shutdown-migration formats", () => {
     const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
     await user.paste(json);
-    await user.click(screen.getByRole("button", { name: /import feeds/i }));
+    await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
+    // Confirm the preview screen — see ImportPreview, added 2026-05-24.
+    await user.click(await screen.findByRole("button", { name: /^import \d+ feeds?$/i }));
 
     expect(addFeedMock).toHaveBeenCalledTimes(2);
     const urls = addFeedMock.mock.calls.map((c) => c[0]).sort();
