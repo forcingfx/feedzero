@@ -1,5 +1,5 @@
 // @ts-nocheck
-// src/utils/result.ts
+// packages/core/src/utils/result.ts
 function ok(value) {
   return { ok: true, value };
 }
@@ -162,14 +162,15 @@ function cleanFeedContent(raw) {
 // src/core/proxy/pick-user-agent.ts
 var DEFAULT_USER_AGENT = "FeedZero/1.0 (RSS Reader)";
 var BROWSER_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0";
-function pickUserAgent(env) {
+function pickUserAgent(env, routeKind = "feed") {
   const explicit = env.FEED_USER_AGENT;
   if (explicit && explicit.length > 0) return explicit;
+  if (routeKind === "page") return BROWSER_USER_AGENT;
   if (env.SELF_HOSTED === "1") return BROWSER_USER_AGENT;
   return DEFAULT_USER_AGENT;
 }
 
-// src/utils/log-error.ts
+// packages/core/src/utils/log-error.ts
 var ALLOWED_FIELDS = [
   "route",
   "method",
@@ -198,7 +199,7 @@ function logError(fields) {
   }
 }
 
-// src/utils/trace-id.ts
+// packages/core/src/utils/trace-id.ts
 function newTraceId() {
   return "req_" + crypto.randomUUID().split("-")[0];
 }
@@ -238,15 +239,28 @@ async function handleProxyRequest(req, defaultContentType, options) {
       });
     }
   }
+  const validators = await extractValidators(req);
+  const upstreamHeaders = {
+    "User-Agent": pickUserAgent(process.env, options?.routeKind)
+  };
+  if (validators.etag) upstreamHeaders["If-None-Match"] = validators.etag;
+  if (validators.lastModified)
+    upstreamHeaders["If-Modified-Since"] = validators.lastModified;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15e3);
     const response = await fetch(url, {
-      headers: { "User-Agent": pickUserAgent(process.env) },
+      headers: upstreamHeaders,
       signal: controller.signal
     });
     clearTimeout(timeout);
     const contentType = response.headers.get("content-type") || defaultContentType;
+    if (response.status === 304) {
+      return new Response("", {
+        status: 304,
+        headers: buildResponseHeaders(contentType, response)
+      });
+    }
     const body = await response.arrayBuffer();
     if (cache && response.status >= 200 && response.status < 400) {
       cache.set(url, body, contentType, response.status);
@@ -287,19 +301,42 @@ function buildResponseHeaders(contentType, upstream) {
     const retryAfter = upstream.headers.get("Retry-After");
     if (retryAfter) headers["Retry-After"] = retryAfter;
   }
+  const etag = upstream.headers.get("ETag");
+  if (etag) headers["ETag"] = etag;
+  const lastModified = upstream.headers.get("Last-Modified");
+  if (lastModified) headers["Last-Modified"] = lastModified;
+  if (upstream.status >= 200 && upstream.status < 300 && /^image\//i.test(contentType)) {
+    headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800";
+  }
   return headers;
+}
+async function parseBody(req) {
+  if (req.method !== "POST") {
+    return { url: null, etag: null, lastModified: null };
+  }
+  try {
+    const body = await req.clone().json();
+    return {
+      url: body.url ?? null,
+      etag: body.etag ?? null,
+      lastModified: body.lastModified ?? null
+    };
+  } catch {
+    return { url: null, etag: null, lastModified: null };
+  }
 }
 async function extractTargetUrl(req) {
   if (req.method === "POST") {
-    try {
-      const body = await req.json();
-      return body.url ?? null;
-    } catch {
-      return null;
-    }
+    const body = await parseBody(req);
+    return body.url;
   }
   const url = new URL(req.url, "http://localhost");
   return url.searchParams.get("url");
+}
+async function extractValidators(req) {
+  if (req.method !== "POST") return { etag: null, lastModified: null };
+  const body = await parseBody(req);
+  return { etag: body.etag, lastModified: body.lastModified };
 }
 
 // src/core/proxy/rate-limiter.ts
@@ -409,6 +446,10 @@ var rateLimitPromise = resolveProxyRateLimiter();
 async function dispatch(req, contentType) {
   const rateLimit = await rateLimitPromise;
   return handleProxyRequest(req, contentType, {
+    // Article-page fetches mimic a real browser visit so the FeedZero
+    // identifier doesn't get blocked by Cloudflare-class WAFs on
+    // article URLs. See pick-user-agent.ts for the policy.
+    routeKind: "page",
     ...rateLimit ? { rateLimit } : {}
   });
 }

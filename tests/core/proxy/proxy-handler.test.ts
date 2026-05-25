@@ -27,6 +27,30 @@ describe("handleProxyRequest", () => {
     expect(headers.get("User-Agent")).toBe("FeedZero/1.0 (RSS Reader)");
   });
 
+  it("sends a browser User-Agent when routeKind=page", async () => {
+    // Article-page fetches mimic a real user visit. The FeedZero identifier
+    // is blocked on sight by Cloudflare-class WAFs on article URLs (kottke.org,
+    // zeit.de, etc.), turning extraction into a silent failure for the user.
+    // Feed fetches keep the FeedZero identifier so publishers can see
+    // aggregator traffic — only the page route flips to browser UA.
+    fetchSpy.mockResolvedValue(
+      new Response("<html><body>article</body></html>", { status: 200 }),
+    );
+
+    const req = new Request("http://localhost/api/page", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://kottke.org/26/05/some-post" }),
+    });
+    await handleProxyRequest(req, "text/html", { routeKind: "page" });
+
+    const [, options] = fetchSpy.mock.calls[0];
+    const headers = new Headers(options!.headers as HeadersInit);
+    const ua = headers.get("User-Agent");
+    expect(ua).not.toBe("FeedZero/1.0 (RSS Reader)");
+    expect(ua).toMatch(/Mozilla/);
+  });
+
   it("accepts POST with JSON body to keep URLs out of server logs", async () => {
     fetchSpy.mockResolvedValue(new Response("<rss/>", { status: 200 }));
 

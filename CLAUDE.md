@@ -120,6 +120,7 @@ Single CSS entry: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero
 
 - `@theme` — Design tokens (`--color-*`, `--font-*`).
 - `@layer base` — Resets, base button/input styles. (The desktop layout is a two-tier `ResizablePanelGroup` in `feeds-page.tsx`, not a CSS grid — see ADR 013.)
+- `@plugin "@tailwindcss/typography"` — Required for `prose` classes used by `BriefingAbstract` to render model-generated markdown (h2, ul, li, p). Without the directive the classes are silent no-ops and Tailwind's preflight strips browser-default styling — bullets run together, headings render as plain inline text. Locked by `tests/index-css-briefing-typography.test.ts`.
 - Use Tailwind utilities in JSX with `cn()` from `src/lib/utils.ts`.
 - **Spacing** — Use Tailwind v4's default numeric scale (`p-4`, `gap-2`). Do **not** define `--spacing-xs/sm/md/lg/xl` in `@theme` — these collide with `max-w-*` utilities (`max-w-lg` resolves to `--spacing-lg` instead of `--container-lg`). [Tailwind v4 gotcha](https://github.com/tailwindlabs/tailwindcss/discussions/17777).
 

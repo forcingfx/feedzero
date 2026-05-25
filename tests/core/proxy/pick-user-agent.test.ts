@@ -30,4 +30,25 @@ describe("pickUserAgent", () => {
       pickUserAgent({ SELF_HOSTED: "1", FEED_USER_AGENT: "Custom/1.0" }),
     ).toBe("Custom/1.0");
   });
+
+  it("uses a browser UA for page fetches even on hosted deployments", () => {
+    // /api/page fetches are user-initiated, one-off article requests that
+    // should look like a regular browser visit. The FeedZero identifier
+    // is widely blocked by WAFs on article URLs (vs feed URLs where bot
+    // traffic is expected), so page fetches use a browser UA by default.
+    const ua = pickUserAgent({}, "page");
+    expect(ua).not.toBe(DEFAULT_USER_AGENT);
+    expect(ua).toMatch(/Mozilla/);
+  });
+
+  it("FEED_USER_AGENT overrides the page-route browser default", () => {
+    // Operators who set FEED_USER_AGENT get the final word for every route.
+    expect(
+      pickUserAgent({ FEED_USER_AGENT: "Custom/1.0" }, "page"),
+    ).toBe("Custom/1.0");
+  });
+
+  it("defaults the route kind to feed when omitted (back-compat)", () => {
+    expect(pickUserAgent({})).toBe(DEFAULT_USER_AGENT);
+  });
 });
