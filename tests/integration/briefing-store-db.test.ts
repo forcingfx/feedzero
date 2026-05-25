@@ -107,6 +107,7 @@ describe("briefing-store ↔ db.ts integration", () => {
       statusById: new Map(),
       errorById: new Map(),
       pendingScoreById: new Map(),
+      loadingStartedAtById: new Map(),
     });
     // Pro tier so the feature gate is open.
     useLicenseStore.setState({ tier: "pro" });
@@ -213,6 +214,55 @@ describe("briefing-store ↔ db.ts integration", () => {
 
     const status = useBriefingStore.getState().statusById.get(created.value.id);
     expect(status).toBe("ready");
+  });
+
+  it("stamps loadingStartedAt while a refresh is in flight and clears it on resolution", async () => {
+    // Why this lives in the store, not in briefing-page React state:
+    // navigating away from /briefings/:id while a refresh is running
+    // unmounts the page. If the timer is local React state, remounting
+    // resets it to "now" and the "elapsed time" lies. The skeleton needs
+    // the wall-clock from when the refresh actually started — which only
+    // the store, the same module that drives the in-flight Promise, has.
+    await setAnthropicKey("sk-ant-test");
+    let resolveClient: ((v: ReturnType<typeof ok<BriefingReport>>) => void) | null = null;
+    generateBriefingMock.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveClient = r;
+        }),
+    );
+
+    const created = await useBriefingStore
+      .getState()
+      .createBriefing({ name: "EU AI", prompt: "EU AI Act enforcement" });
+    if (!created.ok) throw new Error("create failed");
+
+    const refreshPromise = useBriefingStore
+      .getState()
+      .refreshBriefing(created.value.id, { articles: strongCorpus("EU AI Act") });
+
+    // Drive the microtask queue until refreshBriefingFlow has reached
+    // the (suspended) generateBriefing call. While the LLM call is
+    // suspended, the store should already record the start timestamp so
+    // a remounted page can read it.
+    await vi.waitFor(() => {
+      expect(resolveClient).not.toBeNull();
+    });
+
+    const startedAt = useBriefingStore
+      .getState()
+      .loadingStartedAtById.get(created.value.id);
+    expect(typeof startedAt).toBe("number");
+    expect(startedAt!).toBeLessThanOrEqual(Date.now());
+    expect(startedAt!).toBeGreaterThan(Date.now() - 5_000);
+
+    resolveClient!(ok(reportFromClient()));
+    await refreshPromise;
+
+    // Cleared on resolution so a follow-up loading run gets a fresh stamp.
+    expect(
+      useBriefingStore.getState().loadingStartedAtById.has(created.value.id),
+    ).toBe(false);
   });
 
   it("client error path persists nothing and surfaces status:error", async () => {

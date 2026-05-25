@@ -78,6 +78,13 @@ interface BriefingStore {
   errorById: Map<string, string>;
   /** Per-briefing-id signal score for "not-enough-evidence" splashes. */
   pendingScoreById: Map<string, number>;
+  /**
+   * Per-briefing-id wall-clock for when the current "loading" refresh
+   * started. Lives in the store, not in the page component, so the
+   * elapsed-time skeleton survives nav away + back (which unmounts the
+   * page and would otherwise reset a local-state timer).
+   */
+  loadingStartedAtById: Map<string, number>;
   loadBriefings: () => Promise<void>;
   createBriefing: (
     input: CreateBriefingInput,
@@ -134,7 +141,15 @@ function setStatus(
     } else {
       pendingScoreById.delete(id);
     }
-    return { statusById, errorById, pendingScoreById };
+    // Stamp the run start on the loading transition; clear it on every
+    // other terminal status so the next loading run gets a fresh stamp.
+    const loadingStartedAtById = new Map(state.loadingStartedAtById);
+    if (status === "loading") {
+      loadingStartedAtById.set(id, Date.now());
+    } else {
+      loadingStartedAtById.delete(id);
+    }
+    return { statusById, errorById, pendingScoreById, loadingStartedAtById };
   });
 }
 
@@ -144,6 +159,7 @@ export const useBriefingStore = create<BriefingStore>((set, get) => ({
   statusById: new Map(),
   errorById: new Map(),
   pendingScoreById: new Map(),
+  loadingStartedAtById: new Map(),
 
   loadBriefings: async () => {
     set({ isLoading: true });
@@ -215,7 +231,9 @@ export const useBriefingStore = create<BriefingStore>((set, get) => ({
       errorById.delete(id);
       const pendingScoreById = new Map(state.pendingScoreById);
       pendingScoreById.delete(id);
-      return { statusById, errorById, pendingScoreById };
+      const loadingStartedAtById = new Map(state.loadingStartedAtById);
+      loadingStartedAtById.delete(id);
+      return { statusById, errorById, pendingScoreById, loadingStartedAtById };
     });
 
     await reload(set);

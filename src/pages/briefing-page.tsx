@@ -68,6 +68,7 @@ export function BriefingPage() {
   const statusById = useBriefingStore((s) => s.statusById);
   const errorById = useBriefingStore((s) => s.errorById);
   const pendingScoreById = useBriefingStore((s) => s.pendingScoreById);
+  const loadingStartedAtById = useBriefingStore((s) => s.loadingStartedAtById);
   const loadBriefings = useBriefingStore((s) => s.loadBriefings);
   const refresh = useBriefingStore((s) => s.refreshBriefing);
   const removeBriefing = useBriefingStore((s) => s.removeBriefing);
@@ -75,7 +76,6 @@ export function BriefingPage() {
   const feeds = useFeedStore((s) => s.feeds);
   const [preferredModel] = useBriefingModelPreference();
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
     void loadBriefings();
@@ -98,16 +98,13 @@ export function BriefingPage() {
   const pendingScore = briefing
     ? pendingScoreById.get(briefing.id)
     : undefined;
-
-  // Stamp the start time when we transition INTO loading; clear it when
-  // we leave. The skeleton uses this to drive the elapsed-time counter.
-  useEffect(() => {
-    if (status === "loading" && loadingStartedAt === null) {
-      setLoadingStartedAt(Date.now());
-    } else if (status !== "loading" && loadingStartedAt !== null) {
-      setLoadingStartedAt(null);
-    }
-  }, [status, loadingStartedAt]);
+  // Read from the store, not local React state, so the elapsed-time
+  // counter survives navigating away from /briefings/:id and back —
+  // unmount/remount would otherwise reset it to "now" and the skeleton
+  // would lie about how long the refresh has actually been running.
+  const loadingStartedAt = briefing
+    ? (loadingStartedAtById.get(briefing.id) ?? null)
+    : null;
 
   // Gate-locked users see the matrix-derived upgrade splash.
   if (!gate.enabled) {

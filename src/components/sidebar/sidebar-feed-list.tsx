@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { arrayMove, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, DragOverlay, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useDroppable } from "@dnd-kit/core";
+import { buildFeedListSensorDescriptors } from "@/lib/feed-list-dnd-sensors.ts";
 import { ArrowUpDown, Check } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
@@ -74,7 +75,15 @@ export function SidebarFeedList({
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  // Split sensors per-input: mouse uses a small distance threshold so
+  // desktop drag stays snappy, touch uses a brief hold so a scroll
+  // swipe doesn't immediately pick a feed up. See feed-list-dnd-sensors
+  // for the rationale + the unit test that locks the values down.
+  const [mouseDescriptor, touchDescriptor] = buildFeedListSensorDescriptors();
+  const sensors = useSensors(
+    useSensor(mouseDescriptor.sensor, mouseDescriptor.options),
+    useSensor(touchDescriptor.sensor, touchDescriptor.options),
+  );
 
   const unfiledFeeds = useMemo(() => {
     // Defensive: feeds whose folderId points at a folder that isn't on
