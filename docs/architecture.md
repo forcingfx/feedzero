@@ -181,6 +181,7 @@ Tailwind CSS v4 via `@tailwindcss/vite` (build-time only, zero runtime cost). Si
 - **`@theme`** — Design tokens (colors, spacing, fonts, radius)
 - **`@layer base`** — Global resets, button/input base styles (the desktop layout itself is a two-tier `ResizablePanelGroup` in `feeds-page.tsx`, not a CSS grid — see ADR 013)
 - **Tailwind utilities** — Used in JSX `className` props via `cn()` helper (clsx + tailwind-merge)
+- **`@plugin "@tailwindcss/typography"`** — Required for the `prose` classes that style the briefing abstract (`BriefingAbstract`). Without it, Tailwind's preflight strips h2/ul/li styling and model-generated markdown renders as a wall of plain text. Locked by `tests/index-css-briefing-typography.test.ts`.
 
 See [ADR 004](decisions/004-tailwind-css.md) for Tailwind rationale.
 
