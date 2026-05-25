@@ -20,7 +20,13 @@ import { test, expect } from "./fixtures";
  */
 
 test.describe("Signal Briefings — sidebar + free-tier upgrade splash", () => {
-  test("sidebar entry navigates to /briefings", async ({ feedPage: page }) => {
+  test("Signal sidebar entry + Briefings sub-tab routes free users to the upgrade splash", async ({
+    feedPage: page,
+  }) => {
+    // Briefings is a sub-tab under Signal (PR #190): the sidebar entry
+    // is "Signal" (testId `sidebar-signal-link`), clicking it lands on
+    // /signal, and the "Briefings" sub-tab navigates to /signal/briefings
+    // where the gate-locked upgrade splash renders for free-tier users.
     const isMobile = page.viewportSize() && page.viewportSize()!.width < 768;
     if (isMobile) {
       const drawerHandle = page
@@ -30,15 +36,17 @@ test.describe("Signal Briefings — sidebar + free-tier upgrade splash", () => {
         await drawerHandle.click();
       }
     }
-    const briefingsLink = page.getByTestId("sidebar-briefings-link").first();
-    await expect(briefingsLink).toBeVisible({ timeout: 10000 });
-    await briefingsLink.click();
-    // Free-tier user — the gate routes them to the upgrade splash but
-    // the URL doesn't change to /briefings (gate intercepts in the
-    // click handler). Either path is acceptable as long as they see
-    // the upgrade affordance.
+    const signalLink = page.getByTestId("sidebar-signal-link").first();
+    await expect(signalLink).toBeVisible({ timeout: 10000 });
+    await signalLink.click();
+    await page.getByRole("radio", { name: "Briefings" }).click();
+    // Free-tier user — UpgradeSplash for `signal-briefings` renders
+    // "Unlock Signal Briefings" + a "Pro" tier label.
     await expect(
-      page.getByText(/Pro/i).or(page.getByText(/Signal Briefings/i)).first(),
+      page
+        .getByText(/Pro/i)
+        .or(page.getByText(/Signal Briefings/i))
+        .first(),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -75,12 +83,15 @@ test.describe("Signal Briefings — sidebar + free-tier upgrade splash", () => {
     await keyInput.fill("sk-ant-test-key-from-e2e");
     await page.getByRole("button", { name: /^Save$/i }).first().click();
 
-    // Toast confirmation OR the inline "saved" badge.
+    // Successful save renders BOTH the sonner toast AND the inline
+    // emerald "saved" badge next to the field. The toast is the more
+    // specific signal — assert on it directly to avoid a strict-mode
+    // violation against the two simultaneous matches.
     await expect(
       page
         .locator("[data-sonner-toast]")
         .filter({ hasText: /saved/i })
-        .or(page.getByText(/saved/i).first()),
+        .first(),
     ).toBeVisible({ timeout: 10000 });
   });
 
