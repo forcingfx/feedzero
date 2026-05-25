@@ -40,6 +40,7 @@ function resetExtraction() {
     viewMode: "feed",
     statusMap: {},
     paywallMap: {},
+    rateLimitedMap: {},
   });
 }
 
@@ -277,6 +278,73 @@ describe("extraction-store paywall handling", () => {
       expect(
         useExtractionStore.getState().paywallMap["https://example.com/down"],
       ).toBeUndefined();
+    });
+
+    it("records a rate-limit verdict on a 429 with Retry-After (surface, don't silently fail)", async () => {
+      // The default extraction flow used to route 429 into the silent
+      // `statusMap[url] = "failed"` branch. That made many feeds look
+      // broken after a refresh exhausted the proxy rate limit. The user
+      // got a disabled "Full text" button and a tooltip — nothing
+      // actionable. Record the verdict so the reader pane can render a
+      // visible "Rate limited — try again in N seconds" message.
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({ "Retry-After": "42" }),
+        text: () => Promise.resolve(""),
+      }) as unknown as typeof fetch;
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://kottke.org/26/05/some-post");
+
+      const state = useExtractionStore.getState();
+      const verdict = state.rateLimitedMap["https://kottke.org/26/05/some-post"];
+      expect(verdict).toBeDefined();
+      expect(verdict.retryAfterSec).toBe(42);
+      // Status is still "failed" but the reader pane reads from
+      // rateLimitedMap first and renders a distinct prompt.
+      expect(state.statusMap["https://kottke.org/26/05/some-post"]).toBe("failed");
+    });
+
+    it("falls back to a default Retry-After when the header is missing", async () => {
+      // RFC 6585 makes Retry-After optional. If absent we still want a
+      // user-visible cooldown rather than a perpetually-failed toggle.
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({}),
+        text: () => Promise.resolve(""),
+      }) as unknown as typeof fetch;
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://example.com/post");
+
+      const verdict =
+        useExtractionStore.getState().rateLimitedMap["https://example.com/post"];
+      expect(verdict).toBeDefined();
+      expect(verdict.retryAfterSec).toBeGreaterThan(0);
+    });
+
+    it("a 429 signals the prefetch cooldown so background passes back off", async () => {
+      const { isInCooldown, clearCooldown } = await import(
+        "@/core/extractor/prefetch-cooldown"
+      );
+      clearCooldown();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({ "Retry-After": "30" }),
+        text: () => Promise.resolve(""),
+      }) as unknown as typeof fetch;
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://example.com/post-x");
+
+      expect(isInCooldown()).toBe(true);
+      clearCooldown();
     });
 
     it("retries via the extension on a 403 when the publisher is authorized", async () => {

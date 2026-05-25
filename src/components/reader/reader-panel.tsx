@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/tooltip.tsx";
 import { ArticleContent } from "./article-content.tsx";
 import { PaywallPrompt } from "./paywall-prompt.tsx";
+import { RateLimitedNotice } from "./rate-limited-notice.tsx";
 import { cn } from "@/lib/utils.ts";
 
 type ViewMode = "feed" | "extracted";
@@ -69,6 +70,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   const resetForArticle = useExtractionStore((s) => s.resetForArticle);
   const statusMap = useExtractionStore((s) => s.statusMap);
   const paywallMap = useExtractionStore((s) => s.paywallMap);
+  const rateLimitedMap = useExtractionStore((s) => s.rateLimitedMap);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -215,14 +217,21 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
 
   // A paywall verdict is NOT an extraction failure — clicking the toggle
   // surfaces the Authorize-publisher prompt, which is exactly what the user
-  // needs to act on. Only disable for in-flight extraction or a real
-  // failure where the user has no recourse.
+  // needs to act on. Same for rate-limit: the user can switch to the
+  // extracted view to read the "try again in N seconds" message and the
+  // status doubles as an explanation. Only disable for in-flight
+  // extraction or a real failure where the user has no recourse.
   const hasPaywallVerdict = article.link
     ? Boolean(paywallMap[article.link])
     : false;
+  const hasRateLimitVerdict = article.link
+    ? Boolean(rateLimitedMap[article.link])
+    : false;
   const extractedDisabled =
     extractionStatus === "extracting" ||
-    (extractionStatus === "failed" && !hasPaywallVerdict);
+    (extractionStatus === "failed" &&
+      !hasPaywallVerdict &&
+      !hasRateLimitVerdict);
 
   function handleModeChange(mode: ViewMode) {
     if (mode === "extracted") {
@@ -386,6 +395,14 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           <p className="italic text-muted-foreground">
             Extracting full article…
           </p>
+        ) : viewMode === "extracted" &&
+          !cachedExtraction &&
+          article.link &&
+          rateLimitedMap[article.link] ? (
+          <RateLimitedNotice
+            verdict={rateLimitedMap[article.link]}
+            articleUrl={article.link}
+          />
         ) : viewMode === "extracted" &&
           !cachedExtraction &&
           article.link &&

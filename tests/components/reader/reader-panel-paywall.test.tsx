@@ -50,6 +50,7 @@ describe("ReaderPanel paywall integration", () => {
       cache: {},
       statusMap: {},
       paywallMap: {},
+      rateLimitedMap: {},
       viewMode: "feed",
     });
     useExtensionStore.setState({
@@ -254,5 +255,81 @@ describe("ReaderPanel paywall integration", () => {
 
     const toggle = screen.getByRole("button", { name: /Full text/i });
     expect(toggle).toBeDisabled();
+  });
+});
+
+describe("ReaderPanel rate-limit integration", () => {
+  beforeEach(() => {
+    mockIsDesktop = true;
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
+    });
+    useExtractionStore.setState({
+      cache: {},
+      statusMap: {},
+      paywallMap: {},
+      rateLimitedMap: {},
+      viewMode: "feed",
+    });
+  });
+
+  it("renders the RateLimitedNotice when extracted view has a rate-limited verdict", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+
+    act(() => {
+      useExtractionStore.setState({
+        cache: {},
+        statusMap: { "https://nytimes.com/article-x": "failed" },
+        paywallMap: {},
+        rateLimitedMap: {
+          "https://nytimes.com/article-x": {
+            retryAfterSec: 30,
+            observedAt: Date.now(),
+          },
+        },
+        viewMode: "extracted",
+      });
+    });
+
+    const notice = screen.getByTestId("rate-limited-notice");
+    expect(notice).toBeInTheDocument();
+    expect(notice).toHaveTextContent(/rate limited/i);
+    expect(notice).toHaveTextContent(/try again in/i);
+  });
+
+  it("keeps the Full text toggle ENABLED when only a rate-limit verdict is present (so the user can switch over to see the notice)", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+
+    act(() => {
+      useExtractionStore.setState({
+        cache: {},
+        statusMap: { "https://nytimes.com/article-x": "failed" },
+        paywallMap: {},
+        rateLimitedMap: {
+          "https://nytimes.com/article-x": {
+            retryAfterSec: 30,
+            observedAt: Date.now(),
+          },
+        },
+        viewMode: "feed",
+      });
+    });
+
+    const toggle = screen.getByRole("button", { name: /Full text/i });
+    expect(toggle).not.toBeDisabled();
   });
 });

@@ -29,6 +29,7 @@ import type { Result } from "../../../packages/core/src/utils/result";
 import { getAllArticles, updateArticle } from "../storage/db.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
 import type { Article } from "../../../packages/core/src/types";
+import { isInCooldown, signalRateLimited } from "./prefetch-cooldown.ts";
 
 /**
  * Defuddle is hundreds of KB and is only ever needed once the user
@@ -108,14 +109,29 @@ function isFeedPrefetchCandidate(article: Article, now: number): boolean {
   return true;
 }
 
+/** Default Retry-After to assume when the upstream omits the header. */
+const DEFAULT_RETRY_AFTER_SEC = 60;
+
 /**
  * Fetch + extract + persist a single article. Returns true on success.
  * Failures are swallowed (logged via the caller's counter) so one bad
  * URL doesn't abort the whole batch.
+ *
+ * Honours the shared cooldown signal: if a previous fetch in this batch
+ * — or the user's manual click — observed a 429, this call exits
+ * immediately without spending another bucket token. On a fresh 429
+ * here, we signal the cooldown so the rest of the batch (and any other
+ * concurrent prefetch passes) back off.
  */
 async function prefetchOne(article: Article): Promise<boolean> {
+  if (isInCooldown()) return false;
   try {
     const response = await proxyFetch("/api/page", article.link);
+    if (response.status === 429) {
+      const retryAfter = parseRetryAfter(response.headers.get("Retry-After"));
+      signalRateLimited(retryAfter);
+      return false;
+    }
     if (!response.ok) return false;
     const html = await response.text();
     const extract = await loadExtract();
@@ -135,6 +151,18 @@ async function prefetchOne(article: Article): Promise<boolean> {
 }
 
 /**
+ * Parse an HTTP `Retry-After` header value. Accepts the delta-seconds
+ * variant (an integer) — HTTP-date is rare in practice and the proxy
+ * always sends seconds. Returns the default window when the header is
+ * missing, non-numeric, or non-positive.
+ */
+function parseRetryAfter(raw: string | null): number {
+  if (!raw) return DEFAULT_RETRY_AFTER_SEC;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RETRY_AFTER_SEC;
+}
+
+/**
  * Run a fixed-size worker pool over `items`. Each worker pulls the next
  * item from a shared cursor, awaits the task, and accumulates the boolean
  * result. The pool resolves when every item has been processed.
@@ -142,6 +170,10 @@ async function prefetchOne(article: Article): Promise<boolean> {
  * Plain semaphore-style scheduler — keeps the cap honest under back-to-back
  * resolution patterns (every settled task immediately starts the next),
  * which a chunked `Promise.all` slice loop would not.
+ *
+ * Workers exit early if the shared cooldown trips mid-batch (a 429 on any
+ * fetch). Without this, all N workers would grind through every candidate
+ * burning the bucket further while every response 429s.
  */
 async function runWithConcurrency<T>(
   items: T[],
@@ -154,6 +186,7 @@ async function runWithConcurrency<T>(
 
   async function worker(): Promise<void> {
     while (cursor < items.length) {
+      if (isInCooldown()) return;
       const index = cursor++;
       const item = items[index];
       const success = await task(item);

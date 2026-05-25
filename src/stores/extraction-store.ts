@@ -3,6 +3,7 @@ import { proxyFetch } from "../core/proxy/proxy-fetch.ts";
 import { detectPaywall, type PaywallVerdict } from "../core/extractor/paywall-detectors/index.ts";
 import { publisherHost } from "../core/extractor/paywall-detectors/host.ts";
 import { fetchArticle as extensionFetchArticle } from "../core/extension/protocol.ts";
+import { signalRateLimited } from "../core/extractor/prefetch-cooldown.ts";
 import { useExtensionStore } from "./extension-store.ts";
 
 /**
@@ -13,8 +14,30 @@ import { useExtensionStore } from "./extension-store.ts";
  * shows the authorize/install prompt instead of a dead "Full text" button.
  * Transient/missing codes (404, 429, 5xx) are NOT in this set — those are
  * genuine failures with no authenticated-fetch recourse.
+ *
+ * 429 has its own dedicated path: see `RateLimitedVerdict` below.
  */
 const GATED_STATUS_CODES = new Set([401, 402, 403, 451]);
+
+/**
+ * Default Retry-After when the upstream proxy omits the header. RFC 6585
+ * makes it optional; matches `DEFAULT_WINDOW_SEC` in
+ * `resolve-rate-limiter.ts`.
+ */
+const DEFAULT_RETRY_AFTER_SEC = 60;
+
+export interface RateLimitedVerdict {
+  /** Seconds to wait before retrying — propagated to the reader prompt. */
+  retryAfterSec: number;
+  /** When this verdict was recorded; reader uses it to count down. */
+  observedAt: number;
+}
+
+function parseRetryAfter(raw: string | null): number {
+  if (!raw) return DEFAULT_RETRY_AFTER_SEC;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RETRY_AFTER_SEC;
+}
 
 function paywallVerdictFromStatus(
   url: string,
@@ -58,6 +81,13 @@ interface ExtractionStore {
    * `getPaywallVerdict` to decide whether to render PaywallPrompt.
    */
   paywallMap: Record<string, PaywallVerdict & { paywalled: true }>;
+  /**
+   * Per-URL rate-limit verdict. Populated when /api/page returns 429.
+   * The reader pane reads this via `getRateLimitedVerdict` and renders
+   * a visible "Rate limited — try again in N seconds" message instead
+   * of the silent disabled-toggle the old code produced.
+   */
+  rateLimitedMap: Record<string, RateLimitedVerdict>;
   viewMode: "feed" | "extracted";
   setViewMode: (mode: "feed" | "extracted") => void;
   toggleViewMode: (articleLink: string | undefined) => void;
@@ -70,6 +100,7 @@ interface ExtractionStore {
   getPaywallVerdict: (
     url: string | undefined,
   ) => (PaywallVerdict & { paywalled: true }) | null;
+  getRateLimitedVerdict: (url: string | undefined) => RateLimitedVerdict | null;
 }
 
 /** Maximum number of cached extractions held in memory. */
@@ -180,6 +211,7 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
   cache: {},
   statusMap: {},
   paywallMap: {},
+  rateLimitedMap: {},
   viewMode: "feed",
 
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -226,6 +258,27 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
 
       const response = await proxyFetch("/api/page", sourceUrl);
       if (!response.ok) {
+        // 429 lives on its own path: a proxy rate-limit is neither a
+        // paywall nor a permanent failure — it's a "try again in N
+        // seconds" the user (and prefetch) need to know about. Record
+        // a rate-limited verdict so the reader pane shows a visible
+        // message instead of a silently-disabled toggle, and signal
+        // the shared cooldown so background prefetch backs off for
+        // the remainder of the window.
+        if (response.status === 429) {
+          const retryAfterSec = parseRetryAfter(
+            response.headers.get("Retry-After"),
+          );
+          signalRateLimited(retryAfterSec);
+          set({
+            statusMap: { ...get().statusMap, [url]: "failed" },
+            rateLimitedMap: {
+              ...get().rateLimitedMap,
+              [url]: { retryAfterSec, observedAt: Date.now() },
+            },
+          });
+          return;
+        }
         // A gated status code (403/401/…) IS the paywall signal — the
         // publisher refused the anonymous fetch outright rather than
         // serving a stub. Route it through the same gate handler so an
@@ -277,6 +330,11 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
   getPaywallVerdict: (url) => {
     if (!url) return null;
     return get().paywallMap[url] ?? null;
+  },
+
+  getRateLimitedVerdict: (url) => {
+    if (!url) return null;
+    return get().rateLimitedMap[url] ?? null;
   },
 }));
 
