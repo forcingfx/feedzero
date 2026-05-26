@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "sonner";
 import {
   getFeeds,
   getFeed,
@@ -294,6 +295,29 @@ async function reloadFeeds(
 ): Promise<void> {
   const all = await getFeeds();
   if (all.ok) set({ feeds: sortFeeds(all.value) });
+}
+
+/**
+ * Build the "live pulse" toast for a completed refreshAll. Returns null
+ * when the refresh produced nothing new (the silent path — background
+ * ticks must not surface noise). One feed → "N new article[s] from
+ * <title>"; multiple feeds → "N new articles across M feeds". Updates
+ * to existing articles (`updatedCount`) intentionally don't toast —
+ * they're invisible to the user and toasting them would surface "what
+ * changed" noise the UI doesn't otherwise expose.
+ */
+function refreshSummaryToast(
+  results: Array<{ feed: Feed; newCount: number }>,
+): string | null {
+  const withNew = results.filter((r) => r.newCount > 0);
+  if (withNew.length === 0) return null;
+  const total = withNew.reduce((sum, r) => sum + r.newCount, 0);
+  if (withNew.length === 1) {
+    const { feed, newCount } = withNew[0];
+    const noun = newCount === 1 ? "article" : "articles";
+    return `${newCount} new ${noun} from ${feed.title}`;
+  }
+  return `${total} new articles across ${withNew.length} feeds`;
 }
 
 /**
@@ -636,6 +660,8 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       const results = refreshResult?.ok ? refreshResult.value?.results : null;
       if (results) {
         mergeRefreshResultsIntoStore(set, get, results);
+        const message = refreshSummaryToast(results);
+        if (message) toast(message);
       } else {
         await reloadFeeds(set);
       }

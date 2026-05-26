@@ -610,6 +610,113 @@ describe("feed-store", () => {
 
       expect(prefetchStarredArticles).not.toHaveBeenCalled();
     });
+
+    it("toasts a summary when new articles arrived", async () => {
+      // The summary toast is the "live pulse" that tells the user a
+      // background refresh actually delivered something. Without it, the
+      // 30-min timer and on-focus refreshes happened silently and the
+      // app felt batch-oriented instead of live.
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: {
+          results: [
+            {
+              feed: mockFeed("a", "A"),
+              newCount: 3,
+              updatedCount: 0,
+            },
+            {
+              feed: mockFeed("b", "B"),
+              newCount: 2,
+              updatedCount: 1,
+            },
+            {
+              feed: mockFeed("c", "C"),
+              newCount: 0,
+              updatedCount: 0,
+            },
+          ],
+        },
+      });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(toast).toHaveBeenCalledTimes(1);
+      const message = vi.mocked(toast).mock.calls[0][0] as string;
+      // "5 new articles across 2 feeds" — exact wording is locked by a
+      // dedicated test below; here we just assert the counts surfaced.
+      expect(message).toMatch(/5/);
+      expect(message).toMatch(/2/);
+    });
+
+    it("does not toast when no new articles arrived", async () => {
+      // A refresh that produced nothing new must stay quiet — otherwise
+      // every 30-min background tick would surface a noisy "no new
+      // articles" notification.
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: {
+          results: [
+            { feed: mockFeed("a", "A"), newCount: 0, updatedCount: 0 },
+            { feed: mockFeed("b", "B"), newCount: 0, updatedCount: 2 },
+          ],
+        },
+      });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(toast).not.toHaveBeenCalled();
+    });
+
+    it("singularizes the toast when exactly one new article from one feed arrives", async () => {
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: {
+          results: [
+            { feed: mockFeed("a", "A"), newCount: 1, updatedCount: 0 },
+            { feed: mockFeed("b", "B"), newCount: 0, updatedCount: 0 },
+          ],
+        },
+      });
+
+      await useFeedStore.getState().refreshAll();
+
+      const message = vi.mocked(toast).mock.calls[0][0] as string;
+      expect(message).toBe("1 new article from A");
+    });
+
+    it("formats the multi-feed toast as 'N new articles across M feeds'", async () => {
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: {
+          results: [
+            { feed: mockFeed("a", "A"), newCount: 4, updatedCount: 0 },
+            { feed: mockFeed("b", "B"), newCount: 3, updatedCount: 0 },
+            { feed: mockFeed("c", "C"), newCount: 0, updatedCount: 0 },
+          ],
+        },
+      });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(toast).toHaveBeenCalledWith("7 new articles across 2 feeds");
+    });
+
+    it("formats a single-feed multi-article toast as 'N new articles from <feed title>'", async () => {
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: {
+          results: [
+            { feed: mockFeed("a", "A"), newCount: 5, updatedCount: 0 },
+            { feed: mockFeed("b", "B"), newCount: 0, updatedCount: 0 },
+          ],
+        },
+      });
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(toast).toHaveBeenCalledWith("5 new articles from A");
+    });
   });
 
   describe("refreshFeed", () => {
