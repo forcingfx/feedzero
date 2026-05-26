@@ -153,6 +153,80 @@ describe("ArticleList", () => {
     expect(refreshFeed).toHaveBeenCalledWith(f1);
   });
 
+  it("mounts the article-list controls even when the feed has no articles", () => {
+    // Without this, a failed-fetch placeholder feed has no settings entry
+    // point on desktop — the cog only mounted when articles existed, so
+    // users had no way to refresh-with-cleared-cache or delete the feed.
+    useFeedStore.setState({
+      feeds: [mockFeed("f1", "Feed 1")],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    render(<ArticleList />);
+
+    expect(screen.getByTestId("article-list-controls")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-pill")).toBeInTheDocument();
+  });
+
+  it("surfaces the feed's last error in the empty state when the feed has never fetched", () => {
+    // The empty-state refresh re-runs the same fetch — if the publisher is
+    // returning 404 / 5xx, it silently fails and the user sees nothing
+    // change. Surface lastError so they know why their refresh doesn't help.
+    const failedFeed = {
+      ...mockFeed("f1", "Feed 1"),
+      lastError: "HTTP 404: Not Found",
+      lastSuccessfulFetchAt: undefined,
+    };
+    useFeedStore.setState({
+      feeds: [failedFeed],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    render(<ArticleList />);
+
+    expect(screen.getByText(/HTTP 404: Not Found/)).toBeInTheDocument();
+  });
+
+  it("does not surface lastError when the feed has previously fetched successfully", () => {
+    // A feed that fetched fine once and is currently empty (all read /
+    // cache cleared) should not raise an alarm just because its most-recent
+    // refresh hit a transient error.
+    const sometimesFlakyFeed = {
+      ...mockFeed("f1", "Feed 1"),
+      lastError: "HTTP 500: Server Error",
+      lastSuccessfulFetchAt: Date.now() - 60_000,
+    };
+    useFeedStore.setState({
+      feeds: [sometimesFlakyFeed],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    render(<ArticleList />);
+
+    expect(screen.queryByText(/HTTP 500/)).toBeNull();
+  });
+
   it("never renders a Load more button — the display cap has been removed", () => {
     useFeedStore.setState({
       feeds: [],
