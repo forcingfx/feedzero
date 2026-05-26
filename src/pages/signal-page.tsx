@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import { StoryRow } from "@/components/signal/story-row.tsx";
 import { SignalTabs } from "@/components/signal/signal-tabs.tsx";
-import { SignalModeToggle } from "@/components/signal/signal-mode-toggle.tsx";
+import { SignalModeBadge } from "@/components/signal/signal-mode-badge.tsx";
 import { useSignalMode } from "@/lib/signal-mode-preference.ts";
 import { BriefingGeneratingSkeleton } from "@/components/briefings/briefing-generating-skeleton.tsx";
 import { formatRelative } from "@/lib/format-relative.ts";
@@ -239,20 +239,20 @@ function ReadyView({
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <header className="mb-6 flex flex-col gap-1">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-semibold">Signal</h1>
-            <div className="flex items-center gap-2">
-              <SignalModeToggle />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => void onRefresh()}
-                aria-label="Refresh"
-                title="Refresh"
-                disabled={spinning}
-              >
-                <RefreshCw className={`size-4 ${spinning ? "animate-spin" : ""}`} />
-              </Button>
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-xl font-semibold">Signal</h1>
+              <SignalModeBadge />
             </div>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => void onRefresh()}
+              aria-label="Refresh"
+              title="Refresh"
+              disabled={spinning}
+            >
+              <RefreshCw className={`size-4 ${spinning ? "animate-spin" : ""}`} />
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             {`${windowLabel(report.window)} · ${report.corpusInWindow} articles · ${report.feedsInWindow} feeds${
@@ -496,11 +496,10 @@ function AISignalView() {
             in your vault and only sent to <code>api.anthropic.com</code>{" "}
             when you click Refresh.
           </p>
-          <div className="flex justify-center gap-2">
+          <div className="flex justify-center">
             <Button onClick={() => goToSettings(navigate, "reading")}>
               Open Settings
             </Button>
-            <SignalModeToggle />
           </div>
         </div>
       </>
@@ -514,22 +513,22 @@ function AISignalView() {
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
           <header className="mb-6 flex flex-col gap-1">
             <div className="flex items-center justify-between gap-3">
-              <h1 className="text-xl font-semibold">Signal</h1>
-              <div className="flex items-center gap-2">
-                <SignalModeToggle />
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => void loadReport({ force: true })}
-                  aria-label="Refresh"
-                  title="Refresh (calls Anthropic — counts against your token bill)"
-                  disabled={status === "loading"}
-                >
-                  <RefreshCw
-                    className={`size-4 ${status === "loading" ? "animate-spin" : ""}`}
-                  />
-                </Button>
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="text-xl font-semibold">Signal</h1>
+                <SignalModeBadge />
               </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => void loadReport({ force: true })}
+                aria-label="Refresh"
+                title="Refresh (calls Anthropic — counts against your token bill)"
+                disabled={status === "loading"}
+              >
+                <RefreshCw
+                  className={`size-4 ${status === "loading" ? "animate-spin" : ""}`}
+                />
+              </Button>
             </div>
             {report ? (
               <p className="text-xs text-muted-foreground">
