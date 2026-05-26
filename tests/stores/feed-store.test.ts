@@ -813,6 +813,31 @@ describe("feed-store", () => {
       pullSpy.mockRestore();
     });
 
+    it("skips the sync pull when the caller passes skipSyncPull (boot-time path)", async () => {
+      // The boot-time refresh runs immediately after `initializeReturningUser`
+      // has already pulled and imported the cloud vault. Pulling again would
+      // re-run importAll's clear+bulkPut sequence and race readers (see
+      // tests/e2e/sync-100-feeds.spec.ts). The boot caller passes
+      // skipSyncPull: true to take the feed-fetch path only.
+      const pullSpy = vi
+        .spyOn(useSyncStore.getState(), "pull")
+        .mockResolvedValue(undefined);
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+      useSyncStore.setState({
+        credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey, kdfSpec: { kind: "pbkdf2-600k" } },
+      });
+
+      await useFeedStore.getState().refreshAll({ skipSyncPull: true });
+
+      expect(pullSpy).not.toHaveBeenCalled();
+      expect(refreshAllFeeds).toHaveBeenCalled();
+      pullSpy.mockRestore();
+    });
+
     it("reloads feeds from DB after pull before refreshing", async () => {
       const callOrder: string[] = [];
       const newFeed = mockFeed("pulled", "Pulled Feed");

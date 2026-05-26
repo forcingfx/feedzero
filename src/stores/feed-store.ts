@@ -150,11 +150,15 @@ interface FeedStore {
    * auto-refresh timer so quiet feeds (consecutive 304s past the
    * backoff threshold) get skipped. Explicit user-triggered refreshes
    * (the toolbar button, the `r` keyboard shortcut) leave it false so
-   * every feed is queried.
+   * every feed is queried. `skipSyncPull` (default false) is set by
+   * the boot-time refresh — `initializeReturningUser` already pulled
+   * and imported the cloud vault, so re-running the pull here would
+   * race importAll's clear+bulkPut window with consumers reading feeds.
    */
   refreshAll: (options?: {
     respectBackoff?: boolean;
     intervalMs?: number;
+    skipSyncPull?: boolean;
   }) => Promise<void>;
   /**
    * Refresh only the scope currently being viewed, then reload the article
@@ -613,7 +617,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     retryFailedFavicons();
     try {
       const syncStore = useSyncStore.getState();
-      if (syncStore.credentials) {
+      if (syncStore.credentials && !options.skipSyncPull) {
         await syncStore.pull();
         // Pull may have added/removed rows; full reload is the cheapest
         // way to reconcile.

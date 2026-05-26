@@ -10,7 +10,6 @@ import {
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
-import { useSyncStore } from "@/stores/sync-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { CHANGELOG_FEED_URL } from "@feedzero/core/utils/constants";
 import { Toaster } from "@/components/ui/sonner.tsx";
@@ -193,13 +192,11 @@ function AppInit({ children }: { children: React.ReactNode }) {
       // user-defined config that the sidebar needs immediately;
       // the encrypted-blob read is cheap (typically <10 rows).
       void loadSmartFilters();
-      // Sync users: initializeReturningUser already pulled the cloud vault,
-      // so an immediate refreshAll() would do a redundant second pull whose
-      // importAll's clear+bulkPut window races with consumers reading feeds.
-      // Local users still get auto-refresh on boot (no pull involved).
-      if (!useSyncStore.getState().credentials) {
-        refreshAll();
-      }
+      // Refresh feeds on boot for everyone. Sync users skip the inner
+      // vault pull (initializeReturningUser already did it; re-running
+      // importAll would race readers), and just fetch from origins —
+      // conditional requests turn most of those into cheap 304s.
+      refreshAll({ skipSyncPull: true });
     }
   }, [isDbReady, loadFeeds, refreshAll, preloadArticles, loadSmartFilters, addFeed]);
 

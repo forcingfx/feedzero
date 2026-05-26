@@ -187,6 +187,34 @@ describe("App sync-aware init", () => {
     expect(useSyncStore.getState().status).toBe("synced");
   });
 
+  it("auto-refreshes feeds on app load for sync users too", async () => {
+    // Previously refreshAll() was skipped for sync users on boot to avoid
+    // racing initializeReturningUser's importAll. The boot-time refresh
+    // now passes skipSyncPull: true so feeds get fetched from origin
+    // immediately on cold start without re-running importAll.
+    const mockCredentials = {
+      vaultId: "stored-vault-id",
+      vaultKey: "mock-key" as unknown as CryptoKey,
+      kdfSpec: { kind: "pbkdf2-600k" } as const,
+    };
+    vi.mocked(restore).mockResolvedValue({
+      status: "ready",
+      isSyncUser: true,
+      credentials: mockCredentials,
+    });
+    localStorageMock.setItem("feedzero:onboarding-complete", "true");
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().isDbReady).toBe(true);
+    });
+
+    await waitFor(() => {
+      expect(refreshAllFeeds).toHaveBeenCalled();
+    });
+  });
+
   it("shows error when new-user initialization fails", async () => {
     // New user — onboarding not complete
     useAppStore.setState({ hasCompletedOnboarding: false });
