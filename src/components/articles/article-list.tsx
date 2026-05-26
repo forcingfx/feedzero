@@ -235,9 +235,18 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     // load settles with nothing — or while a user-initiated refresh runs — the
     // empty state with its refresh affordance stays put so the user has a
     // prominent way to pull this feed/folder/filter again.
+    //
+    // Always mount ArticleListControls so the settings cog stays reachable
+    // when a feed is selected — even when the article list is empty. Without
+    // this, a failed-fetch placeholder feed has no settings entry point on
+    // desktop, so the user can't refresh-with-cache-cleared or delete it.
     const showBlank = isLoading && !isRefreshing;
     return (
       <div ref={scrollRef} className="h-full overflow-y-auto">
+        <ArticleListControls
+          sortMode={articleSortMode}
+          onSortChange={setArticleSortMode}
+        />
         {showBlank ? null : <EmptyArticleList feedId={selectedFeedId} />}
       </div>
     );
@@ -318,16 +327,34 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
  * Empty-list state. An empty feed is most often a feed that just hasn't been
  * fetched yet (or one whose cache was cleared), so the primary action is to
  * refresh — scoped to whatever the user is viewing via `refreshView`.
+ *
+ * When the selected single feed has never successfully fetched and has a
+ * stored `lastError`, surface that error so the user sees *why* refresh keeps
+ * doing nothing — the same red-X placeholder condition the sidebar uses.
+ * Without this, a placeholder feed's refresh button silently re-runs the same
+ * failing fetch on every tap. Use the cog above the list (always mounted now)
+ * to delete the feed if recovery isn't possible.
  */
 function EmptyArticleList({ feedId }: { feedId: string }) {
   const refreshView = useFeedStore((s) => s.refreshView);
   const isRefreshing = useFeedStore((s) => s.isRefreshingAll);
+  const feed = useFeedStore((s) => s.feeds.find((f) => f.id === feedId));
+  const hasNeverFetched =
+    !!feed?.lastError && !feed.lastSuccessfulFetchAt;
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
       <p className="text-sm text-muted-foreground">
-        No articles here yet.
+        {hasNeverFetched ? "This feed hasn't loaded yet." : "No articles here yet."}
       </p>
+      {hasNeverFetched && (
+        <p
+          data-testid="empty-last-error"
+          className="text-xs text-destructive max-w-sm break-words"
+        >
+          {feed!.lastError}
+        </p>
+      )}
       <Button
         data-testid="empty-refresh"
         variant="secondary"
@@ -338,6 +365,11 @@ function EmptyArticleList({ feedId }: { feedId: string }) {
         <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} />
         {isRefreshing ? "Refreshing…" : "Refresh"}
       </Button>
+      {hasNeverFetched && (
+        <p className="text-xs text-muted-foreground max-w-sm">
+          If refresh keeps failing, use the cog above the list to delete this feed.
+        </p>
+      )}
     </div>
   );
 }
