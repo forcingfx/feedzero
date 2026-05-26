@@ -5,7 +5,7 @@ Implemented
 
 ## Summary
 
-Feeds can be refreshed to fetch new articles and update changed ones. Refresh happens automatically on app load, on a background interval (`AUTO_REFRESH_INTERVAL_MS`, 30 min) while the app is open, and when a stale tab regains focus. It can also be triggered manually. The global "refresh all" control lives on the desktop sidebar header, the mobile nav-drawer row, and the `R` keyboard shortcut. The **header refresh control** (mobile header pill) is instead **scoped to the current view** via `refreshView`: viewing a single feed refreshes only that feed, a folder refreshes only its members, and an aggregated view (All items / Starred / a smart filter) refreshes every feed. When an article list is empty, that same scoped refresh is offered as a prominent in-list button. New articles are detected via guid-based deduplication using a compound IndexedDB index.
+Feeds can be refreshed to fetch new articles and update changed ones. Refresh happens automatically on app load (including sync users — the boot caller passes `skipSyncPull: true` so the just-imported vault isn't re-pulled), on a background interval (`AUTO_REFRESH_INTERVAL_MS`, 30 min) while the app is open, and when a stale tab regains focus (using the shorter `FOCUS_REFRESH_STALENESS_MS`, 5 min, so coming back to the tab feels live). It can also be triggered manually. The global "refresh all" control lives on the desktop sidebar header, the mobile nav-drawer row, and the `R` keyboard shortcut. The **header refresh control** (mobile header pill) is instead **scoped to the current view** via `refreshView`: viewing a single feed refreshes only that feed, a folder refreshes only its members, and an aggregated view (All items / Starred / a smart filter) refreshes every feed. When an article list is empty, that same scoped refresh is offered as a prominent in-list button. New articles are detected via guid-based deduplication using a compound IndexedDB index. When a refresh actually delivers new articles, `refreshAll` toasts a one-line summary ("3 new articles from <feed title>" or "12 new articles across 4 feeds") — silent on no-op refreshes so background ticks don't surface noise.
 
 ## Behaviour
 
@@ -18,16 +18,31 @@ Feature: Feed refresh
     Then all feeds are refreshed in the background
     And new articles appear in the feed list
 
+  Scenario: Auto-refresh on app load also fires for sync users
+    Given a sync user opens the app
+    And initializeReturningUser has imported the cloud vault
+    When isDbReady flips true
+    Then refreshAll is called with skipSyncPull: true
+    And feeds are fetched from origin (etag/If-Modified-Since making most 304s)
+    But the cloud vault is not pulled a second time
+
   Scenario: Periodic background refresh
     Given the app has been open with existing feeds
     When AUTO_REFRESH_INTERVAL_MS elapses
     Then all feeds are refreshed in the background
 
   Scenario: Refresh on focus when stale
-    Given the app has been in a background tab longer than AUTO_REFRESH_INTERVAL_MS
+    Given the app has been in a background tab longer than FOCUS_REFRESH_STALENESS_MS
     When the user returns focus to the tab
     Then all feeds are refreshed
-    But a return within the interval does not trigger a refresh
+    But a return within FOCUS_REFRESH_STALENESS_MS does not trigger a refresh
+
+  Scenario: Live-pulse toast when new articles arrive
+    Given a background refresh ran (timer, focus, or boot)
+    When the per-feed results contain at least one article with newCount > 0
+    Then a summary toast appears ("N new articles from <feed>" or
+         "N new articles across M feeds")
+    But a refresh that produced no new articles stays silent
 
   Scenario: Scoped refresh from the mobile header
     Given the user is on a mobile viewport viewing a single feed

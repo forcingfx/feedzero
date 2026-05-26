@@ -1,14 +1,19 @@
 import { useEffect } from "react";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { AUTO_REFRESH_INTERVAL_MS } from "@feedzero/core/utils/constants";
+import {
+  AUTO_REFRESH_INTERVAL_MS,
+  FOCUS_REFRESH_STALENESS_MS,
+} from "@feedzero/core/utils/constants";
 
 /**
  * Keeps an open tab's feeds fresh without user action.
  *
- * Two triggers, one threshold (AUTO_REFRESH_INTERVAL_MS):
- *  - a background timer refreshes every feed on each interval
- *  - returning focus to a tab that's been idle longer than the interval
- *    refreshes immediately rather than waiting out the remainder
+ * Two triggers, two thresholds:
+ *  - a background timer refreshes every feed on AUTO_REFRESH_INTERVAL_MS
+ *  - returning focus to a tab that's been idle longer than
+ *    FOCUS_REFRESH_STALENESS_MS (shorter than the timer) refreshes
+ *    immediately, so coming back to the tab after a few minutes feels
+ *    live instead of showing yesterday's articles
  *
  * Reads the store via getState() inside the handlers so the effect can
  * run once (empty deps) and never re-subscribe — refreshAll already
@@ -42,7 +47,7 @@ export function useAutoRefresh() {
         return;
       }
       const last = useFeedStore.getState().lastRefreshAllAt;
-      if (last !== null && Date.now() - last < AUTO_REFRESH_INTERVAL_MS) return;
+      if (last !== null && Date.now() - last < FOCUS_REFRESH_STALENESS_MS) return;
       refreshNow();
     }
 

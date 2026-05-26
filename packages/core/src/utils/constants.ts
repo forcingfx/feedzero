@@ -192,12 +192,20 @@ export const ARTICLE_GROUPING = {
 
 /**
  * How often the app refreshes every feed in the background while it's
- * open. A timer fires on this interval; the same window doubles as the
- * staleness threshold for the focus-triggered refresh — returning to a
- * tab that's been idle longer than this pulls fresh articles instead of
- * waiting out the rest of the interval.
+ * open. A timer fires on this interval; conditional requests (etag /
+ * If-Modified-Since) make most ticks cheap 304s on the network side.
  */
 export const AUTO_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+
+/**
+ * Staleness threshold for the focus-triggered refresh. Returning to a
+ * tab that's been idle longer than this re-fetches feeds immediately
+ * instead of waiting for the next AUTO_REFRESH_INTERVAL_MS tick. Tuned
+ * lower than the background interval so the most common "feels stale"
+ * complaint — coming back after ~10 minutes — produces a refresh; per-feed
+ * 304-backoff still suppresses publishers that have nothing new.
+ */
+export const FOCUS_REFRESH_STALENESS_MS = 5 * 60 * 1000;
 
 /**
  * Watchdog for the boot-time sync pull. The returning-user boot path

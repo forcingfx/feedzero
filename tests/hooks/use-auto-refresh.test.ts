@@ -14,7 +14,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { AUTO_REFRESH_INTERVAL_MS } from "@feedzero/core/utils/constants";
+import {
+  AUTO_REFRESH_INTERVAL_MS,
+  FOCUS_REFRESH_STALENESS_MS,
+} from "@feedzero/core/utils/constants";
 
 function setOnline(value: boolean) {
   Object.defineProperty(navigator, "onLine", { value, configurable: true });
@@ -69,8 +72,40 @@ describe("useAutoRefresh", () => {
     expect(refreshAll).toHaveBeenCalledTimes(1);
   });
 
+  it("refreshes on focus after 10 minutes — between the new focus window and the 30-min timer", () => {
+    // The "feels stale" complaint from coming back to a tab after ~10
+    // minutes: previously the focus-refresh used AUTO_REFRESH_INTERVAL_MS
+    // (30 min) as its staleness threshold so 10-minute returns saw
+    // yesterday's articles. The shorter focus threshold trips a refresh
+    // immediately; backoff still keeps quiet feeds quiet downstream.
+    // The exact threshold is FOCUS_REFRESH_STALENESS_MS — 10 min sits
+    // safely above it and below the 30-min timer.
+    expect(FOCUS_REFRESH_STALENESS_MS).toBeLessThan(10 * 60 * 1000);
+    expect(FOCUS_REFRESH_STALENESS_MS).toBeLessThan(AUTO_REFRESH_INTERVAL_MS);
+    useFeedStore.setState({
+      lastRefreshAllAt: Date.now() - 10 * 60 * 1000,
+    });
+    renderHook(() => useAutoRefresh());
+
+    window.dispatchEvent(new Event("focus"));
+    expect(refreshAll).toHaveBeenCalledTimes(1);
+  });
+
   it("does not refresh on focus when the corpus is still fresh", () => {
     useFeedStore.setState({ lastRefreshAllAt: Date.now() });
+    renderHook(() => useAutoRefresh());
+
+    window.dispatchEvent(new Event("focus"));
+    expect(refreshAll).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh on focus when the last refresh was within FOCUS_REFRESH_STALENESS_MS", () => {
+    // The lower bound of the new threshold: a focus event halfway
+    // through the focus-staleness window stays silent — repeatedly
+    // alt-tabbing must not hammer publishers.
+    useFeedStore.setState({
+      lastRefreshAllAt: Date.now() - FOCUS_REFRESH_STALENESS_MS / 2,
+    });
     renderHook(() => useAutoRefresh());
 
     window.dispatchEvent(new Event("focus"));
