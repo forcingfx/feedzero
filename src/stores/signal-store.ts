@@ -53,6 +53,14 @@ export const useSignalStore = create<SignalStore>((set) => ({
   error: null,
 
   loadReport: async (opts) => {
+    // In-flight guard. The Signal page useEffect kicks loadReport on
+    // every mount + corpus change, so a navigate-away + back during a
+    // refresh would otherwise restart the run. An explicit
+    // { force: true } from the user's Refresh click bypasses.
+    if (!opts?.force && useSignalStore.getState().status === "loading") {
+      return;
+    }
+
     const articles = collectAllArticles();
     const corpusSize = articles.length;
 

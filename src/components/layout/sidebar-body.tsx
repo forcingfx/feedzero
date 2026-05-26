@@ -1,9 +1,11 @@
 import { useNavigate, useLocation } from "react-router";
-import { Compass, Layers, Sparkles, Star, Plus } from "lucide-react";
+import { Compass, Layers, RefreshCw, Sparkles, Star, Plus } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { useBriefingStore } from "@/stores/briefing-store.ts";
+import { useSignalStore } from "@/stores/signal-store.ts";
+import { useAISignalStore } from "@/stores/ai-signal-store.ts";
 import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import {
   ALL_FEEDS_ID,
@@ -82,6 +84,15 @@ export function SidebarBody({
     0,
   );
 
+  // In-flight indicator: either the ML or AI Signal store is generating
+  // a report. Renders a small spinning icon on the Signal entry so the
+  // user knows a refresh kicked from /signal is still running after
+  // they've navigated elsewhere. Takes precedence over the stale dot —
+  // in-flight is more time-relevant than "briefing has new articles".
+  const signalLoading = useSignalStore((s) => s.status === "loading");
+  const aiSignalLoading = useAISignalStore((s) => s.status === "loading");
+  const signalInFlight = signalLoading || aiSignalLoading;
+
   // Honor-system open-core: the Filters section stays visible to free
   // users so the feature is discoverable. Clicking "New filter" while
   // gate-locked routes to the Subscription tab instead of opening an
@@ -117,12 +128,18 @@ export function SidebarBody({
         >
           <Sparkles className="size-4" />
           <span>Signal</span>
-          {briefingsStaleCount > 0 && (
+          {signalInFlight ? (
+            <RefreshCw
+              data-testid="sidebar-signal-inflight"
+              aria-label="Signal refresh in progress"
+              className="ml-auto size-3 animate-spin text-muted-foreground"
+            />
+          ) : briefingsStaleCount > 0 ? (
             <span
               aria-label={`${briefingsStaleCount} briefing(s) have new matching articles`}
               className="ml-auto size-2 rounded-full bg-amber-500"
             />
-          )}
+          ) : null}
         </SidebarMenuButton>
       </SidebarMenuItem>
       {feeds.length > 0 && (
