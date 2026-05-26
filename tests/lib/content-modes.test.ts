@@ -200,9 +200,9 @@ describe("content-modes", () => {
       expect(isFeedBlurbEmpty(null as unknown as string, undefined as unknown as string)).toBe(true);
     });
 
-    it("returns true for HTML that strips to nothing (image-only, empty tags)", () => {
-      expect(isFeedBlurbEmpty('<img alt="">', "<p></p>")).toBe(true);
-      expect(isFeedBlurbEmpty("<div>   </div>", "")).toBe(true);
+    it("returns true for HTML that strips to nothing AND has no visible media", () => {
+      expect(isFeedBlurbEmpty("<p></p>", "<div>   </div>")).toBe(true);
+      expect(isFeedBlurbEmpty("   ", "")).toBe(true);
     });
 
     it("returns false when content has readable text", () => {
@@ -211,6 +211,38 @@ describe("content-modes", () => {
 
     it("returns false when summary has readable text", () => {
       expect(isFeedBlurbEmpty("", "<p>A teaser.</p>")).toBe(false);
+    });
+
+    // Photo blogs, Mastodon image posts, art feeds: the picture IS the
+    // point. Auto-switching to extracted view throws the picture away.
+    it("returns false when content has only an image", () => {
+      expect(isFeedBlurbEmpty('<img src="https://example.com/photo.jpg" alt="">', "")).toBe(false);
+    });
+
+    // YouTube embeds, video posts.
+    it("returns false when content has only an iframe (embed)", () => {
+      expect(
+        isFeedBlurbEmpty('<iframe src="https://youtube.com/embed/abc"></iframe>', ""),
+      ).toBe(false);
+    });
+
+    // Podcast item with a media element.
+    it("returns false when content has only audio or video", () => {
+      expect(isFeedBlurbEmpty('<audio src="ep.mp3"></audio>', "")).toBe(false);
+      expect(isFeedBlurbEmpty('<video src="clip.mp4"></video>', "")).toBe(false);
+    });
+
+    // Picture element (responsive images), SVG, embed/object.
+    it("returns false for other visible-media wrappers", () => {
+      expect(isFeedBlurbEmpty("<picture><img src='a.jpg'></picture>", "")).toBe(false);
+      expect(isFeedBlurbEmpty('<svg><circle r="10"/></svg>', "")).toBe(false);
+    });
+
+    // Empty alt + no text was the original false-positive: stripHtml saw
+    // no text, the auto-switch fired, and the user lost the picture.
+    // Visible media in EITHER content or summary keeps us in Feed view.
+    it("returns false when summary has media even though content is empty", () => {
+      expect(isFeedBlurbEmpty("", '<img alt="" src="https://example.com/photo.jpg">')).toBe(false);
     });
   });
 

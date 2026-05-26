@@ -30,14 +30,39 @@ function countWords(text: string): number {
   return text.split(/\s+/).filter((w) => w.length > 0).length;
 }
 
+const VISIBLE_MEDIA_SELECTOR =
+  "img, video, audio, iframe, picture, svg, embed, object, source";
+
 /**
- * True when the feed view would render nothing — both content and summary
- * are missing or strip down to no readable text (e.g. image-only payloads,
- * empty `<p></p>` wrappers). Used by the reader to auto-switch to Full text
- * so the user doesn't land on a blank pane.
+ * Whether `html` would render anything the user can see — readable text
+ * OR a visible media element (image, video, audio, iframe, embed). Used
+ * by `isFeedBlurbEmpty` to decide whether the Feed view would be a blank
+ * pane worth bypassing.
+ *
+ * Earlier this lived inline as `stripHtml(html).length > 0`, which only
+ * sees text. A photo blog or podcast feed whose blurb is `<img>` or
+ * `<audio>` strips to empty text but is NOT blank — the picture / player
+ * IS the content, and auto-switching to extracted view throws it away.
+ */
+function hasVisibleBlurbContent(html: string): boolean {
+  if (!html) return false;
+  if (stripHtml(html).length > 0) return true;
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.querySelector(VISIBLE_MEDIA_SELECTOR) !== null;
+}
+
+/**
+ * True when the feed view would render nothing — neither content nor
+ * summary carries readable text or visible media. Used by the reader to
+ * auto-switch to Full text so the user doesn't land on a blank pane.
+ *
+ * Media counts as visible content: image-only photo posts, YouTube
+ * embeds, and `<audio>` podcast players are the point of the entry,
+ * not a teaser to bypass.
  */
 export function isFeedBlurbEmpty(content: string, summary: string): boolean {
-  return stripHtml(content || "").length === 0 && stripHtml(summary || "").length === 0;
+  return !hasVisibleBlurbContent(content) && !hasVisibleBlurbContent(summary);
 }
 
 const MIN_WORDS_FOR_FULL_ARTICLE = 100;
