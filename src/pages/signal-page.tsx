@@ -492,11 +492,12 @@ function AISignalView() {
           </p>
           <p className="text-sm text-muted-foreground">
             AI Signal calls Anthropic with your own key. Paste one in
-            Settings — the key is encrypted at rest in your vault and only
-            sent to <code>api.anthropic.com</code> when you click Refresh.
+            Settings → Reading → Signal — the key is encrypted at rest
+            in your vault and only sent to <code>api.anthropic.com</code>{" "}
+            when you click Refresh.
           </p>
           <div className="flex justify-center gap-2">
-            <Button onClick={() => goToSettings(navigate, "briefings")}>
+            <Button onClick={() => goToSettings(navigate, "reading")}>
               Open Settings
             </Button>
             <SignalModeToggle />

@@ -420,7 +420,7 @@ function NoApiKeySplash() {
         encrypted at rest and never leaves your browser except to call Anthropic
         directly.
       </p>
-      <Button className="mt-4" onClick={() => goToSettings(navigate, "briefings")}>
+      <Button className="mt-4" onClick={() => goToSettings(navigate, "reading")}>
         <SettingsIcon className="size-4" />
         Open Settings
       </Button>
