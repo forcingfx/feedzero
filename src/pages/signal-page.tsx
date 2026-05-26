@@ -97,7 +97,13 @@ function MLSignalView() {
     );
   }
 
-  if (status === "idle" || status === "loading" || !report) {
+  // Only show the bare "Computing signal…" splash on a genuine cold
+  // start (no prior report). When we already have a report and the
+  // store is refreshing, keep the data visible and let the refresh
+  // button's spinner be the in-progress affordance — flashing a blank
+  // splash on every refresh is the bug the user reported as "no
+  // visual feedback on the refresh icon."
+  if (!report) {
     return (
       <>
         <SignalTabs active="topics" />
@@ -108,7 +114,13 @@ function MLSignalView() {
     );
   }
 
-  return <ReadyView report={report} onRefresh={() => loadReport({ force: true })} />;
+  return (
+    <ReadyView
+      report={report}
+      isRefreshing={status === "loading"}
+      onRefresh={() => loadReport({ force: true })}
+    />
+  );
 }
 
 function LockedSplash({ count }: { count: number }) {
@@ -176,9 +188,17 @@ function LockedSplash({ count }: { count: number }) {
 
 function ReadyView({
   report,
+  isRefreshing,
   onRefresh,
 }: {
   report: SignalReport;
+  /**
+   * True while the underlying store is generating a fresh report.
+   * Drives both the refresh icon's `animate-spin` AND the button's
+   * `disabled` state, so clicks register visually and back-to-back
+   * clicks don't fire duplicate runs.
+   */
+  isRefreshing: boolean;
   onRefresh: () => void | Promise<void>;
 }) {
   const navigate = useNavigate();
@@ -189,11 +209,12 @@ function ReadyView({
   const articleMap = useMemo(() => indexArticles(articlesByFeedId), [articlesByFeedId]);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const { pullPx, isRefreshing } = usePullToRefresh({
+  const { pullPx, isRefreshing: isPullRefreshing } = usePullToRefresh({
     scrollRef: containerRef,
     enabled: !isDesktop,
     onRefresh,
   });
+  const spinning = isRefreshing || isPullRefreshing;
 
   const hasTopics = report.topics.length > 0;
   const topStories = useMemo(() => collectTopStories(report.topics), [report.topics]);
@@ -209,7 +230,7 @@ function ReadyView({
           style={{ height: Math.min(pullPx, 80) }}
         >
           <RefreshCw
-            className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
+            className={`size-4 ${isPullRefreshing ? "animate-spin" : ""}`}
             style={{ transform: `rotate(${Math.min(pullPx, 80) * 4.5}deg)` }}
           />
         </div>
@@ -227,8 +248,9 @@ function ReadyView({
                 onClick={() => void onRefresh()}
                 aria-label="Refresh"
                 title="Refresh"
+                disabled={spinning}
               >
-                <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw className={`size-4 ${spinning ? "animate-spin" : ""}`} />
               </Button>
             </div>
           </div>

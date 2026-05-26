@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { SignalPage } from "@/pages/signal-page.tsx";
@@ -307,6 +307,28 @@ describe("SignalPage", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /refresh/i }));
     await waitFor(() => expect(useSignalStore.getState().report?.generatedAt).not.toBe(first));
+  });
+
+  it("Refresh button spins while the report is loading", async () => {
+    seedReadyCorpus();
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+    // Flip the store into the loading state externally — same shape as
+    // mid-flight refresh after a click. The icon (and button) must
+    // reflect that the work is in progress so the user knows their
+    // click registered. Previously the spinner was wired to
+    // `usePullToRefresh().isRefreshing`, which only tracks
+    // pull-to-refresh on mobile — button clicks left the icon static.
+    act(() => {
+      useSignalStore.setState({ status: "loading" });
+    });
+
+    const refreshButton = screen.getByRole("button", { name: /refresh/i });
+    const icon = refreshButton.querySelector("svg");
+    expect(icon).not.toBeNull();
+    expect(icon?.classList.contains("animate-spin")).toBe(true);
+    expect(refreshButton).toBeDisabled();
   });
 
   describe("Top stories digest", () => {
