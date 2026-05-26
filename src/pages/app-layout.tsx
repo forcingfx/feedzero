@@ -4,6 +4,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh.ts";
+import { useSignalMidnightRefresh } from "@/hooks/use-signal-midnight-refresh.ts";
 import { useBriefingAutoRefresh } from "@/hooks/use-briefing-auto-refresh.ts";
 import { useLicenseRefresh } from "@/hooks/use-license-refresh.ts";
 import { useSharedSidebarSize } from "@/hooks/use-shared-sidebar-size.ts";
@@ -96,6 +97,7 @@ export function AppLayout() {
   useAutoRefresh();
   useBriefingAutoRefresh();
   useLicenseRefresh();
+  useSignalMidnightRefresh();
   useDefaultFeedsRedirect();
 
   function handleFeedSelect(id: string) {

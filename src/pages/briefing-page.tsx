@@ -24,6 +24,7 @@ import {
   Settings as SettingsIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -317,6 +318,7 @@ function BriefingHeader({
   onRefresh: () => void;
   onDelete: () => void;
 }) {
+  const setDailyRefresh = useBriefingStore((s) => s.setBriefingDailyRefresh);
   const lastRunLabel = briefing.lastRunAt
     ? new Date(briefing.lastRunAt).toLocaleString()
     : "never";
@@ -366,9 +368,19 @@ function BriefingHeader({
           </AlertDialog>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Last refreshed: {lastRunLabel}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Last refreshed: {lastRunLabel}
+        </p>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Switch
+            checked={briefing.dailyRefresh === true}
+            onCheckedChange={(v) => void setDailyRefresh(briefing.id, !!v)}
+            aria-label="Refresh this briefing nightly"
+          />
+          <span>Refresh nightly</span>
+        </label>
+      </div>
     </div>
   );
 }

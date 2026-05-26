@@ -305,6 +305,42 @@ describe("briefing-store ↔ db.ts integration", () => {
     expect(fromDb.value[0].name).toBe("Renamed");
   });
 
+  /**
+   * `dailyRefresh` is the per-briefing opt-in for the midnight
+   * scheduler. The flag must persist through the encryption envelope
+   * so a reload (or sync pull on another device) preserves the
+   * choice — otherwise the user wakes up to a missing nightly run.
+   * createBriefing defaults to false; setBriefingDailyRefresh flips
+   * it; the round-trip lands in the encrypted row.
+   */
+  it("createBriefing defaults dailyRefresh to false on the persisted row", async () => {
+    const created = await useBriefingStore
+      .getState()
+      .createBriefing({ name: "Defaults", prompt: "x" });
+    if (!created.ok) throw new Error("create failed");
+    const fromDb = await dbGetBriefings();
+    if (!fromDb.ok) throw new Error("dbGetBriefings failed");
+    expect(fromDb.value[0].dailyRefresh).toBe(false);
+  });
+
+  it("setBriefingDailyRefresh persists the flag through encryption", async () => {
+    const created = await useBriefingStore
+      .getState()
+      .createBriefing({ name: "Nightly fan", prompt: "x" });
+    if (!created.ok) throw new Error("create failed");
+
+    const flipped = await useBriefingStore
+      .getState()
+      .setBriefingDailyRefresh(created.value.id, true);
+    expect(flipped.ok).toBe(true);
+    if (!flipped.ok) return;
+    expect(flipped.value.dailyRefresh).toBe(true);
+
+    const fromDb = await dbGetBriefings();
+    if (!fromDb.ok) throw new Error("dbGetBriefings failed");
+    expect(fromDb.value[0].dailyRefresh).toBe(true);
+  });
+
   it("removeBriefing deletes the row and clears the per-id status maps", async () => {
     const created = await useBriefingStore
       .getState()
