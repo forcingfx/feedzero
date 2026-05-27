@@ -293,6 +293,23 @@ async function reloadFeeds(
 }
 
 /**
+ * Reload the article store so the open list reflects any rows written
+ * by the refresh path that just ran. Mirrors the tail every
+ * feed-mutating action (refreshAll, refreshView, reloadSingleFeed)
+ * already needs — without it, the user has to navigate away and back
+ * for new articles to appear. Extracted so an action that intentionally
+ * skips the reload (e.g. a metadata-only mutator) is a visible
+ * one-line omission instead of a forgotten copy of the dance.
+ */
+async function reloadArticleStoreForView(
+  selectedFeedId: string | null,
+): Promise<void> {
+  const articleStore = useArticleStore.getState();
+  await articleStore.preloadAll();
+  if (selectedFeedId) await articleStore.loadArticles(selectedFeedId);
+}
+
+/**
  * Apply the per-feed results returned by `refreshAllFeeds()` to the
  * in-memory feeds list, replacing each refreshed entry with the
  * (freshness-mutated) feed object the worker carried back. Feeds not
@@ -635,6 +652,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       } else {
         await reloadFeeds(set);
       }
+      // Without this, auto-refresh (boot, timer, focus) lands new rows
+      // in the DB that don't render until the user navigates away and
+      // back. On mobile that read as a "stale feed" after the loading
+      // screen cleared.
+      await reloadArticleStoreForView(get().selectedFeedId);
       schedulePush();
     } finally {
       set({ isRefreshingAll: false, lastRefreshAllAt: Date.now() });
@@ -664,12 +686,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         await Promise.all(targets.map((feed) => refreshFeed(feed)));
       }
       await reloadFeeds(set);
-      // Reload the article store so the freshly-fetched items show up in the
-      // open list without the user re-navigating. preloadAll keeps the other
-      // views coherent; loadArticles re-derives the visible list for this one.
-      const articleStore = useArticleStore.getState();
-      await articleStore.preloadAll();
-      await articleStore.loadArticles(feedId);
+      await reloadArticleStoreForView(feedId);
       schedulePush();
     } finally {
       // A scoped refresh leaves other feeds untouched, so it must not stamp
@@ -694,10 +711,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       const feed = feedResult.value;
 
       await reloadFeed(feed);
-      const { loadArticles, preloadAll } = useArticleStore.getState();
-      await preloadAll();
-      const selectedFeedId = get().selectedFeedId;
-      if (selectedFeedId) await loadArticles(selectedFeedId);
+      await reloadArticleStoreForView(get().selectedFeedId);
     } finally {
       const ids = new Set(get().refreshingFeedIds);
       ids.delete(feedId);

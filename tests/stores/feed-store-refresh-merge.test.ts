@@ -15,6 +15,11 @@ vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn(),
   getFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   updateFeed: vi.fn(async () => ({ ok: true, value: undefined })),
+  // refreshAll now reloads the article store at its tail so freshly-fetched
+  // items show up in the open list. Stub the article DB reads so the merge-
+  // focused tests below don't trip the mocker.
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 vi.mock("@/core/feeds/feed-service.ts", () => ({

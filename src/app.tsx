@@ -10,7 +10,6 @@ import {
 import { useAppStore } from "@/stores/app-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
-import { useSyncStore } from "@/stores/sync-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { CHANGELOG_FEED_URL } from "@feedzero/core/utils/constants";
 import { Toaster } from "@/components/ui/sonner.tsx";
@@ -34,6 +33,7 @@ import { useExtensionStore } from "@/stores/extension-store.ts";
 import { isExtensionEnabled } from "@/core/extension/extension-enabled.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { InvalidKeysScreen } from "@/components/recovery/invalid-keys-screen";
+import { AppShellSkeleton } from "@/components/loading/app-shell-skeleton.tsx";
 
 const ExploreCatalog = lazy(() =>
   import("@/components/explore/explore-catalog.tsx").then((m) => ({
@@ -193,13 +193,13 @@ function AppInit({ children }: { children: React.ReactNode }) {
       // user-defined config that the sidebar needs immediately;
       // the encrypted-blob read is cheap (typically <10 rows).
       void loadSmartFilters();
-      // Sync users: initializeReturningUser already pulled the cloud vault,
-      // so an immediate refreshAll() would do a redundant second pull whose
-      // importAll's clear+bulkPut window races with consumers reading feeds.
-      // Local users still get auto-refresh on boot (no pull involved).
-      if (!useSyncStore.getState().credentials) {
-        refreshAll();
-      }
+      // Every boot fetches fresh articles. For sync users, refreshAll's
+      // internal syncStore.pull() awaits the background pull kicked off
+      // by initializeReturningUser via the inFlightPull dedup, then
+      // runs the publisher fetches once the vault import settles. This
+      // is what makes "open the app" actually show today's articles
+      // instead of yesterday's snapshot.
+      refreshAll();
     }
   }, [isDbReady, loadFeeds, refreshAll, preloadArticles, loadSmartFilters, addFeed]);
 
@@ -284,7 +284,7 @@ function AppInit({ children }: { children: React.ReactNode }) {
   }
 
   if (!isDbReady) {
-    return <div className="p-4 text-muted-foreground">Loading…</div>;
+    return <AppShellSkeleton />;
   }
 
   return (

@@ -5,7 +5,7 @@ import {
   destroy,
 } from "../core/storage/key-manager.ts";
 import { dedupeArticles } from "../core/storage/db.ts";
-import { BOOT_PULL_TIMEOUT_MS, LOCAL_STORAGE } from "@feedzero/core/utils/constants";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import { useSyncStore } from "./sync-store.ts";
 import { usePreferencesStore } from "./preferences-store.ts";
 import { persistPreferences } from "./persist-preferences.ts";
@@ -111,39 +111,30 @@ async function runDedupeMigrationOnce(): Promise<void> {
 }
 
 /**
- * Race the sync pull against a watchdog. Resolves either when the pull
- * settles or when `BOOT_PULL_TIMEOUT_MS` elapses, whichever comes first.
- * Returning early on timeout lets boot proceed with the local DB; the
- * pull stays in-flight in the background and `useSyncStore.pull()`'s
- * own `inFlightPull` dedup means a downstream `refreshAll()` will await
- * the same promise rather than firing a second pull.
+ * Kick off the sync pull in the background and reconcile the in-memory
+ * feed list when it lands. Boot does NOT await this — mobile users
+ * waited multiple seconds on "Loading…" while a slow cloud round-trip
+ * settled; now the UI mounts on the canary-validated local DB
+ * immediately and the pull's result materializes when it arrives.
  *
- * Background completion triggers a `loadFeeds` so the sidebar reflects
- * any data the pull eventually imported. Only fires when the pull
- * actually finishes — if it never does, the background side stays a
- * pending promise (which the runtime GCs on tab close).
+ * `useSyncStore.pull()`'s `inFlightPull` dedup means the `refreshAll`
+ * that AppInit fires shortly after isDbReady will await this exact
+ * promise rather than racing a second pull — the original concern that
+ * justified the boot-time await (see issue #117 / sync-100-feeds.spec).
  */
-async function pullWithBootWatchdog(): Promise<void> {
-  const pull = useSyncStore.getState().pull();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const watchdog = new Promise<"timeout">((resolve) => {
-    timer = setTimeout(() => resolve("timeout"), BOOT_PULL_TIMEOUT_MS);
-  });
-  const outcome = await Promise.race([pull.then(() => "settled" as const), watchdog]);
-  if (timer !== undefined) clearTimeout(timer);
-  if (outcome === "timeout") {
-    // Best-effort: if the pull eventually completes after we've given up
-    // on it, refresh the in-memory feed list so the UI catches up to the
-    // imported vault. Failures are ignored — the user can manually
-    // refresh if needed.
-    void pull
-      .then(async () => {
-        await useFeedStore.getState().loadFeeds();
-      })
-      .catch(() => {
-        /* noop — pull's own error handling already set sync status */
-      });
-  }
+function pullInBackground(): void {
+  void useSyncStore
+    .getState()
+    .pull()
+    .then(async () => {
+      // The pull imported new rows; refresh the in-memory feed list so
+      // the sidebar reflects them even if refreshAll never runs (e.g.
+      // user closes the tab before its network fetches complete).
+      await useFeedStore.getState().loadFeeds();
+    })
+    .catch(() => {
+      /* noop — pull's own error handling already set sync status */
+    });
 }
 
 // Dedup concurrent boot-time calls. AppInit's effect 1 fires twice in
@@ -223,25 +214,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
         useSyncStore.setState({ credentials: status.credentials });
       }
 
-      // For sync users, finish the initial pull BEFORE flipping isDbReady.
-      // AppInit's `isDbReady` effect kicks off loadFeeds + refreshAll the
-      // moment the flag goes true; if we set it before the pull settles,
-      // refreshAll's own pull() races with this one and importAll's
-      // clear+bulkPut sequences interleave, leaving a window where feeds
-      // appear absent. See tests/e2e/sync-100-feeds.spec.ts for the
-      // reproducer.
-      //
-      // BUT: a pull that never settles must not trap the user on the
-      // "Loading…" splash. Race against a watchdog timer — on timeout we
-      // proceed with the (canary-validated) local DB; the pull stays
-      // in-flight and an eventual `loadFeeds` picks up its result if it
-      // ever lands. Boot-blocks-on-network was the production hang
-      // reported here.
+      // Sync users: fire the cloud pull in the background and proceed
+      // with the canary-validated local DB. AppInit's refreshAll kicks
+      // off right after isDbReady; its own syncStore.pull() awaits the
+      // same in-flight promise via the inFlightPull dedup, so feeds
+      // imported by the pull land before refreshAllFeeds runs. The
+      // race that justified the old await (importAll's clear+bulkPut
+      // racing readers — sync-100-feeds.spec.ts) is prevented by the
+      // dedup, not by blocking boot on the network round-trip.
       if (status.isSyncUser) {
-        await pullWithBootWatchdog();
-        if (useSyncStore.getState().status !== "error") {
-          useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
-        }
+        useSyncStore.setState({ status: "syncing" });
+        pullInBackground();
       }
 
       await runDedupeMigrationOnce();

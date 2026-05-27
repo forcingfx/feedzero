@@ -274,6 +274,10 @@ describe("app-store", () => {
 
       expect(useAppStore.getState().isDbReady).toBe(true);
       expect(useSyncStore.getState().credentials).toBe(mockCredentials);
+      // Pull runs in the background — flush microtasks so its .then settles
+      // and the status transitions from "syncing" to "synced".
+      await Promise.resolve();
+      await Promise.resolve();
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
@@ -297,42 +301,36 @@ describe("app-store", () => {
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
 
-    it("still initializes when the sync pull never resolves (boot must not hang on the network)", async () => {
-      // Reproduces the production hang: a returning sync user whose
-      // /api/sync request stalls indefinitely (slow upstream, dropped
-      // connection mid-response, edge function cold-start hang). Before
-      // the boot-time pull timeout, isDbReady stayed false forever and
-      // the user was stuck on "Loading…" with no escape.
+    it("mounts instantly for sync users — pull happens in the background", async () => {
+      // On mobile, blocking isDbReady on the cloud pull was the cause of
+      // the "Loading… for a few seconds" complaint. The pull now fires
+      // in the background so the UI can render whatever the canary-
+      // validated local DB already has; refreshAll (kicked off by
+      // AppInit) waits on the same in-flight pull via sync-store dedup
+      // and then fetches fresh articles when it lands.
       vi.mocked(restore).mockResolvedValue({
         status: "ready",
         isSyncUser: true,
         credentials: {
           vaultId: "vault-id",
           vaultKey: "mock-key" as unknown as CryptoKey,
-        kdfSpec: { kind: "pbkdf2-600k" } as const,
+          kdfSpec: { kind: "pbkdf2-600k" } as const,
         },
       });
-      // pullVaultIfChanged returns a promise that never resolves.
+      // Pull never resolves — boot still completes promptly.
       vi.mocked(pullVaultIfChanged).mockReturnValue(
         new Promise(() => {
           /* never resolves */
         }),
       );
 
-      vi.useFakeTimers();
-      try {
-        const initPromise = useAppStore.getState().initializeReturningUser();
-        // Advance past the boot-time pull watchdog (BOOT_PULL_TIMEOUT_MS,
-        // currently 10s). The pull stays in-flight in the background; boot
-        // proceeds with whatever local data the canary already validated.
-        await vi.advanceTimersByTimeAsync(15_000);
-        await initPromise;
-      } finally {
-        vi.useRealTimers();
-      }
+      await useAppStore.getState().initializeReturningUser();
 
       expect(useAppStore.getState().isDbReady).toBe(true);
+      // Sync is in flight, not yet settled.
+      expect(useSyncStore.getState().status).toBe("syncing");
     });
+
   });
 
   describe("resetApp", () => {
