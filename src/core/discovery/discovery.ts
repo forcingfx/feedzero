@@ -28,6 +28,10 @@ async function tryParseFeed(feedUrl: string): Promise<DiscoveryResult | null> {
 
     return { feedUrl, ...result.value };
   } catch {
+    // Network or transport failure on this candidate — treat as "not a
+    // feed" so the cascade walks to the next candidate URL. A real
+    // outage surfaces later when the user's chosen candidate also
+    // fails; this branch is intentionally silent per strategy.
     return null;
   }
 }

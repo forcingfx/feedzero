@@ -49,6 +49,8 @@ export function findFeedLinksInHtml(html: string, pageUrl: string): string[] {
 
     return results;
   } catch {
+    // DOMParser failed on malformed HTML — yield no candidates so the
+    // discovery cascade falls through to the next strategy.
     return [];
   }
 }
@@ -61,6 +63,8 @@ export function getWellKnownFeedUrls(pageUrl: string): string[] {
     const origin = new URL(pageUrl).origin;
     return WELL_KNOWN_PATHS.map((path) => `${origin}${path}`);
   } catch {
+    // pageUrl was not a parseable absolute URL — no origin to derive
+    // candidates from. Falls through to the next discovery strategy.
     return [];
   }
 }
@@ -89,6 +93,8 @@ export function findFeedLinksInAnchors(html: string, pageUrl: string): string[] 
 
     return results;
   } catch {
+    // DOMParser failed on malformed HTML — yield no candidates so the
+    // discovery cascade falls through to the next strategy.
     return [];
   }
 }
