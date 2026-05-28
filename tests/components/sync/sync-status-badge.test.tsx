@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { SyncStatusBadge } from "@/components/sync/sync-status-badge";
 import { useSyncStore } from "@/stores/sync-store";
 import { useFeedStore } from "@/stores/feed-store";
+import { useLicenseStore } from "@/stores/license-store";
 
 /**
  * The persistent "are we synced?" affordance in the top-right of the
@@ -30,6 +31,7 @@ describe("SyncStatusBadge", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-24T20:00:00Z"));
     useFeedStore.setState({ isRefreshingAll: false });
+    useLicenseStore.setState({ verifying: false });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -123,6 +125,20 @@ describe("SyncStatusBadge", () => {
     // reflect that, not the static "Local only" descriptor.
     useSyncStore.setState({ status: "local-only", lastSyncedAt: null });
     useFeedStore.setState({ isRefreshingAll: true });
+    renderBadge();
+    expect(screen.getByTestId("sync-status-badge")).toHaveAttribute(
+      "data-state",
+      "syncing",
+    );
+  });
+
+  it("shows 'Syncing…' while the license is being verified — work-status contract", () => {
+    // License recheck is the third busy source aggregated by
+    // useIsAppBusy. The badge trusts the selector, so verifying must
+    // surface here without the badge knowing about license-store
+    // directly. Locks the badge↔selector contract.
+    useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+    useLicenseStore.setState({ verifying: true });
     renderBadge();
     expect(screen.getByTestId("sync-status-badge")).toHaveAttribute(
       "data-state",

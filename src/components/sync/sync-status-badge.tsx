@@ -13,13 +13,16 @@
  *   synced     → emerald dot, "Synced · <relative>"
  *   error      → rose dot,  "Sync error"
  *
- * Active publisher refreshes override the underlying sync status —
- * showing "Synced · just now" in green while refreshAll is still
- * fetching today's articles from publishers is a lie. The badge is
- * the user's "is the data I'm looking at current?" signal, not the
- * narrow "is the vault byte-equal to the cloud?" one. The override
- * applies to local-only users too: a refresh in flight is real work
- * worth surfacing.
+ * Any in-flight async work (vault pull, publisher refresh, license
+ * verify) overrides the underlying sync status to "syncing" — showing
+ * "Synced · just now" in green while refreshAll is still fetching
+ * today's articles is a lie. The override applies to local-only users
+ * too: a refresh in flight is real work worth surfacing. Vault errors
+ * win over the override (the user needs to see the failure).
+ *
+ * The "is anything in flight?" check goes through {@link useIsAppBusy}
+ * — the single selector that aggregates per-store busy signals so this
+ * component never has to know which stores contribute.
  *
  * The relative-time string ticks itself on a 30s interval so a synced
  * badge doesn't get stuck at "just now" for hours on a quiet tab.
@@ -29,7 +32,7 @@ import { Link } from "react-router";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSyncStore } from "@/stores/sync-store";
-import { useFeedStore } from "@/stores/feed-store";
+import { useIsAppBusy } from "@/stores/work-status";
 
 function formatRelative(ts: number, now: number): string {
   const delta = Math.max(0, now - ts);
@@ -48,13 +51,11 @@ const TICK_INTERVAL_MS = 30 * 1000;
 export function SyncStatusBadge() {
   const rawStatus = useSyncStore((s) => s.status);
   const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt);
-  const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
-  // A publisher refresh is in-flight work too — surface it as syncing
-  // so the badge can't claim "Synced · just now" while the user is
-  // still staring at stale articles. Vault errors win over refresh
-  // (the user needs to see the failure even mid-refresh).
-  const status =
-    isRefreshingAll && rawStatus !== "error" ? "syncing" : rawStatus;
+  const isBusy = useIsAppBusy();
+  // Any in-flight async work surfaces as syncing so the badge can't
+  // claim "Synced · just now" while real work is still happening.
+  // Errors win — the user needs to see the failure regardless.
+  const status = isBusy && rawStatus !== "error" ? "syncing" : rawStatus;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
