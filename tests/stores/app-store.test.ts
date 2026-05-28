@@ -354,6 +354,7 @@ describe("app-store", () => {
     beforeEach(() => {
       // Reset side-effect state between tests
       useAppStore.setState({
+        bootState: { kind: "unknown" },
         isDbReady: false,
         error: null,
         hasCompletedOnboarding: null,
@@ -365,14 +366,20 @@ describe("app-store", () => {
       });
     });
 
-    it("completes the full sequence on a healthy environment", async () => {
-      // happy-dom defaults to isSecureContext=true via tests/setup.ts
+    it("transitions to needs-onboarding (modal takes over from here) on a healthy environment", async () => {
+      // Previous behavior auto-generated a passphrase and initialized
+      // a local-only DB without ever surfacing the modal — meaning every
+      // new user ended up local-only with a passphrase they'd never see.
+      // The fix: the action only runs the secure-context guard; the modal
+      // drives the actual choice (local / sync / recovery) and calls
+      // initialize() once the user has chosen.
       await useAppStore.getState().startNewUserOnboarding();
 
-      expect(initFresh).toHaveBeenCalled();
+      expect(initFresh).not.toHaveBeenCalled();
       const state = useAppStore.getState();
-      expect(state.isDbReady).toBe(true);
-      expect(state.hasCompletedOnboarding).toBe(true);
+      expect(state.bootState.kind).toBe("needs-onboarding");
+      expect(state.isDbReady).toBe(false);
+      expect(state.hasCompletedOnboarding).toBe(false);
       expect(state.securityProblem).toBeNull();
       expect(state.error).toBeNull();
     });
@@ -400,14 +407,14 @@ describe("app-store", () => {
       expect(state.hasCompletedOnboarding).toBeNull();
     });
 
-    it("does not complete onboarding when initialize sets an error", async () => {
-      vi.mocked(initFresh).mockResolvedValue({ ok: false, error: "boom" });
-
+    it("does NOT call initFresh — passphrase generation + DB init are the modal's job", async () => {
+      // Lock the structural property that motivated the refactor: this
+      // action no longer creates a DB silently. Any future caller that
+      // accidentally re-adds an initialize() here will trip this test
+      // before reaching production (and shipping every new user into
+      // local-only mode with a passphrase they can't see).
       await useAppStore.getState().startNewUserOnboarding();
-
-      const state = useAppStore.getState();
-      expect(state.error).toBe("boom");
-      expect(state.hasCompletedOnboarding).toBeNull();
+      expect(initFresh).not.toHaveBeenCalled();
     });
   });
 });

@@ -13,7 +13,6 @@ import { useFeedStore } from "./feed-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { useOnboardingStore } from "./onboarding-store.ts";
 import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
-import { generatePassphrase } from "../core/crypto/passphrase-generator.ts";
 import {
   checkSecureContext,
 } from "../core/security/secure-context.ts";
@@ -308,6 +307,19 @@ export const useAppStore = create<AppStore>((set, get) => {
     },
 
     startNewUserOnboarding: async () => {
+      // New-user entry point. Job: secure-context guard, then hand off
+      // to the OnboardingModal by parking the FSM in `needs-onboarding`.
+      //
+      // Previously this action ALSO auto-generated a passphrase,
+      // initialized a local-only DB, and marked onboarding complete —
+      // which meant the modal never actually appeared. Every new user
+      // landed in local-only mode with a passphrase they never saw,
+      // unable to later enable sync from the same passphrase, and with
+      // no recovery story if their browser data got cleared.
+      //
+      // The modal (mounted at App() top level) owns the welcome →
+      // storage-choice → passphrase-display → confirm flow and calls
+      // initialize() itself once the user has made an explicit choice.
       const check = checkSecureContext({
         isSecureContext: globalThis.isSecureContext ?? false,
         crypto: globalThis.crypto as Pick<Crypto, "subtle"> | undefined,
@@ -325,17 +337,11 @@ export const useAppStore = create<AppStore>((set, get) => {
         });
         return;
       }
-      try {
-        const passphrase = await generatePassphrase();
-        await get().initialize(passphrase, { sync: false });
-        // initialize() dispatches `init-error` or `initialize-completed`
-        // itself; only flip the persisted flag on success.
-        if (get().bootState.kind === "ready") get().completeOnboarding();
-      } catch (e) {
-        await dispatch({
-          type: "init-error",
-          message: e instanceof Error ? e.message : "Initialization failed",
-        });
+      // Land the FSM in needs-onboarding so the modal renders. The
+      // modal's chooseStorageMode → initialize() call drives the FSM
+      // forward to ready via `initialize-completed`.
+      if (get().bootState.kind !== "needs-onboarding") {
+        set(applyBootState({ kind: "needs-onboarding" }));
       }
     },
 
