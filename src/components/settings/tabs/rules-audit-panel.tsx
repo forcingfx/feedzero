@@ -2,11 +2,14 @@
  * Read-only audit view of every rule across every subscribed feed.
  *
  * Answers the "what's hiding articles from me right now?" question.
- * Clicking a row opens the rules editor for that feed (write-side
- * happens in the editor dialog; this view never mutates).
+ * Clicking Edit opens the rules editor for that feed; clicking Run
+ * now applies the rule to articles already stored. Both write paths
+ * route through feed-store actions — this component owns no mutating
+ * logic of its own.
  */
 
-import { Settings2 } from "lucide-react";
+import { Play, Settings2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useFeedStore } from "@/stores/feed-store";
 import { useFeatureGate } from "@/hooks/use-feature-gate";
@@ -45,11 +48,31 @@ function summariseActions(actions: RuleAction[]): string {
 export function RulesAuditPanel() {
   const feeds = useFeedStore((s) => s.feeds);
   const openRulesEditor = useFeedStore((s) => s.openRulesEditor);
+  const applyRuleToExistingArticles = useFeedStore(
+    (s) => s.applyRuleToExistingArticles,
+  );
   const gate = useFeatureGate("rules");
   // Existing rules can linger after a downgrade; route Edit to upgrade
   // when the gate is closed rather than opening an editor that can't save.
   const editRules = (feedId: string) =>
     gate.enabled ? openRulesEditor(feedId) : gate.promptUpgrade();
+
+  async function runRuleNow(feedId: string, ruleId: string) {
+    if (!gate.enabled) {
+      gate.promptUpgrade();
+      return;
+    }
+    const result = await applyRuleToExistingArticles(feedId, ruleId);
+    if (!result.ok) {
+      toast.error(`Couldn't apply rule: ${result.error}`);
+      return;
+    }
+    toast.success(
+      result.value.changed === 0
+        ? "No existing articles matched"
+        : `Applied to ${result.value.changed} of ${result.value.total} articles`,
+    );
+  }
 
   const groups = flattenFeedRules(feeds);
   const totalRules = groups.reduce((sum, g) => sum + g.rules.length, 0);
@@ -117,6 +140,17 @@ export function RulesAuditPanel() {
                         (paused)
                       </span>
                     )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      aria-label={`Run "${rule.name}" now`}
+                      data-testid={`rules-audit-run-now-${rule.id}`}
+                      onClick={() => runRuleNow(feed.id, rule.id)}
+                    >
+                      <Play className="size-3.5" />
+                    </Button>
                   </li>
                 ))}
               </ul>

@@ -9,8 +9,12 @@ import {
   updateFolder as dbUpdateFolder,
   removeFolder as dbRemoveFolder,
   getAllArticles,
+  updateArticles as dbUpdateArticles,
 } from "../core/storage/db.ts";
 import { createRule } from "../core/storage/schema.ts";
+import { applyRuleToExisting } from "../core/rules/engine.ts";
+import { buildContext } from "../core/filters/evaluator.ts";
+import { useSmartFilterStore } from "./smart-filter-store.ts";
 import {
   addFeedFlow,
   addPlaceholderFeed as addPlaceholderFeedCore,
@@ -200,6 +204,17 @@ interface FeedStore {
   updateFeedRule: (feedId: string, rule: Rule) => Promise<Result<Rule>>;
   removeFeedRule: (feedId: string, ruleId: string) => Promise<void>;
   reorderFeedRules: (feedId: string, orderedIds: string[]) => Promise<void>;
+  /**
+   * Backfill one rule across the articles already stored for a feed.
+   * Loads the in-memory snapshot, runs the rule via the pure engine,
+   * persists only the diff via `updateArticles`, schedules a sync push
+   * if anything changed, and reloads the article store for the active
+   * view. Closes the "rule does nothing until next ingest" UX gap.
+   */
+  applyRuleToExistingArticles: (
+    feedId: string,
+    ruleId: string,
+  ) => Promise<Result<{ changed: number; total: number }>>;
   /**
    * When non-null, the rules-editor dialog is open against this feed.
    * Dialog mounts at the app root and reads this slice.
@@ -936,6 +951,33 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       },
       set,
     );
+  },
+
+  applyRuleToExistingArticles: async (feedId, ruleId) => {
+    if (!enforceFeature("rules"))
+      return err("Rules require the Personal tier");
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return err(feedResult.error);
+    const target = (feedResult.value.rules ?? []).find((r) => r.id === ruleId);
+    if (!target) return err(`Rule ${ruleId} not found on feed ${feedId}`);
+
+    const articleStore = useArticleStore.getState();
+    const existing = articleStore.articlesByFeedId[feedId] ?? [];
+    const ctx = buildContext({
+      feeds: get().feeds,
+      filters: useSmartFilterStore.getState().filters,
+    });
+    const { changed } = applyRuleToExisting(existing, target, ctx);
+
+    if (changed.length > 0) {
+      const writeResult = await dbUpdateArticles(changed);
+      if (!writeResult.ok) return err(writeResult.error);
+      schedulePush();
+      // Re-read the article-store from the (now-updated) DB so the UI
+      // reflects the muted state without a navigation.
+      await reloadArticleStoreForView(get().selectedFeedId);
+    }
+    return ok({ changed: changed.length, total: existing.length });
   },
 }));
 

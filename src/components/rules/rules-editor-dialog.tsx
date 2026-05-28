@@ -8,9 +8,12 @@
  * `rulesEditorFeedId`; closing clears it.
  */
 
-import { useEffect, useState } from "react";
-import { Plus, Trash2, Pencil, ChevronLeft, Settings2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Trash2, Pencil, ChevronLeft, Play, Settings2 } from "lucide-react";
+import { toast } from "sonner";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { useArticleStore } from "@/stores/article-store.ts";
+import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +28,12 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { ConditionGroupEditor } from "@/components/smart-filters/condition-group-editor.tsx";
 import { ActionPicker } from "./action-picker.tsx";
+import {
+  buildContext,
+  evaluateGroup,
+} from "@/core/filters/evaluator.ts";
 import type {
+  Article,
   ConditionGroup,
   Feed,
   Rule,
@@ -48,9 +56,26 @@ export function RulesEditorDialog() {
   const addFeedRule = useFeedStore((s) => s.addFeedRule);
   const updateFeedRule = useFeedStore((s) => s.updateFeedRule);
   const removeFeedRule = useFeedStore((s) => s.removeFeedRule);
+  const applyRuleToExistingArticles = useFeedStore(
+    (s) => s.applyRuleToExistingArticles,
+  );
 
   const feed: Feed | undefined = feeds.find((f) => f.id === feedId);
   const rules = feed?.rules ?? [];
+
+  async function runRuleNow(ruleId: string) {
+    if (!feedId) return;
+    const result = await applyRuleToExistingArticles(feedId, ruleId);
+    if (!result.ok) {
+      toast.error(`Couldn't apply rule: ${result.error}`);
+      return;
+    }
+    toast.success(
+      result.value.changed === 0
+        ? "No existing articles matched"
+        : `Applied to ${result.value.changed} of ${result.value.total} articles`,
+    );
+  }
 
   const [mode, setMode] = useState<Mode>({ kind: "list" });
 
@@ -79,6 +104,7 @@ export function RulesEditorDialog() {
               if (!feedId) return;
               await removeFeedRule(feedId, id);
             }}
+            onRunNow={runRuleNow}
             onClose={closeEditor}
           />
         ) : (
@@ -87,12 +113,18 @@ export function RulesEditorDialog() {
             target={mode.rule}
             folders={folders}
             onBack={() => setMode({ kind: "list" })}
-            onSave={async (next) => {
+            onSave={async (next, applyOnSave) => {
               if (!feedId) return;
+              let ruleId: string | null = null;
               if (mode.rule) {
                 await updateFeedRule(feedId, { ...mode.rule, ...next });
+                ruleId = mode.rule.id;
               } else {
-                await addFeedRule(feedId, next);
+                const result = await addFeedRule(feedId, next);
+                if (result.ok) ruleId = result.value.id;
+              }
+              if (applyOnSave && ruleId) {
+                await runRuleNow(ruleId);
               }
               setMode({ kind: "list" });
             }}
@@ -109,10 +141,19 @@ interface ListViewProps {
   onEdit: (rule: Rule) => void;
   onAdd: () => void;
   onDelete: (id: string) => void | Promise<void>;
+  onRunNow: (id: string) => void | Promise<void>;
   onClose: () => void;
 }
 
-function ListView({ feed, rules, onEdit, onAdd, onDelete, onClose }: ListViewProps) {
+function ListView({
+  feed,
+  rules,
+  onEdit,
+  onAdd,
+  onDelete,
+  onRunNow,
+  onClose,
+}: ListViewProps) {
   return (
     <>
       <DialogHeader>
@@ -151,6 +192,17 @@ function ListView({ feed, rules, onEdit, onAdd, onDelete, onClose }: ListViewPro
             {!rule.enabled && (
               <span className="text-xs text-muted-foreground">Paused</span>
             )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              aria-label={`Run "${rule.name}" now`}
+              data-testid={`rule-run-now-${rule.id}`}
+              onClick={() => onRunNow(rule.id)}
+            >
+              <Play className="size-4" />
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -199,14 +251,24 @@ interface EditViewProps {
   folders: import("@feedzero/core/types").Folder[];
   onBack: () => void;
   onSave: (
-    next:
-      | { name: string; condition: ConditionGroup; actions: RuleAction[]; enabled?: boolean },
+    next: {
+      name: string;
+      condition: ConditionGroup;
+      actions: RuleAction[];
+      enabled?: boolean;
+    },
+    applyOnSave: boolean,
   ) => void | Promise<void>;
 }
 
 function EditView({ feed, target, folders, onBack, onSave }: EditViewProps) {
   const [name, setName] = useState(target?.name ?? "");
   const [enabled, setEnabled] = useState(target?.enabled ?? true);
+  // Default ON — the most common reason users open this dialog is to
+  // *retroactively* mute/star/route articles already in the feed. A
+  // silent default-off would reproduce the "I set a rule and nothing
+  // happened" gap that motivated this work.
+  const [applyOnSave, setApplyOnSave] = useState(true);
   const [condition, setCondition] = useState<ConditionGroup>(
     target?.condition ?? EMPTY_CONDITION,
   );
@@ -219,7 +281,10 @@ function EditView({ feed, target, folders, onBack, onSave }: EditViewProps) {
     if (!canSave) return;
     setSaving(true);
     try {
-      await onSave({ name: name.trim(), condition, actions, enabled });
+      await onSave(
+        { name: name.trim(), condition, actions, enabled },
+        applyOnSave,
+      );
     } finally {
       setSaving(false);
     }
@@ -289,6 +354,26 @@ function EditView({ feed, target, folders, onBack, onSave }: EditViewProps) {
             folders={folders}
           />
         </div>
+
+        <RuleMatchPreview feed={feed} condition={condition} />
+
+        <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3">
+          <Switch
+            id="rule-apply-on-save"
+            checked={applyOnSave}
+            onCheckedChange={setApplyOnSave}
+            data-testid="rule-apply-on-save-switch"
+          />
+          <Label
+            htmlFor="rule-apply-on-save"
+            className="text-sm cursor-pointer flex-1"
+          >
+            Apply to existing articles when saved
+            <span className="block text-xs text-muted-foreground font-normal">
+              Otherwise the rule only runs on articles fetched after this save.
+            </span>
+          </Label>
+        </div>
       </div>
 
       <DialogFooter>
@@ -324,4 +409,88 @@ function summariseActions(actions: RuleAction[]): string {
       }
     })
     .join(", ");
+}
+
+const PREVIEW_LIMIT = 8;
+// Stable reference for the empty-articles case so the selector doesn't
+// hand React a fresh `[]` literal each render — Zustand + useSyncExternalStore
+// treat the new reference as a state change and you get an infinite loop.
+const EMPTY_ARTICLES: Article[] = Object.freeze([] as Article[]) as Article[];
+
+/**
+ * Live "what will this rule catch?" preview. Reads the article store's
+ * in-memory snapshot for this feed, evaluates the condition against
+ * each article, and surfaces the count + a short list of titles. Pure
+ * front-end derivation — no DB read, no rule write.
+ *
+ * Empty conditions are vacuously true for `match: "all"`, which would
+ * "match every article" and is almost never what the user wants while
+ * they're still editing. We hide the list in that case and show a
+ * gentle hint instead.
+ */
+function RuleMatchPreview({
+  feed,
+  condition,
+}: {
+  feed: Feed | undefined;
+  condition: ConditionGroup;
+}) {
+  const articles =
+    useArticleStore((s) =>
+      feed ? s.articlesByFeedId[feed.id] : undefined,
+    ) ?? EMPTY_ARTICLES;
+  const feeds = useFeedStore((s) => s.feeds);
+  const filters = useSmartFilterStore((s) => s.filters);
+  const matches = useMemo(() => {
+    if (!feed) return [];
+    if (condition.children.length === 0) return [];
+    const ctx = buildContext({ feeds, filters });
+    const hits: Article[] = [];
+    for (const a of articles) {
+      if (evaluateGroup(condition, a, ctx)) hits.push(a);
+    }
+    return hits;
+  }, [feed, articles, condition, feeds, filters]);
+
+  const total = articles.length;
+  const isEmpty = condition.children.length === 0;
+  return (
+    <div className="space-y-1.5" data-testid="rule-preview">
+      <Label>Preview</Label>
+      <div className="rounded-md border bg-muted/30 p-3 text-sm">
+        {isEmpty ? (
+          <p className="text-xs text-muted-foreground italic">
+            Add a condition above to see which existing articles would match.
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground mb-2">
+              Matches {matches.length} of {total} loaded article
+              {total === 1 ? "" : "s"}
+              {matches.length > PREVIEW_LIMIT
+                ? ` (showing first ${PREVIEW_LIMIT})`
+                : ""}
+            </p>
+            {matches.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">
+                Nothing in the loaded snapshot matches this condition.
+              </p>
+            ) : (
+              <ul className="space-y-1">
+                {matches.slice(0, PREVIEW_LIMIT).map((a) => (
+                  <li
+                    key={a.id}
+                    className="truncate text-xs"
+                    data-testid="rule-preview-match"
+                  >
+                    {a.title || "(untitled)"}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
 }

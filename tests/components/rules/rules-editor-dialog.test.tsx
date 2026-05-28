@@ -175,4 +175,93 @@ describe("RulesEditorDialog", () => {
     expect(screen.getByTestId("rule-list-item")).toBeInTheDocument();
     expect(screen.getByText("Mute spam")).toBeInTheDocument();
   });
+
+  describe("Apply-on-save toggle", () => {
+    it("renders an 'Apply to existing' switch in the editor, default on", async () => {
+      const user = userEvent.setup();
+      dbMock._seed(feed());
+      useFeedStore.setState({ feeds: [feed()], rulesEditorFeedId: "f1" });
+      renderDialog();
+      await user.click(screen.getByTestId("rule-add"));
+      const toggle = screen.getByTestId("rule-apply-on-save-switch");
+      expect(toggle).toBeInTheDocument();
+      // Radix Switch reflects state via aria-checked; default = on.
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("calls applyRuleToExistingArticles after save when toggle is on", async () => {
+      const user = userEvent.setup();
+      dbMock._seed(feed());
+      useFeedStore.setState({ feeds: [feed()], rulesEditorFeedId: "f1" });
+      const spy = vi
+        .spyOn(useFeedStore.getState(), "applyRuleToExistingArticles")
+        .mockResolvedValue({ ok: true, value: { changed: 3, total: 10 } });
+
+      renderDialog();
+      await user.click(screen.getByTestId("rule-add"));
+      await user.type(screen.getByTestId("rule-name-input"), "Mute spam");
+      await user.click(screen.getByTestId("rule-action-add"));
+      await user.click(screen.getByText("Mute"));
+      await user.click(screen.getByTestId("rule-save"));
+
+      expect(spy).toHaveBeenCalledWith("f1", expect.any(String));
+    });
+
+    it("does NOT call applyRuleToExistingArticles when toggle is off", async () => {
+      const user = userEvent.setup();
+      dbMock._seed(feed());
+      useFeedStore.setState({ feeds: [feed()], rulesEditorFeedId: "f1" });
+      const spy = vi
+        .spyOn(useFeedStore.getState(), "applyRuleToExistingArticles")
+        .mockResolvedValue({ ok: true, value: { changed: 0, total: 0 } });
+
+      renderDialog();
+      await user.click(screen.getByTestId("rule-add"));
+      await user.type(screen.getByTestId("rule-name-input"), "Mute spam");
+      await user.click(screen.getByTestId("rule-action-add"));
+      await user.click(screen.getByText("Mute"));
+      // Flip the toggle off before save.
+      await user.click(screen.getByTestId("rule-apply-on-save-switch"));
+      await user.click(screen.getByTestId("rule-save"));
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Run-now button in list", () => {
+    it("renders a Run-now control on each rule row", () => {
+      useFeedStore.setState({
+        feeds: [feed([muteRule()])],
+        rulesEditorFeedId: "f1",
+      });
+      renderDialog();
+      expect(screen.getByTestId("rule-run-now-r-1")).toBeInTheDocument();
+    });
+
+    it("invokes applyRuleToExistingArticles for that rule", async () => {
+      const user = userEvent.setup();
+      useFeedStore.setState({
+        feeds: [feed([muteRule()])],
+        rulesEditorFeedId: "f1",
+      });
+      const spy = vi
+        .spyOn(useFeedStore.getState(), "applyRuleToExistingArticles")
+        .mockResolvedValue({ ok: true, value: { changed: 0, total: 0 } });
+
+      renderDialog();
+      await user.click(screen.getByTestId("rule-run-now-r-1"));
+
+      expect(spy).toHaveBeenCalledWith("f1", "r-1");
+    });
+  });
+
+  describe("Live preview", () => {
+    it("renders a preview region in the edit view", async () => {
+      const user = userEvent.setup();
+      useFeedStore.setState({ feeds: [feed()], rulesEditorFeedId: "f1" });
+      renderDialog();
+      await user.click(screen.getByTestId("rule-add"));
+      expect(screen.getByTestId("rule-preview")).toBeInTheDocument();
+    });
+  });
 });

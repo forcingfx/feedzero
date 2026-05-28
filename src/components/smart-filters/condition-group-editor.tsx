@@ -1,7 +1,5 @@
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
-import { Label } from "@/components/ui/label.tsx";
-import { Switch } from "@/components/ui/switch.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,9 +26,14 @@ interface ConditionGroupEditorProps {
 
 /**
  * Recursive editor for a condition group. Renders a "match all/any"
- * toggle + an optional NOT inversion + a list of children, each of
- * which is either a leaf ConditionRow or another nested
- * ConditionGroupEditor.
+ * toggle + a list of children, each of which is either a leaf
+ * ConditionRow or another nested ConditionGroupEditor.
+ *
+ * Group-level NOT inversion was removed from the UI — the per-
+ * condition `not-contains` / `not-in` operators cover the common
+ * cases with a simpler mental model. The `not?` field on
+ * ConditionGroup stays on the type; the engine still evaluates it
+ * so older vaults keep filtering correctly.
  *
  * State lives in the parent — every change rebuilds the group from
  * the child's onChange callback. The component is a controlled
@@ -95,16 +98,6 @@ export function ConditionGroupEditor({
           <option value="any">any</option>
         </select>
         <span className="text-muted-foreground">of the following</span>
-        <Label className="flex items-center gap-2 ml-2 text-xs text-muted-foreground cursor-pointer">
-          <Switch
-            checked={Boolean(group.not)}
-            onCheckedChange={(checked) =>
-              onChange({ ...group, not: checked })
-            }
-            aria-label="Negate this group"
-          />
-          NOT
-        </Label>
         {onRemove && (
           <Button
             type="button"

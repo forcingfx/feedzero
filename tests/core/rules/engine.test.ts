@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { applyRules } from "../../../src/core/rules/engine.ts";
+import {
+  applyRules,
+  applyRuleToExisting,
+} from "../../../src/core/rules/engine.ts";
 import { buildContext } from "../../../src/core/filters/evaluator.ts";
 import type {
   Article,
@@ -186,5 +189,63 @@ describe("applyRules", () => {
     const r = rule(cond, [{ kind: "mute" }]);
     const out = applyRules(article(), [r], ctx);
     expect(out.muted).toBe(true);
+  });
+});
+
+describe("applyRuleToExisting", () => {
+  const ctx = buildContext({ feeds: [feed()], filters: [] });
+
+  it("returns the subset of articles the rule actually changes", () => {
+    const muteHello = rule(titleContains("Hello"), [{ kind: "mute" }]);
+    const articles = [
+      article({ id: "a", title: "Hello world", muted: false }),
+      article({ id: "b", title: "Goodbye world", muted: false }),
+      article({ id: "c", title: "Hello again", muted: false }),
+    ];
+    const { changed } = applyRuleToExisting(articles, muteHello, ctx);
+    expect(changed.map((a) => a.id).sort()).toEqual(["a", "c"]);
+    expect(changed.every((a) => a.muted === true)).toBe(true);
+  });
+
+  it("skips articles already in the rule's terminal state (idempotent)", () => {
+    // Articles where mute=true already need no update — including them in
+    // the changed set would cause needless re-encryption + IndexedDB writes
+    // on every Run-now click. The contract is "diff only".
+    const muteHello = rule(titleContains("Hello"), [{ kind: "mute" }]);
+    const articles = [
+      article({ id: "a", title: "Hello world", muted: true }),
+      article({ id: "b", title: "Hello again", muted: false }),
+    ];
+    const { changed } = applyRuleToExisting(articles, muteHello, ctx);
+    expect(changed.map((a) => a.id)).toEqual(["b"]);
+  });
+
+  it("returns the empty array when no article matches", () => {
+    const muteNever = rule(titleContains("never matches"), [{ kind: "mute" }]);
+    const { changed } = applyRuleToExisting(
+      [article({ id: "a", title: "Hello world" })],
+      muteNever,
+      ctx,
+    );
+    expect(changed).toEqual([]);
+  });
+
+  it("returns the empty array when the rule is disabled", () => {
+    const muteHello = rule(titleContains("Hello"), [{ kind: "mute" }], {
+      enabled: false,
+    });
+    const { changed } = applyRuleToExisting(
+      [article({ id: "a", title: "Hello world" })],
+      muteHello,
+      ctx,
+    );
+    expect(changed).toEqual([]);
+  });
+
+  it("does not mutate the input articles (pure function)", () => {
+    const input = [article({ id: "a", title: "Hello world", muted: false })];
+    const muteHello = rule(titleContains("Hello"), [{ kind: "mute" }]);
+    applyRuleToExisting(input, muteHello, ctx);
+    expect(input[0].muted).toBe(false);
   });
 });
