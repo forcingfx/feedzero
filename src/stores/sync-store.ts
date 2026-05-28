@@ -27,7 +27,6 @@ import {
   getPreferencesUpdatedAt,
 } from "../core/storage/db.ts";
 import { clearLicenseToken } from "../core/license/license-token-store.ts";
-import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import type { Result } from "@feedzero/core/utils/result";
 import { ok, err } from "@feedzero/core/utils/result";
 import { useLicenseStore } from "./license-store.ts";
@@ -35,30 +34,16 @@ import { useFeedStore } from "./feed-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { usePreferencesStore } from "./preferences-store.ts";
 import { resetAllStores } from "./app-store.ts";
+import * as syncCoordinator from "./sync-coordinator.ts";
 
 export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 
-const DEBOUNCE_MS = 5000;
-const MAX_JITTER_MS = 30000;
-
-/**
- * The debounced push timer lives only in memory, so a tab reload drops it
- * and the queued change is never sent. This localStorage marker records
- * "local has changes the cloud hasn't seen yet" so it outlives the reload;
- * pull() flushes it before importVault would overwrite the change. Set when
- * a push is scheduled, cleared when one succeeds.
- */
-function markPendingPush(): void {
-  localStorage.setItem(LOCAL_STORAGE.SYNC_PENDING_PUSH, "1");
-}
-
-function clearPendingPush(): void {
-  localStorage.removeItem(LOCAL_STORAGE.SYNC_PENDING_PUSH);
-}
-
-function hasPendingPush(): boolean {
-  return localStorage.getItem(LOCAL_STORAGE.SYNC_PENDING_PUSH) !== null;
-}
+// Push-scheduling policy (debounce + jitter, durable pending-push
+// marker) lives in `sync-coordinator.ts`. This module composes it.
+// See ADR 026 for the subscription-based follow-up that will let the
+// 38 explicit `scheduleSyncPush` call sites drop away entirely.
+const clearPendingPush = syncCoordinator.clearPending;
+const hasPendingPush = syncCoordinator.hasPending;
 
 type SwitchMode = "replace" | "merge";
 
@@ -122,26 +107,12 @@ interface SyncStore {
   ) => Promise<Result<boolean>>;
 }
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let jitterTimer: ReturnType<typeof setTimeout> | null = null;
-
 // Concurrent pull() callers share a single in-flight pull. Without this,
 // AppInit's initializeReturningUser pull and the auto-fired refreshAll
 // pull run back-to-back: the second one's importAll clears the tables
 // and races readers. See tests/e2e/sync-100-feeds.spec.ts for the
 // reproducer.
 let inFlightPull: Promise<void> | null = null;
-
-function clearPendingTimers(): void {
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
-  if (jitterTimer) {
-    clearTimeout(jitterTimer);
-    jitterTimer = null;
-  }
-}
 
 export const useSyncStore = create<SyncStore>((set, get) => ({
   status: "local-only",
@@ -182,7 +153,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   disableSync: async () => {
-    clearPendingTimers();
+    syncCoordinator.cancelScheduled();
     // Purely local: drop vault keys + clear in-memory credentials.
     // Idempotent — calling twice yields the same final state.
     // To also delete the server vault, call deleteCloudVault() FIRST
@@ -217,7 +188,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   logout: async () => {
-    clearPendingTimers();
+    syncCoordinator.cancelScheduled();
     // Preserve cloud vault (intentional — for recovery on another device)
     await destroyLocal();
     set({
@@ -326,7 +297,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     // "discard local, take cloud" action, so the pending-push marker is
     // dropped too — the local change the user chose to discard must not
     // resurrect itself on the next pull's flush.
-    clearPendingTimers();
+    syncCoordinator.cancelScheduled();
     clearPendingPush();
 
     set({ status: "syncing", error: null });
@@ -360,19 +331,10 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   scheduleSyncPush: () => {
     const { credentials } = get();
     if (!credentials) return;
-
-    // Record the intent durably before arming the in-memory timer, so a
-    // reload between now and the push still leaves a trail pull() can flush.
-    markPendingPush();
-    clearPendingTimers();
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null;
-      const jitter = Math.floor(Math.random() * MAX_JITTER_MS);
-      jitterTimer = setTimeout(() => {
-        jitterTimer = null;
-        get().push();
-      }, jitter);
-    }, DEBOUNCE_MS);
+    // notifyChange marks pending-push in localStorage immediately so a
+    // reload before the timer fires still leaves a trail pull() can
+    // flush, then schedules push() through the debounce + jitter window.
+    syncCoordinator.notifyChange(() => get().push());
   },
 
   switchToExistingCloud: async (passphrase, mode) => {
