@@ -1,4 +1,8 @@
 import { resolveIconUrl } from "./favicon-resolver.ts";
+import {
+  FAVICON_FETCH_TIMEOUT_MS,
+  FAVICON_USER_AGENT,
+} from "./favicon-http.ts";
 import { validateProxyUrl } from "../proxy/validate-url.ts";
 
 /**
@@ -28,8 +32,8 @@ export async function handleFaviconRequest(
     const iconUrl = await resolveIconUrl(origin);
 
     const res = await fetch(iconUrl, {
-      headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
-      signal: AbortSignal.timeout(10000),
+      headers: { "User-Agent": FAVICON_USER_AGENT },
+      signal: AbortSignal.timeout(FAVICON_FETCH_TIMEOUT_MS),
     });
 
     if (!res.ok) {

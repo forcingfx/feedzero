@@ -1,3 +1,5 @@
+import { FAVICON_PROBE_TIMEOUT_MS, FAVICON_USER_AGENT } from "./favicon-http.ts";
+
 const WELL_KNOWN_PATHS = [
   "/favicon.ico",
   "/favicon.png",
@@ -33,8 +35,8 @@ async function tryWellKnownPaths(origin: string): Promise<string | null> {
     try {
       const res = await fetch(url, {
         method: "HEAD",
-        headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
-        signal: AbortSignal.timeout(5000),
+        headers: { "User-Agent": FAVICON_USER_AGENT },
+        signal: AbortSignal.timeout(FAVICON_PROBE_TIMEOUT_MS),
       });
       if (res.ok && isImageResponse(res)) return url;
     } catch {
@@ -59,8 +61,8 @@ function isImageResponse(res: Response): boolean {
 async function tryHtmlParsing(origin: string): Promise<string | null> {
   try {
     const res = await fetch(origin, {
-      headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
-      signal: AbortSignal.timeout(5000),
+      headers: { "User-Agent": FAVICON_USER_AGENT },
+      signal: AbortSignal.timeout(FAVICON_PROBE_TIMEOUT_MS),
     });
     if (!res.ok) return null;
 
