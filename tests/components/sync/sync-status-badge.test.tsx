@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SyncStatusBadge } from "@/components/sync/sync-status-badge";
 import { useSyncStore } from "@/stores/sync-store";
+import { useFeedStore } from "@/stores/feed-store";
 
 /**
  * The persistent "are we synced?" affordance in the top-right of the
@@ -28,6 +29,7 @@ describe("SyncStatusBadge", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-24T20:00:00Z"));
+    useFeedStore.setState({ isRefreshingAll: false });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -95,5 +97,36 @@ describe("SyncStatusBadge", () => {
     const badge = screen.getByTestId("sync-status-badge");
     expect(badge.tagName).toBe("A");
     expect(badge).toHaveAttribute("href", "/settings?tab=sync-and-data");
+  });
+
+  it("shows 'Syncing…' while feeds are refreshing even when the vault is synced", () => {
+    // The cloud vault is up to date, but refreshAll is still fetching new
+    // articles from publishers. Showing "Synced · just now" in green here
+    // is a lie — the user is looking at yesterday's articles until the
+    // fetches land. The badge must reflect work in progress, not the
+    // narrow "is the vault byte-equal to the cloud?" question.
+    useSyncStore.setState({
+      status: "synced",
+      lastSyncedAt: Date.now() - 5_000,
+    });
+    useFeedStore.setState({ isRefreshingAll: true });
+    const { container } = renderBadge();
+    const badge = screen.getByTestId("sync-status-badge");
+    expect(badge).toHaveAttribute("data-state", "syncing");
+    expect(badge).toHaveTextContent(/syncing/i);
+    expect(container.querySelector(".animate-spin")).not.toBeNull();
+  });
+
+  it("shows 'Syncing…' while feeds are refreshing for local-only users too", () => {
+    // Local-only users don't have a cloud vault, but a publisher refresh
+    // is still meaningful work. While it's in flight the badge should
+    // reflect that, not the static "Local only" descriptor.
+    useSyncStore.setState({ status: "local-only", lastSyncedAt: null });
+    useFeedStore.setState({ isRefreshingAll: true });
+    renderBadge();
+    expect(screen.getByTestId("sync-status-badge")).toHaveAttribute(
+      "data-state",
+      "syncing",
+    );
   });
 });
