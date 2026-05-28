@@ -34,6 +34,7 @@ import { isExtensionEnabled } from "@/core/extension/extension-enabled.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { InvalidKeysScreen } from "@/components/recovery/invalid-keys-screen";
 import { AppShellSkeleton } from "@/components/loading/app-shell-skeleton.tsx";
+import { OnboardingModal } from "@/components/onboarding/onboarding-modal.tsx";
 
 const ExploreCatalog = lazy(() =>
   import("@/components/explore/explore-catalog.tsx").then((m) => ({
@@ -334,7 +335,10 @@ export function App() {
         </AppInit>
         {/* Top-level dialogs mounted inside the Router so hooks like
             useNavigate and useWhatsNew (which Settings → Help calls)
-            have router context. */}
+            have router context. OnboardingModal gates itself on
+            `hasCompletedOnboarding === false` and is the one piece
+            of UI a never-onboarded user is allowed to see. */}
+        <OnboardingModal />
         <DeviceSetupWizard />
         <SmartFilterEditorDialog />
         <RulesEditorDialog />
