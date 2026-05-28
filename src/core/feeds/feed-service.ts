@@ -17,6 +17,7 @@ import {
   dedupeArticles,
 } from "../storage/db.ts";
 import type { Feed, Article } from "../../../packages/core/src/types";
+import type { ParsedArticle } from "../parser/parser.ts";
 import { proxyFetch } from "../proxy/proxy-fetch.ts";
 import { groupByHostForRefresh } from "./group-by-host.ts";
 import { parseRetryAfter } from "./parse-retry-after.ts";
@@ -143,6 +144,27 @@ function fetchFailure(message: string): AddFeedFlowResult {
 }
 
 /**
+ * Map parser output into persistable `Article` rows for a given feed.
+ *
+ * Entries that `createArticle` rejects (missing link, malformed guid) are
+ * skipped silently so a single malformed item can't poison the whole
+ * ingest — the rest of the feed still lands in the DB. Shared by the
+ * initial add-feed flow and the refresh flow so the per-article shape
+ * stays in lock-step between them.
+ */
+export function createArticlesForFeed(
+  feedId: string,
+  parsed: ParsedArticle[],
+): Article[] {
+  return parsed
+    .map((a) => {
+      const r = createArticle({ feedId, ...a });
+      return r.ok ? r.value : null;
+    })
+    .filter((a): a is Article => a !== null);
+}
+
+/**
  * Full add-feed flow: check duplicate → fetch → parse → store.
  * Returns AddFeedFlowResult with user-friendly error messages. On a
  * recoverable failure the err branch carries `reason: "fetch-failure"`.
@@ -261,14 +283,7 @@ export async function addFeedFlow(
     const storeResult = await addFeed(feed);
     if (!storeResult.ok) return storeResult;
 
-    // Create and store articles
-    const articles = parsedArticles
-      .map((a) => {
-        const r = createArticle({ feedId: feed.id, ...a });
-        return r.ok ? r.value : null;
-      })
-      .filter((a): a is Article => a !== null);
-
+    const articles = createArticlesForFeed(feed.id, parsedArticles);
     await addArticles(articles);
 
     return ok({ feed, articles });
@@ -569,12 +584,7 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
     // rule engine reuses the smart-filter EvalContext; rules can't
     // reference other rules or smart filters yet, so an empty
     // `filters` list is fine.
-    const created = newArticles
-      .map((a) => {
-        const r = createArticle({ feedId: feed.id, ...a });
-        return r.ok ? r.value : null;
-      })
-      .filter((a): a is Article => a !== null);
+    const created = createArticlesForFeed(feed.id, newArticles);
 
     const rulesToApply = feed.rules ?? [];
     const ruleCtx = buildContext({ feeds: [feed], filters: [] });
