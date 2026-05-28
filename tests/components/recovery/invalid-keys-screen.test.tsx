@@ -31,10 +31,12 @@ describe("InvalidKeysScreen", () => {
     vi.clearAllMocks();
     localStorageMock.clear();
     useAppStore.setState({
+      bootState: { kind: "needs-recovery" },
       isDbReady: false,
       error: null,
       recoveryMode: "invalid-keys",
       hasCompletedOnboarding: true,
+      securityProblem: null,
     });
     useSyncStore.setState({
       status: "local-only",

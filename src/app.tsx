@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -126,82 +126,70 @@ function BriefingsLegacyRedirect() {
 }
 
 function AppInit({ children }: { children: React.ReactNode }) {
-  const isDbReady = useAppStore((s) => s.isDbReady);
-  const error = useAppStore((s) => s.error);
-  const recoveryMode = useAppStore((s) => s.recoveryMode);
-  const securityProblem = useAppStore((s) => s.securityProblem);
-  const hasCompletedOnboarding = useAppStore((s) => s.hasCompletedOnboarding);
-  const checkOnboardingStatus = useAppStore((s) => s.checkOnboardingStatus);
-  const initializeReturningUser = useAppStore((s) => s.initializeReturningUser);
+  // bootState is now the canonical pre-mount lifecycle. The legacy
+  // `isDbReady` / `error` / `recoveryMode` / `securityProblem` fields
+  // remain available as derived mirrors for consumers we haven't yet
+  // migrated, but the renderer here reads bootState directly so
+  // every UI branch corresponds to exactly one FSM state.
+  const bootState = useAppStore((s) => s.bootState);
+  const dispatch = useAppStore((s) => s.dispatch);
   const startNewUserOnboarding = useAppStore((s) => s.startNewUserOnboarding);
   const resetApp = useAppStore((s) => s.resetApp);
   const loadFeeds = useFeedStore((s) => s.loadFeeds);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const preloadArticles = useArticleStore((s) => s.preloadAll);
   const loadSmartFilters = useSmartFilterStore((s) => s.loadFilters);
+  const addFeed = useFeedStore((s) => s.addFeed);
   const [isResetting, setIsResetting] = useState(false);
+  const newUserDispatched = useRef(false);
 
+  // Kick the FSM once on mount. From `unknown` it walks itself through
+  // checking-onboarding → restoring → hydrating → ready (or to any of
+  // the failure terminal states). No cascading useEffects co-ordinating
+  // who can fire when — the side-effect runner in app-store owns that.
   useEffect(() => {
-    checkOnboardingStatus();
-    // Resolve the user's license tier once at startup so gated UI (Sidebar
-    // status chip, feature gates) doesn't flash "Free" for paid users.
+    void dispatch({ type: "boot" });
+    // License re-verification and the extension probe are independent
+    // of the boot FSM: they run regardless of which state we land in.
     void useLicenseStore.getState().refresh();
-    // Probe for the FeedZero browser extension only when the surface is
-    // enabled. Short timeout (200ms), resolves to "installed" / "absent"
-    // so the reader pane's paywall prompts can pick the right CTA without
-    // ping-on-every-render. While the extension is undistributed
-    // (VITE_EXTENSION_ENABLED off) there's nothing to probe for.
     if (isExtensionEnabled()) {
       void useExtensionStore.getState().detect();
     }
+    // Empty deps: one-shot. dispatch is a stable reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Returning users: restore from stored keys.
+  // New-user path: when the FSM reaches needs-onboarding the auto
+  // onboarding sequence (secure-context check + passphrase + initialize
+  // + completeOnboarding) runs alongside the OnboardingModal that
+  // mounts at App() level. Guarded by a ref so React StrictMode's
+  // double-invoke doesn't fire it twice.
   useEffect(() => {
-    if (hasCompletedOnboarding === true && !isDbReady) {
-      initializeReturningUser();
-    }
-  }, [hasCompletedOnboarding, isDbReady, initializeReturningUser]);
+    if (bootState.kind !== "needs-onboarding") return;
+    if (newUserDispatched.current) return;
+    newUserDispatched.current = true;
+    void startNewUserOnboarding();
+  }, [bootState.kind, startNewUserOnboarding]);
 
-  // New users: fire the full new-user boot sequence in app-store.
-  // The action handles secure-context check + passphrase generation +
-  // DB init + completeOnboarding; AppInit just renders the resulting
-  // state (isDbReady / error / securityProblem).
+  // Post-ready: load the user's feeds, smart filters, articles, and
+  // kick off the first publisher refresh. Sync users have already had
+  // their vault pull fired in the background by the FSM's `hydrating`
+  // side effect; refreshAll's internal syncStore.pull() awaits the
+  // same in-flight promise via the inFlightPull dedup.
   useEffect(() => {
-    if (hasCompletedOnboarding === false && !isDbReady) {
-      void startNewUserOnboarding();
-    }
-  }, [hasCompletedOnboarding, isDbReady, startNewUserOnboarding]);
-
-  const addFeed = useFeedStore((s) => s.addFeed);
-
-  useEffect(() => {
-    if (isDbReady) {
-      loadFeeds().then(async () => {
-        // Auto-subscribe new users to the release notes feed published by the
-        // landing site. addFeed handles the cross-origin fetch via the feed
-        // service (CORS is enabled on feedzero.app/releases.xml).
-        const { feeds } = useFeedStore.getState();
-        if (feeds.length === 0) {
-          try {
-            await addFeed(CHANGELOG_FEED_URL);
-          } catch { /* noop — first-launch auto-subscribe is best-effort */ }
-        }
-        preloadArticles();
-      });
-      // Load smart filters once on boot. Like folders, they're
-      // user-defined config that the sidebar needs immediately;
-      // the encrypted-blob read is cheap (typically <10 rows).
-      void loadSmartFilters();
-      // Every boot fetches fresh articles. For sync users, refreshAll's
-      // internal syncStore.pull() awaits the background pull kicked off
-      // by initializeReturningUser via the inFlightPull dedup, then
-      // runs the publisher fetches once the vault import settles. This
-      // is what makes "open the app" actually show today's articles
-      // instead of yesterday's snapshot.
-      refreshAll();
-    }
-  }, [isDbReady, loadFeeds, refreshAll, preloadArticles, loadSmartFilters, addFeed]);
+    if (bootState.kind !== "ready") return;
+    loadFeeds().then(async () => {
+      const { feeds } = useFeedStore.getState();
+      if (feeds.length === 0) {
+        try {
+          await addFeed(CHANGELOG_FEED_URL);
+        } catch { /* noop — first-launch auto-subscribe is best-effort */ }
+      }
+      preloadArticles();
+    });
+    void loadSmartFilters();
+    refreshAll();
+  }, [bootState.kind, loadFeeds, refreshAll, preloadArticles, loadSmartFilters, addFeed]);
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -220,20 +208,21 @@ function AppInit({ children }: { children: React.ReactNode }) {
     setIsResetting(false);
   };
 
-  if (securityProblem) {
+  if (bootState.kind === "security-blocked") {
+    const { problem } = bootState;
     return (
       <div className="p-6 max-w-xl mx-auto space-y-4">
         <h1 className="text-lg font-semibold">FeedZero can't start here</h1>
         <p className="text-sm text-muted-foreground whitespace-pre-line">
-          {securityProblem.message}
+          {problem.message}
         </p>
-        {securityProblem.origin ? (
+        {problem.origin ? (
           <p className="text-sm">
             <span className="text-muted-foreground">You're loading from:</span>{" "}
-            <code className="text-foreground">{securityProblem.origin}</code>
+            <code className="text-foreground">{problem.origin}</code>
           </p>
         ) : null}
-        {securityProblem.kind === "insecure-context" ? (
+        {problem.kind === "insecure-context" ? (
           <div className="text-sm space-y-2">
             <p>Common fixes for self-hosters:</p>
             <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
@@ -260,14 +249,14 @@ function AppInit({ children }: { children: React.ReactNode }) {
   // Invalid-keys recovery screen replaces the previous boot-time
   // auto-destroy cascade. Surface explicit choices instead of silently
   // deleting the user's cloud vault (issue #117).
-  if (recoveryMode === "invalid-keys") {
+  if (bootState.kind === "needs-recovery") {
     return <InvalidKeysScreen />;
   }
 
-  if (error) {
+  if (bootState.kind === "error") {
     return (
       <div className="p-4 space-y-4">
-        <div className="text-destructive">Failed to initialize: {error}</div>
+        <div className="text-destructive">Failed to initialize: {bootState.message}</div>
         <div className="text-sm text-muted-foreground">
           Your local data may be corrupted or was encrypted with a different
           passphrase. You can reset the app to start fresh.
@@ -283,7 +272,11 @@ function AppInit({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isDbReady) {
+  if (bootState.kind !== "ready") {
+    // unknown / checking-onboarding / needs-onboarding / restoring / hydrating
+    // — all "still booting" states render the same skeleton chrome.
+    // OnboardingModal mounts at App() level and opens itself when
+    // bootState transitions to needs-onboarding.
     return <AppShellSkeleton />;
   }
 

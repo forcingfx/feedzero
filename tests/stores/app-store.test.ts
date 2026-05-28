@@ -74,10 +74,17 @@ describe("app-store", () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
+    // Reset BOTH the FSM canonical (bootState) and the legacy mirror
+    // fields so every test starts from a clean slate. Without this,
+    // the FSM carries forward from a prior test's `ready` and the
+    // next dispatch({type:"boot"}) is a no-op.
     useAppStore.setState({
+      bootState: { kind: "unknown" },
       isDbReady: false,
       error: null,
       hasCompletedOnboarding: false,
+      recoveryMode: null,
+      securityProblem: null,
     });
   });
 

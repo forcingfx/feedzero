@@ -103,9 +103,12 @@ describe("App sync-aware init", () => {
     localStorageMock.clear();
     vi.clearAllMocks();
     useAppStore.setState({
+      bootState: { kind: "unknown" },
       isDbReady: false,
       error: null,
       hasCompletedOnboarding: null,
+      recoveryMode: null,
+      securityProblem: null,
     });
     useSyncStore.setState({
       status: "local-only",
