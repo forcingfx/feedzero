@@ -524,6 +524,23 @@ describe("FeedsPage layout — desktop", () => {
     const style = (wrapper as HTMLElement).getAttribute("style") ?? "";
     expect(style).toMatch(/--sidebar-width:\s*18rem/);
   });
+
+  it("sync status badge lives inside the sidebar header on desktop, not as a viewport overlay", () => {
+    // Before this change the badge was rendered by FloatingSyncBadge as a
+    // `fixed right-4 top-3` pill — on narrow desktop widths it overlapped
+    // the reader's article title in the right-hand stage panel. Anchoring
+    // the badge to the sidebar header (which never overlaps the stage)
+    // removes the overlap while keeping the affordance always visible.
+    const { container } = renderPage();
+    const sidebarHeader = container.querySelector("[data-slot='sidebar-header']");
+    expect(sidebarHeader).not.toBeNull();
+    const badgeInHeader = sidebarHeader!.querySelector(
+      "[data-testid='sync-status-badge']",
+    );
+    expect(badgeInHeader).not.toBeNull();
+    // No floating viewport overlay anywhere.
+    expect(container.querySelector("[data-testid='floating-sync-badge']")).toBeNull();
+  });
 });
 
 describe("FeedsPage layout — mobile", () => {
