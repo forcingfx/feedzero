@@ -20,7 +20,8 @@
       "@/*": ["./src/*"],
       "@feedzero/core/*": ["./packages/core/src/*"]
     },
-    "baseUrl": "."
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src", "tests", "packages/core/src"],
   "exclude": ["node_modules"]
