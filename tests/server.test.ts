@@ -65,6 +65,20 @@ describe("server", () => {
       expect(csp).toContain("img-src 'self' data: https:");
     });
 
+    it("allows WebAssembly instantiation in CSP (Argon2id KDF needs hash-wasm)", async () => {
+      // The Argon2id sync-vault KDF uses hash-wasm, which calls
+      // WebAssembly.instantiate. Browsers gate that behind
+      // 'wasm-unsafe-eval' in script-src. Without it, every sync
+      // enable / restore fails with "Refused to create a WebAssembly
+      // object because 'unsafe-eval' or 'wasm-unsafe-eval' is not an
+      // allowed source of script". We use 'wasm-unsafe-eval' rather
+      // than 'unsafe-eval' so eval() and new Function() stay blocked
+      // — the narrow directive is exactly the one we want.
+      const res = await createApp().request("/");
+      const csp = res.headers.get("Content-Security-Policy");
+      expect(csp).toContain("'wasm-unsafe-eval'");
+    });
+
     it("does not set CSP on API responses", async () => {
       const res = await createApp().request("/api/feed");
       const csp = res.headers.get("Content-Security-Policy");
