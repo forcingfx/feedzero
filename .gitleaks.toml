@@ -1,0 +1,25 @@
+title = "FeedZero gitleaks config"
+
+# Inherit the upstream default rule pack, then layer FeedZero-specific allowlists
+# for known false positives in test fixtures.
+[extend]
+useDefault = true
+
+# Feed snapshots vendored under tests/fixtures/ are real RSS/Atom payloads
+# captured from public sites. They contain URLs with high-entropy query
+# parameters (Apple Maps share `view_token=...`, ad tracker IDs, signed S3 URLs)
+# that gitleaks' default JWT / generic-secret rules flag despite not being
+# secrets — they are content the parser must handle byte-for-byte. Adding new
+# fixtures is part of the regression workflow (see CLAUDE.md "Tier 2.5"), so
+# the allowlist is path-scoped, not per-fingerprint.
+#
+# Use the singular `[allowlist]` form — gitleaks v8.18.4 (the version pinned in
+# .github/workflows/security.yml) silently ignores the plural `[[allowlists]]`
+# array, even though it parses. Verified locally by running the same binary
+# against the daringfireball fixture: plural form → 5 leaks reported; singular
+# form → 2 (the 3 fixture findings drop out).
+[allowlist]
+description = "Vendored feed fixtures are sample external content, not secrets."
+paths = [
+  '''tests/fixtures/.*''',
+]

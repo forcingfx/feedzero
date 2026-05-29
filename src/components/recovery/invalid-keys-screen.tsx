@@ -65,10 +65,11 @@ export function InvalidKeysScreen() {
       return;
     }
     // applyCloudVault has already populated the DB and refreshed the
-    // in-memory stores. Clear the recovery flag and the AppInit effect
-    // will flip isDbReady through normal completion.
+    // in-memory stores. The boot FSM transitions
+    // needs-recovery → ready on `recovery-cleared`, which flips
+    // isDbReady (the legacy mirror) as a derived effect — no
+    // separate setState needed.
     clearRecoveryMode();
-    useAppStore.setState({ isDbReady: true });
   }
 
   async function handleWipe() {

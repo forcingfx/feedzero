@@ -178,6 +178,32 @@ describe("signal-store", () => {
     expect(second?.generatedAt).not.toBe(firstGeneratedAt);
   });
 
+  /**
+   * The Signal page kicks loadReport() on mount and whenever the
+   * corpus changes. When the user navigates away mid-refresh and
+   * comes back, the page remounts and would otherwise restart the
+   * run. The in-flight guard keeps the existing run alive: a
+   * non-force loadReport while status === "loading" is a no-op.
+   * An explicit `{ force: true }` from the user still bypasses.
+   */
+  it("non-force loadReport is a no-op while status is loading", async () => {
+    seedFeedsAndArticles(6, SIGNAL_CORPUS_GATE + 20);
+    useSignalStore.setState({ status: "loading", report: null });
+    const stateBefore = useSignalStore.getState();
+    await useSignalStore.getState().loadReport();
+    const stateAfter = useSignalStore.getState();
+    expect(stateAfter.status).toBe(stateBefore.status);
+    expect(stateAfter.report).toBe(stateBefore.report);
+  });
+
+  it("force loadReport still bypasses the in-flight guard", async () => {
+    seedFeedsAndArticles(6, SIGNAL_CORPUS_GATE + 20);
+    useSignalStore.setState({ status: "loading", report: null });
+    await useSignalStore.getState().loadReport({ force: true });
+    expect(useSignalStore.getState().status).toBe("ready");
+    expect(useSignalStore.getState().report).not.toBeNull();
+  });
+
   it("persists the report to localStorage and survives a state reset", async () => {
     seedFeedsAndArticles(6, SIGNAL_CORPUS_GATE + 20);
     await useSignalStore.getState().loadReport();

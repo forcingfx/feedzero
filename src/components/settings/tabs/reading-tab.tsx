@@ -18,6 +18,7 @@ import { useFeedStore } from "@/stores/feed-store";
 import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
 import { ThemeToggle } from "../theme-toggle";
 import { RulesAuditPanel } from "./rules-audit-panel";
+import { SignalSection } from "../signal-section";
 
 export function ReadingTab() {
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
@@ -79,6 +80,8 @@ export function ReadingTab() {
           </Button>
         </div>
       )}
+
+      <SignalSection />
 
       <RulesAuditPanel />
 

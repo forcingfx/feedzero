@@ -130,4 +130,23 @@ describe("RulesAuditPanel", () => {
     );
     expect(useFeedStore.getState().rulesEditorFeedId).toBe("f1");
   });
+
+  it("Run-now button invokes applyRuleToExistingArticles for that rule", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [feed("f1", "Tech Crunchies", [rule("r1", "Mute sponsored")])],
+      folders: [],
+    });
+    const spy = vi
+      .spyOn(useFeedStore.getState(), "applyRuleToExistingArticles")
+      .mockResolvedValue({ ok: true, value: { changed: 2, total: 10 } });
+
+    render(
+      <MemoryRouter>
+        <RulesAuditPanel />
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByTestId("rules-audit-run-now-r1"));
+    expect(spy).toHaveBeenCalledWith("f1", "r1");
+  });
 });

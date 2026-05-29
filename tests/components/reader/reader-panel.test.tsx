@@ -692,10 +692,13 @@ describe("ReaderPanel", () => {
       expect(useExtractionStore.getState().viewMode).toBe("extracted");
     });
 
-    it("auto-switches when blurb HTML strips to nothing (image-only feed)", () => {
+    it("stays in feed view when the blurb is an image (photo blog, mastodon image post)", () => {
+      // The image IS the content. Auto-switching to extracted view here
+      // replaces a perfectly good picture with whatever the publisher's
+      // article page extracts to — usually NOT the original photo.
       const article = mockArticle({
         link: "https://example.com/image-only",
-        content: '<img alt="">',
+        content: '<img alt="" src="https://example.com/photo.jpg">',
         summary: "<p></p>",
       });
       useExtractionStore.setState({
@@ -711,7 +714,29 @@ describe("ReaderPanel", () => {
 
       render(<ReaderPanel />);
 
-      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+      expect(useExtractionStore.getState().viewMode).toBe("feed");
+    });
+
+    it("stays in feed view when the blurb is an iframe embed (YouTube, etc.)", () => {
+      const article = mockArticle({
+        link: "https://example.com/video-post",
+        content: '<iframe src="https://www.youtube.com/embed/abc"></iframe>',
+        summary: "",
+      });
+      useExtractionStore.setState({
+        cache: { [article.link]: "<p>full text from cache</p>" },
+        statusMap: { [article.link]: "available" },
+        viewMode: "feed",
+      });
+      useArticleStore.setState({
+        selectedArticle: article,
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(useExtractionStore.getState().viewMode).toBe("feed");
     });
 
     it("does not auto-switch when the article has no fetchable link", () => {

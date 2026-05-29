@@ -91,6 +91,12 @@ interface BriefingStore {
   ) => Promise<Result<Briefing>>;
   renameBriefing: (id: string, name: string) => Promise<Result<Briefing>>;
   removeBriefing: (id: string) => Promise<void>;
+  /**
+   * Flip the per-briefing daily-refresh flag. When true and the
+   * user's Signal nightly setting is on, the midnight scheduler
+   * runs `refreshBriefing` for this briefing.
+   */
+  setBriefingDailyRefresh: (id: string, value: boolean) => Promise<Result<Briefing>>;
   refreshBriefing: (
     id: string,
     options: RefreshOptions,
@@ -209,6 +215,22 @@ export const useBriefingStore = create<BriefingStore>((set, get) => ({
     if (!existing) return err("Briefing not found");
 
     const next: Briefing = { ...existing, name: trimmed };
+    const updated = await updateBriefing(next);
+    if (!updated.ok) return err(updated.error);
+
+    await reload(set);
+    schedulePush();
+    return ok(next);
+  },
+
+  setBriefingDailyRefresh: async (id, value) => {
+    const gateError = rejectIfGateClosed();
+    if (gateError) return gateError;
+
+    const existing = get().briefings.find((b) => b.id === id);
+    if (!existing) return err("Briefing not found");
+
+    const next: Briefing = { ...existing, dailyRefresh: value };
     const updated = await updateBriefing(next);
     if (!updated.ok) return err(updated.error);
 

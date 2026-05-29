@@ -188,7 +188,11 @@ describe("AppSidebar layout structure", () => {
     it("still renders the Synced pill when sync is active", () => {
       useSyncStore.setState({ status: "synced" });
       renderSidebar();
-      expect(screen.getByText(/^Synced$/)).toBeInTheDocument();
+      // Two renderings share the word "Synced" now: the rich header
+      // SyncStatusBadge and the tiny footer chip on the Settings button.
+      // Both are valid sync surfaces; the test just needs to confirm the
+      // status text is present, not that there is exactly one.
+      expect(screen.getAllByText(/^Synced$/).length).toBeGreaterThan(0);
     });
 
     it("renders the Settings label centered (single-line) when no chip is visible", () => {

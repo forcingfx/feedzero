@@ -39,6 +39,19 @@ async function goToImportExportTab(page: Page) {
   await expect(page.getByRole("heading", { name: /^Export$/i })).toBeVisible();
 }
 
+/**
+ * Confirm the import-preview step that PR #192 inserted between the
+ * initial "Import feeds" click and the addFeed loop. The preview's
+ * confirm button is "Import N feed(s)" — wait for it, click it.
+ */
+async function confirmImportPreview(page: Page) {
+  const confirm = page
+    .getByTestId("import-preview")
+    .getByRole("button", { name: /^Import \d+ feeds?$/ });
+  await expect(confirm).toBeVisible({ timeout: 5000 });
+  await confirm.click();
+}
+
 test.describe("Import/Export navigation", () => {
   test("Explore 'Import / Export' button navigates to Settings → Data", async ({
     feedPage: page,
@@ -67,12 +80,15 @@ test.describe("Import feeds", () => {
     // Switch the Import card to text-paste mode.
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML, Pocket HTML export, or feed URLs (one per line)")
+      .getByPlaceholder(/^Paste OPML XML/)
       .fill(SAMPLE_OPML);
     await page.getByRole("button", { name: "Import feeds" }).click();
+    await confirmImportPreview(page);
 
     await expect(page.getByText(/Adding feed/)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText(/feed.*added/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/\d+ feeds? added/i)).toBeVisible({
+      timeout: 15000,
+    });
 
     // "Done" returns to the input view.
     await page.getByRole("button", { name: "Done" }).click();
@@ -84,11 +100,14 @@ test.describe("Import feeds", () => {
 
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML, Pocket HTML export, or feed URLs (one per line)")
+      .getByPlaceholder(/^Paste OPML XML/)
       .fill(SAMPLE_URL_LIST);
     await page.getByRole("button", { name: "Import feeds" }).click();
+    await confirmImportPreview(page);
 
-    await expect(page.getByText(/feed.*added/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/\d+ feeds? added/i)).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test("Import button is disabled with empty text input", async ({
@@ -106,7 +125,7 @@ test.describe("Import feeds", () => {
     await goToImportExportTab(page);
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML, Pocket HTML export, or feed URLs (one per line)")
+      .getByPlaceholder(/^Paste OPML XML/)
       .fill("# just a comment\n\n# another comment");
     await page.getByRole("button", { name: "Import feeds" }).click();
 
@@ -119,11 +138,14 @@ test.describe("Import feeds", () => {
 
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder("Paste OPML XML, Pocket HTML export, or feed URLs (one per line)")
+      .getByPlaceholder(/^Paste OPML XML/)
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Import feeds" }).click();
+    await confirmImportPreview(page);
 
-    await expect(page.getByText(/feed.*added/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/\d+ feeds? added/i)).toBeVisible({
+      timeout: 15000,
+    });
     await page.getByRole("button", { name: "Import more" }).click();
     await expect(
       page.getByRole("radio", { name: "Upload file" }),

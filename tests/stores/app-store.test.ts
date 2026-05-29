@@ -74,10 +74,17 @@ describe("app-store", () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
+    // Reset BOTH the FSM canonical (bootState) and the legacy mirror
+    // fields so every test starts from a clean slate. Without this,
+    // the FSM carries forward from a prior test's `ready` and the
+    // next dispatch({type:"boot"}) is a no-op.
     useAppStore.setState({
+      bootState: { kind: "unknown" },
       isDbReady: false,
       error: null,
       hasCompletedOnboarding: false,
+      recoveryMode: null,
+      securityProblem: null,
     });
   });
 
@@ -274,6 +281,10 @@ describe("app-store", () => {
 
       expect(useAppStore.getState().isDbReady).toBe(true);
       expect(useSyncStore.getState().credentials).toBe(mockCredentials);
+      // Pull runs in the background — flush microtasks so its .then settles
+      // and the status transitions from "syncing" to "synced".
+      await Promise.resolve();
+      await Promise.resolve();
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
@@ -297,42 +308,36 @@ describe("app-store", () => {
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
 
-    it("still initializes when the sync pull never resolves (boot must not hang on the network)", async () => {
-      // Reproduces the production hang: a returning sync user whose
-      // /api/sync request stalls indefinitely (slow upstream, dropped
-      // connection mid-response, edge function cold-start hang). Before
-      // the boot-time pull timeout, isDbReady stayed false forever and
-      // the user was stuck on "Loading…" with no escape.
+    it("mounts instantly for sync users — pull happens in the background", async () => {
+      // On mobile, blocking isDbReady on the cloud pull was the cause of
+      // the "Loading… for a few seconds" complaint. The pull now fires
+      // in the background so the UI can render whatever the canary-
+      // validated local DB already has; refreshAll (kicked off by
+      // AppInit) waits on the same in-flight pull via sync-store dedup
+      // and then fetches fresh articles when it lands.
       vi.mocked(restore).mockResolvedValue({
         status: "ready",
         isSyncUser: true,
         credentials: {
           vaultId: "vault-id",
           vaultKey: "mock-key" as unknown as CryptoKey,
-        kdfSpec: { kind: "pbkdf2-600k" } as const,
+          kdfSpec: { kind: "pbkdf2-600k" } as const,
         },
       });
-      // pullVaultIfChanged returns a promise that never resolves.
+      // Pull never resolves — boot still completes promptly.
       vi.mocked(pullVaultIfChanged).mockReturnValue(
         new Promise(() => {
           /* never resolves */
         }),
       );
 
-      vi.useFakeTimers();
-      try {
-        const initPromise = useAppStore.getState().initializeReturningUser();
-        // Advance past the boot-time pull watchdog (BOOT_PULL_TIMEOUT_MS,
-        // currently 10s). The pull stays in-flight in the background; boot
-        // proceeds with whatever local data the canary already validated.
-        await vi.advanceTimersByTimeAsync(15_000);
-        await initPromise;
-      } finally {
-        vi.useRealTimers();
-      }
+      await useAppStore.getState().initializeReturningUser();
 
       expect(useAppStore.getState().isDbReady).toBe(true);
+      // Sync is in flight, not yet settled.
+      expect(useSyncStore.getState().status).toBe("syncing");
     });
+
   });
 
   describe("resetApp", () => {
@@ -349,6 +354,7 @@ describe("app-store", () => {
     beforeEach(() => {
       // Reset side-effect state between tests
       useAppStore.setState({
+        bootState: { kind: "unknown" },
         isDbReady: false,
         error: null,
         hasCompletedOnboarding: null,
@@ -360,14 +366,20 @@ describe("app-store", () => {
       });
     });
 
-    it("completes the full sequence on a healthy environment", async () => {
-      // happy-dom defaults to isSecureContext=true via tests/setup.ts
+    it("transitions to needs-onboarding (modal takes over from here) on a healthy environment", async () => {
+      // Previous behavior auto-generated a passphrase and initialized
+      // a local-only DB without ever surfacing the modal — meaning every
+      // new user ended up local-only with a passphrase they'd never see.
+      // The fix: the action only runs the secure-context guard; the modal
+      // drives the actual choice (local / sync / recovery) and calls
+      // initialize() once the user has chosen.
       await useAppStore.getState().startNewUserOnboarding();
 
-      expect(initFresh).toHaveBeenCalled();
+      expect(initFresh).not.toHaveBeenCalled();
       const state = useAppStore.getState();
-      expect(state.isDbReady).toBe(true);
-      expect(state.hasCompletedOnboarding).toBe(true);
+      expect(state.bootState.kind).toBe("needs-onboarding");
+      expect(state.isDbReady).toBe(false);
+      expect(state.hasCompletedOnboarding).toBe(false);
       expect(state.securityProblem).toBeNull();
       expect(state.error).toBeNull();
     });
@@ -395,14 +407,14 @@ describe("app-store", () => {
       expect(state.hasCompletedOnboarding).toBeNull();
     });
 
-    it("does not complete onboarding when initialize sets an error", async () => {
-      vi.mocked(initFresh).mockResolvedValue({ ok: false, error: "boom" });
-
+    it("does NOT call initFresh — passphrase generation + DB init are the modal's job", async () => {
+      // Lock the structural property that motivated the refactor: this
+      // action no longer creates a DB silently. Any future caller that
+      // accidentally re-adds an initialize() here will trip this test
+      // before reaching production (and shipping every new user into
+      // local-only mode with a passphrase they can't see).
       await useAppStore.getState().startNewUserOnboarding();
-
-      const state = useAppStore.getState();
-      expect(state.error).toBe("boom");
-      expect(state.hasCompletedOnboarding).toBeNull();
+      expect(initFresh).not.toHaveBeenCalled();
     });
   });
 });

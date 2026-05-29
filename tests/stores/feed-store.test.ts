@@ -610,6 +610,54 @@ describe("feed-store", () => {
 
       expect(prefetchStarredArticles).not.toHaveBeenCalled();
     });
+
+    it("reloads the visible article list so new articles appear without manual refresh", async () => {
+      // Before fix: articles fetched by refreshAll landed in the DB but the
+      // in-memory articleStore.articles wasn't recomputed — the user had to
+      // navigate away and back (or hit the toolbar refresh) to see them. On
+      // mobile that read as "stale feed" after the loading screen cleared.
+      const feed = mockFeed("f1", "Feed 1");
+      useFeedStore.setState({ feeds: [feed], selectedFeedId: "f1" });
+      useArticleStore.setState({ articles: [], articlesByFeedId: {} });
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
+      const fresh = {
+        id: "fresh-1",
+        feedId: "f1",
+        title: "Just published",
+        link: "https://f1.com/1",
+        content: "",
+        publishedAt: Date.now(),
+        read: false,
+        starred: false,
+      };
+      vi.mocked(getArticles).mockResolvedValue({
+        ok: true,
+        value: [fresh] as never,
+      });
+
+      await useFeedStore.getState().refreshAll();
+
+      const visible = useArticleStore.getState().articles;
+      expect(visible).toHaveLength(1);
+      expect(visible[0].id).toBe("fresh-1");
+    });
+
+    it("does not throw when no feed is selected (e.g. on /explore route)", async () => {
+      useFeedStore.setState({ selectedFeedId: null });
+      vi.mocked(refreshAllFeeds).mockResolvedValue({
+        ok: true,
+        value: { results: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+
+      await expect(
+        useFeedStore.getState().refreshAll(),
+      ).resolves.toBeUndefined();
+    });
   });
 
   describe("refreshFeed", () => {

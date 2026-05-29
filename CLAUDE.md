@@ -260,6 +260,7 @@ Reference: `tests/smoke/release-feed.test.ts`, `tests/smoke/rate-limiter.test.ts
 ## Operations
 
 - **License support runbook** — `docs/operations/license-support.md`. The procedure for handling "I can't recover my license" support emails. Uses `scripts/find-license.ts` (operator CLI) backed by the pure library at `src/core/license/admin-find-license.ts`. Both reuse `findCustomerByEmail` from `src/core/stripe/find-customer-by-email.ts` so the recover-handler and the CLI agree on Stripe-customer lookup semantics.
+- **Quarterly architecture audit lap** — `docs/operations/audit-lap.md`. 90-minute recurring task; runs the test-suspicion detector + churn/size analytics + the structured eyeball pass, produces a 3-finding memo under `docs/reports/audit-YYYY-QQ.md`. Exists because four production incidents in one quarter (2026-05-12 sync, 2026-05-14 stats, 2026-05-19 destroy cascade, 2026-05-28 onboarding modal) shared a pattern that no per-PR review caught. ADR 025 names the pattern; the lap is the operational loop that catches the next instance.
 
 ## Auditing the codebase
 

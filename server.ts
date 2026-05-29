@@ -138,7 +138,11 @@ export function createApp(
 
   const CSP = [
     "default-src 'self'",
-    "script-src 'self'",
+    // 'wasm-unsafe-eval' lets hash-wasm instantiate its Argon2id
+    // WebAssembly module — required for the sync-vault KDF. We use
+    // the narrow directive (not 'unsafe-eval') so eval() and new
+    // Function() stay blocked.
+    "script-src 'self' 'wasm-unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     "connect-src 'self'",

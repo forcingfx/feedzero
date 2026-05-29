@@ -85,9 +85,12 @@ describe("RecoveryStep", () => {
       confirmationError: null,
     });
     useAppStore.setState({
+      bootState: { kind: "unknown" },
       isDbReady: false,
       error: null,
       hasCompletedOnboarding: false,
+      recoveryMode: null,
+      securityProblem: null,
     });
     useSyncStore.setState({
       status: "local-only",

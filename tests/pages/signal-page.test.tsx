@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { SignalPage } from "@/pages/signal-page.tsx";
@@ -307,6 +307,70 @@ describe("SignalPage", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /refresh/i }));
     await waitFor(() => expect(useSignalStore.getState().report?.generatedAt).not.toBe(first));
+  });
+
+  /**
+   * The in-page Local/AI toggle moved to Settings → Reading → Signal.
+   * The header still needs to surface the current mode at a glance, so
+   * a read-only badge sits next to the "Signal" title. Clicking it
+   * sends the user to the Settings tab that owns the toggle.
+   */
+  describe("Signal mode badge", () => {
+    it("renders a mode badge on the header (Local at default)", async () => {
+      seedReadyCorpus();
+      renderAt();
+      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+      const badge = screen.getByTestId("signal-mode-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge.textContent?.toLowerCase()).toContain("local");
+    });
+
+    it("clicking the mode badge navigates to Settings → Reading", async () => {
+      seedReadyCorpus();
+      renderAt();
+      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+      const user = userEvent.setup();
+      await user.click(screen.getByTestId("signal-mode-badge"));
+      const probe = screen.getByTestId("location");
+      expect(probe.textContent).toContain("/settings");
+      expect(probe.textContent).toContain("tab=reading");
+    });
+
+    it("the in-page Local/AI toggle has been removed from the header", async () => {
+      seedReadyCorpus();
+      renderAt();
+      await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+      // The old SignalModeToggle exposed both options as togglegroup
+      // items with aria-labels "Local frequency engine" / "AI overview"
+      // (the verbose labels). After the move the page must not render
+      // either of those.
+      expect(
+        screen.queryByLabelText(/local frequency engine/i),
+      ).toBeNull();
+      expect(screen.queryByLabelText(/^ai overview$/i)).toBeNull();
+    });
+  });
+
+  it("Refresh button spins while the report is loading", async () => {
+    seedReadyCorpus();
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+
+    // Flip the store into the loading state externally — same shape as
+    // mid-flight refresh after a click. The icon (and button) must
+    // reflect that the work is in progress so the user knows their
+    // click registered. Previously the spinner was wired to
+    // `usePullToRefresh().isRefreshing`, which only tracks
+    // pull-to-refresh on mobile — button clicks left the icon static.
+    act(() => {
+      useSignalStore.setState({ status: "loading" });
+    });
+
+    const refreshButton = screen.getByRole("button", { name: /refresh/i });
+    const icon = refreshButton.querySelector("svg");
+    expect(icon).not.toBeNull();
+    expect(icon?.classList.contains("animate-spin")).toBe(true);
+    expect(refreshButton).toBeDisabled();
   });
 
   describe("Top stories digest", () => {

@@ -34,6 +34,7 @@ import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
 import { goToSettings, goToSyncSetup } from "@/lib/go-to-settings.ts";
 import { BrandMark } from "@/components/brand/brand-mark.tsx";
+import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
@@ -229,6 +230,11 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                   </Tooltip>
                 )}
               </div>
+            </div>
+            {/* Anchored to the sidebar so it can't overlap the reader's
+                article title in the stage panel. */}
+            <div>
+              <SyncStatusBadge />
             </div>
           </div>
         </SidebarHeader>

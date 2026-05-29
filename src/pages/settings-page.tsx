@@ -18,16 +18,17 @@ const VALID_TABS: readonly SettingsTab[] = [
   "subscription",
   "sync-and-data",
   "reading",
-  "briefings",
   "help",
 ];
 
 // Old tab names that point at content now hosted under a different slug.
 // Keep them mapped so deep-links shared before the redesign still land in
-// the right place after the merge into Subscription / Sync & Data.
+// the right place after the merge into Subscription / Sync & Data /
+// Reading.
 const LEGACY_TAB_REDIRECTS: Record<string, SettingsTab> = {
   recovery: "subscription",
   data: "sync-and-data",
+  briefings: "reading",
 };
 
 function isSettingsTab(value: string | null): value is SettingsTab {

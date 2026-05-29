@@ -1,0 +1,2017 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+<title>Daring Fireball</title>
+<subtitle>By John Gruber</subtitle>
+<link rel="alternate" type="text/html" href="https://daringfireball.net/" />
+<link rel="self" type="application/atom+xml" href="https://daringfireball.net/feeds/main" />
+<id>https://daringfireball.net/feeds/main</id>
+
+
+<updated>2026-05-25T23:57:52Z</updated><rights>Copyright © 2026, John Gruber</rights><entry>
+	
+	<link rel="alternate" type="text/html" href="https://exe.dev/?df" />
+	<link rel="shorturl" href="http://df4.us/x7z" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/feeds/sponsors/2026/05/exedev" />
+	<id>tag:daringfireball.net,2026:/feeds/sponsors//11.43055</id>
+	<author><name>Daring Fireball Department of Commerce</name></author>
+	<published>2026-05-25T23:57:24Z</published>
+	<updated>2026-05-25T23:57:52Z</updated>
+	<content type="html" xml:base="https://daringfireball.net/feeds/sponsors/" xml:lang="en"><![CDATA[
+<p>A cloud for the agent era. Use <a href="https://exe.dev/?df">exe.dev</a> to get a pool of VMs with SSH, root, and web auth by default. Secrets injected at the network edge stay out of the LLM’s hands. Persistent servers, internal tools, vibe coding, disposable devboxes, whatever. It’s just a computer.</p>
+
+<div>
+<a  title="Permanent link to ‘exe.dev’"  href="https://daringfireball.net/feeds/sponsors/2026/05/exedev">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+	<title>[Sponsor] exe.dev</title></entry><entry>
+	<title>Awarding Jay Haynes His Being Right Points for Predicting Apple Hitting $3 Trillion in Market Cap</title>
+	<link rel="alternate" type="text/html" href="https://daringfireball.net/linked/2014/01/29/haynes-aapl" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7y" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/25/awarding-jay-haynes-his-being-right-points" />
+	<id>tag:daringfireball.net,2026:/linked//6.43054</id>
+	<published>2026-05-25T20:32:29Z</published>
+	<updated>2026-05-25T20:32:38Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Here’s a fun one. Back in 2014 <a href="https://daringfireball.net/linked/2014/01/29/haynes-aapl">I linked to a post by Jay Haynes</a> in which he projected that with a very reasonable level of annual growth, Apple ought to reach a $3 trillion market cap within 10 years. At the time of his writing, Apple’s market cap was “just” $450 billion, and no company had hit the $1 trillion market. So projecting a $3 trillion valuation in 10 years was a bold prediction.</p>
+
+<p>Apple hit $3 trillion <a href="https://www.nytimes.com/2022/01/03/technology/apple-3-trillion-market-value.html">in just 8 years</a>.</p>
+
+<p>Haynes’s original blog went belly-up, alas, but <a href="https://medium.com/thrv/the-math-behind-warren-buffets-1-billion-stake-in-apple-5cbcc228dada">he republished the piece on Medium</a>, with a bit of additional commentary up front, in 2016. Re-reading Haynes’s piece today, it holds up extremely well, including his case that the iPhone and iPad are almost textbook examples of Clayton Christensen’s disruption theory (yet <a href="http://daringfireball.net/2012/07/iphone_disruption_five_years_in">Christensen himself got it wrong</a>).</p>
+
+<p>(Thanks to Nathan Peretic, longtime DF reader and owner of a <a href="https://www.nathanperetic.com/">perfect personal homepage</a>, for prompting me to revisit this and award Haynes his well-earned Being Right Points.)</p>
+
+<div>
+<a  title="Permanent link to ‘Awarding Jay Haynes His Being Right Points for Predicting Apple Hitting $3 Trillion in Market Cap’"  href="https://daringfireball.net/linked/2026/05/25/awarding-jay-haynes-his-being-right-points">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Thieves Are Texting Threats to Victims of iPhone Theft in London</title>
+	<link rel="alternate" type="text/html" href="https://www.nytimes.com/2026/05/23/world/europe/phone-theft-threats-london.html?unlocked_article_code=1.lFA.OUt7.VJ_FoDpINr0L" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7x" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/25/london-iphone-thieves-threats" />
+	<id>tag:daringfireball.net,2026:/linked//6.43053</id>
+	<published>2026-05-25T19:23:32Z</published>
+	<updated>2026-05-25T20:27:45Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Lizzie Dearden and Amelia Nierenberg, reporting for The New York Times (gift link):</p>
+
+<blockquote>
+  <p>The crime Alex Pikula reported to the police was one they had
+heard before: An e-bike rider had zoomed past as Mr. Pikula left a
+theater in London’s West End, ripping his phone from his hands. It
+was frustrating, Mr. Pikula thought, but that was that.</p>
+
+<p>He was wrong.</p>
+
+<p>His mother soon started receiving strange texts, claiming to have
+her son’s emails and bank information. Then she received a video
+of a man brandishing a gun. Then came threats of sexual assault
+and death.</p>
+
+<p>“I know who you are and where you live,” read one, full of
+obscenities and typos. “I’ve killed or [<em>sic</em>] far less than a
+phone before,” it went on. “We will see if you value your life
+over this phone.”</p>
+
+<p>All of the messages wanted her to do one thing: unlink her son’s
+Apple ID from his stolen phone.</p>
+</blockquote>
+
+<p>The story only mentions the word iPhone twice, but <em>phone</em> appears over 30 times. “Apple ID” appears four times. There’s zero mention of Android or Google. It’s just implicitly assumed that the only phones worth stealing or threatening victims about are iPhones. The story makes no mention of Apple’s <a href="https://support.apple.com/en-us/120340">Stolen Device Protection</a>, which Apple recently began <a href="https://www.macrumors.com/2026/02/16/ios-26-4-stolen-device-protection/">turning on by default</a> when users install iOS 26.4.</p>
+
+<p>Dearden and Nierenberg filed <a href="https://daringfireball.net/linked/2025/10/20/london-phone-theft">a previous report in October</a> about organized iPhone crime rings in London. And in November <a href="https://daringfireball.net/linked/2025/11/18/life-in-london-with-an-android-phone">I linked to a story</a> where a thief, after stealing an Android phone, turned around and handed it back, explaining to the victim, “Don’t want no Samsung.”</p>
+
+<div>
+<a  title="Permanent link to ‘Thieves Are Texting Threats to Victims of iPhone Theft in London’"  href="https://daringfireball.net/linked/2026/05/25/london-iphone-thieves-threats">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Trump Mobile Website Exposed the Number of Pre-Orders — Both Completed and Abandoned — and the Associated Customer Information</title>
+	<link rel="alternate" type="text/html" href="https://www.theguardian.com/us-news/2026/may/23/trump-mobile-investigating-potential-exposure-of-would-be-customers-personal-information" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7w" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/25/trump-mobile-preorders" />
+	<id>tag:daringfireball.net,2026:/linked//6.43052</id>
+	<published>2026-05-25T18:54:37Z</published>
+	<updated>2026-05-25T18:54:53Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Catie McLeod, The Guardian:</p>
+
+<blockquote>
+  <p>Trump Mobile said in a statement that it was investigating the
+issue — “with the assistance of independent cybersecurity
+professionals” — in which the full names, addresses and phone
+numbers of people who filled out preorder forms appeared to be
+exposed. [...]</p>
+
+<p>Jonathan Soma, a programmer and professor at New York’s Columbia
+University, reviewed the code that the Australian had uncovered
+and copied from the Trump Mobile website. Soma said the website
+used a common e-commerce model, in which every potential order
+added another “1” to a list, the total of which had reached 27,224
+possible pre-orders on the available information.</p>
+
+<p>But he said the code reflected the last step before payment,
+meaning those who didn’t proceed with the purchase were also
+recorded in the data, even those people who have abandoned their
+carts without paying the deposit, so the true number of preorders
+was likely to be even lower.</p>
+
+<p>“I probably started three phone purchases and didn’t buy any of
+them,” he said.</p>
+</blockquote>
+
+<p>Auric Goldfinger is surely rolling over in his grave.</p>
+
+<div>
+<a  title="Permanent link to ‘Trump Mobile Website Exposed the Number of Pre-Orders — Both Completed and Abandoned — and the Associated Customer Information’"  href="https://daringfireball.net/linked/2026/05/25/trump-mobile-preorders">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>The History of ‘OK’</title>
+	<link rel="alternate" type="text/html" href="https://www.merriam-webster.com/wordplay/the-hilarious-history-of-ok-okay" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7v" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/25/the-history-of-ok" />
+	<id>tag:daringfireball.net,2026:/linked//6.43051</id>
+	<published>2026-05-25T17:18:56Z</published>
+	<updated>2026-05-25T21:41:45Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Merriam-Webster:</p>
+
+<blockquote>
+  <p>The 1820s and 1830s shared another linguistic fad with today: an
+appreciation for deliberate misspellings. (Kewl, rite?) This
+trend, which had humorists adopting now-cringey bumpkin personas
+with ignorance manifested in uneducated spellings, turned <em>no go</em>
+into <em>know go</em> and <em>no use</em> into <em>know yuse</em> (lol). Abbreviations
+were not immune, and <em>no go</em> became <em>K.G.</em>. So too <em>all right</em>
+became <em>O.W.</em>, as an abbreviation for <em>oll wright</em>. And <em>all
+correct</em> became <em>o.k.</em>, as an abbreviation for <em>oll korrect</em>.</p>
+
+<p>Although <em>OK</em> became one of the more commonly used initialisms, it
+might have passed into oblivion when the linguistic fad had passed
+if not for the presidential election of 1840, when Martin Van
+Buren was given the nickname of “Old Kinderhook” because of his
+hometown of Kinderhook, NY. The Van Buren <a href="https://www.merriam-webster.com/words-at-play/stan-obsessed-fan-origin-meaning">stans</a> who joined “OK
+Clubs” nationwide were themselves, they proclaimed, “OK.” Their
+campaign was memorable enough to have both popularized the word
+and to have hijacked the story of its origin: there are today
+still those who believe that “Old Kinderhook” is the original
+meaning of <em>OK</em>.</p>
+</blockquote>
+
+<p>I have a strong preference for <em>OK</em> (perhaps infused by the <a href="http://interface.free.fr/Archives/Apple_HIGuidelines.pdf#page=231">classic Macintosh Human Interface Guidelines</a>’s adamance on the spelling). <em>Okay</em> is OK in prose, but never as a UI button label. <em>Ok</em> and <em>ok</em> are not OK.</p>
+
+<div>
+<a  title="Permanent link to ‘The History of ‘OK’’"  href="https://daringfireball.net/linked/2026/05/25/the-history-of-ok">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>WorkOS: ‘Agents Need Context. Ship the Integrations That Give It to Them.’</title>
+	<link rel="alternate" type="text/html" href="https://workos.com/docs/pipes?utm_source=daringfireball&amp;utm_medium=newsletter&amp;utm_campaign=q22026" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7u" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/25/workos" />
+	<id>tag:daringfireball.net,2026:/linked//6.43050</id>
+	<published>2026-05-25T15:09:17Z</published>
+	<updated>2026-05-25T15:09:43Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>My thanks to WorkOS for once again sponsoring DF last week. The context that actually matters isn’t in your database. It’s in the tools your users live in every day. Multi-stage agents stall the moment they hit a step they can’t see. And every missing integration is a different OAuth flow, a different token lifecycle, weeks of plumbing before the agent reads a single record.</p>
+
+<p><a href="https://workos.com/blog/workos-pipes-third-party-integrations?utm_source=daringfireball&amp;utm_medium=newsletter&amp;utm_campaign=q22026&amp;utm_content=product_name_link">WorkOS Pipes</a> connects your agent to the tools your users live in. Pre-built connectors for GitHub, Slack, Salesforce, Google Drive, and more. Pipes handles OAuth, token refresh, and credential storage. You call the real provider API with a fresh token, every time. Your agent pulls context at every step, for as long as the task runs.</p>
+
+<p><a href="https://workos.com/docs/pipes?utm_source=daringfireball&amp;utm_medium=newsletter&amp;utm_campaign=q22026">Give your agent context.</a></p>
+
+<div>
+<a  title="Permanent link to ‘WorkOS: ‘Agents Need Context. Ship the Integrations That Give It to Them.’’"  href="https://daringfireball.net/linked/2026/05/25/workos">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Why Steve Kerr Stayed With the Warriors</title>
+	<link rel="alternate" type="text/html" href="https://www.espn.com/nba/story/_/id/48686303/steve-kerr-decision-return-coach-golden-state-warriors-steph-curry" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7t" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/24/kerr" />
+	<id>tag:daringfireball.net,2026:/linked//6.43049</id>
+	<published>2026-05-24T17:27:24Z</published>
+	<updated>2026-05-24T18:09:47Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Terrific, poignant profile of Warriors head coach Steve Kerr by Wright Thompson for ESPN:</p>
+
+<blockquote>
+  <p>Kerr doesn’t want the Warriors to end up like the New England Patriots, marred by grudges and grievances. He watched Michael Jordan retire, then unretire, then retire, then unretire. His friends used to grill him about MJ.</p>
+
+<p>“Why doesn’t he go out on top?”</p>
+
+<p>“Because he can’t,” Kerr told them.</p>
+
+<p>For the past few years, Kerr has watched his mentor, San Antonio Spurs coach Gregg Popovich, struggle through this same decision. Pop once called Steve to tell him he’d finally decided to retire. Steve congratulated him on a Hall of Fame career. A week later Pop signed an extension with San Antonio. Popovich finally officially quit six weeks before our lunch, six months after a stroke diminished him physically. People who loved him had to show him the door, as gently as possible. That hurt Steve. He respects Popovich so much. He loved playing for him and coaching with him. He once told Gregg he was the finest man he’d ever known and thanked him for all he’d done for him. Pop smiled and said his feet were made of clay like everyone else’s. Steve didn’t believe it then. Now he does.</p>
+
+<p>“I realized he couldn’t do it,” Kerr said. “He couldn’t walk away.”</p>
+
+<p>I asked how he’d avoided the trap. He laughed.</p>
+
+<p>“I’m sitting here wondering,” he said.</p>
+</blockquote>
+
+<p>It sounds so easy to go out on top. But it very seldom happens.</p>
+
+<div>
+<a  title="Permanent link to ‘Why Steve Kerr Stayed With the Warriors’"  href="https://daringfireball.net/linked/2026/05/24/kerr">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+    
+    <link rel="alternate" type="text/html" href="https://daringfireball.net/2026/05/the_fonts_of_the_us_federal_courts" />
+	<link rel="shorturl" href="http://df4.us/x7s" />
+	<id>tag:daringfireball.net,2026://1.43048</id>
+	<published>2026-05-22T20:30:18Z</published>
+	<updated>2026-05-25T18:22:13Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<summary type="text">The Supreme Court’s typographic style has been stunningly consistent for — no pun intended — well over a century.</summary>
+	<content type="html" xml:base="https://daringfireball.net/" xml:lang="en"><![CDATA[
+
+<p>The 13 circuits of <a href="https://en.wikipedia.org/wiki/United_States_courts_of_appeals">the U.S. federal courts of appeals</a> operate with a fair amount of independence, including <a href="https://www.findlaw.com/legalblogs/greedy-associates/5-non-times-new-roman-fonts-courts-use-in-their-opinions/">their typographic choices</a>. I was reminded of this today while reading the <a href="https://daringfireball.net/linked/2026/05/22/ninth-circuit-epic-v-apple">aforelinked</a> decision <a href="https://cdn.ca9.uscourts.gov/datastore/opinions/2025/12/11/25-2935.pdf">from the Ninth Circuit in <em>Epic v. Apple</em></a>, because the Ninth Circuit sets their decisions in <a href="https://daringfireball.net/linked/2025/12/15/a-brief-history-of-timesnewroman">Times New Roman</a> — a font that <a href="https://daringfireball.net/linked/2025/12/10/">came up back in December</a> in the context of the Trump State Department.</p>
+
+<p>Long argument short, Times New Roman isn’t bad, but it isn’t good. It is the median choice. But <a href="https://www.reddit.com/r/LawSchool/comments/ge4tzq/different_fonts_used_by_us_court_of_appeals/">most of the circuit courts use it</a>: the Third, Fourth, Sixth, Eighth, Ninth, Tenth, and Eleventh. It could be worse: the <a href="https://media.ca1.uscourts.gov/pdf.opinions/14-1043P-01A.pdf">First</a> circuit not only uses Courier New (<a href="https://daringfireball.net/linked/2026/01/14/clintons-letter">the worst version of Courier</a>, so of course it’s the one Microsoft shipped with Windows), but fully justifies their text — contrary to the nature of a monospaced font. (The Fourth circuit only recently switched <a href="https://www.ca4.uscourts.gov/Opinions/Published/131839A.P.pdf">from Courier New</a> <a href="https://www.ca4.uscourts.gov/opinions/251012.P.pdf">to Times New Roman</a> — an upgrade, to be sure, but a disappointingly mediocre one.) It could be better: the <a href="https://ww3.ca2.uscourts.gov/decisions/OPN/24-341_opn.pdf">Second</a> and <a href="https://media.ca7.uscourts.gov/cgi-bin/OpinionsWeb/processWebInputExternal.pl?Submit=Display&amp;Path=Y2026/D05-20/C:24-2015:J:Hamilton:aut:T:fnOp:N:3544786:S:0">Seventh</a> use Palatino. (Note how much better that Seventh Circuit decision looks than the Second’s, with its wider margins creating a narrower column of text.)</p>
+
+<p>But it can be <em>much</em> better. The Fifth Circuit was long typographically superior to its peers, using <a href="https://en.wikipedia.org/wiki/Century_type_family">Century Schoolbook</a> — a highly legible font with great tradition and the right vibe. But in 2020, the Fifth Circuit upgraded, switching to <a href="https://typographyforlawyers.com/equity.html">Equity</a>, Matthew Butterick’s excellent type family (which, of course, is used throughout Butterick’s own web book, <a href="https://typographyforlawyers.com/"><em>Typography for Lawyers</em></a>). Here’s a <a href="https://x.com/E_A_Young/status/1285354790176935936">before and after tweet</a> noting the change. The <a href="https://www.ca5.uscourts.gov/opinions/pub/25/25-11006-CV1.pdf">results</a> are typographically sublime (including improved margins).</p>
+
+<p>The gold standard is the U.S. Supreme Court, which uses Century Schoolbook. Yes, I just praised the Fifth Circuit’s change from Century Schoolbook to Equity as an upgrade, but tradition and consistency have their place. The Supreme Court’s typographic style has been stunningly consistent for — no pun intended — well over a century. (If only that were true of their recent decisions. <em>Rimshot.</em>) Here is last month’s <a href="https://www.supremecourt.gov/opinions/25pdf/24-109_new_jifl.pdf"><em>Louisiana v. Callais</em> decision</a> — the gerrymandering / redistricting case. Here is <a href="https://tile.loc.gov/storage-services/service/ll/usrep/usrep347/usrep347483/usrep347483.pdf">1954’s <em>Brown v. Board of Education</em></a>. I’d give the nod to the older one, which made better use of proper small caps, but the overall consistency is obvious.</p>
+
+<p>Here is <a href="https://www.supremecourt.gov/filingandrules/2026RulesoftheCourt_WEB.pdf">the 2026 edition of the Rules of the Supreme Court</a>. Not only does the Court use Century Schoolbook for its own decisions, it requires submissions to the Court to use the same (p. 44):</p>
+
+<blockquote>
+  <p>The text of every booklet-format document, including any appendix
+thereto, shall be typeset in a Century family (e. g., Century
+Expanded, New Century Schoolbook, or Century Schoolbook) 12-point
+type with 2-point or more leading between lines. Quotations in
+excess of 50 words shall be indented. The typeface of footnotes
+shall be 10-point type with 2-point or more leading between lines.
+The text of the document must appear on both sides of the page.</p>
+
+<p>Every booklet-format document shall be produced on paper that is
+opaque, unglazed, and not less than 60 pounds in weight, and
+shall have margins of at least three-fourths of an inch on all
+sides. The text field, including footnotes, may not exceed 4⅛
+by 7⅛ inches.</p>
+</blockquote>
+
+<p>Why the extra one-eighths of an inch instead of just 4 × 7? I don’t know. But 4⅛ × 7⅛ is exactly the size of the text field in the court’s own decisions.</p>
+
+<p>Now compare the current 2026 rulebook to <a href="https://www.supremecourt.gov/pdfs/rules/rules_1910.pdf">this edition printed in 1910</a> (with rules adopted in 1884). The consistency is striking — but, once again, the older version makes better use of small caps and just has a bit more vim and vigor to it. <a href="https://daringfireball.net/misc/2026/05/scotus-1910-rules-p-44.jpeg">Just look at page 44</a>, for example. It’s perfect. The current Court’s document formatters should aspire only to more closely ape the confidence and sturdiness of this older one. A century from now, U.S. Supreme Court decisions should look as similar to today’s as today’s do to those from a century ago.</p>
+
+<hr />
+
+<p>The various circuit courts using lesser typefaces, looser margins, and lazier formatting should follow the Fifth’s lead and get their shit together. Tuck your shirt in, comb your hair, straighten your tie, and pop a mint in your mouth. If you’re a United States federal court, your typographic style should reflect that.</p>
+
+<p>Back in 2020, <a href="https://matthewbutterick.com/chron/choose-wisely-2020-edition.html">Butterick took a well-deserved victory lap</a> when the Fifth Circuit adopted Equity.<sup id="fnr1-2026-05-22-f"><a href="#fn1-2026-05-22-f">1</a></sup> He quoted Fifth Circuit Judge <a href="https://x.com/justicewillett">Don Willett</a>, a typography fan who spearheaded the restyling project, on its rationale. Willett wrote:</p>
+
+<blockquote>
+  <p>[Why] did the circuit devote finite judicial energy to swapping
+typefaces and widening margins? Simple answer: Our job is not
+just to present clear opinions, but to present our opinions
+clearly. Getting the law right is, of course, our tip-top
+priority. Nothing matters more. ... But good enough is never good
+enough. Our work is consequential, impacting the lives and
+livelihoods of real people walloped by real problems in the real
+world. The stakes are high, and we must present our best opinion,
+not merely a passable one. And that presentation begins before
+the first word is ever read.</p>
+</blockquote>
+
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1-2026-05-22-f">
+<p>In the very same post, Butterick sings the praises of the Apple Extended Keyboard II, and notes that he has several spares in reserve. I do keenly intend to take Butterick up on <a href="https://practicaltypography.com/effluents-influence-affluence.html#:~:text=Musso%20%26%20Frank">his standing offer</a> to dine when next I’m in Los Angeles, but I worry that if we meet, we’ll trigger some sort of calamitous singularity of aligned taste.&nbsp;<a href="#fnr1-2026-05-22-f"  class="footnoteBackLink"  title="Jump back to footnote 1 in the text.">&#x21A9;&#xFE0E;</a></p>
+</li>
+</ol>
+</div>
+
+
+
+
+    ]]></content>
+  <title>★ The Fonts of the U.S. Federal Courts</title></entry><entry>
+	<title>The Ninth Circuit Appeal Ruling in ‘Epic v. Apple’ That Apple Is Seeking to Overturn at the Supreme Court (PDF)</title>
+	<link rel="alternate" type="text/html" href="https://cdn.ca9.uscourts.gov/datastore/opinions/2025/12/11/25-2935.pdf" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7r" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/22/ninth-circuit-epic-v-apple" />
+	<id>tag:daringfireball.net,2026:/linked//6.43047</id>
+	<published>2026-05-22T17:39:05Z</published>
+	<updated>2026-05-22T17:39:06Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Following up on <a href="https://cdn.ca9.uscourts.gov/datastore/opinions/2025/12/11/25-2935.pdf">yesterday’s item</a> re: Apple’s petition to the Supreme Court, here’s the Ninth Circuit ruling. It starts with a “Summary” that is specifically intended for the convenience of the reader. Page 50 is where it covers Apple’s argument regarding <em>Trump v. CASA</em> as precedent that an injunction on commissions should apply only to Epic Games, not to all developers in the U.S. App Store.</p>
+
+<div>
+<a  title="Permanent link to ‘The Ninth Circuit Appeal Ruling in ‘Epic v. Apple’ That Apple Is Seeking to Overturn at the Supreme Court (PDF)’"  href="https://daringfireball.net/linked/2026/05/22/ninth-circuit-epic-v-apple">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Zero Sum Problems and Apple Sports</title>
+	<link rel="alternate" type="text/html" href="https://kieranhealy.org/blog/archives/2026/05/21/zero-sum-problems/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7p" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/22/zero-sum-problems-and-apple-sports" />
+	<id>tag:daringfireball.net,2026:/linked//6.43045</id>
+	<published>2026-05-22T17:15:00Z</published>
+	<updated>2026-05-22T17:22:32Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Kieran Healy kindly accepted my <a href="https://daringfireball.net/linked/2026/05/21/apple-sports-world-cup">implicit homework assignment yesterday</a>, and wrote a piece on Apple Sports’s bizarre “zero sum” team stats visualization:</p>
+
+<blockquote>
+  <p>It also doesn’t do away with the core problem. That problem is
+principally one of information design rather than data
+visualization. What I mean is that what we’re trying to organize
+is, in effect, fifteen pairs of related but fundamentally distinct
+numbers. If we had fifteen <em>cases</em> and two <em>variables</em> things
+would be simple. But with fifteen variables and two cases … well,
+this is not the kind of thing you can make a single effective and
+non-confusing graph out of. That’s why I kind of sympathize with
+the designer. In a constrained space they have to show thirty
+numbers (thirty two, including the score). Lots of information. A
+straight table seems like it would be boring. Surely there’s some
+way to thematically integrate the numbers in a visually appealing
+manner that brings out some of the relationships across the rows.
+That’s what graphs do; it seems like the right thing to reach for.
+But at its heart this information is not a graph. It just sort of
+looks like one, and that ends up confusing people.</p>
+</blockquote>
+
+<p>Just a crackerjack explanation for why this presentation in Apple Sports is confusing, and for why it is a difficult problem to solve. The problem is further complicated by the fact that Apple Sports shows the same screen for all sports, just with different sport-specific stats. I think the solution is to just present these numbers in a table. Yes, tables are boring. But they’re not confusing. What Apple Sports is doing, in an attempt not to be boring, is confusing.</p>
+
+<p><strong>Sidenote:</strong> Healy writes:</p>
+
+<blockquote>
+  <p>I don’t know much about basketball, but I do know a bit about data
+visualization and in a pleasing coincidence my former student
+<a href="https://www.linkedin.com/in/joshua-fink">Josh Fink</a> is the A-VP of Basketball Data Science for the Spurs.</p>
+</blockquote>
+
+<p>I don’t want to get Healy in any trouble, especially after he responded to my prompt with such a remarkably thoughtful, helpfully illustrated little essay, but I was under the impression that it’s illegal for any <a href="https://kieranhealy.org/about/">professor at Duke</a> not to know much about basketball.</p>
+
+<div>
+<a  title="Permanent link to ‘Zero Sum Problems and Apple Sports’"  href="https://daringfireball.net/linked/2026/05/22/zero-sum-problems-and-apple-sports">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Stephen Colbert’s ‘The Late Show’ Finale</title>
+	<link rel="alternate" type="text/html" href="https://www.nytimes.com/2026/05/22/arts/television/colbert-last-late-show.html?unlocked_article_code=1.kVA.GO3I.gVq9KeUrHEyM" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7q" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/22/colbert-late-show-finale" />
+	<id>tag:daringfireball.net,2026:/linked//6.43046</id>
+	<published>2026-05-22T17:12:10Z</published>
+	<updated>2026-05-22T17:15:02Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>James Poniewozik, writing for The New York Times (gift link):</p>
+
+<blockquote>
+  <p>He didn’t land the pope, but he got a Beatle. He didn’t have a new
+project to announce, but he left us with a song (in fact two). He
+didn’t choose to end his show, but he ended it his own weird,
+wonderful way.</p>
+
+<p>Stephen Colbert hosted his final “Late Show” on Thursday night,
+completing the story of the TV year’s most notorious and rancorous
+cancellation. But his final hour-plus — an emotional and
+delightfully bizarre wake for a comedy institution — turned it
+into a cancellebration. [...]</p>
+
+<p>In fact, the episode gradually revealed a story arc, more like the
+closing episode of a surreal comedy than of a talk show.</p>
+</blockquote>
+
+<p>Series finales are so difficult to do well. I find them compelling even when they fall a little flat. Colbert’s finale last night was just amazingly good. Good and fun and surprising and perfectly on-brand. And what a song to end on. Perfect.</p>
+
+<div>
+<a  title="Permanent link to ‘Stephen Colbert’s ‘The Late Show’ Finale’"  href="https://daringfireball.net/linked/2026/05/22/colbert-late-show-finale">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Apple Seeks Supreme Court Review of Contempt Finding and Injunction Scope in Epic Games Case</title>
+	<link rel="alternate" type="text/html" href="https://9to5mac.com/2026/05/21/apple-seeks-supreme-court-review-of-contempt-finding-and-injunction-scope-in-epic-games-case/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7o" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/21/apple-scotus-epic" />
+	<id>tag:daringfireball.net,2026:/linked//6.43044</id>
+	<published>2026-05-22T01:00:47Z</published>
+	<updated>2026-05-22T01:02:21Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Marcus Mendes, reporting for 9to5Mac:</p>
+
+<blockquote>
+  <p>Apple today filed a request with the Supreme Court in an attempt
+to reverse key lower court rulings over the App Store injunction
+in its long-running legal battle with Epic Games. [...] In its
+petition, Apple is asking the Supreme Court to review two
+questions.</p>
+
+<p>The first is whether Apple should have been held in contempt for
+charging a commission on purchases made outside the App Store. The
+second is about the scope of the injunction.</p>
+
+<p>On the first point, Apple argues that the original injunction did
+not specifically address commissions. Instead, it says the order
+only prevented Apple from blocking developers from including
+buttons, external links, or other calls to action directing users
+to external purchasing options.</p>
+
+<p>According to Apple, that is not the same as saying the company
+could not charge a commission on those purchases. The Ninth
+Circuit acknowledged that the text of the injunction did not
+address commissions, but still upheld the contempt finding by
+relying on the idea that a party can violate the “spirit” of an
+injunction, even when the injunction does not specifically
+prohibit the conduct at issue.</p>
+</blockquote>
+
+<p>Apple’s argument here is that only the letter of the law matters, and the letter of the injunction did not say anything about charging commissions on external payments, and thus they can’t be held in contempt for violating something that was never spelled out explicitly.</p>
+
+<blockquote>
+  <p>As for the second point, regarding scope, Apple argues that the
+injunction extends far beyond Epic itself, as it applies to all
+registered developers worldwide with apps on the U.S. App Store
+storefront. That includes developers that were never part of the
+Epic case, and, as Apple has pointed out before, even companies
+that compete with Epic.</p>
+
+<p>Apple argues that this directly conflicts with the Supreme Court’s
+2025 decision in Trump v. CASA, which limited the ability of
+federal courts to issue broad injunctions that go beyond the
+parties actually involved in a case.</p>
+</blockquote>
+
+<p>Apple’s argument here is that even if the Supreme Court upholds the contempt finding, the exemption from commissions should only apply to Epic, not to all developers in the U.S. App Store. I am definitely not a constitutional law scholar, but I think this would have been a long-shot argument pre-CASA. But post-CASA I think Apple might have something here, with <a href="https://talkingpointsmemo.com/edblog/with-the-corrupt-supreme-court-its-calvinball-all-the-way-down/sharetoken/26b34b4b-6926-4466-8800-f3a168a48fb6">this Court</a>.</p>
+
+<p>Apple’s full petition is not yet publicly available, but should be soon from the Supreme Court’s website. I’ve seen a copy, and Mendes’s summary jibes with my reading. In the meantime, <a href="https://www.scotusblog.com/cases/trump-v-casa-inc/">here’s SCOTUSblog’s index page for <em>Trump v. CASA</em></a>, and here’s <a href="https://www.scotusblog.com/2025/07/trump-v-casa-and-the-future-of-the-universal-injunction/">Mila Sohoni’s analysis of the CASA ruling</a>.</p>
+
+<div>
+<a  title="Permanent link to ‘Apple Seeks Supreme Court Review of Contempt Finding and Injunction Scope in Epic Games Case’"  href="https://daringfireball.net/linked/2026/05/21/apple-scotus-epic">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Apple TV to Broadcast Entire MLS Match Shot Using iPhones</title>
+	<link rel="alternate" type="text/html" href="https://www.apple.com/newsroom/2026/05/apple-tv-to-air-first-major-live-pro-sports-event-shot-on-iphone-17-pro/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7n" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/21/apple-tv-to-broadcast-entire-mls-match-shot-using-iphones" />
+	<id>tag:daringfireball.net,2026:/linked//6.43043</id>
+	<published>2026-05-21T23:59:07Z</published>
+	<updated>2026-05-21T23:59:53Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p><a href="https://daringfireball.net/linked/2026/05/21/apple-sports-world-cup">Speaking of</a> Apple and sports, here’s another one from Apple Newsroom:</p>
+
+<blockquote>
+  <p>This Saturday, May 23, Apple TV will present a special live Major
+League Soccer match captured exclusively on iPhone 17 Pro — marking the first time iPhone will be used to capture the entirety
+of a major professional live sporting event broadcast. Developed
+in partnership with MLS, the milestone broadcast will feature the
+LA Galaxy vs. Houston Dynamo FC, streaming live on Apple TV from
+Dignity Health Sports Park in Carson, California, during the final
+weekend of MLS play before the regular season pauses for the FIFA
+World Cup 2026 in North America.</p>
+</blockquote>
+
+<p>The word “major” is doing a bit of work in the phrase “major professional live sporting event” here, but it’s still quite a moment for iPhone photography. Apple started using iPhone 17 Pro cameras <a href="https://daringfireball.net/linked/2025/09/30/iphone-17-pro-friday-night-baseball">during Friday Night Baseball games last year</a>, but this will be the first event to use them exclusively.</p>
+
+<div>
+<a  title="Permanent link to ‘Apple TV to Broadcast Entire MLS Match Shot Using iPhones’"  href="https://daringfireball.net/linked/2026/05/21/apple-tv-to-broadcast-entire-mls-match-shot-using-iphones">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Apple Sports Expands to More Than 90 New Countries on Cusp of World Cup</title>
+	<link rel="alternate" type="text/html" href="https://www.apple.com/newsroom/2026/05/apple-sports-expands-to-more-than-90-new-countries-and-regions/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7m" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/21/apple-sports-world-cup" />
+	<id>tag:daringfireball.net,2026:/linked//6.43042</id>
+	<published>2026-05-21T19:13:56Z</published>
+	<updated>2026-05-21T20:12:35Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Apple Newsroom:</p>
+
+<blockquote>
+  <p>Apple Sports — the free app for iPhone that gives fans access to
+real-time scores, stats, and more — is now available to download
+on the App Store in more than 170 countries and regions around the
+world, including more than 90 newly added markets. Designed for
+speed and simplicity, the app delivers a personalized experience,
+putting fans’ favorite teams and leagues front and center with a
+simple, intuitive interface designed by Apple.</p>
+
+<p>Apple Sports is helping fans get ready for the World Cup by
+allowing them to explore tournament groupings and customize their
+scoreboards simply by following the entire tournament or their
+favorite national teams — making it easier to stay on top of key
+moments when the tournament kicks off in June. Following a team
+also enables Live Activities on a user’s iPhone Lock Screen or
+Apple Watch, letting them follow every moment of a match with just
+a quick glance.</p>
+</blockquote>
+
+<p>I’ve got some gripes about certain specific aspects of Apple Sports. Like, where does one even <em>start</em> to explain how much is wrong with <a href="https://daringfireball.net/misc/2026/05/apple-sports-team-stats-wtf.png">their zero-sum visualization of team stats</a>? Has anyone ever even seen a presentation like that before? <a href="https://kieranhealy.org/">Anyone</a>?</p>
+
+<p>But overall it really is a good app. I don’t love the UI layout but I don’t hate it, either, and it is interesting. It’s a very modern layout. Apple Sports is fast to load — the primary reason <a href="https://sixcolors.com/post/2024/02/apple-sports-a-free-iphone-app-to-get-you-the-score-fast/">Eddy Cue wanted the app in the first place</a> — and its Live Activities are very good. It remains my go-to for “checking scores” for every sport except baseball, for which I have a much better dedicated app.</p>
+
+<p>Yes, Apple promotes some of its own sports-related properties in the app occasionally. Just now I had a promotion for the F1 Canadian Grand Prix at the top. But the ads that do appear are always sports-related and never obscure content. That’s a fair deal.</p>
+
+<p><a href="https://daringfireball.net/2024/02/apple_sports">I was glad when Apple Sports debuted two years ago</a> and it’s lived on my first or second home screen ever since, depending on which sports are in season. I’m really glad Apple has stuck with it, shipping steady improvements on a regular basis. Expanding now to nearly the entire world is a big step. If you’re new to it, it might take some getting used to, but give it a shot. It stuck with me.</p>
+
+<p>Still kind of curious that Apple Sports remains iPhone-only — not even an iPad version — but in a way I find that charming too. Maybe Apple is tight on money?</p>
+
+<div>
+<a  title="Permanent link to ‘Apple Sports Expands to More Than 90 New Countries on Cusp of World Cup’"  href="https://daringfireball.net/linked/2026/05/21/apple-sports-world-cup">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Google I/O Keynote in 54 Seconds</title>
+	<link rel="alternate" type="text/html" href="https://x.com/ArtemR/status/2056961743142957143" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7l" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/21/google-io-54-secs" />
+	<id>tag:daringfireball.net,2026:/linked//6.43041</id>
+	<published>2026-05-21T15:31:54Z</published>
+	<updated>2026-05-21T16:42:01Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Tight edit but covers the whole thing. (<a href="https://xcancel.com/ArtemR/status/2056961743142957143">XCancel link</a>; <a href="https://www.threads.com/@passivelywealthydad/post/DYhWutmkbZz">Threads link</a>.)</p>
+
+<div>
+<a  title="Permanent link to ‘Google I/O Keynote in 54 Seconds’"  href="https://daringfireball.net/linked/2026/05/21/google-io-54-secs">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>‘Geography Is Four-Dimensional’</title>
+	<link rel="alternate" type="text/html" href="https://sive.rs/4d" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7k" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/21/sivers-geography-4d" />
+	<id>tag:daringfireball.net,2026:/linked//6.43040</id>
+	<published>2026-05-21T14:39:19Z</published>
+	<updated>2026-05-21T14:39:20Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Derek Sivers:</p>
+
+<blockquote>
+  <p>When someone speaks of a place, you have to ask, “When?”
+<em>Geography is four-dimensional. You can’t know a place — only a
+place as it was at a time. Where is bound to when.</em> Unless you are
+in a place right now, you can only speak of it in past-tense.</p>
+</blockquote>
+
+<div>
+<a  title="Permanent link to ‘‘Geography Is Four-Dimensional’’"  href="https://daringfireball.net/linked/2026/05/21/sivers-geography-4d">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>The Verge: ‘The 13 Biggest Announcements at Google I/O 2026’</title>
+	<link rel="alternate" type="text/html" href="https://www.theverge.com/tech/933415/google-io-2026-biggest-announcements-ai-gemini?view_token=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6Ik5tNTBSc0hxRXQiLCJwIjoiL3RlY2gvOTMzNDE1L2dvb2dsZS1pby0yMDI2LWJpZ2dlc3QtYW5ub3VuY2VtZW50cy1haS1nZW1pbmkiLCJleHAiOjE3Nzk3NTk5MjQsImlhdCI6MTc3OTMyNzkyNH0.g_JiqbJBfi9YcDT1re8aofzmpb3tcZNwY2jQybgwJL0" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7j" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/20/the-verge-google-io" />
+	<id>tag:daringfireball.net,2026:/linked//6.43039</id>
+	<published>2026-05-21T01:47:24Z</published>
+	<updated>2026-05-21T01:47:24Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Andrew Liszewski and Stevie Bonifield, writing for The Verge (gift link):</p>
+
+<blockquote>
+  <p>Google’s I/O 2026 keynote today was once again full of AI-related
+announcements including a new family of Gemini 3.5 AI models, new
+features for Search and Gmail, and updates about its Project Aura
+smart glasses.</p>
+
+<p>If you weren’t able to <a href="https://www.theverge.com/tech/932939/google-io-2026-how-to-watch">tune into the event’s livestream today</a>
+or <a href="https://www.theverge.com/tech/932275/google-io-2026-live-blog-on-the-ground-at-googles-keynote">follow along with our live blog</a>, you can catch up on
+everything you missed in our roundup below.</p>
+</blockquote>
+
+<p>This roundup was the only way I could really make sense out of Google I/O.</p>
+
+<div>
+<a  title="Permanent link to ‘The Verge: ‘The 13 Biggest Announcements at Google I/O 2026’’"  href="https://daringfireball.net/linked/2026/05/20/the-verge-google-io">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>WSJ: ‘Google Unveils New Gemini AI Agent for Personal Tasks’</title>
+	<link rel="alternate" type="text/html" href="https://www.wsj.com/tech/ai/google-unveils-new-gemini-ai-agent-for-personal-tasks-b8093197?st=BFmPev" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7i" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/20/wsj-google-gemini-spark" />
+	<id>tag:daringfireball.net,2026:/linked//6.43038</id>
+	<published>2026-05-21T01:05:14Z</published>
+	<updated>2026-05-21T01:05:14Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Katherine Blunt and Rolfe Winkler, reporting for The Wall Street Journal from Google I/O (gift link):</p>
+
+<blockquote>
+  <p>Google is supercharging its Gemini artificial-intelligence model
+to become more competitive in the era of agentic AI.</p>
+
+<p>The company has started rolling out what it calls Gemini Spark, a
+personal agent it says is capable of navigating a user’s digital
+life and acting on his or her behalf. The agent will work across
+many of Google’s products and run on the company’s cloud
+infrastructure. [...]</p>
+
+<p>The company has been testing Spark with a limited number of users
+and plans to make it available next week to those who pay for AI
+Ultra, a new subscription tier that costs $100 a month.</p>
+</blockquote>
+
+<p>A different top-level takeaway <a href="https://daringfireball.net/linked/2026/05/20/nyt-google-io">than the NYT’s</a>, which in turn was different from <a href="https://www.bloomberg.com/news/articles/2026-05-19/google-revamps-youtube-docs-with-artificial-intelligence-tools">Bloomberg’s</a>.</p>
+
+<p>Ben Thompson, <a href="https://stratechery.com/2026/google-i-o-world-models-i-o-spaghetti/">in a subscriber-only update at Stratechery</a>, sums it up:</p>
+
+<blockquote>
+  <p>Indeed, if you wanted a positive spin on Google’s plethora of
+announcements, it’s that the company is clearly fully committed to
+putting AI into anything and everything; if you want to put a
+negative spin, well, it’s the exact same thing. One of the
+enduring critiques of Google is that the company is unfocused and
+unmanageable, which, to the extent this keynote was a
+manifestation of the company it represents, the shoe fits.</p>
+</blockquote>
+
+<p>I personally find Google I/O days very hard to follow. My brain doesn’t jibe with the sprawling nature of the company. This year this was particularly so.</p>
+
+<div>
+<a  title="Permanent link to ‘WSJ: ‘Google Unveils New Gemini AI Agent for Personal Tasks’’"  href="https://daringfireball.net/linked/2026/05/20/wsj-google-gemini-spark">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>NYT: ‘Powered by A.I., Google Changes Its Search Box for the First Time in 25 Years’</title>
+	<link rel="alternate" type="text/html" href="https://www.nytimes.com/2026/05/19/business/google-seach-bar-ai-gemini.html?unlocked_article_code=1.jlA.95yh.ptfBUHf-rBtB&amp;smid=url-share" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7h" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/20/nyt-google-io" />
+	<id>tag:daringfireball.net,2026:/linked//6.43037</id>
+	<published>2026-05-20T21:20:23Z</published>
+	<updated>2026-05-20T21:20:24Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Tripp Mickle, Kate Conger, and Brian X. Chen, opening The New York Times’s report on yesterday’s Google I/O keynote (gift link):</p>
+
+<blockquote>
+  <p>For 25 years, Google’s iconic search box was a long, slender bar
+where people typed in keywords like “World Cup.”</p>
+
+<p>But over the past three years, artificial intelligence allowed
+people to type in longer, more complex questions like “Who are the
+top 24 teams in the World Cup and what chance does the United
+States have of advancing?”</p>
+
+<p>On Tuesday, Google said the A.I. shift had inspired it to overhaul
+the dimensions of its search bar for the first time since 2001.
+The box is getting bigger and more interactive so that people can
+ask even longer questions and upload photographs and videos into
+queries.</p>
+</blockquote>
+
+<p>Interesting to me that this is the Times’s biggest takeaway. But it speaks to how unchanged the google.com homepage has been <a href="https://www.webdesignmuseum.org/gallery/google-1998">since its earliest days</a>.</p>
+
+<blockquote>
+  <p>In addition, people can ask follow-up questions with a chatbot on
+Google’s main search page. The company will also offer digital
+assistants, known as agents, to automate searches so that someone
+who may be apartment hunting can be notified of a new listing
+without opening a real estate site like Zillow.</p>
+</blockquote>
+
+<p>Odd, to me, to paint this only in terms of user convenience (ostensible user convenience at that), and not in terms of this being a de facto attack on Zillow and the rest of the web. Later in the Times report:</p>
+
+<blockquote>
+  <p>Richard Kramer, a financial analyst with Arete Research, said the
+changes were helping Google make more money from advertising. Last
+year, Google’s ad clicks rose 6 percent, and it charged 7 percent
+more for each click. The company’s annual profit has more than
+doubled since 2022 to $132 billion.</p>
+
+<p>“The open web is on its way out,” Mr. Kramer said, referring to
+the way internet traffic now often begins and ends with a visit to
+Google rather than visiting other sites. “With A.I., Google is
+reducing everyone to raw data providers.”</p>
+</blockquote>
+
+<p>What an odd statement to include in the middle of an article without any acknowledgement of what a profound loss that would be, if Kramer is correct. It’s as though Kramer said that light mode is on its way out, everyone is into dark mode these days. </p>
+
+<div>
+<a  title="Permanent link to ‘NYT: ‘Powered by A.I., Google Changes Its Search Box for the First Time in 25 Years’’"  href="https://daringfireball.net/linked/2026/05/20/nyt-google-io">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>‘You Do Not Need Fancy Equipment, You Do Not Need a Degree, to Make Money and to Do This as Your Job’</title>
+	<link rel="alternate" type="text/html" href="https://www.tiktok.com/@brye.shhh/video/7641047549758934285" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7g" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/20/brye-garageband" />
+	<id>tag:daringfireball.net,2026:/linked//6.43036</id>
+	<published>2026-05-20T20:53:22Z</published>
+	<updated>2026-05-21T13:17:52Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>22-year-old pop singer-songwriter <a href="https://music.apple.com/us/artist/brye/898404719">Brye</a>, on TikTok:</p>
+
+<blockquote>
+  <p>“Lemons”, my biggest song ever, that went like super viral during
+quarantine back in 2020, was actually produced, if you can believe
+it, in GarageBand on my school iPad.</p>
+
+<p>My high school gave us all iPads and I produced “Lemons” on there. I
+used to just like make beats on GarageBand in high school. I wrote
+musicals for my school with GarageBand on my iPad. And then I made
+that little demo for “Lemons”, recorded it ... <em>on my iPad</em> ... with
+my horrible little plug-in mic, posted it to spite a guy who was
+being horrible to me, and it blew up.</p>
+
+<p>All of this to say, how crazy is it that a song that could be on
+Sirius XM radio — streamed a hundred million times, literally
+charted on the global top like viral 50 or whatever — it was
+literally made on GarageBand. You do not need fancy equipment, you
+do not need a degree, to make money and to do this as your job.</p>
+
+<p>Obviously it’s good to learn. It’s fun to upgrade. But if you are
+working on a budget, GarageBand’s free on any Apple device.</p>
+</blockquote>
+
+<p>If Brye’s story isn’t <em>exactly</em> what Steve Jobs was talking about when <a href="https://www.youtube.com/watch?v=RYTkVh33Ags">he introduced GarageBand in 2004</a> and <a href="https://youtu.be/gIq0__oVLKs?t=2844">GarageBand for iPad in 2011</a>, well, I don’t know what is. Right down to the fact that she did it on school equipment. Her enthusiasm for the simplicity of the kit she used to record “<a href="https://music.apple.com/us/album/lemons-demo/1503424075?i=1503424077">Lemons</a>” is contagious.</p>
+
+<p>John Ternus (or whatshisname ... Tim Cook) should send this video to every single employee at Apple and tell them that this — <em>this</em> — is exactly Apple’s mission. To empower creative people to create great new things they didn’t believe were possible with the tools already in their hands.</p>
+
+<div>
+<a  title="Permanent link to ‘‘You Do Not Need Fancy Equipment, You Do Not Need a Degree, to Make Money and to Do This as Your Job’’"  href="https://daringfireball.net/linked/2026/05/20/brye-garageband">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Andrej Karpathy Joined Anthropic</title>
+	<link rel="alternate" type="text/html" href="https://x.com/karpathy/status/2056753169888334312" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7f" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/19/karpathy-anthropic" />
+	<id>tag:daringfireball.net,2026:/linked//6.43035</id>
+	<published>2026-05-19T15:42:38Z</published>
+	<updated>2026-05-19T15:45:17Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Andrej Karpathy, on Twitter/X (<a href="https://xcancel.com/karpathy/status/2056753169888334312">XCancel link</a>):</p>
+
+<blockquote>
+  <p>Personal update: I’ve joined Anthropic. I think the next few
+years at the frontier of LLMs will be especially formative. I am
+very excited to join the team here and get back to R&amp;D. I remain
+deeply passionate about education and plan to resume my work on
+it in time.</p>
+</blockquote>
+
+<p><a href="https://karpathy.ai/">Karpathy</a> is, to say the least, a star in the AI research field. He co-founded OpenAI in 2015, was director of AI at Tesla (reporting directly to Elon Musk) from 2017–2022, went back to OpenAI in 2023, and then left again in 2024 to start an AI education company named <a href="https://eurekalabs.ai/">Eureka Labs</a>. He <a href="https://x.com/karpathy/status/1886192184808149383">coined the term “vibe coding”</a> in February last year.</p>
+
+<div>
+<a  title="Permanent link to ‘Andrej Karpathy Joined Anthropic’"  href="https://daringfireball.net/linked/2026/05/19/karpathy-anthropic">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	
+	<link rel="alternate" type="text/html" href="https://workos.com/docs/pipes?utm_source=daringfireball&amp;utm_medium=newsletter&amp;utm_campaign=q22026" />
+	<link rel="shorturl" href="http://df4.us/x7e" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/feeds/sponsors/2026/05/workos_agents_need_context_shi" />
+	<id>tag:daringfireball.net,2026:/feeds/sponsors//11.43034</id>
+	<author><name>Daring Fireball Department of Commerce</name></author>
+	<published>2026-05-19T01:27:00Z</published>
+	<updated>2026-05-19T01:27:16Z</updated>
+	<content type="html" xml:base="https://daringfireball.net/feeds/sponsors/" xml:lang="en"><![CDATA[
+<p>The context that actually matters isn’t in your database. It’s in the tools your users live in every day. Multi-stage agents stall the moment they hit a step they can’t see. And every missing integration is a different OAuth flow, a different token lifecycle, weeks of plumbing before the agent reads a single record.</p>
+
+<p><a href="https://workos.com/blog/workos-pipes-third-party-integrations?utm_source=daringfireball&amp;utm_medium=newsletter&amp;utm_campaign=q22026&amp;utm_content=product_name_link">WorkOS Pipes</a> connects your agent to the tools your users live in. Pre-built connectors for GitHub, Slack, Salesforce, Google Drive, and more. Pipes handles OAuth, token refresh, and credential storage. You call the real provider API with a fresh token, every time. Your agent pulls context at every step, for as long as the task runs.</p>
+
+<p><a href="https://workos.com/docs/pipes?utm_source=daringfireball&amp;utm_medium=newsletter&amp;utm_campaign=q22026">Give your agent context →</a></p>
+
+<div>
+<a  title="Permanent link to ‘WorkOS: Agents Need Context. Ship the Integrations That Give It to Them.’"  href="https://daringfireball.net/feeds/sponsors/2026/05/workos_agents_need_context_shi">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+	<title>[Sponsor] WorkOS: Agents Need Context. Ship the Integrations That Give It to Them.</title></entry><entry>
+	<title>Jury Rejects Elon Musk’s Claim Against Sam Altman in Unanimous Verdict</title>
+	<link rel="alternate" type="text/html" href="https://www.nytimes.com/live/2026/05/18/technology/openai-trial-verdict-altman-musk?unlocked_article_code=1.jVA.Cc2V.IwYuu2r4SJfQ" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7d" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/18/jury-rejects-elon-musks-claim-against-sam-altman" />
+	<id>tag:daringfireball.net,2026:/linked//6.43033</id>
+	<published>2026-05-18T17:53:33Z</published>
+	<updated>2026-05-18T17:53:34Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Cade Metz and Mike Isaac, reporting for The New York Times (gift link):</p>
+
+<blockquote>
+  <p>A nine-person jury found that Elon Musk did not bring his lawsuit
+against OpenAI and Sam Altman until after the expiration of the
+three-year statute of limitations.</p>
+
+<p>Mr. Musk filed his suit against the $730 billion artificial
+intelligence start-up in the summer of 2024, but the jury found
+that he was aware of the behavior discussed in his complaint
+against OpenAI as far back as 2021.</p>
+</blockquote>
+
+<p><a href="https://www.nytimes.com/live/2026/05/18/technology/openai-trial-verdict-altman-musk/b9130408-2a29-5624-9bff-6d29ca60f062?smid=url-share">This update</a> quoting Judge Yvonne Gonzalez Rogers’s “poetic” jury instructions is just lovely:</p>
+
+<blockquote>
+  <p>“A jury reflects the attitudes and mores of the community from
+which it is drawn,” she said, paraphrasing another judge. “It
+lives only for the day and does justice according to its limits.
+The group of jurors who are drawn to hear a case make a decision
+and then melt away. It is not present the next day to be
+criticized. It is the one governmental agency that has no
+ambition. It is as human as the people who make it up.”</p>
+</blockquote>
+
+<div>
+<a  title="Permanent link to ‘Jury Rejects Elon Musk’s Claim Against Sam Altman in Unanimous Verdict’"  href="https://daringfireball.net/linked/2026/05/18/jury-rejects-elon-musks-claim-against-sam-altman">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>‘John Appleseed’</title>
+	<link rel="alternate" type="text/html" href="https://om.co/2026/04/20/john-appleseed/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7c" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/18/john-appleseed" />
+	<id>tag:daringfireball.net,2026:/linked//6.43032</id>
+	<published>2026-05-18T17:34:46Z</published>
+	<updated>2026-05-18T17:35:49Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Here’s a great take from last month re: the Cook/Ternus transition, from Om Malik:</p>
+
+<blockquote>
+  <p>When he took over from Steve Jobs in August 2011, Apple’s market
+capitalization was around $350 billion. As of this morning, it
+sits near $4 trillion. That is more than a 1,000 percent increase.
+Revenue went from $108 billion in fiscal 2011 to over $416 billion
+in fiscal 2025, almost four times bigger. Apple under Cook became
+the most valuable company in human history, multiple times over.
+It built Services into a $100-billion-a-year business.</p>
+
+<p>Sure, Cook inherited the greatest product portfolio and the
+greatest brand in modern business. How many times have we seen
+people screw it up? He ran it with operational ruthlessness. He is
+no product visionary, and neither is Ternus. They are not Steve.
+Tim has run Apple for fifteen years, through a pandemic, two trade
+wars, a supply chain reordering, and the slow grinding shift from
+hardware-only to hardware-plus-services-plus-silicon. Most
+importantly, he didn’t mess it up.</p>
+</blockquote>
+
+<p>Services, as a whole, is now as big a business for Apple as the entirety of the company was when Cook took the helm. And “not screwing it up” is an enormous accomplishment. Success is always precarious. Keeping a good thing going is inordinately difficult. It only looks easy compared to getting the good thing off the ground in the first place.</p>
+
+<div>
+<a  title="Permanent link to ‘‘John Appleseed’’"  href="https://daringfireball.net/linked/2026/05/18/john-appleseed">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Define ‘Boom’ Please</title>
+	<link rel="alternate" type="text/html" href="https://www.nytimes.com/2026/04/21/business/how-apple-became-a-4-trillion-company-under-tim-cook.html?unlocked_article_code=1.jVA.MV8m.0JfUOJOME5WH" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7b" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/18/define-boom-please" />
+	<id>tag:daringfireball.net,2026:/linked//6.43031</id>
+	<published>2026-05-18T17:17:02Z</published>
+	<updated>2026-05-18T17:20:43Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>While I’m linking to pieces on Apple’s CEO transition, here’s an annoying tidbit from Tripp Mickle and Karl Russell’s piece for The New York Times, under the headline “Tim Cook Was Very, Very Good at Making Money” (gift link):</p>
+
+<blockquote>
+  <p>Even though it has largely missed out on the artificial
+intelligence boom now lifting the sales of its technology peers,
+the company’s profits and stock value continue to grow.</p>
+</blockquote>
+
+<p>Which peers have had their “sales lifted” by AI? There’s Nvidia (now the most valuable company in the world). But Apple doesn’t compete directly with Nvidia. What makes Apple different from its peer companies isn’t that the others are profiting from AI while Apple is not, but rather that Apple, seemingly alone, is <a href="https://asymco.com/2026/05/05/will-apple-avoid-giving-their-cash-flow-to-nvidia/">not funnelling its free cash flow to Nvidia</a> to build out massive AI datacenters.</p>
+
+<p>Apple might wind up missing out on something huge as a result of its decision to stay out of this race. But it’s nonsense to say they’ve already missed out on a boom. To date it’s a money pit.</p>
+
+<div>
+<a  title="Permanent link to ‘Define ‘Boom’ Please’"  href="https://daringfireball.net/linked/2026/05/18/define-boom-please">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Ted Turner’s Small Apartment Above the Former CNN Center</title>
+	<link rel="alternate" type="text/html" href="https://www.youtube.com/watch?v=OUIVs58oyPI" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x7a" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/18/ted-turner-cnn-apartment" />
+	<id>tag:daringfireball.net,2026:/linked//6.43030</id>
+	<published>2026-05-18T16:52:03Z</published>
+	<updated>2026-05-18T17:02:56Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Simultaneously audacious and humble, a combination that <a href="https://www.cnn.com/2026/05/06/us/ted-turner-death">epitomizes Ted Turner’s entire life</a>. (Shades, too, of <a href="https://mickeyvisit.com/walt-disney-apartment-disneyland/">Walt Disney’s apartment</a> above the fire department at Disneyland.)</p>
+
+<div>
+<a  title="Permanent link to ‘Ted Turner’s Small Apartment Above the Former CNN Center’"  href="https://daringfireball.net/linked/2026/05/18/ted-turner-cnn-apartment">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Existing Stakeholders Have a Say in the Future</title>
+	<link rel="alternate" type="text/html" href="https://daringfireball.net/2026/05/ai_is_technology_not_a_product" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x79" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/18/existing-stakeholders-have-a-say-in-the-future" />
+	<id>tag:daringfireball.net,2026:/linked//6.43029</id>
+	<published>2026-05-18T16:47:08Z</published>
+	<updated>2026-05-18T16:47:09Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>A follow-up point on my “<a href="https://daringfireball.net/2026/05/ai_is_technology_not_a_product">AI Is Technology, Not a Product</a>” column over the weekend. Here’s a repeat of Steven Levy’s argument that John Ternus must direct Apple towards building “a killer AI product”:</p>
+
+<blockquote>
+  <p>By the end of this decade, it’s unlikely that people will swipe on
+their phones to tap on Uber or Lyft. They will just tell their
+always-on AI agent to get them home. Or that agent will have
+already figured out where they need to go, and the car will be
+waiting without the friction of a request. “There’s an app for
+that,” may be replaced by “Let the agent do that.”</p>
+</blockquote>
+
+<p>Putting aside whether this is technically feasible or psychologically comfortable, what Levy is arguing here is yadda-yadda-yadda-ing over Uber and Lyft’s say in the matter. Those two companies are now deeply entrenched. They might get disrupted. (Google’s Waymo isn’t operating here in Philly yet, but I see their vehicles around the city all the time now. <a href="https://www.axios.com/local/philadelphia/2025/07/10/waymo-robotaxi-philadelphia-self-driving-vehicles">You can’t miss them</a>.) But I think it’s a good bet that most ride shares at the end of this decade (which is Levy’s own timeline) will largely be Ubers and Lyfts.</p>
+
+<p>Uber and Lyft get to decide the terms of which platforms they’re hail-able from. Here’s a note a friend sent me that prompted this follow-up:</p>
+
+<blockquote>
+  <p>It’s a newbie take to think all deeds will soon be on the
+blockchain, all newspapers will migrate to RSS, all broadcast
+companies will put shows out on one service.</p>
+
+<p>Some companies will forge a path into the next medium, some will
+be replaced, and others will succeed at slowing its adoption.</p>
+</blockquote>
+
+<p>When people get taken by a wave of technology hype, there’s a strong tendency to assume that not only will other people get taken by the same hype wave, but that entrenched stakeholders will too. That often doesn’t happen. <a href="https://www.macrumors.com/2026/01/19/walmart-no-apple-pay/">Walmart still doesn’t take Apple Pay</a>, for chrissakes. The idea that Uber and Lyft are going to put their own futures in the hands of OpenAI and Anthropic (or Google, who, through Waymo, is already their direct competitor) seems like folly.</p>
+
+<div>
+<a  title="Permanent link to ‘Existing Stakeholders Have a Say in the Future’"  href="https://daringfireball.net/linked/2026/05/18/existing-stakeholders-have-a-say-in-the-future">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>‘AI, “Humanity”, and Dr. Manhattan Syndrome’</title>
+	<link rel="alternate" type="text/html" href="https://www.personfamiliar.com/p/ai-humanity-and-dr-manhattan-syndrome" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x78" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/18/prosser-ai-humanity" />
+	<id>tag:daringfireball.net,2026:/linked//6.43028</id>
+	<published>2026-05-18T16:21:35Z</published>
+	<updated>2026-05-18T16:22:19Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Jim Prosser, back in February:</p>
+
+<blockquote>
+  <p>Let me be clear about causation, because the AI parallel only
+works if we’re honest about it. The communications failures didn’t
+kill nuclear power. The disasters did. But two decades of talking
+<em>over</em> the public meant the industry had built precisely zero
+reservoir of human-scale trust to draw on when the real crises
+hit. Nuclear pioneer Alvin Weinberg admitted in 1976 (three years
+<em>before</em> Three Mile Island) that “the public perception and
+acceptance of nuclear energy appears to be the question that we
+missed rather badly.” After TMI and Chernobyl confirmed the
+public’s worst suspicions, over a hundred planned U.S. reactors
+were cancelled.</p>
+</blockquote>
+
+<p>The entire essay is very good, quite thought provoking. But it really shines in drawing the parallels to nuclear power a generation ago, and the need to communicate the benefits to ordinary people in ways that they actually care about. Regarding OpenAI co-founder Greg Brockman:</p>
+
+<blockquote>
+  <p>But think about what the people behind those numbers are actually
+worried about. They’re not anxious about AI in the abstract, <em>per
+se</em>, but its implications. They’re anxious about their job, their
+kid’s homework, their creative work getting scraped without
+permission, their privacy. Human-scale concerns that are specific,
+personal, and grounded in the daily texture of individual lives.</p>
+
+<p>And Brockman’s response to this very specific, very human anxiety
+is to ... float further up into the philosophical stratosphere
+while writing a mega-checks to a partisan PAC and explaining it in
+the language of civilizational mission. It’s like a doctor hearing
+a patient who says, “My knee hurts,” who then delivers a lecture
+on the elegance of the musculoskeletal system. The patient doesn’t
+need you to appreciate the beauty of human biology. They need you
+to look at their damn knee.</p>
+</blockquote>
+
+<div>
+<a  title="Permanent link to ‘‘AI, “Humanity”, and Dr. Manhattan Syndrome’’"  href="https://daringfireball.net/linked/2026/05/18/prosser-ai-humanity">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>The Alaska Permanent Fund as Loose Precedent for AI Data Center ‘UBI’ Payments</title>
+	<link rel="alternate" type="text/html" href="https://en.wikipedia.org/wiki/Alaska_Permanent_Fund" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x77" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/18/alaska-permanent-fund" />
+	<id>tag:daringfireball.net,2026:/linked//6.43027</id>
+	<published>2026-05-18T15:34:47Z</published>
+	<updated>2026-05-18T15:35:49Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Wikipedia:</p>
+
+<blockquote>
+  <p>The Alaska Permanent Fund (APF) is a constitutionally established
+permanent fund and sovereign wealth fund managed by a state-owned
+corporation, the Alaska Permanent Fund Corporation (APFC). It was
+established in Alaska in 1976 by Article 9, Section 15 of the
+Alaska State Constitution under Governor Jay Hammond and Attorney
+General Avrum Gross. [...] As of 2019, the fund was worth
+approximately $64 billion that has been funded by oil and mining
+revenues and has paid out an average of approximately $1,600
+annually per resident (adjusted to 2019 dollars). The main use for
+the fund’s revenue has been to pay out the Permanent Fund Dividend
+(PFD), which many authors portray as the only example of a basic
+income in practice. [...]</p>
+
+<p>The PFD is a Basic Income in the form of a resource dividend. Some
+researchers argue, “It has helped Alaska attain the highest
+economic equality of any state in the United States... And,
+seemingly unnoticed, it has provided unconditional cash assistance
+to needy Alaskans at a time when most states have scaled back aid
+and increased conditionality.”</p>
+</blockquote>
+
+<p>Alaska is not exactly a left-wing state. <a href="https://daringfireball.net/linked/2026/05/18/ai-data-centers-are-deeply-unpopular">Again</a>, money talks.</p>
+
+<div>
+<a  title="Permanent link to ‘The Alaska Permanent Fund as Loose Precedent for AI Data Center ‘UBI’ Payments’"  href="https://daringfireball.net/linked/2026/05/18/alaska-permanent-fund">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>AI Data Centers Are Deeply Unpopular, Across the Political Spectrum</title>
+	<link rel="alternate" type="text/html" href="https://news.gallup.com/poll/709772/americans-oppose-data-centers-area.aspx" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x76" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/18/ai-data-centers-are-deeply-unpopular" />
+	<id>tag:daringfireball.net,2026:/linked//6.43026</id>
+	<published>2026-05-18T14:59:59Z</published>
+	<updated>2026-05-19T00:27:19Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Jeffrey M. Jones, Gallup:</p>
+
+<blockquote>
+  <p>Seven in 10 Americans oppose constructing data centers for
+artificial intelligence in their local area, including nearly
+half, 48%, who are strongly opposed. Barely a quarter favor these
+projects, with 7% strongly in favor. [...]</p>
+
+<p>The data center question parallels the wording Gallup uses to ask
+about <a href="https://news.gallup.com/poll/708620/less-support-solar-wind-energy-nuclear.aspx">local nuclear power plant construction</a>. In the same
+March survey, 53% of Americans say they oppose building a nuclear
+energy plant in their area, far less than the 71% opposed to data
+center construction. Since Gallup first asked the nuclear power
+plant question in 2001, the high point in opposition has been 63%.</p>
+</blockquote>
+
+<p>It’s hard to overstate how unpopular this polling paints AI data centers. It’s just an absolute messaging and marketing disaster for the entire tech industry. Tellingly, the anti-AI-data-center sentiment is bipartisan:</p>
+
+<p><a href="https://daringfireball.net/misc/2026/05/gallup-data-center-poll-by-party.png" class="noborder">
+  <img
+    src = "https://daringfireball.net/misc/2026/05/gallup-data-center-poll-by-party.png"
+    alt = "Screenshot of Gallup AI polling for Democrats, Independents, and Republicans."
+    width = 631
+  /></a></p>
+
+<p>There are partisan differences, but only in slight degree. A savvy politician or party could grab this issue and carve out a broadly bipartisan anti-data-center, anti-AI message. US politics is so polarized in today’s era that the salience of this issue will not go unnoticed. The only thing the hyperscalers have on their side is money, but that fact is a significant factor in the general resentment toward the entire industry.</p>
+
+<p>To that point, Ben Thompson suggests (in today’s subscriber-only Stratechery column) <a href="https://stratechery.com/2026/data-center-discontent-understanding-the-opposition-fixing-the-problem/">that the industry simply pay residents</a>:</p>
+
+<blockquote>
+  <p>Instead, the most obvious solution is the most crass: simply start
+giving people money. If data centers are a resource for our AI
+future, then start paying people for that resource. If that data
+center up the road weren’t sold to my neighbors based on amorphous
+tax benefits that my local government may or may not spend
+appropriately, but rather were to result in a check in the mailbox
+every year, I suspect you could get a lot more people on board!</p>
+
+<p>Just to put some numbers on this, the data center up the road was
+expected to be 1.6 GW, which could generate around $3 billion in
+annual operator revenue. DeForest, the village it was to be built
+in, has around 11,500 people. You could pay every person in
+DeForest $10,000 a year for 3.8% of annual revenue grossed by the
+data center — I bet that proposal would have been approved, and I
+bet that the operator could very easily pass those costs on to the
+actual data center users (it also highlights how relatively
+pathetic QTS’s <a href="https://q.com/news/qts-advances-plans-for-state-of-the-art-data-center-campus-and-announces-50-million-community-commitment-for-dane-county/">$50 million commitment</a> was).</p>
+
+<p>I do get how ridiculous this sounds, but ridiculous is how we do
+things in America.</p>
+</blockquote>
+
+<p>After mulling the idea for a bit this morning, I’d say it’s unusual, but not ridiculous. Money talks.</p>
+
+<div>
+<a  title="Permanent link to ‘AI Data Centers Are Deeply Unpopular, Across the Political Spectrum’"  href="https://daringfireball.net/linked/2026/05/18/ai-data-centers-are-deeply-unpopular">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Drata</title>
+	<link rel="alternate" type="text/html" href="https://drata.com/daring" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x75" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/17/drata" />
+	<id>tag:daringfireball.net,2026:/linked//6.43025</id>
+	<published>2026-05-17T17:59:15Z</published>
+	<updated>2026-05-17T17:59:15Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>My thanks to Drata for sponsoring last week at DF. Their message is short and sweet: Leverage autonomous AI agents to automate compliance, manage internal and third-party risk, and continuously prove your security posture. </p>
+
+<div>
+<a  title="Permanent link to ‘Drata’"  href="https://daringfireball.net/linked/2026/05/17/drata">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Reddit Is Blocking Some Users From Accessing Its Website From Mobile Devices</title>
+	<link rel="alternate" type="text/html" href="https://arstechnica.com/information-technology/2026/05/why-reddit-blocked-my-daily-visit-to-its-mobile-website/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x74" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/16/reddit-mobile-web" />
+	<id>tag:daringfireball.net,2026:/linked//6.43024</id>
+	<published>2026-05-16T21:22:38Z</published>
+	<updated>2026-05-16T21:22:38Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Nate Anderson, writing at Ars Technica:</p>
+
+<blockquote>
+  <p>But I was surprised this weekend to suddenly find myself cut off;
+Reddit simply would not let me visit the site on my mobile phone.
+Instead, a new overlay popped up, saying, “Get the app to keep
+using Reddit.”</p>
+
+<p>There was no way to skip, bypass, or close the overlay. It did not
+provide any instructions or alternatives for continuing to use the
+mobile web version. What it did offer was a large button I could
+press to get the app. If I did so, the overlay told me, I would be
+able to “search better” and “personalize your feed” — two things
+I don’t care to do. [...]</p>
+
+<p>I reached out to the company to ask what was going on. According
+to a spokesperson, “We recently started running a test for a small
+subset of frequent logged-out mobile users that prompts them to
+download the app after visiting the site. These users are already
+familiar with Reddit and we’ve seen that the experience is much
+better for them in the app. The app offers a more personalized
+experience and users can more easily find communities that match
+their interests.”</p>
+</blockquote>
+
+<p>Yes, they’re doing this for the users’ benefit. Sure.</p>
+
+<div>
+<a  title="Permanent link to ‘Reddit Is Blocking Some Users From Accessing Its Website From Mobile Devices’"  href="https://daringfireball.net/linked/2026/05/16/reddit-mobile-web">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Santa Clara County Sues Meta Over Alleged Scam Ads</title>
+	<link rel="alternate" type="text/html" href="https://sanjosespotlight.com/santa-clara-county-sues-meta-over-alleged-scam-ads/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x73" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/16/santa-clara-county-sues-meta-over-alleged-scam-ads" />
+	<id>tag:daringfireball.net,2026:/linked//6.43023</id>
+	<published>2026-05-16T21:17:15Z</published>
+	<updated>2026-05-16T23:57:25Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Brandon Pho, reporting for San Jose Spotlight:</p>
+
+<blockquote>
+  <p>The <a href="https://files.santaclaracounty.gov/exjcpb1611/2026-05/complaint-final.pdf">lawsuit filed Monday</a> alleges that instead of cracking
+down on deceptive ads designed to trick users out of their money,
+Meta has hamstrung its own fraud prevention teams and helped fake
+companies bypass its filters to enable the tech powerhouse to
+enjoy an estimated $7 billion in ad revenue from the scams every
+year. [...]</p>
+
+<p>The county lawsuit seeks attorney fees and a ruling barring Meta
+from further alleged violations of false advertising and unfair
+competition laws. Much of the lawsuit’s allegations stem from a
+<a href="https://www.reuters.com/investigations/meta-is-earning-fortune-deluge-fraudulent-ads-documents-show-2025-11-06/">2025 Reuters investigation</a> suggesting Meta was at one
+point involved in one-third of all successful Internet scams in
+the U.S.</p>
+
+<p>The company has vowed to fight the lawsuit.</p>
+
+<p>“This claim relies on Reuters reporting that distorts our motives
+and ignores the full range of actions we take to combat scams
+every day,” a spokesperson for the company told San José
+Spotlight. “We aggressively fight scams on and off our platforms
+because they’re not good for us or the people and businesses that
+rely on our services.”</p>
+</blockquote>
+
+<p>Reuters’s Jeff Horwitz and Engen Tham <a href="https://www.pulitzer.org/winners/jeff-horwitz-and-engen-tham-reuters">were awarded the Pulitzer Prize for Beat Reporting</a> for their reporting on this story. As the adage goes, if the facts are on your side, pound the facts. If the law’s on your side, pound the law. If neither are on your side, pound the table.</p>
+
+<p>I have to say, though, it does not seem scalable for individual counties to be suing Meta.</p>
+
+<div>
+<a  title="Permanent link to ‘Santa Clara County Sues Meta Over Alleged Scam Ads’"  href="https://daringfireball.net/linked/2026/05/16/santa-clara-county-sues-meta-over-alleged-scam-ads">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+    
+    <link rel="alternate" type="text/html" href="https://daringfireball.net/2026/05/ai_is_technology_not_a_product" />
+	<link rel="shorturl" href="http://df4.us/x72" />
+	<id>tag:daringfireball.net,2026://1.43022</id>
+	<published>2026-05-16T20:32:51Z</published>
+	<updated>2026-05-18T16:48:28Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<summary type="text">It’s not even a feature. It’s just technology.</summary>
+	<content type="html" xml:base="https://daringfireball.net/" xml:lang="en"><![CDATA[
+
+<p>Steven Levy, writing for Wired last month after Apple’s CEO transition was announced, under the provocative headline “<a href="https://www.wired.com/story/apples-next-ceo-needs-to-launch-a-killer-ai-product/">Apple’s Next CEO Needs to Launch a Killer AI Product</a>” (<a href="https://apple.news/AdCC7y43rTQq6SZH2bDmqxA">News+ link</a> to get around Wired’s miserly paywall):</p>
+
+<blockquote>
+  <p>Much more recently, <a href="https://www.wired.com/story/apple-50-year-anniversary-artificial-intelligence-iphone/">I quizzed Ternus</a> and global marketing
+head Greg Joswiak about Apple’s future, specifically its plans to
+get ahead of the AI transformation. Ternus acknowledged that AI is
+“an immense kind of inflection point,” but couched it as one of
+many leaps that Apple has navigated. Each hit product — the Apple
+II, the Mac, iTunes, the iPod, the iPhone, iPad — piggybacked on
+a previous product. “We never think about shipping a technology,”
+he said. “We want to ship amazing products, features, and
+experiences, and we don’t want our customers to think about what
+[underlying] technology makes it possible. That’s the way we think
+about AI.”</p>
+
+<p>That’s fine, but I look back to the mid-2000s when everybody was
+waiting for Apple to come out with a phone. When Jobs finally
+delivered in January 2007, the product defined the mobile era.
+It’s a big ask for Ternus to do something similar for the AI age — but it’s an opportunity that must be seized. AI threatens to
+disrupt the entire iPhone ecosystem. By the end of this decade,
+it’s unlikely that people will swipe on their phones to tap on
+Uber or Lyft. They will just tell their always-on AI agent to get
+them home. Or that agent will have already figured out where they
+need to go, and the car will be waiting without the friction of a
+request. “There’s an app for that,” may be replaced by “Let the
+agent do that.”</p>
+</blockquote>
+
+<p>I’m a huge longtime Steven Levy fan, but this is nonsense. It’s hard to read this and not worry that he too has lost his mind to the AI snake-oil hypesters. What Ternus told him is exactly right. The Apple way is never to ship a technology. The iPod wasn’t about MP3 files. It wasn’t about <a href="https://www.wired.com/2006/10/straight-dope-on-the-ipods-birth/">1.8-inch hard drives</a>. It was about music. The iPhone did define the mobile era (which we’re still very much in), but Apple doesn’t need to capitalize on every single market the mobile era opened up. Social media is a defining component of the mobile era. It comprises the entirety of Meta’s value and a sizable slice of Google’s (via YouTube). Apple doesn’t have a social network business. It’s fine — because the way people consume and create social media is using their phones.</p>
+
+<p>Does AI “threaten to disrupt the entire iPhone ecosystem”? It’s possible, but it doesn’t seem nearly as likely to me as Levy asserts. <em>Changing</em> the iPhone ecosystem? Sure — that’s already true. <em>Obviating</em> the iPhone ecosystem? I don’t see it. Levy’s argument reminds me of the hype around “the cloud” when that first became a term. It’s so meaningless when used broadly (e.g. “<em>Everything will soon be in the cloud</em>”) that it could mean anything. It’s step #2 in the <a href="https://southpark.fandom.com/wiki/Underpants_Gnomes">gnomes-stealing-underpants</a> master plan.</p>
+
+<p>The idea that AI agents “will have already figured out where [we] need to go, and the car will be waiting without the friction of a request” strikes me as pure fever dream high-on-the-hype fantasy. I’m just going to step outside a restaurant when I’m done eating a meal and a ride-share is going to be there, waiting for me, without my having hailed it? Every time? And I’m going to find this pleasing, not creepy? And ride-share drivers are going to respond to all these requests, because the requests will never be wrong? And this is going to happen, somehow, without my carrying a phone with me? And this is going to happen in the next four years? I don’t think I’d want this even if it were plausible, but it doesn’t sound plausible.</p>
+
+<p>Actual products have to be real. Actual experiences have to rely on actual products. How exactly in Levy’s end-of-this-decade scenario will we tell our “always-on AI agent” to get us home? What microphone is listening to the command? What speaker is telling us the request was understood and acted upon? What screen do we look at to see how far away the hailed car is? I’d bet a pretty large sum of money that in 2030, when someone hails a ride-share vehicle to take them home, the most common product they’ll use to do that will be their phone. Whether they’re doing it via a verbal command issued to an “always-on AI agent” or good old tapping and swiping, it’ll be a phone.</p>
+
+<p>If you think that people will buy smaller devices to replace their phones, and use those to talk to “always-on AI agents” instead, you have to answer some questions. What company is the best in the world at making smaller-than-phone personal computing devices? What device will people use as their camera? What device will people use as their screen, for watching videos, playing games, texting, and (one hopes) reading? My answers to those three questions: Apple, phone, phone. Why would smaller devices — you know, like watches, earbuds, and, say, glasses — work independently rather than pair with the phone that you’re almost certainly still going to be carrying with you?</p>
+
+<p>Only a fool would argue that Apple can stand on the sidelines and ignore AI. It’s very different from, say, social media that way. Social media doesn’t pervade everything in technology. You can ignore social media as a user. (And you’re probably more productive, and happier, if you do.) A company can eschew social media as a business. AI, on the other hand, is pervasive. It can’t be ignored. But it’s just technology.</p>
+
+<p>Wireless networking is pervasive too. But Apple doesn’t have “a killer wireless networking product”.<sup id="fnr1-2026-05-16"><a href="#fn1-2026-05-16">1</a></sup> Wireless networking simply pervades everything Apple makes. I’m hard pressed to think of a single product Apple makes that doesn’t use some combination of Wi-Fi, cellular, Bluetooth, and proprietary wireless protocols. There was a time, not <em>too</em> long ago, when Apple didn’t make a single product with wireless connectivity. Now it’s pervasive in all their devices. That’s more what AI is going to be like. There’s not going to be one “killer AI device”. Everything is going to be an AI device, to some extent, just like how everything today is a wireless connectivity device, to some extent.</p>
+
+<p><strong>Postscript:</strong> “<a href="https://daringfireball.net/linked/2026/05/18/existing-stakeholders-have-a-say-in-the-future">Existing Stakeholders Have a Say in the Future</a>”.</p>
+
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1-2026-05-16">
+<p>AirPort qualified, arguably. But Apple walked away from it, alas.&nbsp;<a href="#fnr1-2026-05-16"  class="footnoteBackLink"  title="Jump back to footnote 1 in the text.">&#x21A9;&#xFE0E;</a></p>
+</li>
+</ol>
+</div>
+
+
+
+
+    ]]></content>
+  <title>★ AI Is Technology, Not a Product</title></entry><entry>
+	<title>ArXiv to Ban Researchers for a Year if They Submit AI Slop</title>
+	<link rel="alternate" type="text/html" href="https://www.404media.co/new-arxiv-rules-ai-generated-papers-ban/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x71" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/16/arxiv-anti-slop-rule" />
+	<id>tag:daringfireball.net,2026:/linked//6.43021</id>
+	<published>2026-05-16T19:27:34Z</published>
+	<updated>2026-05-16T19:27:35Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Samantha Cole, writing for 404 Media:</p>
+
+<blockquote>
+  <p>Late Thursday evening, Thomas Dietterich, chair of the computer
+science section of ArXiv, <a href="https://x.com/tdietterich/status/2055000956144935055?s=20&amp;ref=404media.co">wrote on X</a>: “If generative AI
+tools generate inappropriate language, plagiarized content,
+biased content, errors, mistakes, incorrect references, or
+misleading content, and that output is included in scientific
+works, it is the responsibility of the author(s). We have
+recently clarified our penalties for this. If a submission
+contains incontrovertible evidence that the authors did not check
+the results of LLM generation, this means we can’t trust anything
+in the paper.” [...]</p>
+
+<p>“The penalty is a 1-year ban from arXiv followed by the
+requirement that subsequent arXiv submissions must first be
+accepted at a reputable peer-reviewed venue,” Dietterich wrote.
+Dietterich told me in an email on Friday morning that this is a
+one-strike rule — meaning authors caught just once including AI
+slop in submissions will be banned — but that decisions will be
+open to appeal.</p>
+</blockquote>
+
+<p>I see no cognitive dissonance in being pro-AI, in general, but vehemently anti-slop.</p>
+
+<div>
+<a  title="Permanent link to ‘ArXiv to Ban Researchers for a Year if They Submit AI Slop’"  href="https://daringfireball.net/linked/2026/05/16/arxiv-anti-slop-rule">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>The Talk Show: ‘A Sociopathic Father’</title>
+	<link rel="alternate" type="text/html" href="https://daringfireball.net/thetalkshow/2026/05/15/ep-447" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x6z" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/15/the-talk-show-447" />
+	<id>tag:daringfireball.net,2026:/linked//6.43019</id>
+	<published>2026-05-16T01:38:00Z</published>
+	<updated>2026-05-16T01:39:05Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Adam Lisagor returns to the show to talk about <a href="https://sandwich.vision/hovercraft">Hovercraft</a>, his new virtual presentation camera app for Mac, and how he’s developing it with AI coding tools. Also, delicious Japanese spite sandwich cookies.</p>
+
+<p><audio
+    src = "https://traffic.libsyn.com/secure/daringfireball/thetalkshow-447-adam-lisagor.mp3"
+    controls
+    preload = "none"
+/></p>
+
+<p><strong>Sponsored by:</strong></p>
+
+<ul>
+<li><a href="https://parcel.app">Parcel</a>: Track your packages in one place, with native apps for iPhone, iPad, Apple Watch, and Mac.</li>
+<li><a href="https://scribe.how/talkshow">Scribe</a>: Instantly capture and optimize workflows so your teams and AI agents do their best work.</li>
+<li><a href="https://squarespace.com/talkshow">Squarespace</a>: Save 10% off your first purchase of a website or domain using code <strong>TALKSHOW</strong>.</li>
+</ul>
+
+<div>
+<a  title="Permanent link to ‘The Talk Show: ‘A Sociopathic Father’’"  href="https://daringfireball.net/linked/2026/05/15/the-talk-show-447">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Greg Brockman Officially Takes Control of Products at OpenAI, a Very Stable Well-Run Company</title>
+	<link rel="alternate" type="text/html" href="https://www.wired.com/story/openai-reorg-greg-brockman-product/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x70" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/15/brockman-openai" />
+	<id>tag:daringfireball.net,2026:/linked//6.43020</id>
+	<published>2026-05-16T01:37:57Z</published>
+	<updated>2026-05-16T01:39:39Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Maxwell Zeff, reporting for Wired (News+ link):</p>
+
+<blockquote>
+  <p>OpenAI told staff on Friday that it would reorganize the company
+as part of an ongoing effort to unify its product offerings, Wired
+has learned. OpenAI cofounder and president Greg Brockman will now
+lead the company’s product strategy, in addition to his work on AI
+infrastructure, OpenAI confirms to Wired. Brockman was previously
+assigned to oversee OpenAI products on an interim basis while the
+CEO of AGI deployment, Fidji Simo, was on medical leave; the
+change is now official. [...]</p>
+
+<p>The company tells Wired that Simo remains on medical leave, and
+expects her return, noting that she worked directly with Brockman
+on these organizational changes.</p>
+</blockquote>
+
+<p>Yours truly, <a href="https://daringfireball.net/2026/04/openai_future">last month</a>:</p>
+
+<blockquote>
+  <p>OpenAI’s work environment seems not merely overwhelming, but
+torturous. I have no reason to believe Simo’s medical leave is
+anything but a legitimate medical leave, but I wouldn’t be
+surprised if she never comes back. (What’s the point of being CEO
+of AGI deployment when there is no AGI to deploy?)</p>
+</blockquote>
+
+<p>Her title might as well be “CEO of Technology That Doesn’t Exist”.</p>
+
+<div>
+<a  title="Permanent link to ‘Greg Brockman Officially Takes Control of Products at OpenAI, a Very Stable Well-Run Company’"  href="https://daringfireball.net/linked/2026/05/15/brockman-openai">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Wanton Destruction of CBS Property</title>
+	<link rel="alternate" type="text/html" href="https://www.youtube.com/watch?v=eBKWKu2Rqxc" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x6y" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/15/wanton-destruction-of-cbs-property" />
+	<id>tag:daringfireball.net,2026:/linked//6.43018</id>
+	<published>2026-05-15T20:12:09Z</published>
+	<updated>2026-05-15T20:12:09Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>“Good night and good luck, motherfuckers.”</p>
+
+<div>
+<a  title="Permanent link to ‘Wanton Destruction of CBS Property’"  href="https://daringfireball.net/linked/2026/05/15/wanton-destruction-of-cbs-property">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Dropover, a Mac Shelf Utility That Makes Clever Use of Mouse Shaking</title>
+	<link rel="alternate" type="text/html" href="https://dropoverapp.com/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x6x" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/15/dropover" />
+	<id>tag:daringfireball.net,2026:/linked//6.43017</id>
+	<published>2026-05-15T19:24:10Z</published>
+	<updated>2026-05-15T19:24:11Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Yesterday, regarding the “Magic Cursor” feature Google teased for its upcoming Googlebook/Aluminium OS platform, <a href="https://daringfireball.net/linked/2026/05/14/googlebooks">I wrote</a>:</p>
+
+<blockquote>
+  <p>Shaking your cursor over something is an interesting gesture. The
+only feature I’m aware of that uses that gesture is MacOS’s
+feature that makes your cursor bigger when you shake it, to help
+spot it on the display.</p>
+</blockquote>
+
+<p>Then, last evening, I selected a few files on my desktop, started dragging them, and shook my mouse cursor to conjure a drop shelf from <a href="https://dropoverapp.com/">Dropover</a>, a Mac utility by developer Damir Tursunović that I’ve been using for about two years. As soon I shook my mouse, I smiled and thought, “Well, I should mention that.” So here I am, mentioning the gesture and Dropover.</p>
+
+<p>Years ago <a href="https://daringfireball.net/linked/2017/05/26/yoink">I recommended Yoink</a>, which is very much a direct competitor to Dropover. The basic idea with both apps is that sometimes you want a temporary “shelf” on which to drop items — a way station between where you’re dragging the items from and where you want to drop them. <a href="https://eternalstorms.at/yoink/mac/">Yoink</a> has options to appear only when you drag to the left edge of the screen, or to appear as soon as you start dragging anything. I have always used Yoink with it configured to show its shelf at the edge of the screen, because I only want it to appear when I need it. Appearing on every single drag is, to me, distracting. But sometimes the left edge of the display feels far away.</p>
+
+<p>Dropover has two options for appearing only when you want it, right where your cursor currently is. The first is the aforementioned mid-drag shake gesture. The other is an option to appear, while dragging, only when holding down a modifier key. The default key is Shift, which is what I use, but you can choose between Shift, Command, and Control. When I first started using Dropover, I leaned more on pressing Shift to invoke it. As time has gone on, more and more I use the shake gesture without thinking about it. Like yesterday. It feels like you’re saying “<em>Give me a shelf right here</em>” when you shake mid-drag. It’s clever <em>and</em> convenient, and, unlike using a modifier key, doesn’t require you to involve your other hand. (Dropover also lets you optionally use your MacBook’s notch as a drop target, and both apps let you drop items on their menu bar icons.)</p>
+
+<p><a href="https://dropoverapp.com/">Dropover</a> is a free download <a href="https://apps.apple.com/us/app/dropover-easier-drag-drop/id1355679052?mt=12">from the Mac App Store</a> and unlocking all features costs just $7 (one-time purchase). <a href="https://eternalstorms.at/yoink/mac/">Yoink</a> costs $9, either from the web <a href="https://apps.apple.com/us/app/yoink-better-drag-and-drop/id457622435?mt=12">or the Mac App Store</a>. Both are terrific apps and are worth checking out. And if you’re not already using a utility of this sort, you probably should be.</p>
+
+<div>
+<a  title="Permanent link to ‘Dropover, a Mac Shelf Utility That Makes Clever Use of Mouse Shaking’"  href="https://daringfireball.net/linked/2026/05/15/dropover">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Aluminium OS: Google’s ‘Android for PC’ OS for Googlebooks</title>
+	<link rel="alternate" type="text/html" href="https://aluminium-os.com/" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x6w" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/15/aluminiumos" />
+	<id>tag:daringfireball.net,2026:/linked//6.43016</id>
+	<published>2026-05-15T18:37:13Z</published>
+	<updated>2026-05-16T01:42:39Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p><strong>Update:</strong> I originally posted this item thinking the aluminium-os.com website was official. It’s not. And the fact that it’s not is only mentioned in small print in the page footer. My bad, and my apologies for not noticing. No wonder I thought the descriptions were so un-Google-like in language and humility. This also explains the incongruity between Google’s statement that “Aluminium OS” is only a codename, and the existence of this site premised on the idea that the platform is named Aluminium OS.]</p>
+
+<blockquote>
+  <p>Aluminium OS — internally codenamed ALOS — is Google’s entirely
+new Android-based operating system built specifically for laptops
+and desktop computers.</p>
+</blockquote>
+
+<p>I like the name and wish they’d stick with it. But <a href="https://www.theverge.com/tech/928479/google-googlebook-laptops-android-tease-aluminium-chromebook?view_token=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjNVSjlWdlZESmgiLCJwIjoiL3RlY2gvOTI4NDc5L2dvb2dsZS1nb29nbGVib29rLWxhcHRvcHMtYW5kcm9pZC10ZWFzZS1hbHVtaW5pdW0tY2hyb21lYm9vayIsImV4cCI6MTc3OTIxNjg2NiwiaWF0IjoxNzc4Nzg0ODY2fQ.a74WT34THV0Ih1pGO7NH4daq39ytQXdhO4EAgE6HCeI">The Verge reported this week</a> — re: Google’s Googlebook teaser announcement — that Peter Du of Google’s global communications team told them “We’ll have more to share on the exact OS branding later this year. We can confirm it is not Aluminium — that is the codename, not the official branding.” Maybe they’re going to call it “Google OS” given that they’re calling the devices Googlebooks?</p>
+
+<blockquote>
+  <p>This is not ChromeOS with a Play Store tab. It is not an Android
+phone app scaling itself to a 15-inch display. Aluminium OS is
+built from the ground up on Android 17, with a completely custom
+window manager, a real taskbar, virtual desktops, and Gemini AI
+baked into every layer of the operating system.</p>
+
+<p>For over a decade, Google ran two separate systems in parallel — ChromeOS for laptops, Android for phones — and it showed. Apps
+behaved differently across devices, engineering teams were split
+across two codebases, and Google fell visibly behind Apple’s
+unified iPhone-iPad-Mac ecosystem. Aluminium OS is the decisive
+answer to all of that.</p>
+</blockquote>
+
+<p>I find this description so refreshing, and so un-Google-like. It’s human and humble. I love the flat-out acknowledgement that Apple’s iPhone-iPad-Mac <a href="https://www.apple.com/macos/continuity/">Continuity</a> work has kicked Google’s ass. (It would be fascinating to see Apple acknowledge a similar degree of getting-its-ass-kicked, naming exactly which platforms were kicking its ass, with regard to Siri. I will not hold my breath.)</p>
+
+<p>I’ve been vaguely aware <a href="https://www.androidauthority.com/google-combine-chrome-os-android-3577035/">since last year</a> that Google had announced plans to “combine” ChromeOS and Android. There’s two ways to do that: (a) run Android apps in ChromeOS and do away with Android, as an OS, for device classes other than phones; or (b) do away with ChromeOS and build out Android for tablet and PC form factors. Option (a) never made any sense to me. All OSes have built-in browsers and web rendering engines. A web rendering engine does not make for a good foundation for an OS. I never thought ChromeOS sounded like a good idea, and when I’ve tinkered with Chromebooks, the experience was even worse than I expected. Another dose of welcome humility on this Aluminium mini site is the acknowledgement that ChromeOS is a market failure outside K-12:</p>
+
+<blockquote>
+  <p>ChromeOS captured K-12 education but never broke into mainstream
+consumer or enterprise markets at scale. Aluminium OS is built for
+all segments.</p>
+</blockquote>
+
+<p>Reading the rest of this site, I am much more intrigued by Aluminium OS than I expected to be:</p>
+
+<blockquote>
+  <p><strong>On-Device Code Assistance</strong> <br />
+Write, debug, explain, and refactor code directly in the terminal — no separate paid extension, no cloud subscription for basics.</p>
+
+<p><strong>Natural Language Automation</strong> <br />
+Describe any repetitive task in plain English and Gemini automates
+it permanently as a saved one-command workflow.</p>
+</blockquote>
+
+<p>They’re saying Aluminium OS is meant to serve as a developer workstation. We shall see how that pans out, but that’s a level of ambition that ChromeOS never even aspired to, let alone reached.</p>
+
+<div>
+<a  title="Permanent link to ‘Aluminium OS: Google’s ‘Android for PC’ OS for Googlebooks’"  href="https://daringfireball.net/linked/2026/05/15/aluminiumos">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>‘Musk v. Altman’ Closing Arguments</title>
+	<link rel="alternate" type="text/html" href="https://www.theverge.com/ai-artificial-intelligence/931006/musk-v-altman-closing-arguments-analysis?view_token=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImhxZzBnTXFpSk8iLCJwIjoiL2FpLWFydGlmaWNpYWwtaW50ZWxsaWdlbmNlLzkzMTAwNi9tdXNrLXYtYWx0bWFuLWNsb3NpbmctYXJndW1lbnRzLWFuYWx5c2lzIiwiZXhwIjoxNzc5MjM2OTUwLCJpYXQiOjE3Nzg4MDQ5NTB9.TXQtcV9vkuuKyqcrMaKtSqqoL9_wGWeSYgUyO6ZzK-Y" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x6v" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/14/musk-v-altman-closing-arguments" />
+	<id>tag:daringfireball.net,2026:/linked//6.43015</id>
+	<published>2026-05-15T00:57:38Z</published>
+	<updated>2026-05-15T00:57:38Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Elizabeth Lopatto, reporting for The Verge (gift link):</p>
+
+<blockquote>
+  <p>Today was closing arguments in the <em>Musk v. Altman</em> trial, and I
+almost feel bad writing about the unbelievable demolition derby I
+just witnessed. Steven Molo, Musk’s lawyer, stumbled over his
+words. He at one point called Greg Brockman — a co-defendant — Greg Altman. He erroneously claimed that Musk wasn’t asking for
+money and had to be corrected by the judge. He made it clear we’ve
+heard from many liars over the past few weeks, but offered little
+evidence for Musk’s actual legal claims.</p>
+
+<p>OpenAI’s lawyer, Sarah Eddy, countered this by simply arranging
+the mountain of evidence that the company introduced in
+chronological order. She didn’t spend time trying to pretend
+anyone in this trial is especially reliable. She did, however, get
+the zinger of the day, about Musk: “Even the mother of his
+children can’t back his story.” William Savitt, who took the
+defendant baton after her presentation, demonstrated the number of
+times Musk “didn’t recall” some critical detail — and wondered
+how a sophisticated businessman couldn’t understand or read a
+four-page term sheet OpenAI had sent to him.</p>
+
+<p>I found myself wondering, again, why we were all wasting our time
+here. So let’s discuss the gossip, which is the real point of this
+trial. How good was it? Here are my favorite nuggets.</p>
+</blockquote>
+
+<div>
+<a  title="Permanent link to ‘‘Musk v. Altman’ Closing Arguments’"  href="https://daringfireball.net/linked/2026/05/14/musk-v-altman-closing-arguments">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Let’s Run a Neologism Poll</title>
+	<link rel="alternate" type="text/html" href="https://mastodon.social/@gruber/116575825801893849" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x6u" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/14/neologism-poll" />
+	<id>tag:daringfireball.net,2026:/linked//6.43014</id>
+	<published>2026-05-15T00:53:54Z</published>
+	<updated>2026-05-15T20:19:08Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>After posting <a href="https://daringfireball.net/linked/2026/05/14/vestager-ai-safety-institute">the previous item</a> referencing <em>dickpanels</em>, a term I’ve been using <a href="https://daringfireball.net/linked/2022/08/02/banish">since 2022</a>, it occurred to me that they could also be called <em>dickovers</em> (like popovers, but dickheaded). The latter sounds more clever, but I worry it’s less clear. I’m seldom so indecisive, so I’m running a Mastodon poll.</p>
+
+<div>
+<a  title="Permanent link to ‘Let’s Run a Neologism Poll’"  href="https://daringfireball.net/linked/2026/05/14/neologism-poll">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>The Youth AI Safety Institute Has Margrethe Vestager’s Backing</title>
+	<link rel="alternate" type="text/html" href="https://www.euronews.com/next/2026/05/12/margrethe-vestager-backs-new-ai-safety-institute-for-children-after-decade-regulating-big-" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x6t" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/14/vestager-ai-safety-institute" />
+	<id>tag:daringfireball.net,2026:/linked//6.43013</id>
+	<published>2026-05-15T00:03:13Z</published>
+	<updated>2026-05-15T00:54:33Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Una Hajdari, reporting for Euronews:</p>
+
+<blockquote>
+  <p>A new independent institute dedicated to making artificial
+intelligence safer for children will beformally [<em>sic</em>] presented at the
+Danish Parliament on Tuesday, with former European Commission
+executive vice-president Margrethe Vestager among those co-hosting
+the event.</p>
+
+<p>The institute’s approach, as explained in a statement before the
+launch, is “modelled on independent crash-test ratings” for cars.
+The idea, ostensibly, is that just as consumers can check whether
+a vehicle is safe before buying it, parents should be able to do
+the same for the AI their children use.</p>
+
+<p>Quite what a crash test looks like for a chatbot, the institute
+does not yet say.</p>
+</blockquote>
+
+<p>Hopefully their AI crash testing winds up more effective than the GDPR “cookie” initiative overseen by Vestager, which led to the nonsense that required me to click through <a href="https://daringfireball.net/misc/2026/05/euronews-dickpanel.jpeg">this</a> ridiculous full-window <a href="https://daringfireball.net/linked/2022/08/02/banish">dickpanel</a> just to read the story. (I love that the dickpanel is titled “We value your privacy” and then begins with the sentence, “With your agreement, we and our 399 partners use cookies or similar technologies to store, access, and process personal data like your visit on this website, IP addresses and cookie identifiers.” If Euronews did not value your privacy, they might have 400 partners.)</p>
+
+<div>
+<a  title="Permanent link to ‘The Youth AI Safety Institute Has Margrethe Vestager’s Backing’"  href="https://daringfireball.net/linked/2026/05/14/vestager-ai-safety-institute">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+	<title>Aided by Mythos Preview, Researchers Announce MacOS Kernel Exploit Circumventing M5 Memory Integrity Enforcement</title>
+	<link rel="alternate" type="text/html" href="https://blog.calif.io/p/first-public-kernel-memory-corruption" />
+	<link rel="shorturl" type="text/html" href="http://df4.us/x6s" />
+	<link rel="related" type="text/html" href="https://daringfireball.net/linked/2026/05/14/m5-mie-exploit" />
+	<id>tag:daringfireball.net,2026:/linked//6.43012</id>
+	<published>2026-05-14T23:44:20Z</published>
+	<updated>2026-05-14T23:44:20Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<content type="html" xml:base="https://daringfireball.net/linked/" xml:lang="en"><![CDATA[
+<p>Calif, <a href="https://calif.io/company">a security research team</a>, on their blog:</p>
+
+<blockquote>
+  <p>Many security experts consider Apple devices to be the most secure
+consumer platform. The latest flagship example is MIE (Memory
+Integrity Enforcement), Apple’s hardware-assisted memory safety
+system built around ARM’s MTE (Memory Tagging Extension). It was
+introduced as the marquee security feature for the Apple M5 and
+A19, specifically designed to stop memory corruption exploits, the
+vulnerability class behind many of the most sophisticated
+compromises on iOS and macOS. [...]</p>
+
+<p>Our macOS attack path was actually an accidental discovery. Bruce
+Dang found the bugs on April 25th. Dion Blazakis joined Calif on
+April 27th. Josh Maine built the tooling, and by May 1st we had a
+working exploit.</p>
+
+<p>We didn’t build the chain alone. Mythos Preview helped identify
+the bugs and assisted throughout exploit development. [...] To the
+best of our knowledge, this is the first public macOS kernel
+exploit on MIE hardware. Again, we’ll publish our 55-page report
+after Apple ships a fix.</p>
+</blockquote>
+
+<p>The Wall Street Journal <a href="https://blog.calif.io/p/first-public-kernel-memory-corruption">ran a story</a> on Calif’s announcement today that was heavy on hyperbole and extraordinarily light on technical details. Unsurprisingly, the team’s own blog post was much more informative and interesting. The achievement here is circumventing MIE.</p>
+
+<div>
+<a  title="Permanent link to ‘Aided by Mythos Preview, Researchers Announce MacOS Kernel Exploit Circumventing M5 Memory Integrity Enforcement’"  href="https://daringfireball.net/linked/2026/05/14/m5-mie-exploit">&nbsp;★&nbsp;</a>
+</div>
+
+	]]></content>
+  </entry><entry>
+    
+    <link rel="alternate" type="text/html" href="https://daringfireball.net/2026/05/nextpad" />
+	<link rel="shorturl" href="http://df4.us/x6j" />
+	<id>tag:daringfireball.net,2026://1.43003</id>
+	<published>2026-05-13T02:22:16Z</published>
+	<updated>2026-05-13T22:51:46Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<summary type="text">Nextpad++ feels like a fever dream. Like what Mac apps would be if the Nazis had won WWII.</summary>
+	<content type="html" xml:base="https://daringfireball.net/" xml:lang="en"><![CDATA[
+
+<p>Windows Notepad is, more or less, the Windows peer to MacOS’s TextEdit — the built-in system text editor. For years, it was really basic — so much more basic than TextEdit that it engendered no affection. You don’t see paeans to Notepad <a href="https://daringfireball.net/linked/2026/01/26/chayka-textedit">in The New Yorker</a>. Recently though, Microsoft has started beefing it up, culminating last year <a href="https://daringfireball.net/linked/2025/06/06/markdown-support-in-windows-notepad">when they added fucking Markdown support</a>. Which still blows my mind.</p>
+
+<p><a href="https://notepad-plus-plus.org/">Notepad++</a> is a longstanding open source (GPL) Windows text editor <a href="https://notepad-plus-plus.org/author/">by Don Ho</a>, which <a href="https://notepad-plus-plus.org/">debuted back in 2003</a>. Just adding “++” to the name might be misleading. The name implies that it’s like Microsoft’s Notepad <a href="https://www.waltdisney.org/blog/walts-own-words-plussing-disneyland">plus</a> a little more. But Notepad++ is in fact a wholly independent programming text editor, with a rich plugin library. It doesn’t resemble Microsoft’s Notepad much at all anymore. It’s over two decades old but remains quite popular. To some extent Notepad++ is sorta kinda the Windows peer to <a href="https://www.barebones.com/products/bbedit/">BBEdit</a>.</p>
+
+<p><a href="https://nextpad.org/author/">Nextpad++</a> is something new, <a href="https://nextpad.org/author/">from Andrey Letov</a>. It’s a Mac port of the Notepad++ GPL code. It launched a few weeks ago under the name “Notepad++ for Mac”, but Letov had <a href="https://notepad-plus-plus.org/news/npp-trademark-infringement/">no right or permission to the name</a>. That dispute has been settled, and Letov has renamed this project Nextpad++. The website’s <a href="https://nextpad.org/about/">About page</a> has entire sections for “How Nextpad++ for Mac Was Built” and “Technology Stack”, and neither of those mentions AI, but this thing <em>has</em> to have been built using AI vibe-coding agents. That same About page also says the project only started on March 10, and the 1.0 version (under the defunct “Notepad++ for Mac” name) shipped just a few weeks after that. Something of the scope of this port couldn’t happen at that pace without AI. <strong>Update:</strong> On <a href="https://nextpad.org/author/">the Author page</a>, not the About page, it states, “multi-agent AI development workflows are what make a one-person project at this scale practical.” <em>Possible</em>, sure, but I wouldn’t call this <em>practical</em>.</p>
+
+<p>Nextpad++ feels like a fever dream. Like what Mac apps would be if the Nazis had won WWII. Look, there are all sorts of foreign apps on the Mac. <a href="https://daringfireball.net/2018/12/electron_and_the_decline_of_native_apps">Electron</a> apps. Apps ported with <a href="https://www.winehq.org/">Wine</a>. Web apps running in browser tabs or <a href="https://support.apple.com/guide/safari/add-to-dock-ibrw9e991864/mac">saved to the Dock</a>. The <a href="https://shapeof.com/archives/2026/4/tolaria_ai_and_rust.html">curious new generation</a> of lean-and-mean apps that are, in a technical sense, “native”, but are decidedly not Mac-assed apps, like <a href="https://zed.dev/">Zed</a> and <a href="https://tolaria.md/">Tolaria</a>. All those types of apps feel alien on MacOS. Like different species. They are apps for the Mac but aren’t Mac apps. The Mac, however, is welcoming to them all, <a href="https://daringfireball.net/2026/04/we_dont_serve_their_kind_here">like the Mos Eisley cantina</a>. We do serve their kind here. Nextpad++ isn’t like that. It doesn’t feel like an alien. It feels like Vincent D’Onofrio’s alien-bug-in-human-skin character from <em>Men in Black</em>.</p>
+
+<p>Letov’s website describes Nextpad++ as “A real Mac app, not a Wine wrapper: Objective-C++ on top of Scintilla and Cocoa, shipped as a Universal Binary for Apple Silicon (M1–M5) and Intel Macs.” Ostensibly that’s a good thing. The download is only 14 MB. But Nextpad++ looks and feels like something that should not exist. The promotional screenshots on the app’s own website show it <a href="https://daringfireball.net/misc/2026/05/nextpad++.png">with 50 inscrutable toolbar buttons</a>. It closes document tabs on mousedown, not mouseup. Its default font is 10-point Courier New. <a href="https://daringfireball.net/misc/2026/05/nextpad-editing-contextmenu.png">This</a> is a real dialog box. It offers <a href="https://daringfireball.net/misc/2026/05/nextpad-antialiasing.png">four settings for font antialiasing</a> — “Default”, “None”, “Antialiased”, and “LCD Optimized” — but the default is not “Default”. No human being would port a complex Windows app like Notepad++ to the Mac like this.</p>
+
+<p>I’m not anti-AI. I’m very much intrigued by the whole incipient vibe-coding phenomenon. But this app feels <em>unholy</em>.</p>
+
+
+
+
+    ]]></content>
+  <title>★ Nextpad++</title></entry><entry>
+    
+    <link rel="alternate" type="text/html" href="https://daringfireball.net/2026/05/software_as_the_product_of_obsession_times_voice" />
+	<link rel="shorturl" href="http://df4.us/x5v" />
+	<id>tag:daringfireball.net,2026://1.42979</id>
+	<published>2026-05-05T21:01:05Z</published>
+	<updated>2026-05-05T21:01:06Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<summary type="text">You might think it counterintuitive that a movement obsessed with software would be spearheading a severe decline in the design quality of software, but in Patel’s definition, there’s no concept of software as art, as a practice, as a craft. Software brain is purely an obsession with software as a medium in and of itself. A means with no consideration for the end.</summary>
+	<content type="html" xml:base="https://daringfireball.net/" xml:lang="en"><![CDATA[
+
+<p>Back in 2009, Merlin Mann and I jointly gave a talk at SxSW titled “<a href="https://daringfireball.net/2009/03/obsession_times_voice">Obsession Times Voice</a>”. Regarding how it turned out, <a href="https://daringfireball.net/2009/03/obsession_times_voice">I wrote</a>:</p>
+
+<blockquote>
+  <p>My muse for the session was this quote from Walt Disney: <em>“We
+don’t make movies to make money; we make money to make more
+movies.”</em> To me, that’s it. That’s the thing.</p>
+</blockquote>
+
+<p>Merlin and I were talking about independent writers and podcasters, because that’s what we were (and remain), but the concept applies just as perfectly to independent developers. This came to my mind after reading (<a href="https://daringfireball.net/linked/2026/05/05/pedometer-plus-plus-8">and linking to</a>) David Smith’s description of the new Pedometer++ today. Not just what it does, but why he spent <a href="https://david-smith.org/blog/2026/04/29/maps-on-watchos/">six years making it</a>. That’s the sort of productive obsession that fascinates me.</p>
+
+<p>Ice water is always refreshing, but it tastes better when you’re on a road trip to hell. It feels like the world of software is bifurcating quality-wise. This <a href="https://daringfireball.net/linked/2026/05/04/photoshop-modern-user-interface">whole</a> <a href="https://daringfireball.net/linked/2026/05/04/adobe-modern-webpages">thing</a> about <a href="https://mjtsai.com/blog/2026/04/30/photoshops-modern-spectrum-user-interface/">Adobe’s new craptacular “modern” UI language</a> (a.k.a. “<a href="https://spectrum.adobe.com/">Spectrum</a>”) exemplifies one side of that bifurcation — the bad-and-getting-worse side. Software that is the product not just of an ignorance of <a href="https://asktog.com/atc/principles-of-interaction-design/">long-established principles of interaction design</a>, but of a <a href="https://daringfireball.net/2025/12/bad_dye_job#:~:text=the%20key%20window">willful disdain for those principles</a>. What Adobe is now shipping is just inexplicably bad UI, ignoring literally decades of great work and long-mastered concepts — a lot of which work was <a href="https://daringfireball.net/linked/2026/05/04/adobe-modern-webpages">pioneered by Adobe itself</a>!</p>
+
+<p>The <a href="https://daringfireball.net/linked/2026/04/13/tahoe-reduce-transparency">whole</a> <a href="https://daringfireball.net/2026/03/what_to_do_about_those_menu_item_icons_in_macos_26_tahoe">thing</a> with <a href="https://daringfireball.net/2025/12/bad_dye_job">MacOS 26 Tahoe</a> is similar. To be clear, the UI crimes in Tahoe are deeply worrisome, but they are nowhere near as severe as those in Adobe’s Spectrum. But the problems with Tahoe are steps down the same fork in the road that Adobe took years ago. Spectrum is where Tahoe suggests that MacOS was headed under Alan Dye’s leadership: cross-platform sameness for the sake of sameness, with a complete disregard for longstanding platform nuances and idioms. In Spectrum’s case those platforms are MacOS and Windows and <a href="https://helpx.adobe.com/account/individual/subscriptions-and-plans/plan-types-and-eligibility/cc-app-web-mobile-access.html">the web</a>. In Tahoe’s case it’s MacOS and iOS.<sup id="fnr1-2026-05-05"><a href="#fn1-2026-05-05">1</a></sup></p>
+
+<p>The other side of the software fork is not deserted. It’s just populated, more than ever, by the products of small independent developers who obsess, first and foremost, over quality and artistic vision. Remarkable new software gems exhibiting spectacular UI design <a href="https://www.currentreader.app/">appear</a> <a href="https://daringfireball.net/linked/2026/05/04/chess-peace">all</a> the <a href="https://daringfireball.net/linked/2026/04/15/so-close-to-getting-it">time</a>. They’re just not coming from the biggest companies, the ones whose apps, <a href="https://daringfireball.net/linked/2026/03/28/netflix-wrecked-their-tvos-video-player">alas</a>, dominate not just our desktops and pockets but our entire culture today.<sup id="fnr2-2026-05-05"><a href="#fn2-2026-05-05">2</a></sup></p>
+
+<p>There’s always been software with poorly designed user interfaces. Much of it has been successful financially, sometimes spectacularly so. I’d argue, in all seriousness, that that’s the story of Microsoft in a nutshell. What’s new today is poorly designed software from developers <a href="https://daringfireball.net/linked/2026/04/16/miller-netflix-tvos">from whom we expect better</a>. In the old days there were people who would argue that prioritizing good user interface design was a waste of time — like spending hours decorating cupcakes destined for kindergarteners who are simply going to mash them into their mouths. (Again: cf. Microsoft’s undeniable market success.) What’s new today is people holding up objectively bad interaction design and proclaiming it to be good, and the product of teams that purportedly prioritize “design”, when it’s clear they have no idea what they’re talking about. It’s one thing to make something poorly designed and shrug on the grounds that it doesn’t matter. It’s another thing to make something poorly designed and hold it up as good design.</p>
+
+<p>We are justified to expect nothing short of <a href="https://www.folklore.org/How_to_Hire_Insanely_Great_Employees.html">insane greatness</a> from Apple, and solidly good design from Adobe. In principle, all software ought to have well-designed user interfaces. That’s never going to be the case. But software for designers — Adobe’s <em>raison d’être</em> — absolutely demands to be well-designed itself, like how <a href="https://daringfireball.net/linked/2009/03/31/zinsser">a book on writing</a> must itself <a href="https://daringfireball.net/linked/2009/03/23/strunk-and-white">be well-written</a>.</p>
+
+<p>Perhaps I was wrong, though, to describe Adobe’s new UI as inexplicable. It’s just indefensible. The explanation for so much software going so rotten from a UI-design perspective is, the more I think about it, related to <a href="https://www.theverge.com/podcast/917029/software-brain-ai-backlash-databases-automation">Nilay Patel’s “Software Brain”</a> theory, which I’ve commented on both <a href="https://daringfireball.net/linked/2026/04/23/patel-software-brain">directly</a> and <a href="https://daringfireball.net/2026/04/we_dont_serve_their_kind_here">indirectly</a>. Here’s Patel’s definition of “software brain”:</p>
+
+<blockquote>
+  <p>The simplest definition I’ve come up with is that it’s when you
+see the whole world as a series of databases that can be
+controlled with the structured language of software code. Like I
+said, this is a powerful way of seeing things. So much of our
+lives run through databases, and a bunch of important companies
+have been built around maintaining those databases and providing
+access to them.</p>
+
+<p>Zillow is a database of houses. Uber is a database of cars and
+riders. YouTube is a database of videos. The Verge’s website is a
+database of stories. You can go on and on and on. Once you start
+seeing the world as a bunch of databases, it’s a small jump to
+feeling like you can control everything if you can just control
+the data.</p>
+
+<p>But that doesn’t always work.</p>
+</blockquote>
+
+<p>You might think it counterintuitive that a movement obsessed with software would be spearheading a severe decline in the design quality of software, but in Patel’s definition, there’s no concept of software as art, as a practice, as a craft. Software brain is purely an obsession with software as a medium in and of itself. A means with no consideration for the end.</p>
+
+<p>Framed in Walt Disney’s adage, software brain makes software only to make more money. The idea of making money in order to make more software — to afford the time and talent to <em>craft</em> it — does not compute. Framed in the metaphor that Steve Jobs used to <a href="https://www.youtube.com/watch?v=OesY-denV8k">close his introduction of the original iPad</a>, and returned to again <a href="https://www.youtube.com/watch?v=sUCpuaqlISQ">to close his final keynote at WWDC 2011</a>, software brain is nowhere near the intersection of technology and the liberal arts. Software brain is so far down Technology Street that it’s no longer in the same zip code as Liberal Arts Avenue. Another way, perhaps, to define <em>software brain</em> is that it’s the utter rejection of Jobs’s maxim that “technology is not enough”. With software brain, technology is all there is.</p>
+
+<div class="footnotes">
+<hr />
+<ol>
+
+<li id="fn1-2026-05-05">
+<p>I don’t want to belabor the similarities between Adobe’s Spectrum UI system and Apple’s Liquid Glass, because there are significant differences. Foremost, <a href="https://unsung.aresluna.org/photoshops-challenges-with-focus-pt-2/">what’s wrong with Spectrum</a> is wrong everywhere. Photoshop with Adobe’s new “modern” UI is, I suspect, just as bad a Windows app as it is a Mac app. Whereas the usability problems with Liquid Glass are lopsided platform-wise. It’s a litany of disasters on MacOS 26 Tahoe, but actually pretty good on Apple’s other version 26 OSes, especially iOS. There are aspects of Liquid Glass on iOS 26 that some people don’t like, but they’re literally skin-deep. Cosmetic details. Functionally, iOS 26 is pretty strong, and Apple made some very nice changes regarding the placement of things like search fields to improve consistency system-wide. I still have iOS 18 running on my year-old iPhone 16 Pro, and there are very few things I prefer in iOS 18 versus iOS 26. Whereas I’d be sick if I had to work in MacOS 26 Tahoe every day.</p>
+
+<p>That’s my point here. iOS 26 doesn’t suffer in any way — not even one teensy little single way — from MacOS UI idioms being inappropriately applied to the iPhone. On the iPad, maybe there’s a little of that, like, say, the weird way iPadOS 26 uses Mac-style red / yellow / green window control buttons but makes them too small to use, so before you use them, <a href="https://sixcolors.com/post/2025/09/ipados-26-review-a-computer/">you need a gesture to embiggen them temporarily first</a>. But the implementation of “Liquid Glass” on MacOS Tahoe is just riddled with iOS-isms that aren’t appropriate on MacOS. So many decades-old Mac UI nuances and idioms were just ignored. They weren’t changed, they weren’t updated, they were just ignored. You either see that this is true or you don’t, and if you don’t see it, you shouldn’t be designing the Mac user interface.&nbsp;<a href="#fnr1-2026-05-05"  class="footnoteBackLink"  title="Jump back to footnote 1 in the text.">&#x21A9;&#xFE0E;︎</a></p>
+</li>
+
+
+<li id="fn2-2026-05-05">
+<p>Consider the age of television. Television is the broadcast of motion pictures with sound. Cinema is an artform. But at the peak of television’s hegemony over western culture and mass media, the artistic quality of almost everything on TV was terrible. It was slop. It wallowed in its own sloppiness. This, despite the fact that cinematic artists had largely mastered the artform in the decades preceding TV. TV became popular in the 1950s and culturally dominant in the 1960s. But <em>Citizen Kane</em> came out in 1941. The network executives with “TV brain” in the second half of the 20th century didn’t even consider TV as a medium for art. They just cared that it was watched. It was judged only by ratings and ad revenue, not artistic merit. That’s what’s happening with software right now. But remember too, that as dreadful television programming rocketed to stratospheric popularity in the 1970s, that same decade saw <a href="https://www.imdb.com/list/ls000335086/">a remarkable explosion in innovative filmmaking</a> in movie theaters. Keep the faith.&nbsp;<a href="#fnr2-2026-05-05"  class="footnoteBackLink"  title="Jump back to footnote 2 in the text.">&#x21A9;&#xFE0E;︎</a></p>
+</li>
+
+</ol>
+</div>
+
+
+
+
+    ]]></content>
+  <title>★ Software as the Product of Obsession Times Voice</title></entry><entry>
+    
+    <link rel="alternate" type="text/html" href="https://daringfireball.net/2026/05/y_combinators_stake_in_openai" />
+	<link rel="shorturl" href="http://df4.us/x5p" />
+	<id>tag:daringfireball.net,2026://1.42973</id>
+	<published>2026-05-05T01:47:01Z</published>
+	<updated>2026-05-19T00:24:18Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<summary type="text">The fact that Paul Graham personally has billions of dollars at stake with OpenAI doesn’t mean that his public opinion on Sam Altman’s trustworthiness and leadership is invalid. But it certainly seems like the sort of thing that ought to be disclosed when quoting Graham as an Altman character reference.</summary>
+	<content type="html" xml:base="https://daringfireball.net/" xml:lang="en"><![CDATA[
+
+<p>Speaking of companies with <a href="https://daringfireball.net/linked/2026/05/04/google-owns-a-big-chunk-of-anthropic">valuable minority stakes in AI companies</a>, there’s one thing that stuck in my craw about the blockbuster <a href="https://www.newyorker.com/magazine/2026/04/13/sam-altman-may-control-our-future-can-he-be-trusted">Ronan Farrow / Andrew Marantz investigative piece on Sam Altman and OpenAI</a> last month for The New Yorker. It didn’t come up during <a href="https://www.theverge.com/podcast/911753/sam-altman-openai-ronan-farrow-new-yorker-feature-trust-liar-ai-industry">Nilay Patel’s excellent interview with Farrow on Decoder</a>, either.</p>
+
+<p>Sam Altman was the president of Y Combinator for several years, and left to become the full-time CEO of OpenAI. The New Yorker quotes Y Combinator co-founder Paul Graham multiple times, in the context of Altman’s trustworthiness. (Some of those quotes are firsthand, others secondhand.) Graham’s role in the story — particularly his public remarks <em>after</em> publication — comprised an entire section in <a href="https://daringfireball.net/2026/04/when_he_is_alive_and_not_after_he_is_dead">my own take on the New Yorker piece</a>, wherein I concluded:</p>
+
+<blockquote>
+  <p>I would characterize Graham’s tweets re: Altman this week as
+emphasizing only that Altman was not fired or otherwise forced
+from YC, and could have stayed as CEO at YC if he’d found another
+CEO for OpenAI. But for all of Graham’s elucidating engagement on
+Twitter/X this week regarding this story, he’s dancing around the
+core question of the Farrow/Marantz investigation, the one right
+there in The New Yorker’s headline: Can Sam Altman be trusted?
+“<em>We didn’t ‘remove’ Sam Altman</em>” and “<em>We didn’t want him to
+leave</em>” are not the same things as saying, say, “<em>I think Sam
+Altman is honest and trustworthy</em>” or “<em>Sam Altman is a man of
+integrity</em>”. If Paul Graham were to say such things, clearly and
+unambiguously, those remarks would carry tremendous weight. But — rather conspicuously to my eyes — he’s not saying such things.</p>
+</blockquote>
+
+<p>The thing that stuck in my craw is this: <em>Does Y Combinator own a stake in OpenAI? And if they do, given OpenAI’s sky-high valuation, isn’t that stake worth billions of dollars?</em></p>
+
+<p>OpenAI was seeded by an offshoot of Y Combinator <a href="https://web.archive.org/web/20160611042811/https://ycr.org/">called YC Research</a> in 2016 — when Altman was running YC. In December 2023, the well-known AI expert (and AI-hype skeptic) <a href="https://garymarcus.substack.com/p/not-consistently-candid">Gary Marcus wrote the following</a>, in a piece on Altman’s trustworthiness in the wake of the OpenAI board saga that saw Altman fired, re-hired, and the board purged in the course of a tumultuous week:</p>
+
+<blockquote>
+  <p>After poking around, I found out that “I have no equity in OpenAI”
+was only half the truth; while Altman to my knowledge holds no
+<em>direct</em> equity in OpenAI, he does have an <em>indirect</em> stake in
+OpenAI, and that fact should have been disclosed.</p>
+
+<p>In particular, he owns a stake of Y Combinator, and Y Combinator
+owns a stake in OpenAI. It may well be worth tens of millions of
+dollars; even for Altman, that’s not trivial. Since he was
+President of Y Combinator, and CEO of OpenAI; he surely was
+aware of this.</p>
+</blockquote>
+
+<p>So it’s well known that Y Combinator owns <em>some</em> stake in OpenAI. But how big is that stake? This seems like devilishly difficult information to obtain. I asked around and a little birdie who knows several OpenAI investors came back with an answer: Y Combinator owns about 0.6 percent of OpenAI. At OpenAI’s current <a href="https://openai.com/index/accelerating-the-next-phase-ai/">$852 billion valuation</a>, that’s worth over $5 billion.</p>
+
+<p>Graham <a href="https://www.youtube.com/watch?v=6u4JVz7iQTY">and his wife Jessica Livingston</a> are two of Y Combinator’s four founding partners. The fact that Paul Graham personally has billions of dollars at stake with OpenAI doesn’t mean that his public opinion on Sam Altman’s trustworthiness and leadership is invalid. But it certainly seems like the sort of thing that ought to be disclosed when quoting Graham as an Altman character reference. A billion dollars here, a billion there — that adds up to the sort of money that <em>might</em> skew a fellow’s opinion.</p>
+
+
+
+
+    ]]></content>
+  <title>★ Y Combinator’s Stake in OpenAI</title></entry><entry>
+    
+    <link rel="alternate" type="text/html" href="https://daringfireball.net/2026/05/crimes_against_decency_need_as_much_cover-up_as_crimes_against_the_law" />
+	<link rel="shorturl" href="http://df4.us/x5e" />
+	<id>tag:daringfireball.net,2026://1.42962</id>
+	<published>2026-05-03T23:25:41Z</published>
+	<updated>2026-05-04T01:51:06Z</updated>
+	<author>
+		<name>John Gruber</name>
+		<uri>http://daringfireball.net/</uri>
+	</author>
+	<summary type="text">There is no point getting any more outraged or disgusted at Meta for firing the Kenyan contractors who exposed the privacy fiasco of AI Glasses than you already were in the first place. They had to fire them.</summary>
+	<content type="html" xml:base="https://daringfireball.net/" xml:lang="en"><![CDATA[
+
+<p>A follow-up point to <a href="https://daringfireball.net/linked/2026/05/01/meta-solved-their-problem">Friday’s post</a> about Meta unceremoniously shitcanning its entire contract with Sama, the Kenyan contractor that employed over 1,100 contractors to serve as Mechanical Turks for Meta’s AI efforts, after a few of the contractors told investigative reporters about the incredibly private things they witnessed from footage captured by users of Meta’s AI Glasses.</p>
+
+<p>There is no point getting <a href="https://pxlnv.com/linklog/meta-sama-contract-dispute/">any more</a> outraged or disgusted at Meta for firing these contractors than you already were in the first place. They had to fire them. The moment <a href="https://www.svd.se/a/K8nrV4/metas-ai-smart-glasses-and-data-privacy-concerns-workers-say-we-see-everything">this investigative report was published in late February</a>, the fate of Sama’s Kenyan operation was sealed. They were toast. The key to understanding this is that Meta runs a criminal enterprise. Most of the organized crimes Meta commits aren’t crimes against the legal code (although <a href="https://www.reuters.com/legal/government/meta-faces-new-mexico-trial-that-could-force-changes-facebook-other-platforms-2026-05-02/">some</a> <a href="https://www.reuters.com/sustainability/boards-policy-regulation/italy-court-allows-class-action-against-meta-over-facebook-data-scraping-2026-04-14/">are</a>), but rather crimes against public perception and human decency. Remember <a href="https://daringfireball.net/linked/2024/03/29/meta-onavo-snapchat">what they did with Onavo</a>, their VPN product? Was that illegal? Dunno. Was it outrageous? Hell yes.</p>
+
+<p>Let’s just concede for the sake of argument that there’s nothing illegal about the way Meta was sending video footage from users’ AI Glasses to contractors in Kenya to review. I presume they’re still doing it today, just with different contractors, in a different computer cubicle sweatshop, perhaps in a different country. Nothing to cover up legally. But just the plain description of what they’re doing fills people with a visceral repulsion. However, people only have that visceral reaction <em>if they know what’s going on</em>. Part of the whole premise is that the whole thing has to be kept on the q.t.</p>
+
+<p>If it said right on the box that when you use Meta AI Glasses, the footage might be reviewed by third-party contractors, and when that footage is reviewed, you — the user whose footage is being reviewed — won’t know it’s happening and won’t get prompted first for permission (because you’ve actually OK’d it in advance just by hitting the “Accept” button on the long dense <a href="https://www.facebook.com/legal/ai-terms">terms of service</a> that literally almost <em>no one</em> reads because such terms are written in impenetrable legalese), almost no one would buy them. And if it were more widely known that this is how these glasses work, there’d be more of a social stigma surrounding those who wear them.<sup id="fnr1-2026-05-03"><a href="#fn1-2026-05-03">1</a></sup></p>
+
+<p>That, I think, is the primary reason why the contractors were in Kenya in the first place, and their replacements (now that Meta has terminated its contract with Sama) are surely still in some third-world country. It’s not about the lower wages (but that doesn’t hurt). It’s about the fact that the entire <em>existence</em> of the operation is easier to keep quiet when it’s literally on the other side of the planet. It’s a goddamn marvel that the investigative reporters from those two Swedish newspapers found them.</p>
+
+<p>Most illegal acts are scandalous, but many scandalous acts are perfectly legal. But all scandalous acts need to be covered up. The operation has to be kept quiet, has to be covered up, because it’s unacceptable. It’s outrageous. If this were more widely publicized, Meta would suffer on two fronts. First, it would become better known that there’s nothing artificial about some of what they call “AI” — it’s in fact powered by human intelligence, just in another hemisphere. Second, and related to the first, some of the interactions you have with Meta AI — including images and video you send it, and images and video captured by Meta AI Glasses — are reviewed by human contractors. People write things and show things to AI, thinking it’s kept private between them and a computer program, that they would never share if they knew it might be seen by human beings paid by the AI provider to refine the training and correct its mistakes. A lot of people only use these “AI” products because they have no idea what’s actually going on.</p>
+
+<p>“Three may keep a secret, if two of them are dead.” <br />
+—Benjamin Franklin, <em>Poor Richard’s Almanack</em></p>
+
+<p>Anyway, enjoy the Meta AI built into WhatsApp and Instagram. And maybe keep a link to that <a href="https://www.svd.se/a/K8nrV4/metas-ai-smart-glasses-and-data-privacy-concerns-workers-say-we-see-everything">report on Meta’s contractors in Kenya</a> handy for anyone you meet who wears AI Glasses.</p>
+
+<div class="footnotes">
+<hr />
+<ol>
+
+<li id="fn1-2026-05-03">
+<p>It’s a fascinating mystery what becomes a scandal and what doesn’t. One flaw in our news media culture is that stories from other countries, especially countries where English is not the primary language, tend never to gain traction here. You’d think the Internet, and the rise of very good automated language translation, would change this. But that doesn’t seem to be the case. After this story came out in February — a joint investigation <a href="https://www.svd.se/a/K8nrV4/metas-ai-smart-glasses-and-data-privacy-concerns-workers-say-we-see-everything">co-published by the Swedish publications Svenska Dagbladet</a> and Göteborgs-Posten — it just faded away after a few days. I remember thinking <a href="https://daringfireball.net/linked/2026/03/09/kenya-meta-contractors">when I linked to it</a>, “<em>Man, this feels potentially explosive — this might blow up into a big scandal.</em>” But it didn’t. I didn’t forget about it, but I hadn’t thought about it in weeks, until I happened to catch this news — <a href="https://pxlnv.com/linklog/meta-sama-contract-dispute/">via Nick Heer</a> — that Meta had severed ties with Sama, the contracting firm.</p>
+
+<p>I can’t help but think that if the exact same original report had been published by, say, The New York Times or The New Yorker, or in video form by 60 Minutes, that it might have blown up into a sizable scandal and public relations disaster for Meta. But as it stands, it largely passed without note. In addition to the fact that the original story was published in Sweden, the other missing factor is they didn’t publish leaked images or footage from users of Meta AI Glasses. We read testimony from these Kenyans that as part of their jobs, they watched AI Glasses owners having sex and going to the toilet, but we never see footage of AI Glasses owners having sex or going to the toilet. That shouldn’t make a huge difference, but human nature is such that it does.&nbsp;<a href="#fnr1-2026-05-03"  class="footnoteBackLink"  title="Jump back to footnote 1 in the text.">&#x21A9;&#xFE0E;</a></p>
+</li>
+
+</ol>
+</div>
+
+
+
+
+    ]]></content>
+  <title>★ Crimes Against Decency Need as Much Cover-Up as Crimes Against the Law</title></entry></feed><!-- THE END -->

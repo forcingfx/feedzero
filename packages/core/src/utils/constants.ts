@@ -200,20 +200,6 @@ export const ARTICLE_GROUPING = {
 export const AUTO_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 
 /**
- * Watchdog for the boot-time sync pull. The returning-user boot path
- * awaits a vault pull before flipping `isDbReady` so consumers see a
- * post-importAll DB (avoiding the clear+bulkPut race documented in
- * `tests/e2e/sync-100-feeds.spec.ts`). If the pull never settles — a
- * stalled edge function, a connection that opens but never delivers
- * bytes, a TLS handshake that hangs — that wait would keep the user on
- * "Loading…" indefinitely with no escape. 10s is the upper bound on
- * "still feels like a slow network" before we give up and proceed with
- * the local DB. The pull continues in the background and a follow-up
- * `loadFeeds` picks up its data if it eventually lands.
- */
-export const BOOT_PULL_TIMEOUT_MS = 10 * 1000;
-
-/**
  * How often an open tab re-verifies the license token against the server.
  * The boot-time check (app.tsx) and cross-tab storage events catch most
  * changes, but a tab left open for days never reboots — so a lapsed

@@ -103,9 +103,12 @@ describe("App sync-aware init", () => {
     localStorageMock.clear();
     vi.clearAllMocks();
     useAppStore.setState({
+      bootState: { kind: "unknown" },
       isDbReady: false,
       error: null,
       hasCompletedOnboarding: null,
+      recoveryMode: null,
+      securityProblem: null,
     });
     useSyncStore.setState({
       status: "local-only",
@@ -187,22 +190,13 @@ describe("App sync-aware init", () => {
     expect(useSyncStore.getState().status).toBe("synced");
   });
 
-  it("shows error when new-user initialization fails", async () => {
-    // New user — onboarding not complete
-    useAppStore.setState({ hasCompletedOnboarding: false });
-
-    const { initFresh } = await import("@/core/storage/key-manager");
-    vi.mocked(initFresh).mockResolvedValueOnce({
-      ok: false,
-      error: "Web Crypto unavailable",
-    });
-
-    render(<App />);
-
-    await waitFor(() => {
-      expect(useAppStore.getState().error).toBeTruthy();
-    });
-  });
+  // (Removed) "shows error when new-user initialization fails" —
+  // the auto-initialize-on-new-user path no longer exists. startNewUserOnboarding
+  // now transitions the FSM to needs-onboarding and waits for the modal
+  // to drive initialize() based on the user's explicit choice. The
+  // structural regression-lock lives in app-store.test.ts ("does NOT call
+  // initFresh — passphrase generation + DB init are the modal's job");
+  // modal-driven init failures are covered by the onboarding-modal tests.
 
   it("auto-subscribes new users to the release notes feed on first launch", async () => {
     // The app calls addFeed(CHANGELOG_FEED_URL) when isDbReady and

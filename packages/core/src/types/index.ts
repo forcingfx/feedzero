@@ -353,6 +353,18 @@ export interface Briefing {
    * stale-indicator dot in the sidebar; resets to 0 on a fresh report.
    */
   staleArticleCount: number;
+  /**
+   * Opt-in flag: when true and the user has Signal nightly refresh
+   * enabled, this briefing's `refreshBriefing` flow runs automatically
+   * around local midnight. Each automatic run still calls the user's
+   * Anthropic key with the same cost as a manual refresh. Default
+   * false; flipped from the briefing's header switch.
+   *
+   * Optional in the type because briefings created before the field
+   * was introduced have no value persisted; the absent case is
+   * treated as false everywhere it's read.
+   */
+  dailyRefresh?: boolean;
 }
 
 /**

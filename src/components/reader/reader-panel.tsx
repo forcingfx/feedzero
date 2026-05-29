@@ -80,10 +80,12 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   // previous (article A) scroll offset before the position snaps back to 0.
   // See GitLab #8.
   //
-  // When the feed has preferFullText=true, OR the article has no readable
-  // blurb in the feed (no content/summary), immediately switch to extracted
-  // view so the user doesn't see the teaser flash — or worse, a blank pane —
-  // before the cached or newly-fetched full text takes over.
+  // When the feed has preferFullText=true, OR the article would render a
+  // genuinely blank pane (no readable text AND no visible media), switch
+  // straight to extracted view so the user doesn't sit on a blank pane.
+  // Image-only, video-embed, and `<audio>` podcast entries are NOT blank —
+  // the picture / player IS the content, so isFeedBlurbEmpty keeps us in
+  // Feed view for those. See `src/lib/content-modes.ts`.
   useLayoutEffect(() => {
     resetForArticle();
     if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;

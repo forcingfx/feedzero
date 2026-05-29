@@ -190,6 +190,7 @@ export function createBriefing({
     lastRunAt: null,
     lastReport: null,
     staleArticleCount: 0,
+    dailyRefresh: false,
   });
 }
 

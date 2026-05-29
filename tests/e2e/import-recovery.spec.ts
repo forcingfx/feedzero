@@ -44,9 +44,13 @@ test.describe("Import recovery — placeholder for rate-limited URLs", () => {
       }
       if (targetHost === "rate-limited.example.com") {
         if (phase === "rate-limited") {
+          // Retry-After: 1 (not 60) keeps the host-pause window
+          // (src/core/feeds/host-pause.ts) under the test runtime
+          // budget. The recovery phase below waits the pause out
+          // before pressing "r" so the keypress fires a real fetch.
           route.fulfill({
             status: 429,
-            headers: { "retry-after": "60" },
+            headers: { "retry-after": "1" },
             body: "Too Many Requests",
           });
           return;
@@ -75,11 +79,14 @@ test.describe("Import recovery — placeholder for rate-limited URLs", () => {
     await page.waitForURL(/\/settings\?tab=sync-and-data/);
     await page.getByRole("radio", { name: "Paste text" }).click();
     await page
-      .getByPlaceholder(
-        "Paste OPML XML, Pocket HTML export, or feed URLs (one per line)",
-      )
+      .getByPlaceholder(/^Paste OPML XML/)
       .fill(URL_LIST);
     await page.getByRole("button", { name: "Import feeds" }).click();
+    // Confirm the preview step (added in PR #192) so the actual import runs.
+    await page
+      .getByTestId("import-preview")
+      .getByRole("button", { name: /^Import \d+ feeds?$/ })
+      .click();
 
     // Results summary shows the 3-bucket breakdown: 1 added, 1 queued.
     await expect(
@@ -115,6 +122,12 @@ test.describe("Import recovery — placeholder for rate-limited URLs", () => {
     await expect(
       page.getByRole("button", { name: "Refresh", exact: true }),
     ).toBeEnabled({ timeout: 15000 });
+
+    // The boot refresh's 429 registered a host-pause for ~1s (see the
+    // Retry-After header on the mock). Wait it out before pressing "r"
+    // so the next refreshFeed call clears `hostPausedUntil` and issues
+    // a real fetch instead of skipping with "Skipped: host paused".
+    await page.waitForTimeout(1500);
 
     // Phase 2: flip the mock so rate-limited.* now returns 200. Hit "r"
     // to refresh all feeds. The placeholder upgrades in place: indicator

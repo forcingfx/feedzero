@@ -75,6 +75,14 @@ export const useAISignalStore = create<AISignalStore>((set) => ({
   loadingStartedAt: null,
 
   loadReport: async (opts) => {
+    // In-flight guard. The Signal page useEffect kicks loadReport on
+    // every mount + corpus change; a navigate-away + back during an
+    // AI run would otherwise re-enter while a request was in flight.
+    // The user's explicit Refresh ({ force: true }) bypasses.
+    if (!opts?.force && useAISignalStore.getState().status === "loading") {
+      return;
+    }
+
     const articles = collectAllArticles();
     const corpusSize = articles.length;
 

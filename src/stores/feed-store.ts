@@ -9,8 +9,12 @@ import {
   updateFolder as dbUpdateFolder,
   removeFolder as dbRemoveFolder,
   getAllArticles,
+  updateArticles as dbUpdateArticles,
 } from "../core/storage/db.ts";
 import { createRule } from "../core/storage/schema.ts";
+import { applyRuleToExisting } from "../core/rules/engine.ts";
+import { buildContext } from "../core/filters/evaluator.ts";
+import { useSmartFilterStore } from "./smart-filter-store.ts";
 import {
   addFeedFlow,
   addPlaceholderFeed as addPlaceholderFeedCore,
@@ -201,6 +205,17 @@ interface FeedStore {
   removeFeedRule: (feedId: string, ruleId: string) => Promise<void>;
   reorderFeedRules: (feedId: string, orderedIds: string[]) => Promise<void>;
   /**
+   * Backfill one rule across the articles already stored for a feed.
+   * Loads the in-memory snapshot, runs the rule via the pure engine,
+   * persists only the diff via `updateArticles`, schedules a sync push
+   * if anything changed, and reloads the article store for the active
+   * view. Closes the "rule does nothing until next ingest" UX gap.
+   */
+  applyRuleToExistingArticles: (
+    feedId: string,
+    ruleId: string,
+  ) => Promise<Result<{ changed: number; total: number }>>;
+  /**
    * When non-null, the rules-editor dialog is open against this feed.
    * Dialog mounts at the app root and reads this slice.
    */
@@ -290,6 +305,23 @@ async function reloadFeeds(
 ): Promise<void> {
   const all = await getFeeds();
   if (all.ok) set({ feeds: sortFeeds(all.value) });
+}
+
+/**
+ * Reload the article store so the open list reflects any rows written
+ * by the refresh path that just ran. Mirrors the tail every
+ * feed-mutating action (refreshAll, refreshView, reloadSingleFeed)
+ * already needs — without it, the user has to navigate away and back
+ * for new articles to appear. Extracted so an action that intentionally
+ * skips the reload (e.g. a metadata-only mutator) is a visible
+ * one-line omission instead of a forgotten copy of the dance.
+ */
+async function reloadArticleStoreForView(
+  selectedFeedId: string | null,
+): Promise<void> {
+  const articleStore = useArticleStore.getState();
+  await articleStore.preloadAll();
+  if (selectedFeedId) await articleStore.loadArticles(selectedFeedId);
 }
 
 /**
@@ -635,6 +667,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       } else {
         await reloadFeeds(set);
       }
+      // Without this, auto-refresh (boot, timer, focus) lands new rows
+      // in the DB that don't render until the user navigates away and
+      // back. On mobile that read as a "stale feed" after the loading
+      // screen cleared.
+      await reloadArticleStoreForView(get().selectedFeedId);
       schedulePush();
     } finally {
       set({ isRefreshingAll: false, lastRefreshAllAt: Date.now() });
@@ -664,12 +701,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         await Promise.all(targets.map((feed) => refreshFeed(feed)));
       }
       await reloadFeeds(set);
-      // Reload the article store so the freshly-fetched items show up in the
-      // open list without the user re-navigating. preloadAll keeps the other
-      // views coherent; loadArticles re-derives the visible list for this one.
-      const articleStore = useArticleStore.getState();
-      await articleStore.preloadAll();
-      await articleStore.loadArticles(feedId);
+      await reloadArticleStoreForView(feedId);
       schedulePush();
     } finally {
       // A scoped refresh leaves other feeds untouched, so it must not stamp
@@ -694,10 +726,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       const feed = feedResult.value;
 
       await reloadFeed(feed);
-      const { loadArticles, preloadAll } = useArticleStore.getState();
-      await preloadAll();
-      const selectedFeedId = get().selectedFeedId;
-      if (selectedFeedId) await loadArticles(selectedFeedId);
+      await reloadArticleStoreForView(get().selectedFeedId);
     } finally {
       const ids = new Set(get().refreshingFeedIds);
       ids.delete(feedId);
@@ -922,6 +951,33 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       },
       set,
     );
+  },
+
+  applyRuleToExistingArticles: async (feedId, ruleId) => {
+    if (!enforceFeature("rules"))
+      return err("Rules require the Personal tier");
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return err(feedResult.error);
+    const target = (feedResult.value.rules ?? []).find((r) => r.id === ruleId);
+    if (!target) return err(`Rule ${ruleId} not found on feed ${feedId}`);
+
+    const articleStore = useArticleStore.getState();
+    const existing = articleStore.articlesByFeedId[feedId] ?? [];
+    const ctx = buildContext({
+      feeds: get().feeds,
+      filters: useSmartFilterStore.getState().filters,
+    });
+    const { changed } = applyRuleToExisting(existing, target, ctx);
+
+    if (changed.length > 0) {
+      const writeResult = await dbUpdateArticles(changed);
+      if (!writeResult.ok) return err(writeResult.error);
+      schedulePush();
+      // Re-read the article-store from the (now-updated) DB so the UI
+      // reflects the muted state without a navigation.
+      await reloadArticleStoreForView(get().selectedFeedId);
+    }
+    return ok({ changed: changed.length, total: existing.length });
   },
 }));
 

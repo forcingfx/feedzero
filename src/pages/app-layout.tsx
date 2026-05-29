@@ -4,6 +4,7 @@ import { useFeedStore } from "@/stores/feed-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh.ts";
+import { useSignalMidnightRefresh } from "@/hooks/use-signal-midnight-refresh.ts";
 import { useBriefingAutoRefresh } from "@/hooks/use-briefing-auto-refresh.ts";
 import { useLicenseRefresh } from "@/hooks/use-license-refresh.ts";
 import { useSharedSidebarSize } from "@/hooks/use-shared-sidebar-size.ts";
@@ -96,6 +97,7 @@ export function AppLayout() {
   useAutoRefresh();
   useBriefingAutoRefresh();
   useLicenseRefresh();
+  useSignalMidnightRefresh();
   useDefaultFeedsRedirect();
 
   function handleFeedSelect(id: string) {
@@ -116,35 +118,7 @@ export function AppLayout() {
     );
   }
 
-  return (
-    <>
-      <DesktopShell onFeedSelect={handleFeedSelect} />
-      <FloatingSyncBadge />
-    </>
-  );
-}
-
-/**
- * Floating sync-status pill, pinned to the top-right of the viewport
- * on every route. Lives outside the ResizablePanelGroup so it never
- * triggers a panel-children-changed remount (ADR 013).
- *
- * z-index sits ABOVE Radix dialogs (z-50) so the badge stays visible
- * even when a modal is open — same role as a macOS menu-bar status
- * icon. The pointer-events-none on the outer wrapper means it never
- * blocks clicks except on the badge itself.
- */
-function FloatingSyncBadge() {
-  return (
-    <div
-      className="pointer-events-none fixed right-4 top-3 z-[60]"
-      data-testid="floating-sync-badge"
-    >
-      <div className="pointer-events-auto">
-        <SyncStatusBadge />
-      </div>
-    </div>
-  );
+  return <DesktopShell onFeedSelect={handleFeedSelect} />;
 }
 
 function DesktopShell({ onFeedSelect }: { onFeedSelect: (id: string) => void }) {

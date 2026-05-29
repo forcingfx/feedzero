@@ -43,6 +43,30 @@ export function applyRules(
 }
 
 /**
+ * Run one rule against an array of stored articles and return the
+ * subset whose persisted shape changes. Idempotent actions (mute on an
+ * already-muted article, mark-read on a read article) drop out so the
+ * caller's `updateArticles` write touches only what actually changed —
+ * decryption + IndexedDB writes cost real time on big feeds.
+ *
+ * Disabled rules and rules with empty actions yield an empty diff. The
+ * input array is never mutated; each changed entry is a new object.
+ */
+export function applyRuleToExisting(
+  articles: Article[],
+  rule: Rule,
+  ctx: EvalContext,
+): { changed: Article[] } {
+  if (!rule.enabled || rule.actions.length === 0) return { changed: [] };
+  const changed: Article[] = [];
+  for (const article of articles) {
+    const next = applyRules(article, [rule], ctx);
+    if (next !== article) changed.push(next);
+  }
+  return { changed };
+}
+
+/**
  * Apply one action to one article. Exhaustive switch — TypeScript
  * forces every action kind to be covered, so adding a new kind to
  * `RuleAction` is a compile-time error until the engine handles it.
