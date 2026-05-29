@@ -23,7 +23,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -46,7 +46,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           # gitleaks history scan needs full git history.
           fetch-depth: 0

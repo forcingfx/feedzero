@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           # Check out the SHA Vercel actually deployed, not main HEAD.
           ref: ${{ github.event.deployment.sha }}

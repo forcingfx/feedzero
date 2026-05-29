@@ -179,10 +179,14 @@ describe("AppSidebar layout structure", () => {
   describe("sync chip visibility", () => {
     it("does not render the SyncBadge for local-only online users", () => {
       useSyncStore.setState({ status: "local-only" });
-      renderSidebar();
-      // The amber sidebar-footer chip is the one we want suppressed; ensure
-      // no element with the visible 'Local' label is in the document.
-      expect(screen.queryByText(/^Local$/)).not.toBeInTheDocument();
+      const { container } = renderSidebar();
+      // The amber sidebar-footer chip is the one we want suppressed.
+      // Scope the check to the footer — the header SyncStatusBadge also
+      // renders the word "Local" for local-only users with no refresh
+      // history, and that surface is a different decision.
+      const footer = container.querySelector("[data-sidebar='footer']");
+      expect(footer).not.toBeNull();
+      expect(footer!.textContent).not.toMatch(/\bLocal\b/);
     });
 
     it("still renders the Synced pill when sync is active", () => {
@@ -214,9 +218,13 @@ describe("AppSidebar layout structure", () => {
       // After the dropdown→button refactor, the chip is suppressed for
       // local-only + online users — the amber "Cloud sync" launcher lives
       // inside Settings → Account instead. The button just says "Settings".
+      // Scoped to the footer so the header SyncStatusBadge's "Local"
+      // (a different surface, different decision) doesn't interfere.
       useSyncStore.setState({ status: "local-only" });
-      renderSidebar();
-      expect(screen.queryByText(/^Local$/)).toBeNull();
+      const { container } = renderSidebar();
+      const footer = container.querySelector("[data-sidebar='footer']");
+      expect(footer).not.toBeNull();
+      expect(footer!.textContent).not.toMatch(/\bLocal\b/);
     });
   });
 });
