@@ -57,6 +57,13 @@ describe("extraction-store paywall handling", () => {
     resetExtraction();
     resetExtension();
     vi.clearAllMocks();
+    // Realistic baseline: an *anonymous* fetch of a gated page yields no
+    // usable extraction — only an authenticated retry does. The store now
+    // extracts before deciding paywall (issue #211 fix), so tests that
+    // exercise the gated path must start from "nothing extracted" unless
+    // they explicitly model a readable body. (clearAllMocks resets call
+    // history but not return values, so set the default here every test.)
+    vi.mocked(extract).mockReturnValue(err("no extraction"));
   });
 
   describe("paywall detection on proxy fetch", () => {
@@ -116,6 +123,85 @@ describe("extraction-store paywall handling", () => {
       expect(state.paywallMap["https://example.com/free"]).toBeUndefined();
       expect(state.cache["https://example.com/free"]).toBe("<p>Full</p>");
     });
+
+    // Regression: issue #211. Many free articles (Wired, NYT, lttlabs, …)
+    // ship industry-standard "Subscribe" CTAs in their nav/footer/newsletter
+    // chrome. Detection used to run against the *raw page* before extraction,
+    // so that chrome phrase-matched and the fully-readable article was wrongly
+    // flagged paywalled. The article must render; the chrome is irrelevant.
+    it("renders a fully-readable article even when page chrome contains subscribe CTAs (#211)", async () => {
+      const articleBody = `<article>${"<p>A real, readable paragraph of the article body. </p>".repeat(40)}</article>`;
+      const pageWithChrome = `
+        <html><body>
+          <nav><a href="/subscribe">Subscribe</a></nav>
+          ${articleBody}
+          <footer>
+            <p>Subscribe to continue reading our award-winning journalism.</p>
+            <a href="/login">Already a subscriber?</a>
+          </footer>
+        </body></html>
+      `;
+      const extractedArticle =
+        "<article>" +
+        "<p>A real, readable paragraph of the article body. </p>".repeat(40) +
+        "</article>";
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(pageWithChrome),
+      }) as unknown as typeof fetch;
+      vi.mocked(extract).mockReturnValue({
+        ok: true,
+        value: { content: extractedArticle, title: "", author: "", excerpt: "" },
+      });
+      useExtensionStore.setState({ status: "absent" });
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://www.wired.com/story/free-article");
+
+      const state = useExtractionStore.getState();
+      expect(
+        state.paywallMap["https://www.wired.com/story/free-article"],
+      ).toBeUndefined();
+      expect(state.cache["https://www.wired.com/story/free-article"]).toBe(
+        extractedArticle,
+      );
+      expect(
+        state.statusMap["https://www.wired.com/story/free-article"],
+      ).toBe("available");
+    });
+
+    // Regression: issue #211. A genuinely short but free post (below the
+    // real-article threshold) with no gate phrases must still render — the
+    // raw-page `body-too-short` heuristic used to flag it as paywalled.
+    it("renders a short but free article with no gate phrases (#211)", async () => {
+      const html =
+        "<html><body><article><p>Tiny but completely free post.</p></article></body></html>";
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(html),
+      }) as unknown as typeof fetch;
+      vi.mocked(extract).mockReturnValue({
+        ok: true,
+        value: {
+          content: "<p>Tiny but completely free post.</p>",
+          title: "",
+          author: "",
+          excerpt: "",
+        },
+      });
+      useExtensionStore.setState({ status: "absent" });
+
+      await useExtractionStore
+        .getState()
+        .fetchExtracted("https://blog.example.com/tiny");
+
+      const state = useExtractionStore.getState();
+      expect(state.paywallMap["https://blog.example.com/tiny"]).toBeUndefined();
+      expect(state.cache["https://blog.example.com/tiny"]).toBe(
+        "<p>Tiny but completely free post.</p>",
+      );
+    });
   });
 
   describe("authenticated retry through the extension", () => {
@@ -127,10 +213,21 @@ describe("extraction-store paywall handling", () => {
       vi.mocked(fetchArticle).mockResolvedValue(
         ok({ html: FULL_HTML, finalUrl: "https://nytimes.com/article-3", status: 200 }),
       );
-      vi.mocked(extract).mockReturnValue({
-        ok: true,
-        value: { content: "<p>Authenticated full article</p>", title: "", author: "", excerpt: "" },
-      });
+      // Anonymous PAYWALL_HTML extracts to nothing; the authenticated
+      // FULL_HTML extracts to the full body.
+      vi.mocked(extract).mockImplementation((html: string) =>
+        html === FULL_HTML
+          ? {
+              ok: true,
+              value: {
+                content: "<p>Authenticated full article</p>",
+                title: "",
+                author: "",
+                excerpt: "",
+              },
+            }
+          : err("no extraction"),
+      );
       useExtensionStore.setState({
         status: "installed",
         authorizedDomains: ["nytimes.com"],

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { proxyFetch } from "../core/proxy/proxy-fetch.ts";
 import { detectPaywall, type PaywallVerdict } from "../core/extractor/paywall-detectors/index.ts";
 import { publisherHost } from "../core/extractor/paywall-detectors/host.ts";
+import { visibleTextLength } from "../core/extractor/paywall-detectors/visible-text.ts";
 import { fetchArticle as extensionFetchArticle } from "../core/extension/protocol.ts";
 import { useExtensionStore } from "./extension-store.ts";
 
@@ -176,6 +177,36 @@ function recordCacheEntry(url: string, html: string): void {
   cacheMeta.set(url, { ts: Date.now(), bytes: html.length });
 }
 
+/**
+ * Visible-character count above which an extraction is treated as a real,
+ * readable article — at which point any "Subscribe" CTA in the surrounding
+ * page chrome is irrelevant and we render without consulting paywall
+ * heuristics at all. Applied to the *extracted* content, not the raw page;
+ * that distinction is the fix for issue #211, where free articles were
+ * flagged paywalled because the full page's nav/footer contained
+ * industry-standard subscribe phrases.
+ */
+const MIN_ARTICLE_CHARS = 600;
+
+/** Cache extracted content and mark the URL available (eviction-aware). */
+function cacheExtracted(
+  url: string,
+  content: string,
+  set: (
+    partial: Partial<{
+      cache: Record<string, string>;
+      statusMap: Record<string, ExtractionStatus>;
+    }>,
+  ) => void,
+  get: () => ExtractionStore,
+): void {
+  recordCacheEntry(url, content);
+  set({
+    cache: evictCache({ ...get().cache, [url]: content }),
+    statusMap: { ...get().statusMap, [url]: "available" },
+  });
+}
+
 export const useExtractionStore = create<ExtractionStore>((set, get) => ({
   cache: {},
   statusMap: {},
@@ -241,19 +272,35 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
       }
       const anonymousHtml = await response.text();
 
-      const verdict = detectPaywall(anonymousHtml, url);
-      if (verdict.paywalled) {
+      // Extract FIRST. A substantial extraction is the definitive signal
+      // that the article is readable, so the surrounding page chrome (nav,
+      // footer, newsletter prompts) is irrelevant — render and stop. This
+      // ordering is the fix for issue #211: paywall heuristics used to run
+      // against the raw page before extraction, so a free article whose
+      // chrome contained a stock "Subscribe to continue" / "Already a
+      // subscriber?" phrase was wrongly gated.
+      const result = extract(anonymousHtml, url);
+      const content = result?.ok ? result.value.content : "";
+
+      if (content && visibleTextLength(content) >= MIN_ARTICLE_CHARS) {
+        cacheExtracted(url, content, set, get);
+        return;
+      }
+
+      // Thin or empty extraction. Only NOW consult the paywall heuristics,
+      // and scope them to the extracted teaser when we have one so the
+      // page chrome can't false-positive. A `body-too-short` verdict never
+      // overrides content we *did* extract — a short free post still renders.
+      const verdict = detectPaywall(content || anonymousHtml, url);
+      const gated =
+        verdict.paywalled && !(content && verdict.reason === "body-too-short");
+      if (gated) {
         await handlePaywalledFetch(url, verdict, extract, set, get);
         return;
       }
 
-      const result = extract(anonymousHtml, url);
-      if (result.ok && result.value.content) {
-        recordCacheEntry(url, result.value.content);
-        set({
-          cache: evictCache({ ...get().cache, [url]: result.value.content }),
-          statusMap: { ...get().statusMap, [url]: "available" },
-        });
+      if (content) {
+        cacheExtracted(url, content, set, get);
       } else {
         set({
           statusMap: { ...get().statusMap, [url]: "failed" },
@@ -337,11 +384,7 @@ async function handlePaywalledFetch(
 
   const extracted = extract(retry.value.html, url);
   if (extracted.ok && extracted.value.content) {
-    recordCacheEntry(url, extracted.value.content);
-    set({
-      cache: evictCache({ ...get().cache, [url]: extracted.value.content }),
-      statusMap: { ...get().statusMap, [url]: "available" },
-    });
+    cacheExtracted(url, extracted.value.content, set, get);
     // Clear any stale verdict from a prior anonymous fetch.
     if (get().paywallMap[url]) {
       const next = { ...get().paywallMap };
