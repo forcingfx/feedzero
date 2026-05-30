@@ -1,0 +1,23 @@
+# FeedZero reverse-proxy config — LAN / IP / localhost deployments.
+#
+# Auto-selected by `scripts/feedzero` (via the CADDYFILE env var) when
+# HOSTNAME is an IP address, `localhost`, or a `.local` mDNS name. A public
+# certificate authority (Let's Encrypt) cannot issue certificates for those,
+# so Caddy mints its own root CA and a self-signed cert via `tls internal`.
+#
+# Without this, Caddy attempts ACME for the IP, fails, and the browser ends
+# up talking TLS to a port answering plain HTTP — the classic
+# SSL_ERROR_RX_RECORD_TOO_LONG. (See issue #212 and docs/self-hosting.md.)
+#
+# Trust the Caddy root CA on each client device — instructions in
+# docs/self-hosting.md (LAN-only deployment).
+
+{
+    email {$ACME_EMAIL}
+}
+
+{$HOSTNAME} {
+    tls internal
+    reverse_proxy feedzero:3000
+    encode zstd gzip
+}

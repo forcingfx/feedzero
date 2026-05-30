@@ -22,22 +22,61 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Pure helpers (hostname classification, Caddyfile selection). Sourced so the
+# same logic the CLI uses is what the tests exercise.
+# shellcheck source=scripts/feedzero-lib.sh
+. "$SCRIPT_DIR/feedzero-lib.sh"
+
 red()    { printf '\033[31m%s\033[0m\n' "$1" >&2; }
 green()  { printf '\033[32m%s\033[0m\n' "$1"; }
 yellow() { printf '\033[33m%s\033[0m\n' "$1" >&2; }
 dim()    { printf '\033[2m%s\033[0m\n' "$1"; }
 
-# Detect docker compose (modern) vs docker-compose (legacy)
-if docker compose version >/dev/null 2>&1; then
-  COMPOSE="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE="docker-compose"
-else
-  red "Docker Compose not found."
-  red "  Install Docker Desktop (macOS/Windows) or"
-  red "  the docker-compose-plugin package (Linux)."
-  exit 1
-fi
+# Detect docker compose (modern) vs docker-compose (legacy). Lazy — only the
+# commands that invoke compose call this, so `doctor`, `config`, and `help`
+# work on a box without Docker (and the decision logic stays testable).
+COMPOSE=""
+detect_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE="docker compose"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE="docker-compose"
+  else
+    red "Docker Compose not found."
+    red "  Install Docker Desktop (macOS/Windows) or"
+    red "  the docker-compose-plugin package (Linux)."
+    exit 1
+  fi
+}
+
+# Read HOSTNAME from .env without executing it (the file is user-edited).
+# Echoes the empty string when absent so callers can classify it.
+read_env_hostname() {
+  [ -f .env ] || { echo ""; return 0; }
+  line="$(grep -E '^HOSTNAME=' .env 2>/dev/null | tail -n1 || true)"
+  value="${line#HOSTNAME=}"
+  value="${value%\"}"; value="${value#\"}"
+  value="${value%\'}"; value="${value#\'}"
+  echo "$value"
+}
+
+# Decide which Caddyfile to mount from HOSTNAME and export CADDYFILE for
+# docker compose (which reads `${CADDYFILE:-./Caddyfile}`). Warns when an
+# IP/localhost host forces self-signed (internal) TLS — the fix for the
+# SSL_ERROR_RX_RECORD_TOO_LONG class in issue #212.
+resolve_tls() {
+  host="$(read_env_hostname)"
+  class="$(classify_hostname "$host")"
+  CADDYFILE="$(caddyfile_for_hostname "$host")"
+  export CADDYFILE
+  case "$class" in
+    ip | localhost)
+      yellow "  HOSTNAME '$host' is an IP / local address: using internal TLS (self-signed)."
+      yellow "  Mounting $CADDYFILE. Trust Caddy's root CA on each device —"
+      yellow "  see docs/self-hosting.md (LAN-only deployment)."
+      ;;
+  esac
+}
 
 require_env() {
   if [ ! -f .env ]; then
@@ -64,11 +103,13 @@ confirm() {
 
 cmd_up() {
   require_env
+  resolve_tls
   green "Starting FeedZero..."
   # --remove-orphans so a renamed/removed service doesn't linger.
-  # The first run on a fresh box needs --build because no image
-  # has been published yet. We pass it unconditionally; if the
-  # image is already in place it's a no-op.
+  # The first run on a fresh box needs --build because no published
+  # image may exist yet (the GHCR package is private until a release is
+  # cut + made public — see docs/self-hosting.md). We pass --build
+  # unconditionally; if the image is already in place it's a no-op.
   $COMPOSE up -d --build --remove-orphans
   green "Started. Check logs with: ./scripts/feedzero logs"
 }
@@ -182,8 +223,10 @@ cmd_doctor() {
     ok="no"
   fi
 
-  if $COMPOSE version >/dev/null 2>&1; then
-    green "  ✓ compose available: $($COMPOSE version --short 2>/dev/null || echo unknown)"
+  if docker compose version >/dev/null 2>&1; then
+    green "  ✓ compose available: $(docker compose version --short 2>/dev/null || echo unknown)"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    green "  ✓ compose available (legacy docker-compose)"
   else
     red   "  ✗ docker compose not available"
     ok="no"
@@ -191,21 +234,51 @@ cmd_doctor() {
 
   if [ -f .env ]; then
     green "  ✓ .env present"
-    if grep -qE '^HOSTNAME=feedzero\.example\.com$' .env 2>/dev/null; then
-      yellow "  ! HOSTNAME still set to the example value — edit .env"
-      ok="no"
-    fi
+    host="$(read_env_hostname)"
+    case "$(classify_hostname "$host")" in
+      empty)
+        yellow "  ! HOSTNAME is empty — set it in .env"
+        ok="no" ;;
+      example)
+        yellow "  ! HOSTNAME still set to the example value — edit .env"
+        ok="no" ;;
+      ip|localhost)
+        # Not an error: this is a supported LAN deployment. But it MUST use
+        # internal TLS, or the browser gets SSL_ERROR_RX_RECORD_TOO_LONG.
+        green "  ✓ HOSTNAME '$host' (LAN / IP) — will use internal TLS ($(caddyfile_for_hostname "$host"))"
+        yellow "  ! Self-signed cert: trust Caddy's root CA on each device (docs/self-hosting.md)." ;;
+      domain)
+        green "  ✓ HOSTNAME '$host' — public TLS via Let's Encrypt"
+        yellow "  ! Ensure an A/AAAA record points at this server before 'up', or cert issuance fails." ;;
+    esac
   else
     red   "  ✗ .env missing (copy from .env.example)"
     ok="no"
   fi
 
-  if [ -f Caddyfile ] && [ -f docker-compose.yml ]; then
-    green "  ✓ Caddyfile + docker-compose.yml present"
-  else
-    red   "  ✗ missing Caddyfile or docker-compose.yml"
-    ok="no"
-  fi
+  # The bind mount `${CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile` needs a
+  # real FILE on the host — if it's missing, Docker silently creates it as a
+  # DIRECTORY and Caddy fails to start (issue #212). Verify both variants and
+  # that neither got turned into a directory.
+  for f in Caddyfile Caddyfile.lan docker-compose.yml; do
+    if [ -d "$f" ]; then
+      red "  ✗ $f is a DIRECTORY (Docker created it from a missing bind mount). Run: rm -rf $f && git checkout $f"
+      ok="no"
+    elif [ -f "$f" ]; then
+      green "  ✓ $f present"
+    else
+      red "  ✗ missing $f"
+      ok="no"
+    fi
+  done
+
+  # The default image is the private/unpublished GHCR package, so a plain
+  # pull (or Portainer's "deploy stack", which pulls rather than builds) can
+  # fail with "denied". `up` always passes --build to cover this.
+  dim "  i Image ghcr.io/forcingfx/feedzero may be private/unpublished:"
+  dim "    'feedzero up' builds locally (--build). Portainer users: deploy via"
+  dim "    the Git Repository stack method so these files exist on disk, or"
+  dim "    build the image first. See docs/self-hosting.md (Portainer)."
 
   if [ "$ok" = "yes" ]; then
     green "All prerequisites OK."
@@ -213,6 +286,16 @@ cmd_doctor() {
     red "Some checks failed — see above."
     exit 1
   fi
+}
+
+# Dry-run: print the resolved TLS decision without touching Docker. Used by
+# operators to sanity-check a hostname and by the CLI tests. Accepts an
+# explicit hostname arg, else reads HOSTNAME from .env.
+cmd_config() {
+  host="${1:-$(read_env_hostname)}"
+  echo "HOSTNAME=$host"
+  echo "HOSTNAME_CLASS=$(classify_hostname "$host")"
+  echo "CADDYFILE=$(caddyfile_for_hostname "$host")"
 }
 
 cmd_help() {
@@ -232,6 +315,8 @@ Commands:
   backup                 Snapshot the vault data into backups/feedzero-<ts>.tar.gz.
   restore <archive>      Restore from a backup tarball (asks before overwriting).
   doctor                 Sanity-check the environment (docker, .env, configs).
+  config [hostname]      Show the resolved TLS mode + Caddyfile for a hostname
+                         (defaults to HOSTNAME in .env). No Docker needed.
   help                   This message.
 
 Common flows:
@@ -263,6 +348,12 @@ EOF
 cmd="${1:-help}"
 shift 2>/dev/null || true
 
+# Commands that drive docker compose need it present; detect lazily so the
+# Docker-free commands (doctor, config, help) still run.
+case "$cmd" in
+  up|down|restart|update|logs|status|restore) detect_compose ;;
+esac
+
 case "$cmd" in
   up)      cmd_up      "$@" ;;
   down)    cmd_down    "$@" ;;
@@ -273,6 +364,7 @@ case "$cmd" in
   backup)  cmd_backup  "$@" ;;
   restore) cmd_restore "$@" ;;
   doctor)  cmd_doctor  "$@" ;;
+  config)  cmd_config  "$@" ;;
   help|-h|--help) cmd_help ;;
   *)
     red "Unknown command: $cmd"
