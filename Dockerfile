@@ -37,18 +37,30 @@ ENV NODE_ENV=production \
 
 # Production deps only. `tsx` is needed at runtime because `serve`
 # launches `node --import tsx server.ts` to handle TypeScript on the fly.
+#
+# --ignore-scripts: with --omit=dev, npm still runs the package's own
+# `prepare` lifecycle script, which is `husky` (a devDependency). In this
+# prod image husky isn't installed, so `prepare` fails with
+# `husky: not found` → npm exit code 127, aborting the build (issue #212).
+# A production container has no git hooks to set up, so skipping lifecycle
+# scripts here is both correct and the fix. Runtime deps are pure JS with
+# no required install scripts.
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy the source the runtime actually needs:
 #   - dist/      — the SPA (Hono serves it as static files)
 #   - api/       — Vercel wrappers, also imported by tests; harmless
 #   - src/       — Hono handlers + core (imported at runtime via tsx)
+#   - packages/  — @feedzero/core (src/ imports it at runtime via the
+#                  tsconfig path alias; omitting it crashes the server at
+#                  boot with ERR_MODULE_NOT_FOUND — issue #212)
 #   - server.ts  — the entry point
 #   - tsconfig.json — tsx reads paths/baseUrl from here
 COPY --from=build /app/dist        ./dist
 COPY --from=build /app/api         ./api
 COPY --from=build /app/src         ./src
+COPY --from=build /app/packages    ./packages
 COPY --from=build /app/server.ts   ./server.ts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 

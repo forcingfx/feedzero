@@ -449,10 +449,12 @@ real error (Docker hides it without `--progress=plain`):
 docker compose build --no-cache --progress=plain feedzero 2>&1 | tail -80
 ```
 
-> An `exit code: 127` from `npm ci` almost always means a hand-edited
-> `Dockerfile`/`package.json` — start from a clean checkout
-> (`git checkout Dockerfile package.json package-lock.json`) and build
-> again before debugging further.
+> **`exit code: 127` from `npm ci --omit=dev`** was a real bug in older
+> images: the `prepare` lifecycle script ran `husky` (a devDependency not
+> present in the production layer), so the build aborted with
+> `husky: not found`. Fixed — the runtime install now uses
+> `--ignore-scripts` and the `prepare` script is guarded. If you hit it,
+> rebuild from a current checkout.
 
 ### `feedzero doctor` says HOSTNAME is the example value
 

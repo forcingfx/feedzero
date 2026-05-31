@@ -8,7 +8,11 @@
 {
     # Caddy registers anonymously with Let's Encrypt when ACME_EMAIL is
     # empty. Set it in `.env` to receive renewal failure notifications.
-    email {$ACME_EMAIL}
+    # NOTE: the value MUST be quoted — an unquoted empty `{$ACME_EMAIL}`
+    # expands to zero tokens and Caddy rejects the config with
+    # "wrong argument count after 'email'" (issue #212). Quoting makes a
+    # blank value a valid empty-string token (= anonymous).
+    email "{$ACME_EMAIL}"
 }
 
 {$HOSTNAME} {
