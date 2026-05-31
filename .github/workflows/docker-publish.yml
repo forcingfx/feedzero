@@ -27,6 +27,12 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version without leading v (e.g. 0.12.0). Set when called by release.yml."
+        required: true
+        type: string
 
 concurrency:
   group: docker-publish-${{ github.ref }}
@@ -51,6 +57,24 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v6
+
+      # Resolve the release version from the trigger and (except for the
+      # SHA-only manual dispatch) refuse to publish if it disagrees with
+      # package.json. Closes the drift class behind issues #211/#212.
+      - name: Resolve + verify release version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+            VER="${{ inputs.version }}"
+          else
+            VER="${GITHUB_REF_NAME#v}"
+          fi
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$VER" != "$PKG" ]; then
+            echo "::error::version mismatch: ref/input=$VER package.json=$PKG"; exit 1
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "minor=${VER%.*}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU (arm64 emulation for cross-arch builds)
         uses: docker/setup-qemu-action@v4
@@ -91,13 +115,14 @@ jobs:
           images: |
             ghcr.io/${{ github.repository_owner }}/feedzero
             ${{ secrets.DOCKERHUB_TOKEN != '' && format('docker.io/{0}/feedzero', github.repository_owner) || '' }}
-          # Tags:
-          #   * On version tag: vX.Y.Z, X.Y, latest
-          #   * On manual dispatch: short SHA
+          # Tags (driven by the resolved version so tag-push and
+          # workflow_call behave identically):
+          #   * Release (tag push or workflow_call): vX.Y.Z, X.Y, latest
+          #   * Manual dispatch: short SHA only (a throwaway smoke build)
           tags: |
-            type=semver,pattern={{version}},prefix=v
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=v${{ steps.ver.outputs.version }},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=raw,value=${{ steps.ver.outputs.minor }},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ github.event_name != 'workflow_dispatch' }}
             type=sha,enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build + push

@@ -63,3 +63,39 @@ publishes to GHCR only (zero-config, nothing breaks).
    registry entirely.
 3. Portainer users: Repository stack method, not web-editor paste — see
    `docs/self-hosting.md` (Deploying with Portainer).
+
+## Automated releases (`/release`)
+
+`/release` (the Claude skill in `.claude/skills/release/`) cuts a release
+end to end and replaces the old `/new-release`:
+
+1. **Local skill** — derives the version from conventional commits, drafts +
+   lints the `releases.mjs` entry, runs `build-releases.mjs`, commits and
+   pushes **landing first**, then polls until `feedzero.app/releases.xml`
+   shows the new entry. Only then does it fire the feedzero CI.
+2. **CI (`release.yml`)** — bumps `package.json`, refreshes the vendored
+   fixture from the live feed, re-verifies the version lock, runs
+   `tsc` + `npm test`, commits the bump, pushes the `vX.Y.Z` tag, and calls
+   the reusable `docker-publish.yml` to publish the multi-arch image.
+
+The four version touchpoints stay locked: landing notes → vendored fixture
+(`release-version-sync.test.ts`) → `package.json` → git tag
+(`docker-publish.yml` drift guard).
+
+### One-time setup
+
+`release.yml` commits the version bump and pushes the tag from CI, so GitHub
+Actions needs write access:
+
+- **GitHub → Settings → Actions → General → Workflow permissions → "Read and
+  write permissions"** (and allow Actions to create/approve PRs is not
+  needed). This lets `release.yml` push the bump commit + tag.
+- **Fallback** if you prefer not to grant Actions write to `main`: create a
+  fine-scoped PAT (`contents: write` on this repo), store it as the secret
+  `RELEASE_TAG_TOKEN`, and change `release.yml`'s checkout + push steps to use
+  it (`actions/checkout@v6` with `token: ${{ secrets.RELEASE_TAG_TOKEN }}`).
+  The tag it pushes then also triggers `docker-publish.yml` directly, so you
+  could drop the `publish` job — at the cost of managing a token.
+
+`workflow_call` means `docker-publish.yml` is invoked by `release.yml`; its
+original `push: tags: v*.*.*` trigger still works for hand-pushed tags.
