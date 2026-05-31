@@ -18,6 +18,7 @@ import { PreflightPanel } from "@/components/settings/preflight-panel";
 import { getLicenseToken } from "@/core/license/license-token-store";
 import { isSelfHosted } from "@/core/features/self-hosted";
 import { runSelfHostPreflight } from "@/core/diagnostics/self-host-preflight";
+import { getAppVersion } from "@/core/version";
 
 const isMac =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -72,6 +73,7 @@ interface HelpTabProps {
 export function HelpTab({ onWhatsNew }: HelpTabProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const token = getLicenseToken();
+  const version = getAppVersion();
 
   return (
     <div className="space-y-4 py-2">
@@ -129,8 +131,15 @@ export function HelpTab({ onWhatsNew }: HelpTabProps) {
 
       <ContactSupport
         token={token}
-        diagnosticContext={{ Source: "settings-help" }}
+        diagnosticContext={{ Source: "settings-help", Version: version }}
       />
+
+      <p
+        data-testid="app-version"
+        className="text-center text-xs text-muted-foreground"
+      >
+        FeedZero v{version}
+      </p>
 
       {isSelfHosted() ? (
         <PreflightPanel

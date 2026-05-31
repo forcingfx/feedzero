@@ -22,6 +22,7 @@ vi.mock("@/core/license/license-token-store", () => ({
   setLicenseToken: () => undefined,
   LICENSE_TOKEN_STORAGE_KEY: "feedzero:license-token",
 }));
+vi.mock("@/core/version", () => ({ getAppVersion: () => "9.9.9" }));
 
 describe("<HelpTab>", () => {
   it("renders the keyboard shortcuts inline (was its own modal)", () => {
@@ -43,5 +44,10 @@ describe("<HelpTab>", () => {
     render(<HelpTab onWhatsNew={onWhatsNew} />);
     fireEvent.click(screen.getByRole("button", { name: /what's new/i }));
     expect(onWhatsNew).toHaveBeenCalledTimes(1);
+  });
+
+  it("displays the installed app version (#211)", () => {
+    render(<HelpTab onWhatsNew={() => {}} />);
+    expect(screen.getByTestId("app-version")).toHaveTextContent(/9\.9\.9/);
   });
 });
