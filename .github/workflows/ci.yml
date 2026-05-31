@@ -227,3 +227,52 @@ jobs:
       - name: Dump server log on failure
         if: failure()
         run: tail -100 /tmp/fz-serve.log || true
+
+  docker-smoke:
+    name: Docker image (build + boot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [typecheck]
+    # The jobs above build and boot the SPA + Hono server from the SOURCE
+    # tree. None of them build the Docker IMAGE — which is what self-hosters
+    # actually run, and which has its own failure modes the source path can't
+    # surface: the multi-stage `npm ci --omit=dev`, the `COPY` set, and a
+    # baked `NODE_ENV=production`. Issue #212 shipped five such bugs (husky
+    # `npm ci` exit 127, a missing `COPY packages/`, a production-only boot
+    # guard, a Caddyfile parse error) precisely because nothing here built
+    # and ran the image. This job closes that gap.
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build the self-host image (amd64, native)
+        run: docker build -t feedzero:smoke .
+
+      - name: Boot the image and probe /api/health
+        run: |
+          docker run -d --name fz -p 3000:3000 feedzero:smoke
+          ok=
+          for i in $(seq 1 30); do
+            body=$(curl -fsS http://localhost:3000/api/health 2>/dev/null || true)
+            echo "attempt $i: ${body:-<no response>}"
+            case "$body" in *'"ok":true'*) ok=1; break;; esac
+            sleep 2
+          done
+          echo "--- container logs (tail) ---"
+          docker logs fz 2>&1 | tail -40
+          if [ -z "$ok" ]; then
+            echo "::error::image never reported healthy on /api/health"
+            exit 1
+          fi
+
+      - name: Validate Caddy configs (public + LAN, blank ACME_EMAIL)
+        run: |
+          for f in Caddyfile Caddyfile.lan; do
+            echo "validating $f"
+            docker run --rm -e HOSTNAME=127.0.0.1 -e ACME_EMAIL= \
+              -v "$PWD/$f:/etc/caddy/Caddyfile:ro" caddy:2-alpine \
+              caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile
+          done
+
+      - name: Stop the container
+        if: always()
+        run: docker rm -f fz >/dev/null 2>&1 || true
