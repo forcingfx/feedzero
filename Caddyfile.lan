@@ -5,18 +5,17 @@
 # certificate authority (Let's Encrypt) cannot issue certificates for those,
 # so Caddy mints its own root CA and a self-signed cert via `tls internal`.
 #
-# Without this, Caddy attempts ACME for the IP, fails, and the browser ends
-# up talking TLS to a port answering plain HTTP — the classic
-# SSL_ERROR_RX_RECORD_TOO_LONG. (See issue #212 and docs/self-hosting.md.)
+# We bind `:443` (all interfaces), NOT `{$HOSTNAME}`: an IP site address
+# would make Caddy try to bind that exact IP *inside the container*, which
+# the container does not own — Caddy would fail with "cannot assign
+# requested address" and never serve TLS. Matching by port sidesteps that.
+# This is the same pattern as the original commented LAN block, promoted to
+# its own file so the CLI can select it automatically (issue #212).
 #
 # Trust the Caddy root CA on each client device — instructions in
 # docs/self-hosting.md (LAN-only deployment).
 
-{
-    email {$ACME_EMAIL}
-}
-
-{$HOSTNAME} {
+:443 {
     tls internal
     reverse_proxy feedzero:3000
     encode zstd gzip
