@@ -67,7 +67,41 @@ function Get-EnvVar {
     if ($null -eq $line) { return $Default }
     $value = $line.Line -replace "^$Name=", ''
     if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
-    return $value
+    return $value.Trim('"').Trim("'")
+}
+
+# Mirror of scripts/feedzero-lib.sh classify_hostname: how Caddy must get TLS.
+# Echoes one of: empty | example | ip | localhost | domain
+function Get-HostnameClass([string]$h) {
+    if ([string]::IsNullOrEmpty($h)) { return 'empty' }
+    if ($h -eq 'feedzero.example.com') { return 'example' }
+    if ($h -eq 'localhost' -or $h -match '^localhost:') { return 'localhost' }
+    if ($h -match '^\[') { return 'ip' }                       # bracketed IPv6
+    $hostonly = ($h -split ':', 2)[0]
+    if ($hostonly -match '\.local$') { return 'localhost' }    # mDNS
+    if ($hostonly -match '^\d+\.\d+\.\d+\.\d+$') { return 'ip' }
+    if ($h -match ':.*:') { return 'ip' }                       # bare IPv6
+    return 'domain'
+}
+
+# ip / localhost -> internal self-signed TLS (Caddyfile.lan); else Let's Encrypt.
+function Get-CaddyfileFor([string]$h) {
+    switch (Get-HostnameClass $h) {
+        'ip'        { return './Caddyfile.lan' }
+        'localhost' { return './Caddyfile.lan' }
+        default     { return './Caddyfile' }
+    }
+}
+
+# Pick the Caddyfile from HOSTNAME and export CADDYFILE for docker compose.
+function Resolve-Tls {
+    $h = Get-EnvVar -Name 'HOSTNAME'
+    $env:CADDYFILE = Get-CaddyfileFor $h
+    if ((Get-HostnameClass $h) -in 'ip', 'localhost') {
+        Write-Yellow "  HOSTNAME '$h' is an IP / local address: using internal TLS (self-signed)."
+        Write-Yellow "  Mounting $($env:CADDYFILE). Trust Caddy's root CA on each device —"
+        Write-Yellow "  see docs/self-hosting.md (LAN-only deployment)."
+    }
 }
 
 # ──────────────────────────────────────────────────────────────────
@@ -76,9 +110,18 @@ function Get-EnvVar {
 
 function Cmd-Up {
     Require-Env
+    Resolve-Tls
     Write-Green "Starting FeedZero..."
     Invoke-Compose up -d --build --remove-orphans
     Write-Green "Started. Check logs with: ./scripts/feedzero.ps1 logs"
+}
+
+# Dry-run: print the resolved TLS decision without touching Docker.
+function Cmd-Config {
+    $h = if ($Args -and $Args.Count -gt 0) { $Args[0] } else { Get-EnvVar -Name 'HOSTNAME' }
+    Write-Host "HOSTNAME=$h"
+    Write-Host "HOSTNAME_CLASS=$(Get-HostnameClass $h)"
+    Write-Host "CADDYFILE=$(Get-CaddyfileFor $h)"
 }
 
 function Cmd-Down {
@@ -190,9 +233,17 @@ function Cmd-Doctor {
     if (Test-Path .env) {
         Write-Green "  ✓ .env present"
         $hostname = Get-EnvVar -Name 'HOSTNAME'
-        if ($hostname -eq 'feedzero.example.com') {
-            Write-Yellow "  ! HOSTNAME still set to the example value — edit .env"
-            $ok = $false
+        switch (Get-HostnameClass $hostname) {
+            'empty'   { Write-Yellow "  ! HOSTNAME is empty — set it in .env"; $ok = $false }
+            'example' { Write-Yellow "  ! HOSTNAME still set to the example value — edit .env"; $ok = $false }
+            { $_ -in 'ip', 'localhost' } {
+                Write-Green  "  ✓ HOSTNAME '$hostname' (LAN / IP) — internal TLS ($(Get-CaddyfileFor $hostname))"
+                Write-Yellow "  ! Self-signed cert: trust Caddy's root CA on each device (docs/self-hosting.md)."
+            }
+            'domain' {
+                Write-Green  "  ✓ HOSTNAME '$hostname' — public TLS via Let's Encrypt"
+                Write-Yellow "  ! Point an A/AAAA record at this server before 'up', or cert issuance fails."
+            }
         }
     }
     else {
@@ -200,13 +251,25 @@ function Cmd-Doctor {
         $ok = $false
     }
 
-    if ((Test-Path Caddyfile) -and (Test-Path docker-compose.yml)) {
-        Write-Green "  ✓ Caddyfile + docker-compose.yml present"
+    # A missing bind-mount path makes Docker create a *directory*; Caddy then
+    # can't read its config. Verify each file is a file, not a directory.
+    foreach ($f in 'Caddyfile', 'Caddyfile.lan', 'docker-compose.yml') {
+        if (Test-Path $f -PathType Container) {
+            Write-Red "  ✗ $f is a DIRECTORY (missing bind mount). Run: Remove-Item -Recurse $f; git checkout $f"
+            $ok = $false
+        }
+        elseif (Test-Path $f -PathType Leaf) {
+            Write-Green "  ✓ $f present"
+        }
+        else {
+            Write-Red "  ✗ missing $f"
+            $ok = $false
+        }
     }
-    else {
-        Write-Red "  ✗ missing Caddyfile or docker-compose.yml"
-        $ok = $false
-    }
+
+    Write-Dim "  i Image ghcr.io/forcingfx/feedzero may be private/unpublished:"
+    Write-Dim "    'up' builds locally (--build). Portainer users: deploy via the Git"
+    Write-Dim "    Repository stack method so these files exist. See docs/self-hosting.md."
 
     if ($ok) {
         Write-Green 'All prerequisites OK.'
@@ -234,6 +297,7 @@ Commands:
   backup                 Snapshot vault data into backups/feedzero-<ts>.tar.gz.
   restore <archive>      Restore from a backup tarball (asks before overwriting).
   doctor                 Sanity-check the environment (docker, .env, configs).
+  config [hostname]      Show the resolved TLS mode + Caddyfile (no Docker needed).
   help                   This message.
 
 Common flows:
@@ -264,6 +328,7 @@ switch ($Command) {
     'backup'  { Cmd-Backup }
     'restore' { Cmd-Restore }
     'doctor'  { Cmd-Doctor }
+    'config'  { Cmd-Config }
     { $_ -in 'help', '-h', '--help' } { Cmd-Help }
     default {
         Write-Red "Unknown command: $Command"
