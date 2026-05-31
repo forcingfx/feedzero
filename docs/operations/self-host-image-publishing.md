@@ -1,33 +1,48 @@
 # Runbook: publishing the self-host Docker image
 
 Self-hosters consume `ghcr.io/forcingfx/feedzero` (optionally mirrored to
-`docker.io/forcingfx/feedzero`). Two things, **both maintainer-only**, must
-be true for `docker compose pull` / Portainer to work for them. Issue #212
-was caused by neither being true: the package was private and the only tag
-was `v0.8.1`, so `:latest` was stale and anonymous pulls returned `denied`.
+`docker.io/forcingfx/feedzero`). For `docker compose pull` / Portainer to
+work, the image must (a) **exist** and (b) be **public**, and a current
+release tag must produce `:latest`.
+
+As of issue #212 the image had **never been published**:
+`gh api /users/forcingfx/packages/container/feedzero` → **404**, and every
+`docker-publish.yml` run had failed (an older version startup-failed; the
+current tags-only version had never run because no `v*` tag was pushed
+after it landed). The current workflow is `actionlint`-clean and the
+Dockerfile now builds (verified), so a tag push should publish cleanly.
 
 The CLI (`scripts/feedzero up`) builds from source with `--build`, so a
 self-hoster is *never blocked* on this — but a pullable image is what makes
 the "paste a compose file into Portainer and click Deploy" path work.
 
-## 1. The GHCR package must be public
+## 1. Publish the image, then make the package public
 
-New GHCR packages are **private by default**. An anonymous pull of a private
-package fails with `denied` (and the anonymous token endpoint returns 403).
+The package does not exist until the workflow pushes it once. **Order
+matters** — you can't change visibility on a package that isn't there yet.
 
-Verify visibility from any machine with no auth:
+```bash
+# (Requires PR #217 merged to main — main's Dockerfile must be the fixed one.)
+# 1. Smoke-test the pipeline without cutting a release. A manual run tags
+#    the image with the commit SHA (not `latest`) and creates the package:
+gh workflow run docker-publish.yml --ref main
+gh run watch "$(gh run list --workflow=docker-publish.yml -L1 --json databaseId --jq '.[0].databaseId')"
+```
+
+If that run is green, the package now exists (private by default — new GHCR
+packages always are). Make it public (one-time, web UI; there is no `gh`
+command for visibility): GitHub → your avatar → **Packages** → `feedzero` →
+**Package settings** → **Change visibility → Public**, and **Connect
+repository** so it inherits repo settings.
+
+Verify from any machine with no auth:
 
 ```bash
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:forcingfx/feedzero:pull" | python3 -c "import sys,json;print(json.load(sys.stdin).get('token',''))")
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $TOKEN" \
   "https://ghcr.io/v2/forcingfx/feedzero/manifests/latest"
-# 200 = public + tag exists.  403 = private.  404 = no such tag.
+# 200 = public + tag exists.  403 = exists but private.  404 = not published / no such tag.
 ```
-
-Make it public (one-time, web UI): GitHub → your profile/org → **Packages**
-→ `feedzero` → **Package settings** → **Change visibility** → **Public**.
-(Or link it to the repo and inherit visibility.) There is no `gh` command
-for package visibility today; it must be done in the UI.
 
 ## 2. A current release tag must exist
 
