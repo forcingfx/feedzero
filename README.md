@@ -1,16 +1,28 @@
 # FeedZero
 
-www.feedzero.app
-
-A privacy-first RSS reader that runs entirely in your browser. No accounts, no tracking, no analytics. Your reading habits stay yours.
-
-## What It Does
+A privacy-first RSS reader that runs entirely in your browser. No accounts, no tracking, no analytics — your reading habits stay yours.
 
 - Subscribes to RSS, Atom, and JSON Feed sources
 - Stores all data encrypted in your browser (AES-GCM-256)
 - Optionally syncs across devices with end-to-end encryption
 - Extracts full article text when feeds provide only summaries
 - Works offline after first load
+
+## Use it
+
+**Hosted** — open **[my.feedzero.app](https://my.feedzero.app)**. Nothing to install.
+
+**Run your own** — one Docker command:
+
+```bash
+docker run -p 3000:3000 -v feedzero:/data ghcr.io/forcingfx/feedzero:latest
+```
+
+Open <http://localhost:3000>. Data persists in the `feedzero` volume; the image is on [GitHub Packages](https://github.com/forcingfx/feedzero/pkgs/container/feedzero).
+
+**Run it on a server** with your own domain and automatic HTTPS — see **[Self-hosting](docs/self-hosting.md)** (a Compose stack with Caddy, three commands).
+
+Either self-host path unlocks every Personal feature for free.
 
 ## Privacy Model
 
@@ -28,16 +40,7 @@ For the full threat model, cryptographic details, and honest limitations, see [d
 
 ### Trust Considerations
 
-The CORS proxy is a trust point. It must see feed URLs to fetch them. If you don't trust the hosted version, you can [self-host](#self-hosting) the entire stack.
-
-## Quick Start
-
-```bash
-npm install
-npm run dev
-```
-
-Open http://localhost:3000. Add a feed URL. That's it.
+The CORS proxy is a trust point. It must see feed URLs to fetch them. If you don't trust the hosted version, [run your own](#use-it) — the entire stack is one binary.
 
 ## Usage
 
@@ -71,6 +74,8 @@ Your passphrase never leaves your browser. The server stores only encrypted blob
 ## Development
 
 ```bash
+npm install           # install dependencies
+npm run dev           # dev server at http://localhost:3000
 npm test              # Unit/integration tests (Vitest)
 npm run test:watch    # Watch mode
 npm run test:coverage # Coverage report (90% threshold)
@@ -94,25 +99,6 @@ src/
 ```
 
 See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
-
-## Self-Hosting
-
-Run the whole stack yourself with Docker. Three steps:
-
-```bash
-git clone https://github.com/forcingfx/feedzero.git && cd feedzero
-cp .env.example .env        # set HOSTNAME — a domain, or a LAN IP
-./scripts/feedzero up       # Windows: pwsh .\scripts\feedzero.ps1 up
-```
-
-Open `https://<HOSTNAME>` and save the passphrase it shows. A public
-hostname gets automatic HTTPS; a LAN IP gets a self-signed cert. Full
-walkthrough, day-2 ops (`update`/`backup`/`restore`), and troubleshooting:
-**[docs/self-hosting.md](docs/self-hosting.md)**.
-
-Self-hosting unlocks every Personal feature for free (`VITE_SELF_HOSTED=1`,
-baked into the image). Deploying on Vercel instead? `git push` a connected
-repo — `scripts/build-api.js` bundles the `api/` functions.
 
 ## Tech Stack
 
