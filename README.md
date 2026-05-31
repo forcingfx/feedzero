@@ -1,16 +1,28 @@
 # FeedZero
 
-www.feedzero.app
-
-A privacy-first RSS reader that runs entirely in your browser. No accounts, no tracking, no analytics. Your reading habits stay yours.
-
-## What It Does
+A privacy-first RSS reader that runs entirely in your browser. No accounts, no tracking, no analytics — your reading habits stay yours.
 
 - Subscribes to RSS, Atom, and JSON Feed sources
 - Stores all data encrypted in your browser (AES-GCM-256)
 - Optionally syncs across devices with end-to-end encryption
 - Extracts full article text when feeds provide only summaries
 - Works offline after first load
+
+## Use it
+
+**Hosted** — open **[my.feedzero.app](https://my.feedzero.app)**. Nothing to install.
+
+**Run your own** — one Docker command:
+
+```bash
+docker run -p 3000:3000 -v feedzero:/data ghcr.io/forcingfx/feedzero:latest
+```
+
+Open <http://localhost:3000>. Data persists in the `feedzero` volume; the image is on [GitHub Packages](https://github.com/forcingfx/feedzero/pkgs/container/feedzero).
+
+**Run it on a server** with your own domain and automatic HTTPS — see **[Self-hosting](docs/self-hosting.md)** (a Compose stack with Caddy, three commands).
+
+Either self-host path unlocks every Personal feature for free.
 
 ## Privacy Model
 
@@ -28,16 +40,7 @@ For the full threat model, cryptographic details, and honest limitations, see [d
 
 ### Trust Considerations
 
-The CORS proxy is a trust point. It must see feed URLs to fetch them. If you don't trust the hosted version, you can [self-host](#self-hosting) the entire stack.
-
-## Quick Start
-
-```bash
-npm install
-npm run dev
-```
-
-Open http://localhost:3000. Add a feed URL. That's it.
+The CORS proxy is a trust point. It must see feed URLs to fetch them. If you don't trust the hosted version, [run your own](#use-it) — the entire stack is one binary.
 
 ## Usage
 
@@ -71,6 +74,8 @@ Your passphrase never leaves your browser. The server stores only encrypted blob
 ## Development
 
 ```bash
+npm install           # install dependencies
+npm run dev           # dev server at http://localhost:3000
 npm test              # Unit/integration tests (Vitest)
 npm run test:watch    # Watch mode
 npm run test:coverage # Coverage report (90% threshold)
@@ -94,77 +99,6 @@ src/
 ```
 
 See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
-
-## Self-Hosting
-
-Self-hosting is a first-class deployment. Docker + a hostname is all
-you need.
-
-```bash
-git clone https://github.com/forcingfx/feedzero.git
-cd feedzero
-cp .env.example .env                              # then edit HOSTNAME
-./scripts/feedzero up
-```
-
-Windows PowerShell:
-
-```powershell
-git clone https://github.com/forcingfx/feedzero.git
-cd feedzero
-Copy-Item .env.example .env                       # then edit HOSTNAME
-pwsh .\scripts\feedzero.ps1 up
-```
-
-That's the full first-time install on a server with Docker installed
-and a public hostname pointing at it. The CLI wraps the day-2 ops
-too — `update`, `backup`, `restore`, `logs`, `doctor`. Run
-`./scripts/feedzero help` for the menu.
-
-**See the full guide:** [docs/self-hosting.md](docs/self-hosting.md).
-Covers prerequisites (Docker on macOS/Linux/Windows, DNS, port
-forwarding), the public-hostname path, LAN-only with self-signed
-certs (and how to trust the Caddy root CA per OS), day-2 ops, and
-troubleshooting.
-
-### What `VITE_SELF_HOSTED=1` does
-
-It's the **single master switch** for self-hosting:
-
-- Bypasses every tier gate — every shipped Personal feature is available at no charge.
-- Hides Subscribe / pricing UI.
-- Disables the paid-tier API enforcement (`LAUNCH_PAID_TIER` is forced off).
-- Switches the upstream User-Agent to a browser-like string (fewer WAF blocks).
-
-Features marked "coming soon" stay unavailable until the code lands — the
-flag doesn't conjure them into existence.
-
-`VITE_SELF_HOSTED=1` is a build-time flag (rebuild after changing).
-`SELF_HOSTED=1` is its runtime mirror used by the server. Set both for the
-single-switch invariant to hold end-to-end.
-
-### What you give up vs. the hosted deployment
-
-Self-hosting is supported but not magical. Things you lose:
-
-- **Upstream rate-limiting**: the hosted deployment uses Upstash to smooth
-  bursts; without it, a bulk refresh on a fresh IP can trigger upstream 429s.
-  Symptoms appear as feeds that work on `my.feedzero.app` but fail locally.
-- **IP reputation**: the hosted deployment shares infrastructure IPs known to
-  upstreams. Fresh datacenter/residential IPs may be blocked by Cloudflare-class
-  WAFs. The new browser-like User-Agent default mitigates but doesn't eliminate this.
-- **Automatic TLS**: your reverse proxy must provide it. Caddy is the path of
-  least resistance.
-- **Managed sync storage backups**: the filesystem adapter writes to
-  `data/`; back it up yourself.
-
-See [docs/decisions/014-self-host-first-class.md](docs/decisions/014-self-host-first-class.md) for the design rationale and the messaging lesson from feedback #88.
-
-### Vercel deployment
-
-For Vercel deployment, `git push` to a connected repository. The `api/`
-directory contains serverless function wrappers; `scripts/build-api.js`
-bundles them.
 
 ## Tech Stack
 

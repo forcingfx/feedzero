@@ -20,7 +20,7 @@ If you're happy maintaining your tt-rss instance against the community fork, fan
 ## What you keep from TT-RSS
 
 - **The trust model.** TT-RSS's appeal was "my data lives on my server, not someone else's." FeedZero's E2E architecture preserves that: the operator (us) cannot read your feed list, your reads, your saved articles. Period. We can't subpoena what we don't have.
-- **Self-hostable.** If the hosted service goes away, FeedZero's [Hono server](../../README.md#self-hosting) runs as a single binary on whatever you used to run TT-RSS on. Same threat model, less maintenance.
+- **Self-hostable.** If the hosted service goes away, FeedZero's [Hono server](../self-hosting.md) runs as a single binary on whatever you used to run TT-RSS on. Same threat model, less maintenance.
 - **Open source.** Audit, fork, contribute.
 
 ## Importing your TT-RSS subscriptions

@@ -1,509 +1,96 @@
 # Self-hosting FeedZero
 
-Zero to running, in about half an hour, on Linux, macOS, or Windows.
+You need a server with **Docker** (Engine + Compose v2) and either a
+**hostname** pointing at it (for automatic HTTPS) or just a **LAN IP**.
+Deploy is three steps.
 
-If you're new to self-hosting: this is friendlier than it looks. The
-hard parts (TLS certs, reverse proxy config, encrypted storage) are
-already wired together. You provide a hostname and a server; the
-stack provisions the rest.
-
-## Contents
-
-1. [Before you start](#before-you-start) — prerequisites
-2. [Five-minute deploy with a public hostname](#five-minute-deploy-with-a-public-hostname)
-3. [LAN-only deploy](#lan-only-deploy) — no domain, no port-forwarding
-4. [Day-2 operations](#day-2-operations) — update, back up, restore
-5. [Troubleshooting](#troubleshooting)
-6. [What you give up vs. the hosted version](#what-you-give-up-vs-the-hosted-version)
-
----
-
-## Before you start
-
-### A server
-
-Any of these works. FeedZero is small — a few hundred MB of RAM, a
-few hundred MB of disk plus your feed cache.
-
-- A small VPS (Hetzner, Vultr, DigitalOcean, etc.) for €4–6/month.
-- A Raspberry Pi 4 or 5 on your home network. (The image is multi-arch,
-  including `arm64`.)
-- An old laptop with Linux that you never turn off.
-
-The server needs a static or stable IP — DHCP-managed home networks
-work fine if you give it a reservation.
-
-### A hostname (or use DuckDNS for free)
-
-You need a DNS name that points at the server. Caddy uses it to
-fetch a TLS certificate from Let's Encrypt.
-
-- **You own a domain?** Add an A record (and AAAA if your server has
-  IPv6) for `feedzero.your-domain.com` pointing at the server's
-  public IP. Wait a few minutes for DNS to propagate; check with
-  `dig feedzero.your-domain.com` (Linux/macOS) or
-  `Resolve-DnsName feedzero.your-domain.com` (Windows PowerShell).
-- **You don't?** Sign up at <https://www.duckdns.org/> (free, no
-  email needed — login with GitHub/Google). Pick a subdomain like
-  `your-name.duckdns.org` and point it at your server's public IP.
-  The setup takes 3 minutes.
-
-### Ports 80 and 443 open
-
-Caddy needs port 80 to satisfy Let's Encrypt's HTTP-01 challenge
-(used to prove the domain is yours), and port 443 to serve HTTPS.
-
-- **VPS:** Usually open by default. Check your provider's firewall
-  panel if not — UFW, Cloud Firewall, Security Groups, etc.
-- **Home network:** Forward both ports on your router to the
-  server's local IP. The setting is typically under "Port
-  Forwarding" or "NAT" in your router admin. Some ISPs block
-  inbound 80/443 on residential connections — in that case, use a
-  free Cloudflare Tunnel or a VPS instead.
-
-### Docker
-
-Both the FeedZero container and the Caddy reverse proxy run as
-Docker images. You need Docker Engine + the Compose v2 plugin.
-
-#### macOS or Windows
-
-Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-The Compose plugin ships in the box. Verify after install:
+## Deploy
 
 ```bash
-docker --version          # 24.x or newer
-docker compose version    # 2.x or newer
-```
+# 1. Get the files
+git clone https://github.com/forcingfx/feedzero.git && cd feedzero
 
-#### Linux (Ubuntu / Debian)
+# 2. Configure — set HOSTNAME (and ACME_EMAIL)
+cp .env.example .env && nano .env
 
-Docker Desktop on Linux is heavy; use the engine + plugin instead.
-The one-liner from <https://get.docker.com> works on most distros:
-
-```bash
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER       # log out + back in for this to take effect
-docker --version
-docker compose version
-```
-
-For Fedora, Alpine, Arch, etc., follow
-<https://docs.docker.com/engine/install/>.
-
-### Git (or just download the bundle)
-
-You'll fetch FeedZero's deploy files. Either:
-
-```bash
-# With git
-git clone https://github.com/forcingfx/feedzero.git
-cd feedzero
-```
-
-Or — if you don't want git — download just what you need:
-
-```bash
-# Linux / macOS
-curl -L https://github.com/forcingfx/feedzero/archive/main.tar.gz | tar xz
-cd feedzero-main
-```
-
-```powershell
-# Windows PowerShell
-Invoke-WebRequest -OutFile feedzero.zip `
-  https://github.com/forcingfx/feedzero/archive/main.zip
-Expand-Archive feedzero.zip
-cd feedzero-main\feedzero-main
-```
-
----
-
-## Five-minute deploy with a public hostname
-
-Once you've finished the prerequisites above, deployment is three
-commands.
-
-### 1. Copy the env template and edit it
-
-```bash
-# Linux / macOS / WSL2 / Git Bash
-cp .env.example .env
-nano .env             # or vim, or your favourite editor
-```
-
-```powershell
-# Windows PowerShell
-Copy-Item .env.example .env
-notepad .env
-```
-
-Set at least `HOSTNAME`. `ACME_EMAIL` is recommended; leave the rest
-on defaults.
-
-```env
-HOSTNAME=feedzero.your-domain.com
-ACME_EMAIL=you@example.com
-FEEDZERO_VERSION=latest
-DATA_DIR=./data
-```
-
-### 2. Sanity-check the environment
-
-```bash
-# Linux / macOS / WSL2 / Git Bash
-./scripts/feedzero doctor
-```
-
-```powershell
-# Windows PowerShell
-pwsh .\scripts\feedzero.ps1 doctor
-```
-
-You should see four green checks. If anything fails, fix it before
-moving on — `up` will fail in worse ways downstream.
-
-### 3. Start the stack
-
-```bash
-# Linux / macOS / WSL2 / Git Bash
+# 3. Start
 ./scripts/feedzero up
 ```
 
-```powershell
-# Windows PowerShell
-pwsh .\scripts\feedzero.ps1 up
-```
+Windows (PowerShell): `Copy-Item .env.example .env; notepad .env; pwsh .\scripts\feedzero.ps1 up`.
 
-The first run builds the FeedZero image locally (5–10 minutes on a
-Pi, 1–2 on a modern VPS). Subsequent `up` calls reuse the cached
-image. After the first official release ships a published image to
-GHCR, the `update` command (below) pulls it in seconds instead of
-building.
+Then open `https://<your HOSTNAME>` and **save the 4-word passphrase** it
+shows — it's the only thing that can decrypt your data on another device,
+and the server never sees it.
 
-While it's working, watch the logs for the Let's Encrypt cert
-provisioning:
+- **Public domain:** point an A/AAAA DNS record at the server first. Caddy
+  fetches a Let's Encrypt cert automatically. Ports 80 and 443 must be open.
+- **LAN / no domain:** set `HOSTNAME` to the IP or a `.local` name (e.g.
+  `192.168.1.42`). `up` serves a self-signed cert automatically — see
+  [LAN setup](#lan--no-domain) to trust it.
 
-```bash
-./scripts/feedzero logs caddy
-```
+The first `up` builds the image locally (1–2 min on a VPS, longer on a Pi).
+`./scripts/feedzero doctor` checks your setup; `help` lists every command.
 
-Look for `certificate obtained successfully` from Caddy. Once you
-see that — usually 10–30 seconds after first boot — visit
-`https://feedzero.your-domain.com` in your browser.
+## LAN / no domain
 
-### 4. Save your passphrase
-
-On first launch, FeedZero generates a 4-word passphrase and stores
-the keys derived from it in your browser's IndexedDB. **Save the
-passphrase somewhere you trust** (password manager, encrypted notes).
-The passphrase is the only thing that can decrypt your data if you
-clear your browser or switch devices. FeedZero will never see it
-again, and the server doesn't have it.
-
----
-
-## LAN-only deploy
-
-No domain? No port-forwarding? You can run FeedZero on your home
-network with self-signed certs that you trust on each device.
-
-A public certificate authority (Let's Encrypt) **cannot** issue
-certificates for an IP address, `localhost`, or a `.local` mDNS name.
-If Caddy tries anyway, your browser ends up speaking TLS to a port
-answering plain HTTP and you get **`SSL_ERROR_RX_RECORD_TOO_LONG`**.
-FeedZero handles this for you — no manual `Caddyfile` editing needed.
-
-### 1. Set HOSTNAME to your server's LAN address
-
-Use the LAN IP or a local mDNS name:
-
-```env
-HOSTNAME=192.168.1.42
-# or
-HOSTNAME=homelab.local
-```
-
-`scripts/feedzero up` detects that this isn't a public hostname and
-automatically mounts `Caddyfile.lan`, which uses `tls internal` —
-Caddy mints its own root certificate authority and self-signed leaf
-certs. You can preview the decision without starting anything:
+A public CA can't issue a cert for an IP or `.local` name, so `up`
+auto-selects a self-signed cert (`Caddyfile.lan`). Trust its root once per
+device, or the browser blocks the page (FeedZero needs HTTPS for Web Crypto).
 
 ```bash
-./scripts/feedzero config 192.168.1.42
-# HOSTNAME=192.168.1.42
-# HOSTNAME_CLASS=ip
-# CADDYFILE=./Caddyfile.lan
-```
-
-### 2. Start
-
-Same `feedzero up` as the public path. It prints a note that it's
-using internal TLS for your LAN address.
-
-### 3. Trust the Caddy root CA on each client device
-
-FeedZero requires HTTPS (Web Crypto refuses to run otherwise), so
-your browser will reject Caddy's self-signed cert until you trust
-its root.
-
-Find the root cert: after `feedzero up`, run
-
-```bash
+# Export Caddy's root certificate
 docker exec feedzero-caddy cat /data/caddy/pki/authorities/local/root.crt > caddy-root.crt
 ```
 
-Then install it as a trusted root on each device that will use
-FeedZero:
+Install `caddy-root.crt` as a trusted root:
 
-- **macOS:** Open `caddy-root.crt`, drag into Keychain Access →
-  *System*. Right-click the cert → *Get Info* → expand *Trust* →
-  set *When using this certificate* to *Always Trust*.
-- **Linux (Ubuntu/Debian):**
-  `sudo cp caddy-root.crt /usr/local/share/ca-certificates/ &&
-   sudo update-ca-certificates`.
-- **Windows:** Right-click `caddy-root.crt` → *Install Certificate*
-  → *Local Machine* → *Place all certificates in the following
-  store* → *Trusted Root Certification Authorities*.
-- **iOS:** AirDrop the file, open in Files, install as a profile
-  under Settings → General → VPN & Device Management. Then
-  Settings → General → About → Certificate Trust Settings → enable.
-- **Android:** Settings → Security → Encryption & credentials →
-  Install a certificate → CA certificate. Some phone vendors hide
-  this under different paths.
+- **macOS:** open it → Keychain Access → System → set *Always Trust*.
+- **Linux:** `sudo cp caddy-root.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates`
+- **Windows:** right-click → *Install Certificate* → *Local Machine* → *Trusted Root Certification Authorities*.
+- **iOS / Android:** install the file as a CA certificate in Settings, then enable full trust.
 
-After trusting the root, visit `https://192.168.1.42` (or whatever
-your `HOSTNAME` is) and FeedZero loads cleanly.
-
----
+Then visit `https://<your IP>`.
 
 ## Day-2 operations
 
-### Update
-
-When a new FeedZero version ships, pull and recreate:
-
 ```bash
-./scripts/feedzero update
+./scripts/feedzero update     # pull/rebuild the latest and restart
+./scripts/feedzero backup     # write backups/feedzero-<ts>.tar.gz (move it off-box)
+./scripts/feedzero restore <archive>
+./scripts/feedzero logs [feedzero|caddy]
 ```
 
-```powershell
-pwsh .\scripts\feedzero.ps1 update
-```
-
-The script pulls the latest image, recreates the containers, and
-tails 20 lines of logs so you can confirm a clean restart. Total
-time: ~30 seconds for an unchanged base layer, longer on the first
-update.
-
-To pin a specific version, set `FEEDZERO_VERSION=v0.9.1` in `.env`
-and run `update`. Without a pin, the script tracks `:latest`.
-
-#### Image registry: GHCR or Docker Hub
-
-Every release is published to both registries:
-
-- **GitHub Container Registry** (default in `docker-compose.yml`):
-  `ghcr.io/forcingfx/feedzero`
-- **Docker Hub**: `docker.io/forcingfx/feedzero`
-
-If you'd rather pull from Docker Hub — common when managing the
-stack from Portainer's LAN-only UI, which lists Docker Hub by default —
-edit the `image:` line in `docker-compose.yml`:
-
-```yaml
-image: docker.io/forcingfx/feedzero:${FEEDZERO_VERSION:-latest}
-```
-
-Both registries serve the same multi-arch artefact, so the swap is
-otherwise invisible.
-
-#### Portainer (LAN-only)
-
-If you manage your homelab through Portainer:
-
-1. Go to **Stacks** → **Add stack**.
-2. Paste the contents of `docker-compose.yml` (swap the `image:` line
-   to `docker.io/...` if you'd prefer Docker Hub).
-3. In the **Environment variables** section, paste from `.env.example`
-   and edit `HOSTNAME` to your LAN address.
-4. Deploy. The encrypted vault and feed cache live in the bind-mount
-   declared by `DATA_DIR` — backups via `./scripts/feedzero backup`
-   still work the same way.
-
-### Backup
-
-```bash
-./scripts/feedzero backup
-```
-
-Writes a timestamped `tar.gz` of the data directory under
-`backups/`. Move that file off the server (rsync, scp, cloud
-storage, USB stick — your call). Recommended cadence: weekly, plus
-before any update.
-
-The backup contains the encrypted vault. Without your passphrase,
-the backup is unreadable — restore requires the same passphrase the
-data was created with.
-
-### Restore
-
-```bash
-./scripts/feedzero restore backups/feedzero-2026-05-19T120000Z.tar.gz
-```
-
-The script asks before overwriting. It stops the stack, replaces the
-data dir, and prints `Restart with: ./scripts/feedzero up` when
-done.
-
-### Read the logs
-
-```bash
-./scripts/feedzero logs              # all services
-./scripts/feedzero logs feedzero     # just the app
-./scripts/feedzero logs caddy        # just the reverse proxy
-```
-
----
+Pin a version with `FEEDZERO_VERSION=v0.11.0` in `.env`; otherwise updates
+track `latest`. Backups contain the encrypted vault — they need the same
+passphrase to restore.
 
 ## Troubleshooting
 
-### "TLS certificate error" in the browser
+- **`SSL_ERROR_RX_RECORD_TOO_LONG` / cert error on a LAN IP** — you're on the
+  LAN path; confirm with `./scripts/feedzero config <host>` (should show
+  `CADDYFILE=./Caddyfile.lan`) and trust the root CA above.
+- **TLS cert error on a public domain** — DNS hasn't propagated, or port 80
+  is blocked (Let's Encrypt needs it). Check `./scripts/feedzero logs caddy`.
+- **"Web Crypto refused to run"** — you opened `http://`. Use the `https://`
+  URL Caddy serves.
+- **`up` fails while building** — see the real error with
+  `docker compose build --no-cache --progress=plain feedzero`.
+- **Sync not working across devices** — both need the *same passphrase* and
+  network access to `HOSTNAME` (a `.local` name won't resolve off-LAN).
 
-- **DNS hasn't propagated yet.** Wait 5 minutes, then reload. Verify
-  with `dig HOSTNAME` (Linux/macOS) or `Resolve-DnsName HOSTNAME`
-  (PowerShell) — the response should be your server's IP.
-- **Port 80 is blocked.** Let's Encrypt's HTTP-01 challenge needs
-  it. Check `./scripts/feedzero logs caddy` for `connection
-  refused` from the Let's Encrypt validator.
-- **Hit Let's Encrypt's rate limit** during testing. Caddy logs
-  show `too many failed authorizations recently`. The limit
-  resets in an hour; meanwhile use `tls internal` (the LAN-only
-  block) for testing.
+### Portainer
 
-### `SSL_ERROR_RX_RECORD_TOO_LONG` (or `ERR_SSL_PROTOCOL_ERROR`)
-
-Your browser is speaking HTTPS to a port that answered with plain
-HTTP. The usual cause: `HOSTNAME` is an **IP address**, `localhost`,
-or a `.local` name, but Caddy was configured for a public certificate
-it can never obtain (a CA won't issue certs for IPs).
-
-The fix is the [LAN-only deploy](#lan-only-deploy): set `HOSTNAME` to
-the IP/local name and let `scripts/feedzero up` auto-select
-`Caddyfile.lan` (`tls internal`). Confirm the decision with:
-
-```bash
-./scripts/feedzero config "$HOSTNAME"   # CADDYFILE should be ./Caddyfile.lan
-./scripts/feedzero doctor               # flags an IP/LAN host explicitly
-```
-
-If you deploy compose directly (not via the script), set the env var
-yourself: `CADDYFILE=./Caddyfile.lan docker compose up -d`.
-
-### Deploying with Portainer
-
-Portainer's **web-editor stack** pastes the compose file into an empty
-working directory — so the `./Caddyfile` bind mount has no file to bind
-and Docker silently creates it as a **directory**, which Caddy can't
-read. Portainer also **pulls** images rather than building them, so it
-hits the private/unpublished GHCR package (see below).
-
-Deploy instead via Portainer's **Repository** stack method pointing at
-the FeedZero git repo, so `Caddyfile`, `Caddyfile.lan`, and the
-`scripts/` live on disk. For a LAN/IP host, add `CADDYFILE=./Caddyfile.lan`
-to the stack's environment variables. If you must paste the compose
-file, SSH in and run `./scripts/feedzero up` from a checkout instead.
-
-### "Web Crypto refused to run" / app shows a security warning
-
-You're loading FeedZero over plain HTTP. Browsers gate the Web
-Crypto API behind a secure context. Either:
-
-- Visit the `https://` URL (Caddy serves it), not `http://...:3000`.
-- If you're on LAN-only, make sure you trusted the root CA on this
-  device (see [LAN-only deploy](#lan-only-deploy)).
-
-### Feeds time out / fail with 429s
-
-Self-hosted FeedZero shares no IP reputation with the hosted version.
-Some upstreams (Cloudflare-class WAFs) treat fresh datacenter IPs
-suspiciously. The browser-like User-Agent default (ADR 014) mitigates
-this, but persistent 429s on a specific source are usually upstream
-rate-limits — wait, or set `FEED_USER_AGENT` in `.env` to a contact
-UA the upstream operator will whitelist.
-
-### `feedzero up` fails: "Image not found" / "pull access denied" / "denied"
-
-The pre-built image (`ghcr.io/forcingfx/feedzero`) is only published on
-a version-tag release **and** the GHCR package must be made public —
-new GHCR packages are private by default, so an anonymous `docker pull`
-or `docker compose pull` returns `denied`. (Docker Hub is mirrored only
-when the maintainer configures it.)
-
-`./scripts/feedzero up` passes `--build`, so it **builds from source**
-and never needs the registry — use it instead of `docker compose pull`
-or Portainer's pull-based deploy. If the build itself fails, get the
-real error (Docker hides it without `--progress=plain`):
-
-```bash
-docker compose build --no-cache --progress=plain feedzero 2>&1 | tail -80
-```
-
-> **`exit code: 127` from `npm ci --omit=dev`** was a real bug in older
-> images: the `prepare` lifecycle script ran `husky` (a devDependency not
-> present in the production layer), so the build aborted with
-> `husky: not found`. Fixed — the runtime install now uses
-> `--ignore-scripts` and the `prepare` script is guarded. If you hit it,
-> rebuild from a current checkout.
-
-### `feedzero doctor` says HOSTNAME is the example value
-
-Edit `.env` and set `HOSTNAME` to the domain you actually own.
-`feedzero.example.com` is the placeholder; Let's Encrypt can't
-issue a cert for it.
-
-### Sync isn't working across devices
-
-Both devices need:
-
-- The **same passphrase** (FeedZero will derive the same vault ID
-  on both).
-- Network access to your `HOSTNAME`. If device B is outside your
-  home network, `homelab.local` won't resolve — use a public
-  hostname or a VPN.
-
-If the first device works but a second device fails restore, the
-most likely cause is a typo in the passphrase. The server returns
-`Vault not found`; FeedZero translates that to a human message.
-
-### Containers won't start at boot
-
-The compose file sets `restart: unless-stopped` for both services,
-which survives reboots. If you ran `docker compose down` (which
-counts as "user stopped it"), they'll stay down. Use `feedzero up`
-to restart them; that resets the flag.
-
----
+Don't paste the compose file into Portainer's web editor — the `Caddyfile`
+bind mount needs the repo files on disk, and Portainer pulls (it won't build).
+Deploy via Portainer's **Repository** stack method pointing at this repo, or
+SSH in and run `./scripts/feedzero up`.
 
 ## What you give up vs. the hosted version
 
-Self-hosting is supported but not magical. Things you lose by going
-solo:
-
-- **Upstream rate-limiting.** The hosted deployment uses an Upstash
-  Redis to smooth bursts; without it, a bulk refresh on a fresh IP
-  can trigger upstream 429s. Symptoms: feeds work on
-  `my.feedzero.app` but fail locally.
-- **IP reputation.** Hosted FeedZero shares datacenter IPs known to
-  upstreams. Fresh residential or VPS IPs may be blocked by
-  Cloudflare-class WAFs.
-- **Managed backups.** The hosted deployment snapshots its sync
-  storage. You're responsible for `feedzero backup` and getting
-  those files off the server.
-- **Automatic updates.** The hosted deployment ships continuous
-  deploys. Self-host updates land when you run `feedzero update`.
-  (This is a feature, not a bug — you decide when to take risk.)
+- **IP reputation / rate-limiting** — fresh server IPs can hit upstream WAFs
+  or 429s that the hosted deployment's shared IPs and Upstash buffer avoid.
+- **Managed backups & updates** — you run `backup` and `update` yourself.
 
 See [ADR 014: self-host is first-class](./decisions/014-self-host-first-class.md)
-for the design rationale and the messaging-lesson incident that
-prompted it.
+for the rationale.
