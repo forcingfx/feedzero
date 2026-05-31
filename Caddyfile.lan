@@ -1,0 +1,34 @@
+# FeedZero reverse-proxy config — LAN / IP / localhost deployments.
+#
+# Auto-selected by `scripts/feedzero` (via the CADDYFILE env var) when
+# HOSTNAME is an IP address, `localhost`, or a `.local` mDNS name. A public
+# certificate authority (Let's Encrypt) cannot issue certificates for those,
+# so Caddy mints its own root CA and a self-signed cert via `tls internal`.
+#
+# We keep `{$HOSTNAME}` as the site name (so Caddy's internal CA mints a
+# cert that is actually valid for the IP / hostname) but add `bind 0.0.0.0`
+# so Caddy listens on all interfaces. Without `bind`, an IP site address
+# makes Caddy try to bind that exact IP *inside the container*, which the
+# container does not own — it fails with "cannot assign requested address".
+# Binding `:443` with no site name instead breaks the other way: Caddy has
+# no name to issue an internal cert for and returns a TLS internal-error
+# alert. `{$HOSTNAME}` + `bind 0.0.0.0` satisfies both (issue #212).
+#
+# Trust the Caddy root CA on each client device — instructions in
+# docs/self-hosting.md (LAN-only deployment).
+
+{
+    # Browsers and curl omit SNI when connecting to a bare IP literal, so
+    # without this Caddy has no server name to match the site below and
+    # aborts the handshake with a TLS "internal error" alert. default_sni
+    # makes a no-SNI connection resolve to {$HOSTNAME}, so the internal
+    # cert is served for IP access too (issue #212).
+    default_sni {$HOSTNAME}
+}
+
+{$HOSTNAME} {
+    bind 0.0.0.0
+    tls internal
+    reverse_proxy feedzero:3000
+    encode zstd gzip
+}

@@ -57,6 +57,14 @@ export function assertNotTestOnlyInProduction(
   env: Record<string, string | undefined> = process.env,
 ): void {
   if (env.NODE_ENV !== "production") return;
+  // Self-hosted deploys (SELF_HOSTED=1) legitimately run memory-backed
+  // adapters without a Redis/Upstash — see this module's docstring
+  // ("self-host-without-Redis paths") and resolve-storage.ts. The guard's
+  // job is to catch a misconfigured *hosted* (Vercel) deploy, where
+  // SELF_HOSTED is never set. Without this exemption the official Docker
+  // image (NODE_ENV=production + SELF_HOSTED=1) can't boot — startServer
+  // dies resolving license storage (issue #212).
+  if (env.SELF_HOSTED === "1") return;
   if (!isTestOnly(target)) return;
   throw new Error(
     `[${contextLabel}] Refusing to use a test-only adapter in production. ` +

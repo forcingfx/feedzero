@@ -54,7 +54,13 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # `scripts/feedzero up` sets CADDYFILE to ./Caddyfile.lan when HOSTNAME
+      # is an IP / localhost / .local (self-signed TLS); otherwise it stays
+      # ./Caddyfile (Let's Encrypt). Both files must exist on the host — a
+      # missing path makes Docker create a *directory* and Caddy fails to
+      # start (issue #212). Portainer users: deploy via the Git Repository
+      # stack method so these files are present.
+      - ${CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

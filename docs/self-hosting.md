@@ -208,30 +208,15 @@ again, and the server doesn't have it.
 No domain? No port-forwarding? You can run FeedZero on your home
 network with self-signed certs that you trust on each device.
 
-### 1. Edit `Caddyfile`
+A public certificate authority (Let's Encrypt) **cannot** issue
+certificates for an IP address, `localhost`, or a `.local` mDNS name.
+If Caddy tries anyway, your browser ends up speaking TLS to a port
+answering plain HTTP and you get **`SSL_ERROR_RX_RECORD_TOO_LONG`**.
+FeedZero handles this for you — no manual `Caddyfile` editing needed.
 
-Open `Caddyfile` and swap which block is commented:
+### 1. Set HOSTNAME to your server's LAN address
 
-```caddyfile
-# {$HOSTNAME} {
-#     reverse_proxy feedzero:3000
-#     encode zstd gzip
-# }
-
-:443 {
-    tls internal
-    reverse_proxy feedzero:3000
-    encode zstd gzip
-}
-```
-
-`tls internal` makes Caddy mint its own root certificate authority
-and self-signed leaf certs.
-
-### 2. Set HOSTNAME to your server's LAN address
-
-You still need a value (compose enforces it). Use the LAN IP or a
-local mDNS name:
+Use the LAN IP or a local mDNS name:
 
 ```env
 HOSTNAME=192.168.1.42
@@ -239,11 +224,24 @@ HOSTNAME=192.168.1.42
 HOSTNAME=homelab.local
 ```
 
-### 3. Start
+`scripts/feedzero up` detects that this isn't a public hostname and
+automatically mounts `Caddyfile.lan`, which uses `tls internal` —
+Caddy mints its own root certificate authority and self-signed leaf
+certs. You can preview the decision without starting anything:
 
-Same `feedzero up` as the public path.
+```bash
+./scripts/feedzero config 192.168.1.42
+# HOSTNAME=192.168.1.42
+# HOSTNAME_CLASS=ip
+# CADDYFILE=./Caddyfile.lan
+```
 
-### 4. Trust the Caddy root CA on each client device
+### 2. Start
+
+Same `feedzero up` as the public path. It prints a note that it's
+using internal TLS for your LAN address.
+
+### 3. Trust the Caddy root CA on each client device
 
 FeedZero requires HTTPS (Web Crypto refuses to run otherwise), so
 your browser will reject Caddy's self-signed cert until you trust
@@ -383,6 +381,39 @@ done.
   resets in an hour; meanwhile use `tls internal` (the LAN-only
   block) for testing.
 
+### `SSL_ERROR_RX_RECORD_TOO_LONG` (or `ERR_SSL_PROTOCOL_ERROR`)
+
+Your browser is speaking HTTPS to a port that answered with plain
+HTTP. The usual cause: `HOSTNAME` is an **IP address**, `localhost`,
+or a `.local` name, but Caddy was configured for a public certificate
+it can never obtain (a CA won't issue certs for IPs).
+
+The fix is the [LAN-only deploy](#lan-only-deploy): set `HOSTNAME` to
+the IP/local name and let `scripts/feedzero up` auto-select
+`Caddyfile.lan` (`tls internal`). Confirm the decision with:
+
+```bash
+./scripts/feedzero config "$HOSTNAME"   # CADDYFILE should be ./Caddyfile.lan
+./scripts/feedzero doctor               # flags an IP/LAN host explicitly
+```
+
+If you deploy compose directly (not via the script), set the env var
+yourself: `CADDYFILE=./Caddyfile.lan docker compose up -d`.
+
+### Deploying with Portainer
+
+Portainer's **web-editor stack** pastes the compose file into an empty
+working directory — so the `./Caddyfile` bind mount has no file to bind
+and Docker silently creates it as a **directory**, which Caddy can't
+read. Portainer also **pulls** images rather than building them, so it
+hits the private/unpublished GHCR package (see below).
+
+Deploy instead via Portainer's **Repository** stack method pointing at
+the FeedZero git repo, so `Caddyfile`, `Caddyfile.lan`, and the
+`scripts/` live on disk. For a LAN/IP host, add `CADDYFILE=./Caddyfile.lan`
+to the stack's environment variables. If you must paste the compose
+file, SSH in and run `./scripts/feedzero up` from a checkout instead.
+
 ### "Web Crypto refused to run" / app shows a security warning
 
 You're loading FeedZero over plain HTTP. Browsers gate the Web
@@ -401,17 +432,29 @@ this, but persistent 429s on a specific source are usually upstream
 rate-limits — wait, or set `FEED_USER_AGENT` in `.env` to a contact
 UA the upstream operator will whitelist.
 
-### `feedzero up` fails: "Image not found"
+### `feedzero up` fails: "Image not found" / "pull access denied" / "denied"
 
-The pre-built GHCR image doesn't exist until the first release tag
-publishes one. The `up` script passes `--build` to compensate, so a
-build-from-source falls back automatically. If it still fails, check
-the build logs for missing tools (gcc, python — build deps for
-sharp-style packages):
+The pre-built image (`ghcr.io/forcingfx/feedzero`) is only published on
+a version-tag release **and** the GHCR package must be made public —
+new GHCR packages are private by default, so an anonymous `docker pull`
+or `docker compose pull` returns `denied`. (Docker Hub is mirrored only
+when the maintainer configures it.)
+
+`./scripts/feedzero up` passes `--build`, so it **builds from source**
+and never needs the registry — use it instead of `docker compose pull`
+or Portainer's pull-based deploy. If the build itself fails, get the
+real error (Docker hides it without `--progress=plain`):
 
 ```bash
-docker compose build --no-cache feedzero 2>&1 | tail -50
+docker compose build --no-cache --progress=plain feedzero 2>&1 | tail -80
 ```
+
+> **`exit code: 127` from `npm ci --omit=dev`** was a real bug in older
+> images: the `prepare` lifecycle script ran `husky` (a devDependency not
+> present in the production layer), so the build aborted with
+> `husky: not found`. Fixed — the runtime install now uses
+> `--ignore-scripts` and the `prepare` script is guarded. If you hit it,
+> rebuild from a current checkout.
 
 ### `feedzero doctor` says HOSTNAME is the example value
 

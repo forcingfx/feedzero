@@ -20,7 +20,7 @@
     "serve": "node --import tsx server.ts",
     "docs:tier-matrix": "tsx scripts/generate-tier-matrix-doc.ts",
     "check-env": "tsx scripts/check-env.ts",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
