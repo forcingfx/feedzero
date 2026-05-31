@@ -97,74 +97,22 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 
 ## Self-Hosting
 
-Self-hosting is a first-class deployment. Docker + a hostname is all
-you need.
+Run the whole stack yourself with Docker. Three steps:
 
 ```bash
-git clone https://github.com/forcingfx/feedzero.git
-cd feedzero
-cp .env.example .env                              # then edit HOSTNAME
-./scripts/feedzero up
+git clone https://github.com/forcingfx/feedzero.git && cd feedzero
+cp .env.example .env        # set HOSTNAME — a domain, or a LAN IP
+./scripts/feedzero up       # Windows: pwsh .\scripts\feedzero.ps1 up
 ```
 
-Windows PowerShell:
+Open `https://<HOSTNAME>` and save the passphrase it shows. A public
+hostname gets automatic HTTPS; a LAN IP gets a self-signed cert. Full
+walkthrough, day-2 ops (`update`/`backup`/`restore`), and troubleshooting:
+**[docs/self-hosting.md](docs/self-hosting.md)**.
 
-```powershell
-git clone https://github.com/forcingfx/feedzero.git
-cd feedzero
-Copy-Item .env.example .env                       # then edit HOSTNAME
-pwsh .\scripts\feedzero.ps1 up
-```
-
-That's the full first-time install on a server with Docker installed
-and a public hostname pointing at it. The CLI wraps the day-2 ops
-too — `update`, `backup`, `restore`, `logs`, `doctor`. Run
-`./scripts/feedzero help` for the menu.
-
-**See the full guide:** [docs/self-hosting.md](docs/self-hosting.md).
-Covers prerequisites (Docker on macOS/Linux/Windows, DNS, port
-forwarding), the public-hostname path, LAN-only with self-signed
-certs (and how to trust the Caddy root CA per OS), day-2 ops, and
-troubleshooting.
-
-### What `VITE_SELF_HOSTED=1` does
-
-It's the **single master switch** for self-hosting:
-
-- Bypasses every tier gate — every shipped Personal feature is available at no charge.
-- Hides Subscribe / pricing UI.
-- Disables the paid-tier API enforcement (`LAUNCH_PAID_TIER` is forced off).
-- Switches the upstream User-Agent to a browser-like string (fewer WAF blocks).
-
-Features marked "coming soon" stay unavailable until the code lands — the
-flag doesn't conjure them into existence.
-
-`VITE_SELF_HOSTED=1` is a build-time flag (rebuild after changing).
-`SELF_HOSTED=1` is its runtime mirror used by the server. Set both for the
-single-switch invariant to hold end-to-end.
-
-### What you give up vs. the hosted deployment
-
-Self-hosting is supported but not magical. Things you lose:
-
-- **Upstream rate-limiting**: the hosted deployment uses Upstash to smooth
-  bursts; without it, a bulk refresh on a fresh IP can trigger upstream 429s.
-  Symptoms appear as feeds that work on `my.feedzero.app` but fail locally.
-- **IP reputation**: the hosted deployment shares infrastructure IPs known to
-  upstreams. Fresh datacenter/residential IPs may be blocked by Cloudflare-class
-  WAFs. The new browser-like User-Agent default mitigates but doesn't eliminate this.
-- **Automatic TLS**: your reverse proxy must provide it. Caddy is the path of
-  least resistance.
-- **Managed sync storage backups**: the filesystem adapter writes to
-  `data/`; back it up yourself.
-
-See [docs/decisions/014-self-host-first-class.md](docs/decisions/014-self-host-first-class.md) for the design rationale and the messaging lesson from feedback #88.
-
-### Vercel deployment
-
-For Vercel deployment, `git push` to a connected repository. The `api/`
-directory contains serverless function wrappers; `scripts/build-api.js`
-bundles them.
+Self-hosting unlocks every Personal feature for free (`VITE_SELF_HOSTED=1`,
+baked into the image). Deploying on Vercel instead? `git push` a connected
+repo — `scripts/build-api.js` bundles the `api/` functions.
 
 ## Tech Stack
 
