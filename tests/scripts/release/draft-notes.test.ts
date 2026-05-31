@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toHouseStyle, draftNotes } from "../../../scripts/release/draft-notes.mjs";
+import { toHouseStyle, draftNotes } from "../../../scripts/release/draft-notes.ts";
 
 describe("toHouseStyle", () => {
   it("capitalizes, ensures terminal period, replaces em-dash, drops exclamation", () => {

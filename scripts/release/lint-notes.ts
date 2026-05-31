@@ -4,6 +4,19 @@
 // em-dashes into commas, strip exclamation marks) and ABORTS on the rest
 // (lowercase start, emoji, marketing verbs) so a clumsy auto-drafted line
 // can never reach users' "What's new" feed unattended.
+
+export interface Violation {
+  rule: string;
+  fixable: boolean;
+}
+
+export interface NoteViolation extends Violation {
+  field: string;
+  index: number;
+}
+
+type NoteSection = "added" | "changed" | "fixed" | "removed";
+
 const BANNED = [
   "seamlessly",
   "effortlessly",
@@ -19,8 +32,8 @@ const BANNED = [
 const EMOJI =
   /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}]/u;
 
-export function lintBullet(text) {
-  const v = [];
+export function lintBullet(text: string): Violation[] {
+  const v: Violation[] = [];
   if (!/^[A-Z]/.test(text)) v.push({ rule: "capitalized-start", fixable: false });
   if (!/[.]$/.test(text)) v.push({ rule: "ends-with-period", fixable: true });
   if (/—/.test(text)) v.push({ rule: "no-em-dash", fixable: true });
@@ -32,9 +45,12 @@ export function lintBullet(text) {
   return v;
 }
 
-export function lintNotes(entry) {
-  const out = [];
-  for (const field of ["added", "changed", "fixed", "removed"]) {
+export function lintNotes(
+  entry: Partial<Record<NoteSection, string[]>>,
+): NoteViolation[] {
+  const out: NoteViolation[] = [];
+  const fields: NoteSection[] = ["added", "changed", "fixed", "removed"];
+  for (const field of fields) {
     (entry[field] ?? []).forEach((text, index) => {
       for (const v of lintBullet(text)) out.push({ field, index, ...v });
     });

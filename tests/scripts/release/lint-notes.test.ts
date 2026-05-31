@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lintBullet, lintNotes } from "../../../scripts/release/lint-notes.mjs";
+import { lintBullet, lintNotes } from "../../../scripts/release/lint-notes.ts";
 
 describe("lintBullet", () => {
   it("passes a clean past-tense bullet", () =>
@@ -14,8 +14,14 @@ describe("lintBullet", () => {
       fixable: false,
     }));
   it("flags marketing verbs and emoji (fatal)", () => {
-    expect(lintBullet("Seamlessly improved sync.").some((v) => v.rule === "no-marketing-verb")).toBe(true);
-    expect(lintBullet("Added sparkle ✨.").some((v) => v.rule === "no-emoji")).toBe(true);
+    expect(
+      lintBullet("Seamlessly improved sync.").some(
+        (v: { rule: string }) => v.rule === "no-marketing-verb",
+      ),
+    ).toBe(true);
+    expect(
+      lintBullet("Added sparkle ✨.").some((v: { rule: string }) => v.rule === "no-emoji"),
+    ).toBe(true);
   });
 });
 

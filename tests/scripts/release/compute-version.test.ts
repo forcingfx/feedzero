@@ -4,7 +4,7 @@ import {
   computeBump,
   nextVersion,
   computeVersion,
-} from "../../../scripts/release/compute-version.mjs";
+} from "../../../scripts/release/compute-version.ts";
 
 describe("parseConventional", () => {
   it("parses type, scope, breaking, description", () => {
