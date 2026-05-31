@@ -83,6 +83,23 @@ describe("test-only-brand", () => {
       ).not.toThrow();
     });
 
+    it("does not throw for a self-hosted production deploy (SELF_HOSTED=1)", () => {
+      // Self-hosters legitimately run memory-backed adapters without a
+      // Redis/Upstash — the brand's own contract allows the
+      // "self-host-without-Redis" path. The guard exists to catch a
+      // MISCONFIGURED hosted (Vercel) deploy, where SELF_HOSTED is unset.
+      // Without this exemption the official Docker image (NODE_ENV=production,
+      // SELF_HOSTED=1) can't boot — startServer dies resolving license
+      // storage (issue #212).
+      const adapter = markTestOnly({ get: () => null });
+      expect(() =>
+        assertNotTestOnlyInProduction(adapter, "license.resolveLicenseStorage", {
+          NODE_ENV: "production",
+          SELF_HOSTED: "1",
+        }),
+      ).not.toThrow();
+    });
+
     it("does not throw in production when the adapter is not branded", () => {
       const adapter = { get: () => null };
       expect(() =>
