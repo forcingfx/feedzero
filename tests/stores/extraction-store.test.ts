@@ -34,8 +34,6 @@ describe("extraction-store", () => {
 
   describe("fetchExtracted", () => {
     it("fetches and caches extracted content", async () => {
-      // Long body so the default paywall detector's body-too-short
-      // heuristic does not flag this as gated.
       const fullHtml = `<html><body><article>${"<p>Full readable article paragraph. </p>".repeat(40)}</article></body></html>`;
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -227,8 +225,7 @@ describe("extraction-store", () => {
       }
       useExtractionStore.setState({ cache });
 
-      // Mock a successful extraction for one more. Long body so the
-      // default paywall detector does not flag this as a stub.
+      // Mock a successful extraction for one more.
       const longHtml = `<article>${"<p>Long readable paragraph. </p>".repeat(40)}</article>`;
       vi.mocked(fetch).mockResolvedValueOnce(
         new Response(longHtml, { status: 200 }),
@@ -294,8 +291,6 @@ describe("extraction-store", () => {
     it("evicts oldest entries when cumulative cache bytes exceed the size cap", async () => {
       // Two MB body + new entry will exceed the 5 MB cap when added 3x.
       const bigBody = "x".repeat(2 * 1024 * 1024);
-      // Match the paywall-detector-friendly body shape used elsewhere
-      // in this file — long enough to clear the "body too short" heuristic.
       const fullHtml = `<html><body><article>${"<p>Full readable article paragraph. </p>".repeat(40)}</article></body></html>`;
       const fetchMock = vi.fn();
       globalThis.fetch = fetchMock as unknown as typeof fetch;
