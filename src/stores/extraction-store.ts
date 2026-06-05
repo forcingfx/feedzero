@@ -1,8 +1,6 @@
 import { create } from "zustand";
 import { proxyFetch } from "../core/proxy/proxy-fetch.ts";
-import { detectPaywall, type PaywallVerdict } from "../core/extractor/paywall-detectors/index.ts";
-import { publisherHost } from "../core/extractor/paywall-detectors/host.ts";
-import { visibleTextLength } from "../core/extractor/paywall-detectors/visible-text.ts";
+import { type PaywallVerdict, publisherHost } from "../core/extractor/paywall.ts";
 import { fetchArticle as extensionFetchArticle } from "../core/extension/protocol.ts";
 import { useExtensionStore } from "./extension-store.ts";
 
@@ -20,7 +18,7 @@ const GATED_STATUS_CODES = new Set([401, 402, 403, 451]);
 function paywallVerdictFromStatus(
   url: string,
   status: number,
-): (PaywallVerdict & { paywalled: true }) | null {
+): PaywallVerdict | null {
   if (!GATED_STATUS_CODES.has(status)) return null;
   return {
     paywalled: true,
@@ -54,11 +52,12 @@ interface ExtractionStore {
   /** Per-URL extraction status: idle → extracting → available / failed */
   statusMap: Record<string, ExtractionStatus>;
   /**
-   * Per-URL paywall verdict. Only populated when detectPaywall flagged the
-   * fetched HTML; absence = no paywall observed. Reader-pane reads from
-   * `getPaywallVerdict` to decide whether to render PaywallPrompt.
+   * Per-URL paywall verdict. Only populated when the publisher refused the
+   * anonymous fetch with a gated HTTP status (401/402/403/451); absence = no
+   * paywall observed. Reader-pane reads from `getPaywallVerdict` to decide
+   * whether to render PaywallPrompt.
    */
-  paywallMap: Record<string, PaywallVerdict & { paywalled: true }>;
+  paywallMap: Record<string, PaywallVerdict>;
   viewMode: "feed" | "extracted";
   setViewMode: (mode: "feed" | "extracted") => void;
   toggleViewMode: (articleLink: string | undefined) => void;
@@ -68,9 +67,7 @@ interface ExtractionStore {
   fetchExtracted: (url: string) => Promise<void>;
   resetForArticle: () => void;
   getStatus: (url: string | undefined) => ExtractionStatus;
-  getPaywallVerdict: (
-    url: string | undefined,
-  ) => (PaywallVerdict & { paywalled: true }) | null;
+  getPaywallVerdict: (url: string | undefined) => PaywallVerdict | null;
 }
 
 /** Maximum number of cached extractions held in memory. */
@@ -177,17 +174,6 @@ function recordCacheEntry(url: string, html: string): void {
   cacheMeta.set(url, { ts: Date.now(), bytes: html.length });
 }
 
-/**
- * Visible-character count above which an extraction is treated as a real,
- * readable article — at which point any "Subscribe" CTA in the surrounding
- * page chrome is irrelevant and we render without consulting paywall
- * heuristics at all. Applied to the *extracted* content, not the raw page;
- * that distinction is the fix for issue #211, where free articles were
- * flagged paywalled because the full page's nav/footer contained
- * industry-standard subscribe phrases.
- */
-const MIN_ARTICLE_CHARS = 600;
-
 /** Cache extracted content and mark the URL available (eviction-aware). */
 function cacheExtracted(
   url: string,
@@ -272,32 +258,12 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
       }
       const anonymousHtml = await response.text();
 
-      // Extract FIRST. A substantial extraction is the definitive signal
-      // that the article is readable, so the surrounding page chrome (nav,
-      // footer, newsletter prompts) is irrelevant — render and stop. This
-      // ordering is the fix for issue #211: paywall heuristics used to run
-      // against the raw page before extraction, so a free article whose
-      // chrome contained a stock "Subscribe to continue" / "Already a
-      // subscriber?" phrase was wrongly gated.
+      // The page itself loaded (200), so we never guess at a paywall from its
+      // content — that heuristic false-positived on free articles whose chrome
+      // shipped "Subscribe" CTAs (issue #211, ADR 028). Whatever extracts is
+      // the article; an empty extraction is a plain failure with no gate.
       const result = extract(anonymousHtml, url);
       const content = result?.ok ? result.value.content : "";
-
-      if (content && visibleTextLength(content) >= MIN_ARTICLE_CHARS) {
-        cacheExtracted(url, content, set, get);
-        return;
-      }
-
-      // Thin or empty extraction. Only NOW consult the paywall heuristics,
-      // and scope them to the extracted teaser when we have one so the
-      // page chrome can't false-positive. A `body-too-short` verdict never
-      // overrides content we *did* extract — a short free post still renders.
-      const verdict = detectPaywall(content || anonymousHtml, url);
-      const gated =
-        verdict.paywalled && !(content && verdict.reason === "body-too-short");
-      if (gated) {
-        await handlePaywalledFetch(url, verdict, extract, set, get);
-        return;
-      }
 
       if (content) {
         cacheExtracted(url, content, set, get);
@@ -332,21 +298,22 @@ type Extract = (html: string, url: string) => ReturnType<
 >;
 
 /**
- * Reached when the anonymous proxy fetch returned content the detector
- * flagged. If the user's extension is authorized for the publisher, retry
- * the fetch with credentials and re-detect; on a clean retry, extract and
- * cache. Otherwise record the verdict so the reader pane can render
- * PaywallPrompt.
+ * Reached when the anonymous proxy fetch was refused with a gated HTTP status.
+ * If the user's extension is authorized for the publisher, retry the fetch
+ * with credentials and try to extract; a readable body clears the verdict and
+ * caches. A retry that yields no readable body means the cookie has expired
+ * (session-expired). Otherwise record the verdict so the reader pane can
+ * render PaywallPrompt.
  */
 async function handlePaywalledFetch(
   url: string,
-  verdict: PaywallVerdict & { paywalled: true },
+  verdict: PaywallVerdict,
   extract: Extract,
   set: (
     partial: Partial<{
       cache: Record<string, string>;
       statusMap: Record<string, ExtractionStatus>;
-      paywallMap: Record<string, PaywallVerdict & { paywalled: true }>;
+      paywallMap: Record<string, PaywallVerdict>;
     }>,
   ) => void,
   get: () => ExtractionStore,
@@ -369,19 +336,6 @@ async function handlePaywalledFetch(
     return;
   }
 
-  const retried = detectPaywall(retry.value.html, url);
-  if (retried.paywalled) {
-    // Authenticated fetch came back gated too — cookie has likely
-    // expired since the user authorized the publisher.
-    recordPaywall(
-      url,
-      { ...retried, reason: "session-expired" },
-      set,
-      get,
-    );
-    return;
-  }
-
   const extracted = extract(retry.value.html, url);
   if (extracted.ok && extracted.value.content) {
     cacheExtracted(url, extracted.value.content, set, get);
@@ -392,17 +346,19 @@ async function handlePaywalledFetch(
       set({ paywallMap: next });
     }
   } else {
-    recordPaywall(url, verdict, set, get);
+    // Authenticated fetch produced no readable article — the cookie has
+    // likely expired since the user authorized the publisher.
+    recordPaywall(url, { ...verdict, reason: "session-expired" }, set, get);
   }
 }
 
 function recordPaywall(
   url: string,
-  verdict: PaywallVerdict & { paywalled: true },
+  verdict: PaywallVerdict,
   set: (
     partial: Partial<{
       statusMap: Record<string, ExtractionStatus>;
-      paywallMap: Record<string, PaywallVerdict & { paywalled: true }>;
+      paywallMap: Record<string, PaywallVerdict>;
     }>,
   ) => void,
   get: () => ExtractionStore,

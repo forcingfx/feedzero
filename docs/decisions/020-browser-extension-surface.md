@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-05-21).
+Accepted (2026-05-21). **Amended by [ADR 028](028-remove-paywall-content-heuristics.md) (2026-06-04):** the per-publisher *content* detectors referenced below (`src/core/extractor/paywall-detectors/`) were removed for being unreliable (false positives on free articles, issue #211). Paywall recognition is now keyed solely off the publisher's gated HTTP status on the anonymous fetch. The extension-as-transport decision itself stands; only the "detection lives in per-publisher detectors" mechanism changed.
 
 ## Context
 
