@@ -12,6 +12,9 @@ import { ArticleGroupSummaryRow } from "./article-group-summary-row.tsx";
 import { ArticleListControls } from "./article-list-controls.tsx";
 import { groupArticles } from "@/lib/group-articles.ts";
 import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
+import { useIsDesktop } from "@/hooks/use-media-query.ts";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
+import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indicator.tsx";
 import type { Article } from "@feedzero/core/types";
 
 /**
@@ -78,6 +81,22 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const setArticleSortMode = useArticleStore((s) => s.setArticleSortMode);
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Pull-to-refresh (touch only). Refreshes the current view exactly like
+  // the header RefreshPill: scoped to the selected feed/folder/filter,
+  // falling back to refresh-all when nothing is selected.
+  const isDesktop = useIsDesktop();
+  const refreshView = useFeedStore((s) => s.refreshView);
+  const refreshAll = useFeedStore((s) => s.refreshAll);
+  const handlePullRefresh = useCallback(
+    () => (selectedFeedId ? refreshView(selectedFeedId) : refreshAll()),
+    [selectedFeedId, refreshView, refreshAll],
+  );
+  const { pullPx, isRefreshing: isPullRefreshing } = usePullToRefresh({
+    scrollRef,
+    enabled: !isDesktop,
+    onRefresh: handlePullRefresh,
+  });
 
   // True for ALL_FEEDS_ID and folder-aggregated feed ids. Both render
   // articles from multiple feeds, so each article must show its own
@@ -243,6 +262,10 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     const showBlank = isLoading && !isRefreshing;
     return (
       <div ref={scrollRef} className="h-full overflow-y-auto">
+        <PullToRefreshIndicator
+          pullPx={pullPx}
+          isRefreshing={isPullRefreshing}
+        />
         <ArticleListControls
           sortMode={articleSortMode}
           onSortChange={setArticleSortMode}
@@ -257,6 +280,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto relative">
+      <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isPullRefreshing} />
       <ArticleListControls
         sortMode={articleSortMode}
         onSortChange={setArticleSortMode}

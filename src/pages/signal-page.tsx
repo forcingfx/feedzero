@@ -23,6 +23,7 @@ import { BriefingGeneratingSkeleton } from "@/components/briefings/briefing-gene
 import { formatRelative } from "@/lib/format-relative.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
+import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indicator.tsx";
 import { useFeatureGate } from "@/hooks/use-feature-gate.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { UpgradeSplash } from "@/components/features/upgrade-splash.tsx";
@@ -224,17 +225,7 @@ function ReadyView({
     <>
       <SignalTabs active="topics" />
       <div ref={containerRef} className="h-full overflow-y-auto">
-      {!isDesktop && pullPx > 0 ? (
-        <div
-          className="flex items-center justify-center text-xs text-muted-foreground transition-[height]"
-          style={{ height: Math.min(pullPx, 80) }}
-        >
-          <RefreshCw
-            className={`size-4 ${isPullRefreshing ? "animate-spin" : ""}`}
-            style={{ transform: `rotate(${Math.min(pullPx, 80) * 4.5}deg)` }}
-          />
-        </div>
-      ) : null}
+      <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isPullRefreshing} />
 
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <header className="mb-6 flex flex-col gap-1">
