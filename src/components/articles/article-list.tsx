@@ -15,6 +15,7 @@ import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
 import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indicator.tsx";
+import { ArticleListSkeleton } from "@/components/loading/article-list-skeleton.tsx";
 import type { Article } from "@feedzero/core/types";
 
 /**
@@ -270,7 +271,11 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           sortMode={articleSortMode}
           onSortChange={setArticleSortMode}
         />
-        {showBlank ? null : <EmptyArticleList feedId={selectedFeedId} />}
+        {showBlank ? (
+          <ArticleListSkeleton />
+        ) : (
+          <EmptyArticleList feedId={selectedFeedId} />
+        )}
       </div>
     );
   }
