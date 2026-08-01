@@ -16,6 +16,7 @@ import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
 import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indicator.tsx";
 import { ArticleListSkeleton } from "@/components/loading/article-list-skeleton.tsx";
+import { SwipeToReadRow } from "./swipe-to-read-row.tsx";
 import type { Article } from "@feedzero/core/types";
 
 /**
@@ -328,13 +329,15 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
               }}
             >
               {entry.kind === "article" ? (
-                <ArticleItem
-                  article={entry.article}
-                  isSelected={entry.article.id === selectedArticle?.id}
-                  onSelect={handleSelect}
-                  feedTitle={itemFeedTitle}
-                  feedSiteUrl={itemFeedSiteUrl}
-                />
+                <SwipeToReadRow article={entry.article} enabled={!isDesktop}>
+                  <ArticleItem
+                    article={entry.article}
+                    isSelected={entry.article.id === selectedArticle?.id}
+                    onSelect={handleSelect}
+                    feedTitle={itemFeedTitle}
+                    feedSiteUrl={itemFeedSiteUrl}
+                  />
+                </SwipeToReadRow>
               ) : (
                 <ArticleGroupSummaryRow
                   open={entry.open}
