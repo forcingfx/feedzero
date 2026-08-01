@@ -60,7 +60,16 @@ interface ArticleStore {
   loadArticles: (feedId: string) => Promise<void>;
   selectArticle: (article: Article | null) => Promise<void>;
   markAsRead: (articleId: string) => Promise<void>;
-  markAllAsRead: () => Promise<void>;
+  /**
+   * Mark every visible unread article as read. Returns the articles that
+   * were unread before the sweep — the caller's undo snapshot.
+   */
+  markAllAsRead: () => Promise<Article[]>;
+  /**
+   * Restore unread state for the given article ids (skips ids that are
+   * unknown or already unread). Powers the mark-all-read undo toast.
+   */
+  markUnread: (articleIds: string[]) => Promise<void>;
   /**
    * Flip an article's `starred` flag and sync the change.
    * Sets `starredAt` when starring; clears it when unstarring so the
@@ -486,7 +495,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
 
   markAllAsRead: async () => {
     const unread = get().articles.filter((a) => !a.read);
-    if (unread.length === 0) return;
+    if (unread.length === 0) return [];
 
     // Collapse every mutation into a single set() so subscribers see one
     // consistent transition. Group the updates by feed so we only touch the
@@ -509,6 +518,41 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
 
     for (const article of unread) {
       await updateArticle({ ...article, read: true });
+    }
+    useSyncStore.getState().scheduleSyncPush();
+    return unread;
+  },
+
+  markUnread: async (articleIds) => {
+    const idSet = new Set(articleIds);
+    // Walk the source-of-truth buckets, not the visible slice — the user
+    // may have navigated to another view between the sweep and the undo.
+    let nextByFeed = get().articlesByFeedId;
+    const restored: Article[] = [];
+    for (const [feedId, articles] of Object.entries(nextByFeed)) {
+      if (!articles.some((a) => idSet.has(a.id) && a.read)) continue;
+      nextByFeed = {
+        ...nextByFeed,
+        [feedId]: articles.map((a) => {
+          if (!idSet.has(a.id) || !a.read) return a;
+          const updated = { ...a, read: false };
+          restored.push(updated);
+          return updated;
+        }),
+      };
+    }
+    if (restored.length === 0) return;
+
+    const restoredIds = new Set(restored.map((a) => a.id));
+    set({
+      articlesByFeedId: nextByFeed,
+      articles: get().articles.map((a) =>
+        restoredIds.has(a.id) ? { ...a, read: false } : a,
+      ),
+    });
+
+    for (const article of restored) {
+      await updateArticle(article);
     }
     useSyncStore.getState().scheduleSyncPush();
   },

@@ -18,8 +18,8 @@ import {
 } from "lucide-react";
 import type { NavigateFunction } from "react-router";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { useArticleStore } from "@/stores/article-store.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
+import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
 
 /**
  * A single command palette entry.
@@ -133,7 +133,7 @@ export function buildCommandActions(ctx: ActionContext): CommandAction[] {
       icon: CheckCheck,
       keywords: ["clear", "inbox zero"],
       run: () => {
-        void useArticleStore.getState().markAllAsRead();
+        void markAllReadWithUndo();
       },
     },
     {

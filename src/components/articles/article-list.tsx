@@ -11,6 +11,7 @@ import { ArticleItem } from "./article-item.tsx";
 import { ArticleGroupSummaryRow } from "./article-group-summary-row.tsx";
 import { ArticleListControls } from "./article-list-controls.tsx";
 import { groupArticles } from "@/lib/group-articles.ts";
+import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
 import type { Article } from "@feedzero/core/types";
 
 /**
@@ -72,7 +73,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const articles = useArticleStore((s) => s.articles);
   const selectedArticle = useArticleStore((s) => s.selectedArticle);
   const selectArticle = useArticleStore((s) => s.selectArticle);
-  const markAllAsRead = useArticleStore((s) => s.markAllAsRead);
   const isLoading = useArticleStore((s) => s.isLoading);
   const articleSortMode = useArticleStore((s) => s.articleSortMode);
   const setArticleSortMode = useArticleStore((s) => s.setArticleSortMode);
@@ -318,7 +318,10 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           );
         })}
       </ul>
-      <MarkReadPill unreadCount={unreadCount} onMarkAll={markAllAsRead} />
+      <MarkReadPill
+        unreadCount={unreadCount}
+        onMarkAll={() => void markAllReadWithUndo()}
+      />
     </div>
   );
 }
