@@ -241,7 +241,11 @@ function MobileReaderLayer({
     <div
       ref={layerRef}
       data-testid="reader-layer"
-      className="absolute inset-0 z-20 bg-background animate-in slide-in-from-right duration-200"
+      // touch-pan-y hands horizontal drags to the back-swipe hook on
+      // real hardware (browsers otherwise claim them as scrolls);
+      // <pre> re-enables native panning for wide code blocks, matching
+      // the hook's own pre-guard.
+      className="absolute inset-0 z-20 bg-background animate-in slide-in-from-right duration-200 touch-pan-y [&_pre]:touch-auto"
       style={{
         transform: dragX > 0 ? `translateX(${dragX}px)` : undefined,
         transition: dragX === 0 ? "transform 150ms ease-out" : "none",
