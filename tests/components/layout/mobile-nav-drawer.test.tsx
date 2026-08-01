@@ -165,12 +165,15 @@ describe("MobileNavDrawer", () => {
         .getAllByRole("button")
         .map((b) => b.getAttribute("aria-label"));
       // After the anchored "All items", recency order wins: f3, f1, then the
-      // never-viewed f2; the open-list chevron trails.
+      // never-viewed f2; the fixed Explore/Settings shortcuts and the
+      // open-list chevron trail.
       expect(labels).toEqual([
         "All items",
         "Charlie",
         "Alpha",
         "Bravo",
+        "Explore",
+        "Settings",
         "Open feed list",
       ]);
     });
@@ -199,6 +202,34 @@ describe("MobileNavDrawer", () => {
       expect(
         within(strip).getByRole("button", { name: "Hacker News" }),
       ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("has a fixed Explore shortcut that navigates without opening the drawer", async () => {
+      const user = userEvent.setup();
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      renderDrawer();
+
+      const strip = screen.getByTestId("drawer-handle-strip");
+      await user.click(
+        within(strip).getByRole("button", { name: /explore/i }),
+      );
+
+      expect(screen.getByTestId("probe-path")).toHaveTextContent("/explore");
+      expect(screen.queryByTestId("drawer-content")).toBeNull();
+    });
+
+    it("has a fixed Settings shortcut that navigates without opening the drawer", async () => {
+      const user = userEvent.setup();
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      renderDrawer();
+
+      const strip = screen.getByTestId("drawer-handle-strip");
+      await user.click(
+        within(strip).getByRole("button", { name: /settings/i }),
+      );
+
+      expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings");
+      expect(screen.queryByTestId("drawer-content")).toBeNull();
     });
   });
 

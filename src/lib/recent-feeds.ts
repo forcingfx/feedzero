@@ -6,7 +6,10 @@ import type { Feed } from "@feedzero/core/types";
  * strip is only 60px tall and a fixed cap keeps the open-list trigger
  * reachable on the narrowest phones.
  */
-export const MOBILE_DOCK_FEED_CAP = 6;
+// 4, not 6: the strip now also carries fixed Explore + Settings icons.
+// 4 favicons + All-items + the three fixed buttons fit a 360px-wide
+// phone without clipping inside the overflow-hidden favicon area.
+export const MOBILE_DOCK_FEED_CAP = 4;
 
 /** Upper bound on the persisted recency list. */
 export const RECENT_LIST_CAP = 20;

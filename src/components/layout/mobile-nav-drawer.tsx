@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { ChevronUp, Layers, RefreshCw, Settings } from "lucide-react";
+import { ChevronUp, Compass, Layers, RefreshCw, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@feedzero/core/utils/constants";
@@ -112,6 +112,27 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
           })}
         </div>
 
+        {/* Fixed shortcuts: Explore and Settings ride the dock instead of
+            hiding behind the drawer chevron — the bottom edge is the
+            cheapest thumb real estate on a phone, and these are the two
+            most-reached non-feed surfaces. Signal/Stats stay in the
+            drawer to keep the strip from crowding out feed favicons. */}
+        <button
+          type="button"
+          aria-label="Explore"
+          onClick={() => navigate("/explore")}
+          className="flex items-center justify-center size-10 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
+        >
+          <Compass className="size-5" />
+        </button>
+        <button
+          type="button"
+          aria-label="Settings"
+          onClick={() => goToSettings(navigate)}
+          className="flex items-center justify-center size-10 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
+        >
+          <Settings className="size-5" />
+        </button>
         <Drawer.Trigger asChild>
           <button
             type="button"
