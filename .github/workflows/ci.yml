@@ -138,8 +138,12 @@ jobs:
           path: coverage/
           retention-days: 14
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      # npm audit intentionally NOT here: it lives solely in
+      # security.yml ("npm audit + gitleaks"). When it was duplicated
+      # in this job, a single new upstream advisory turned BOTH checks
+      # red and made the Coverage verdict unreadable — a real coverage
+      # regression would have been indistinguishable from advisory
+      # noise (2026-08-01 SDLC retro, PRs #236/#237).
 
   build:
     name: Build (SPA + serverless functions)
