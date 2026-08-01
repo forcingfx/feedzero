@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-/** Width of the left-edge zone (px) where a back-swipe may begin. */
-const EDGE_ZONE = 28;
 /** Movement (px) before we decide whether the gesture is ours. */
 const ARM_SLOP = 10;
 /** Fallback commit distance when the element width is unknown. */
@@ -14,11 +12,15 @@ interface Options {
 }
 
 /**
- * iOS-style edge-swipe-back for an overlay layer: a rightward drag that
- * STARTS in the left edge zone follows the finger (`dragX`) and commits
- * `onBack` when released past a third of the layer width. Drags starting
- * anywhere else belong to the layer's content (vertical scroll,
- * horizontally scrollable code blocks) and are never intercepted.
+ * Swipe-back for an overlay layer: a rightward-dominant drag ANYWHERE
+ * on the layer follows the finger (`dragX`) and commits `onBack` when
+ * released past a third of the layer width.
+ *
+ * Deliberately not edge-gated: real mobile browsers run their own
+ * back-navigation gesture in the left edge zone, so an edge-only
+ * dismiss is unreachable on device. Vertical-dominant drags stay with
+ * the content scroller, and drags starting inside a `<pre>` are left
+ * alone so horizontally scrollable code blocks keep their native pan.
  *
  * touchmove is registered non-passive so an armed drag can
  * preventDefault() browser panning — React's root touch listeners are
@@ -49,7 +51,10 @@ export function useSwipeBack({ ref, enabled, onBack }: Options): {
 
     function handleStart(e: TouchEvent) {
       const t = e.touches[0];
-      if (!t || t.clientX > EDGE_ZONE) {
+      // Code blocks scroll horizontally; their pans are not back-swipes.
+      const inHorizontalScroller =
+        e.target instanceof Element && e.target.closest("pre") !== null;
+      if (!t || inHorizontalScroller) {
         gestureRef.current = null;
         return;
       }

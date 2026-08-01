@@ -128,7 +128,13 @@ export function SwipeToReadRow({
     <div
       ref={rootRef}
       data-testid="swipe-to-read-row"
-      className="relative overflow-hidden"
+      // touch-pan-y: without it, real mobile browsers claim the drag as
+      // a native scroll after their own slop and stop dispatching
+      // touchmove — the arming logic loses the race on hardware even
+      // though synthetic-event tests pass. pan-y keeps vertical
+      // scrolling native and hands horizontal drags to JS. Safe now
+      // that no ancestor needs horizontal touch gestures on the list.
+      className="relative overflow-hidden touch-pan-y"
     >
       <div
         aria-hidden

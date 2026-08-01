@@ -690,7 +690,46 @@ describe("FeedsPage behavior — mobile", () => {
     });
   });
 
-  it("mobile: a swipe starting away from the edge does not dismiss the reader", async () => {
+  it("mobile: a rightward drag anywhere on the reader dismisses it (browsers own the edge)", async () => {
+    // Real mobile browsers run their OWN back gesture in the left edge
+    // zone, so an edge-only dismiss is unreachable on device. Any
+    // rightward-dominant drag on the reader goes back (Reeder model).
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [makeArticle("art-1")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+    const layer = container.querySelector(
+      "[data-testid='reader-layer']",
+    ) as HTMLElement;
+
+    const touch = (type: string, x: number, y = 300) =>
+      act(() => {
+        layer.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches:
+              type === "touchend"
+                ? []
+                : [new Touch({ identifier: 1, target: layer, clientX: x, clientY: y })],
+          }),
+        );
+      });
+
+    touch("touchstart", 180); // mid-screen
+    touch("touchmove", 260);
+    touch("touchmove", 340);
+    touch("touchend", 340);
+
+    await waitFor(() => {
+      expect(currentUrl).toBe("/feeds/feed-1");
+    });
+  });
+
+  it("mobile: a vertical-dominant drag does not dismiss the reader", async () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [makeArticle("art-1")] });
     useArticleStore.setState({
@@ -716,12 +755,40 @@ describe("FeedsPage behavior — mobile", () => {
         );
       });
 
-    touch("touchstart", 150); // mid-screen — content owns this drag
-    touch("touchmove", 260);
-    touch("touchend", 260);
+    touch("touchstart", 150);
+    act(() => {
+      layer.dispatchEvent(
+        new TouchEvent("touchmove", {
+          bubbles: true,
+          cancelable: true,
+          touches: [new Touch({ identifier: 1, target: layer, clientX: 190, clientY: 460 })],
+        }),
+      );
+    });
+    touch("touchend", 190);
 
     await new Promise((r) => setTimeout(r, 30));
     expect(currentUrl).toBe("/feeds/feed-1/articles/art-1");
+  });
+
+  it("mobile header: dot-only status indicator, view options pinned to the right corner", () => {
+    // "Refreshed X ago · local" moved into the drawer footer; the header
+    // keeps a compact color dot and puts the single view-options control
+    // in the right corner (user feedback on PR #237).
+    useFeedStore.setState({
+      feeds: [makeFeed("feed-1")],
+      lastRefreshAllAt: Date.now() - 5 * 60 * 1000,
+    });
+    const { container } = renderPage("/feeds/feed-1");
+    const header = container.querySelector("header")!;
+
+    expect(header.textContent).not.toMatch(/refreshed/i);
+    expect(
+      header.querySelector("[data-testid='sync-status-badge']"),
+    ).not.toBeNull();
+    const pills = header.querySelector("[data-testid='mobile-header-pills']");
+    expect(pills).not.toBeNull();
+    expect(header.lastElementChild).toBe(pills);
   });
 
   it("mobile header does not have a sidebar trigger (replaced by bottom drawer)", () => {

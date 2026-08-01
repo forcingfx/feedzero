@@ -153,6 +153,17 @@ describe("SwipeToReadRow", () => {
     expect(useArticleStore.getState().articles[0].read).toBe(false);
   });
 
+  it("declares touch-action pan-y so real browsers hand horizontal drags to JS", () => {
+    // Without touch-action, mobile browsers claim the drag as a scroll
+    // after their own slop and stop dispatching touchmove — the arming
+    // logic loses the race on real hardware even though synthetic-event
+    // tests pass. pan-y keeps vertical scrolling native and horizontal
+    // gestures ours. Safe now that the snap pager no longer needs
+    // leftward drags on the list.
+    const row = renderRow(false);
+    expect(row.className).toContain("touch-pan-y");
+  });
+
   it("renders children without gesture chrome when disabled (desktop)", () => {
     const a = seed(false);
     render(
