@@ -140,7 +140,7 @@ export function MobileHeaderPills() {
   return (
     <div
       data-testid="mobile-header-pills"
-      className="flex items-center gap-2"
+      className="ml-auto flex items-center gap-2"
     >
       <ViewOptionsPill />
     </div>

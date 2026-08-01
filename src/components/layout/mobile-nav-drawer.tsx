@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { ChevronUp, Compass, Layers, RefreshCw, Settings } from "lucide-react";
 import { Drawer } from "vaul";
@@ -11,6 +11,7 @@ import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 import { NewFolderInput } from "@/components/sidebar/new-folder-input.tsx";
 import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import { goToSettings } from "@/lib/go-to-settings.ts";
+import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
 
 interface MobileNavDrawerProps {
   onFeedSelect: (feedId: string) => void;
@@ -19,6 +20,26 @@ interface MobileNavDrawerProps {
 export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  // The strip's handle pill advertises "drag me up" — honor it: an
+  // upward-dominant drag on the strip opens the drawer (tapping the
+  // chevron still works). Tracked per-gesture so a horizontal scrub
+  // across the favicons doesn't trigger it.
+  const stripTouchRef = useRef<{ x: number; y: number } | null>(null);
+  function handleStripTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    stripTouchRef.current = t ? { x: t.clientX, y: t.clientY } : null;
+  }
+  function handleStripTouchMove(e: React.TouchEvent) {
+    const start = stripTouchRef.current;
+    const t = e.touches[0];
+    if (!start || !t) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (dy < -20 && Math.abs(dy) > Math.abs(dx)) {
+      stripTouchRef.current = null;
+      setOpen(true);
+    }
+  }
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
   const refreshAll = useFeedStore((s) => s.refreshAll);
@@ -62,6 +83,8 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     <Drawer.Root open={open} onOpenChange={setOpen}>
       <div
         data-testid="drawer-handle-strip"
+        onTouchStart={handleStripTouchStart}
+        onTouchMove={handleStripTouchMove}
         // iOS safe-area clearance:
         //   pb-[env(safe-area-inset-bottom)] + matching h-[calc()] keeps the
         //   60px dock content area above the home indicator.
@@ -209,6 +232,12 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                 <Settings className="size-4 shrink-0 text-muted-foreground" />
                 Settings
               </button>
+              {/* Full refresh/sync status line — the mobile header only
+                  shows the color dot, the words live here next to the
+                  refresh control they describe. */}
+              <div className="px-2 pb-1">
+                <SyncStatusBadge onClick={() => setOpen(false)} />
+              </div>
             </div>
           </SidebarProvider>
         </Drawer.Content>
