@@ -98,6 +98,19 @@ export function selectUnreadCount(
 }
 
 /**
+ * Derived unread count across a set of feeds. Pure function over store
+ * state — drives folder aggregate badges in the sidebar.
+ */
+export function selectUnreadCountForFeeds(
+  state: Pick<ArticleStore, "articlesByFeedId">,
+  feedIds: readonly string[],
+): number {
+  let count = 0;
+  for (const id of feedIds) count += selectUnreadCount(state, id);
+  return count;
+}
+
+/**
  * Derived count of muted articles for a single feed. Pure function over
  * store state — drives the "Show muted (N)" affordance in the article
  * list footer. Muted articles are hidden by default but still counted
