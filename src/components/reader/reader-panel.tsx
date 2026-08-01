@@ -11,6 +11,19 @@ import {
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { shareArticle } from "@/lib/share-article.ts";
 import { TAP_TARGET_EXPAND, TAP_TARGET_EXPAND_Y } from "@/lib/tap-target.ts";
+import { usePreferencesStore } from "@/stores/preferences-store.ts";
+import type { ReaderTextSize } from "@feedzero/core/types";
+
+/**
+ * Body scale per readerTextSize preference. Headings keep their absolute
+ * sizes from ArticleContent — the preference tunes reading comfort of
+ * body copy, not the whole hierarchy.
+ */
+const TEXT_SIZE_CLASS: Record<ReaderTextSize, string> = {
+  small: "text-sm",
+  medium: "",
+  large: "text-lg",
+};
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
@@ -61,6 +74,9 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   const isDesktop = useIsDesktop();
   const article = useArticleStore((s) => s.selectedArticle);
   const toggleStar = useArticleStore((s) => s.toggleStar);
+  const readerTextSize = usePreferencesStore(
+    (s) => s.preferences.readerTextSize ?? "medium",
+  );
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
@@ -258,7 +274,15 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
 
   const articleBody = (
     <div data-testid="article-content-area" className="overflow-x-hidden">
-      <article className="p-4 px-6">
+      {/* max-w-180 matches ArticleContent's internal measure; mx-auto
+          centers the column so wide desktop panels get margins instead
+          of left-hugging text with dead space on the right. */}
+      <article
+        className={cn(
+          "p-4 px-6 max-w-180 mx-auto",
+          TEXT_SIZE_CLASS[readerTextSize],
+        )}
+      >
         <header className="mb-3">
           <h2 className="text-2xl font-semibold tracking-tight mb-2 break-words">
             {article.link ? (

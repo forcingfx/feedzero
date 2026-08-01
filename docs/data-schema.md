@@ -46,6 +46,7 @@ the vault with timestamp last-write-wins — see [ADR 022](decisions/022-prefere
 | articleSortMode   | `"newest" \| "oldest" \| "unread-first"` | Article list ordering          |
 | groupArticleFloods| boolean                               | Collapse same-feed bursts         |
 | theme             | `"light" \| "dark" \| "system"`       | Color scheme (synced; bridged into next-themes by `<ThemeBridge>`) |
+| readerTextSize    | `"small" \| "medium" \| "large"` (optional) | Reader body text scale; absent on rows from older clients → treated as "medium" |
 
 ### Meta (internal)
 

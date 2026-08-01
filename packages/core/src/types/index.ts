@@ -178,6 +178,9 @@ export const ARTICLE_SORT_MODES: readonly ArticleSortMode[] = [
  * `theme` is declared here but not yet wired (next-themes bridge lands in a
  * follow-up PR); until then it stays undefined.
  */
+/** Reader body text scale. "medium" is the historical default. */
+export type ReaderTextSize = "small" | "medium" | "large";
+
 export interface UserPreferences {
   feedSortMode: FeedSortMode;
   feedCustomOrder: string[];
@@ -185,6 +188,11 @@ export interface UserPreferences {
   articleSortMode: ArticleSortMode;
   groupArticleFloods: boolean;
   theme?: "light" | "dark" | "system";
+  /**
+   * Optional so preference rows synced from older clients still parse;
+   * readers treat `undefined` as "medium".
+   */
+  readerTextSize?: ReaderTextSize;
 }
 
 /** Baseline preferences used before hydration and for first-run defaults. */
@@ -199,6 +207,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   // from next-themes' own localStorage (its <head> script runs before
   // React) so this default only takes effect on a brand-new install.
   theme: "system",
+  readerTextSize: "medium",
 };
 
 export interface CreateArticleInput {

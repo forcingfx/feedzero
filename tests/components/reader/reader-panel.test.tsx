@@ -96,6 +96,53 @@ describe("ReaderPanel", () => {
     });
   });
 
+  describe("reading measure + text size", () => {
+    it("centers the article column at the existing max measure", () => {
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+      render(<ReaderPanel />);
+      const articleEl = screen
+        .getByRole("heading", { level: 2 })
+        .closest("article");
+      expect(articleEl!.className).toContain("max-w-180");
+      expect(articleEl!.className).toContain("mx-auto");
+    });
+
+    it.each([
+      ["small", "text-sm"],
+      ["large", "text-lg"],
+    ] as const)(
+      "applies the persisted %s reader text size",
+      async (size, expectedClass) => {
+        const { usePreferencesStore } = await import(
+          "@/stores/preferences-store.ts"
+        );
+        const { DEFAULT_PREFERENCES } = await import("@feedzero/core/types");
+        usePreferencesStore.setState({
+          preferences: { ...DEFAULT_PREFERENCES, readerTextSize: size },
+        });
+        useArticleStore.setState({
+          selectedArticle: mockArticle(),
+          articles: [],
+          isLoading: false,
+        });
+
+        render(<ReaderPanel />);
+
+        const articleEl = screen
+          .getByRole("heading", { level: 2 })
+          .closest("article");
+        expect(articleEl!.className).toContain(expectedClass);
+        usePreferencesStore.setState({
+          preferences: { ...DEFAULT_PREFERENCES },
+        });
+      },
+    );
+  });
+
   describe("tap targets (≥44px effective, Apple HIG)", () => {
     beforeEach(() => {
       useArticleStore.setState({
