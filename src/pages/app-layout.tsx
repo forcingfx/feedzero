@@ -107,10 +107,13 @@ export function AppLayout() {
   if (!isDesktop) {
     return (
       <div className="flex flex-col h-dvh overflow-hidden bg-background">
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 z-10 bg-background">
+        <header className="flex h-12 shrink-0 items-center gap-1 border-b px-3 z-10 bg-background">
           <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
+          {/* Dot-only status: the verbose "Refreshed X ago · mode" line
+              lives in the drawer footer now; the single view-options
+              control anchors the right corner. */}
+          <SyncStatusBadge compact />
           <MobileHeaderPills />
-          <SyncStatusBadge />
         </header>
         <Outlet />
         <MobileNavDrawer onFeedSelect={handleFeedSelect} />

@@ -217,6 +217,32 @@ describe("MobileNavDrawer", () => {
       }
     });
 
+    it("swiping up on the dock strip opens the drawer (the handle pill advertises it)", async () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+
+      const touch = (type: string, y: number) =>
+        strip.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches:
+              type === "touchend"
+                ? []
+                : [new Touch({ identifier: 1, target: strip, clientX: 200, clientY: y })],
+          }),
+        );
+
+      touch("touchstart", 800);
+      touch("touchmove", 760);
+      touch("touchend", 760);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("drawer-content")).toBeInTheDocument();
+      });
+    });
+
     it("has a fixed Explore shortcut that navigates without opening the drawer", async () => {
       const user = userEvent.setup();
       useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
@@ -244,6 +270,20 @@ describe("MobileNavDrawer", () => {
       expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings");
       expect(screen.queryByTestId("drawer-content")).toBeNull();
     });
+  });
+
+  it("drawer footer carries the full 'Refreshed X ago' status (moved out of the header)", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [makeFeed("f1", "Feed 1")],
+      lastRefreshAllAt: Date.now() - 5 * 60 * 1000,
+    });
+    renderDrawer();
+
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
+
+    const drawer = await screen.findByTestId("drawer-content");
+    expect(within(drawer).getByText(/refreshed .* ago/i)).toBeInTheDocument();
   });
 
   it("renders 'All items' entry when drawer is open and there are feeds", async () => {
