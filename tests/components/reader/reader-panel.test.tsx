@@ -57,6 +57,45 @@ describe("ReaderPanel", () => {
     expect(screen.getByText("Select an article to read.")).toBeInTheDocument();
   });
 
+  describe("share button", () => {
+    it("shares the article via the native share sheet when supported", async () => {
+      const user = userEvent.setup();
+      const shareSpy = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "share", {
+        value: shareSpy,
+        configurable: true,
+      });
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+      await user.click(
+        screen.getByRole("button", { name: /share article/i }),
+      );
+
+      expect(shareSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ url: mockArticle().link }),
+      );
+      delete (navigator as { share?: unknown }).share;
+    });
+
+    it("sits in the action row beside the star toggle", () => {
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+      const row = screen.getByTestId("reader-action-row");
+      const share = screen.getByRole("button", { name: /share article/i });
+      expect(row.contains(share)).toBe(true);
+    });
+  });
+
   it("renders article title and content", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),

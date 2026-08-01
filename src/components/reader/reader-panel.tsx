@@ -5,9 +5,11 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
+  Share2,
   Star,
 } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
+import { shareArticle } from "@/lib/share-article.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
@@ -355,6 +357,22 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
               </TooltipContent>
             </Tooltip>
           </div>
+          {article.link && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  data-testid="share-button"
+                  type="button"
+                  onClick={() => void shareArticle(article)}
+                  aria-label="Share article"
+                  className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-border text-muted-foreground/70 hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  <Share2 className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Share</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
