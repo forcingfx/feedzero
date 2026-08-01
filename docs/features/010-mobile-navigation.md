@@ -1,34 +1,50 @@
 # Feature 010: Mobile Navigation
 
 ## Status
-Implemented
+Implemented (reader-as-overlay model, 2026-08)
 
 ## Summary
 
-On mobile devices (< 1024px viewport), FeedZero uses a single-panel navigation pattern with a Back button to navigate between views. The navigation follows a drill-down hierarchy: Feed List → Article List → Article Reader. The Back button respects user intent and does not auto-redirect to articles when the user explicitly navigates back.
+On mobile (< 1024px viewport) the article list fills the viewport and the reader is an **overlay layer** on top of it. Navigation is asymmetric by design: **tap goes in, swipe goes out**. Tapping an article mounts the reader layer (slides in from the right); an edge-swipe right (starting within ~28px of the left edge) follows the finger and dismisses it, as does the back pill. The list never horizontal-swipes into the reader and never unmounts while reading, so its scroll position survives the round trip. The URL stays the source of truth: the reader layer exists iff the route carries an `articleId`.
+
+This replaced two earlier models: the original drill-down-with-back-buttons, and a horizontal snap-x pager (list and reader as side-by-side panels). The pager made the two surfaces feel physically connected — a leftward swipe on the list dragged the reader in — which fought the swipe-right-to-mark-read row gesture and lost list scroll position (PR #237 feedback).
 
 ## Behaviour
 
 ```gherkin
 Feature: Mobile navigation
 
-  Rule: Back button navigates up the hierarchy
+  Rule: Tap goes in, swipe goes out
 
-  Scenario: Back from article shows article list
+  Scenario: Tap opens the reader overlay
+    Given the user is viewing an article list on mobile
+    When the user taps an article row
+    Then the reader layer slides in over the list
+    And the URL gains the articleId segment
+
+  Scenario: Edge-swipe dismisses the reader
+    Given the reader layer is open
+    When the user drags rightward starting at the left screen edge
+    Then the layer follows the finger
+    And releasing past a third of the screen width returns to the list
+    And the article list is unchanged (scroll position intact)
+
+  Scenario: Mid-screen swipes belong to the content
+    Given the reader layer is open
+    When the user drags starting away from the left edge
+    Then the reader does not dismiss
+
+  Scenario: The list cannot swipe into the reader
+    Given the user is viewing an article list on mobile
+    When the user swipes leftward on the list
+    Then no reader appears (rows own rightward swipe-to-mark-read;
+      nothing owns leftward)
+
+  Scenario: Back pill returns to the list without auto-redirect
     Given the user is viewing an article on mobile
-    When the user taps the Back button
+    When the user taps the back pill
     Then the article list is displayed
     And the user is not auto-redirected to an article
-
-  Scenario: Back from article list shows feed sidebar prompt
-    Given the user is viewing an article list on mobile
-    When the user taps the Back button
-    Then the user is navigated to /feeds
-    And a prompt to open the sidebar is shown
-
-  Scenario: Back button is hidden at root
-    Given the user is at the /feeds root on mobile
-    Then the Back button is not displayed
 
   Rule: Auto-select is suppressed after Back navigation
 
@@ -53,14 +69,14 @@ Feature: Mobile navigation
     Then the user stays on that URL (the reader shows its own empty state)
     And no automatic back-navigation occurs
 
-  Rule: Mobile layout is single-panel
+  Rule: The reader is a layer, not a sibling panel
 
-  Scenario: Mobile shows one content panel at a time
+  Scenario: Mobile shows the reader above the mounted list
     Given the user is on a mobile device (< 1024px)
     When viewing /feeds/:feedId/articles/:articleId
-    Then only the reader panel is visible
-    And the article list is not visible
-    And the sidebar is collapsed to offcanvas
+    Then the reader layer covers the viewport
+    And the article list stays mounted beneath it
+    And a deeplink to this URL shows the reader immediately
 
   Scenario: Desktop shows multi-panel layout
     Given the user is on a desktop device (>= 1024px)
@@ -73,8 +89,15 @@ Feature: Mobile navigation
   Scenario: Closed drawer surfaces recent feeds instead of the current feed name
     Given the user is on mobile with the bottom drawer closed
     Then the strip shows an anchored "All items" button
-    And the favicons of the most-recently-viewed feeds, newest first
+    And the favicons of the most-recently-viewed feeds in stable sidebar order
+    And fixed Explore and Settings shortcuts beside the chevron
     And it does not repeat the current feed name (the header already shows it)
+
+  Scenario: Dock slots never reorder under the thumb
+    Given the dock shows a set of feed favicons
+    When the user taps one of them
+    Then the dock's buttons keep their positions
+    And only viewing a feed from outside the dock swaps a slot
 
   Scenario: Tapping a dock favicon switches feed without opening the drawer
     Given the closed drawer dock shows a feed's favicon
@@ -90,22 +113,29 @@ Feature: Mobile navigation
 
 ## Architecture
 
-### Flow
+### Flow (closing the reader)
 
-1. User taps Back button in mobile header
-2. `handleBack()` sets `skipAutoSelectRef.current = true`
-3. Navigation occurs via `navigate()` to parent route
+1. User edge-swipes right on the reader layer (or taps the back pill)
+2. `closeReader()` sets `skipAutoSelectRef.current = true` and navigates
+   to the parent route (`/feeds/:feedId`)
+3. The reader layer unmounts (its existence is derived from `articleId`)
 4. Auto-select effect checks `skipAutoSelectRef` and skips if true
-5. Ref is reset only when user explicitly navigates to an article
+5. Ref is reset only when the user explicitly navigates to an article
+
+Gesture ownership map (mobile):
+- **List rows**: rightward drag → toggle read; vertical → scroll; leftward → nothing.
+- **Reader layer**: edge-zone rightward drag → dismiss; elsewhere → content scroll.
+- **Article list top**: downward overscroll → pull-to-refresh.
 
 ### Files
 
 | File | Role |
 |------|------|
-| `src/pages/feeds-route.tsx` | Mobile/desktop layout switching, scroll-snap nav, auto-select suppression, and the empty-stage→list fallback (present→absent transition guard) |
+| `src/pages/feeds-route.tsx` | Mobile branch renders `<main>` (list) + conditional `<MobileReaderLayer>`; auto-select suppression; empty-stage→list fallback (present→absent transition guard) |
+| `src/hooks/use-swipe-back.ts` | Edge-zone arming, finger-following `dragX`, commit past ⅓ width; non-passive touchmove for `preventDefault` |
 | `src/hooks/use-media-query.ts` | `useIsDesktop()` hook for responsive breakpoint detection |
-| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = quick-switch favicon dock; open state = full feed list + Refresh/Settings footer |
-| `src/lib/recent-feeds.ts` | Pure `orderFeedsByRecency()` / `recordRecentFeed()` helpers + `MOBILE_DOCK_FEED_CAP` |
+| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = quick-switch favicon dock + Explore/Settings shortcuts; open state = full feed list + Refresh/Settings footer |
+| `src/lib/recent-feeds.ts` | Pure `stableDockFeeds()` / `recordRecentFeed()` helpers + `MOBILE_DOCK_FEED_CAP` |
 | `src/stores/feed-store.ts` | Tracks `recentFeedIds` (device-local, persisted) — recorded in `selectFeed`, pruned in `removeFeed` |
 
 ### Tests
@@ -139,7 +169,7 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
 
 - **Ref-based skip flag** — Using a ref (`skipAutoSelectRef`) instead of state avoids re-renders while still persisting across the async article load cycle. The ref is reset only when `articleId` appears in the URL, ensuring the skip persists through multiple effect runs.
 
-- **Stack-based navigation** — Mobile navigation follows the standard iOS/Android pattern: Article → Article List → Feed List. This matches user mental models for drill-down interfaces.
+- **Reader as a layer, not a peer** — The snap-pager model made the list and reader feel like two connected panels; users read that as "swiping the list drags the reader in," which collided with row swipe-actions. A layer matches the iOS mental model (detail slides over master), frees every list gesture, and keeps the list mounted so scroll position is preserved for free. Entry is tap-only; exit is edge-swipe or back pill — asymmetric on purpose.
 
 - **Auto-select only on feed switch** — Auto-selecting the first article when switching feeds improves UX by showing content immediately. But auto-select is suppressed after Back navigation because the user explicitly wanted to see the article list (to pick a different article).
 
