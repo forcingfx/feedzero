@@ -204,6 +204,18 @@ describe("MobileNavDrawer", () => {
       ).toHaveAttribute("aria-pressed", "true");
     });
 
+    it("dock buttons meet the 44px tap-target floor (size-11)", () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("f1", "Feed 1")],
+        recentFeedIds: ["f1"],
+      });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      for (const btn of within(strip).getAllByRole("button")) {
+        expect(btn.className).toContain("size-11");
+      }
+    });
+
     it("has a fixed Explore shortcut that navigates without opening the drawer", async () => {
       const user = userEvent.setup();
       useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });

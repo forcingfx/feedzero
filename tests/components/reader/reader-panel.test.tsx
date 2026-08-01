@@ -96,6 +96,33 @@ describe("ReaderPanel", () => {
     });
   });
 
+  describe("tap targets (≥44px effective, Apple HIG)", () => {
+    beforeEach(() => {
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+    });
+
+    it("star and share keep their compact look but expand the hit area", () => {
+      render(<ReaderPanel />);
+      for (const name of [/star article/i, /share article/i]) {
+        const btn = screen.getByRole("button", { name });
+        // h-7 (28px) + after:-inset-2 (2×8px) = 44px effective.
+        expect(btn.className).toContain("h-7");
+        expect(btn.className).toContain("after:-inset-2");
+      }
+    });
+
+    it("view-mode segments expand vertically only (no cross-segment overlap)", () => {
+      render(<ReaderPanel />);
+      const feedSegment = screen.getByRole("button", { name: "Feed" });
+      expect(feedSegment.className).toContain("after:-inset-y-2");
+      expect(feedSegment.className).not.toContain("after:-inset-2");
+    });
+  });
+
   it("renders article title and content", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),

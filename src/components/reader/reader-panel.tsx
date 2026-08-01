@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { shareArticle } from "@/lib/share-article.ts";
+import { TAP_TARGET_EXPAND, TAP_TARGET_EXPAND_Y } from "@/lib/tap-target.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
@@ -320,6 +321,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
               onClick={() => handleModeChange("feed")}
               className={cn(
                 "px-3 py-1 transition-colors",
+                TAP_TARGET_EXPAND_Y,
                 viewMode === "feed"
                   ? "bg-foreground text-background font-medium"
                   : "text-muted-foreground hover:text-foreground",
@@ -341,6 +343,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                   }
                   className={cn(
                     "inline-flex items-center gap-1 px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    TAP_TARGET_EXPAND_Y,
                     viewMode === "extracted"
                       ? "bg-foreground text-background font-medium"
                       : "text-muted-foreground hover:text-foreground",
@@ -365,7 +368,10 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                   type="button"
                   onClick={() => void shareArticle(article)}
                   aria-label="Share article"
-                  className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-border text-muted-foreground/70 hover:text-foreground hover:bg-accent transition-colors"
+                  className={cn(
+                    "inline-flex items-center justify-center h-7 w-7 rounded-full border border-border text-muted-foreground/70 hover:text-foreground hover:bg-accent transition-colors",
+                    TAP_TARGET_EXPAND,
+                  )}
                 >
                   <Share2 className="size-3.5" />
                 </button>
@@ -383,6 +389,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                 aria-pressed={Boolean(article.starred)}
                 className={cn(
                   "inline-flex items-center justify-center h-7 w-7 rounded-full border border-border transition-colors",
+                  TAP_TARGET_EXPAND,
                   article.starred
                     ? "text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
                     : "text-muted-foreground/70 hover:text-foreground hover:bg-accent",

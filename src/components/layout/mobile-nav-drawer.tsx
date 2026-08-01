@@ -83,7 +83,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
             aria-label="All items"
             aria-pressed={allActive}
             onClick={() => onFeedSelect(ALL_FEEDS_ID)}
-            className={`flex items-center justify-center size-10 shrink-0 rounded-md ${
+            className={`flex items-center justify-center size-11 shrink-0 rounded-md ${
               allActive
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:bg-accent/50"
@@ -100,7 +100,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                 aria-label={feed.title}
                 aria-pressed={active}
                 onClick={() => onFeedSelect(feed.id)}
-                className={`flex items-center justify-center size-10 shrink-0 rounded-md hover:bg-accent/50 ${
+                className={`flex items-center justify-center size-11 shrink-0 rounded-md hover:bg-accent/50 ${
                   active
                     ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
                     : ""
@@ -121,7 +121,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
           type="button"
           aria-label="Explore"
           onClick={() => navigate("/explore")}
-          className="flex items-center justify-center size-10 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
+          className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
         >
           <Compass className="size-5" />
         </button>
@@ -129,7 +129,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
           type="button"
           aria-label="Settings"
           onClick={() => goToSettings(navigate)}
-          className="flex items-center justify-center size-10 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
+          className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
         >
           <Settings className="size-5" />
         </button>
@@ -137,7 +137,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
           <button
             type="button"
             aria-label="Open feed list"
-            className="flex items-center justify-center size-10 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
+            className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
           >
             <ChevronUp
               data-testid="drawer-open-chevron"
