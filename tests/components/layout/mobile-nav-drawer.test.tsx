@@ -154,7 +154,7 @@ describe("MobileNavDrawer", () => {
       expect(onFeedSelect).toHaveBeenCalledWith("all");
     });
 
-    it("orders dock favicons most-recently-viewed first", () => {
+    it("dock keeps sidebar order regardless of recency (no reorder under the thumb)", () => {
       useFeedStore.setState({
         feeds: [makeFeed("f1", "Alpha"), makeFeed("f2", "Bravo"), makeFeed("f3", "Charlie")],
         recentFeedIds: ["f3", "f1"],
@@ -164,14 +164,15 @@ describe("MobileNavDrawer", () => {
       const labels = within(strip)
         .getAllByRole("button")
         .map((b) => b.getAttribute("aria-label"));
-      // After the anchored "All items", recency order wins: f3, f1, then the
-      // never-viewed f2; the fixed Explore/Settings shortcuts and the
-      // open-list chevron trail.
+      // Recency only decides WHICH feeds occupy dock slots; POSITION is
+      // sidebar order. Earlier the dock re-sorted most-recent-first, which
+      // shuffled the buttons on every tap — jarring on a strip you tap
+      // by muscle memory (user feedback on PR #237).
       expect(labels).toEqual([
         "All items",
-        "Charlie",
         "Alpha",
         "Bravo",
+        "Charlie",
         "Explore",
         "Settings",
         "Open feed list",

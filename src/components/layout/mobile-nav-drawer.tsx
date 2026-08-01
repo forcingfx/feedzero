@@ -4,7 +4,7 @@ import { ChevronUp, Compass, Layers, RefreshCw, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@feedzero/core/utils/constants";
-import { orderFeedsByRecency, MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
+import { stableDockFeeds, MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { SidebarMenu, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
@@ -45,12 +45,10 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const recentFeedIds = useFeedStore((s) => s.recentFeedIds);
   // The closed strip is a quick-switch dock, not a status line: showing the
   // current feed name here just echoed the header. Instead, surface the
-  // feeds the user actually hops between — All-items plus their most
-  // recently viewed feeds, capped so the open-list chevron stays reachable.
-  const dockFeeds = orderFeedsByRecency(feeds, recentFeedIds).slice(
-    0,
-    MOBILE_DOCK_FEED_CAP,
-  );
+  // feeds the user actually hops between. Recency picks WHICH feeds are
+  // here; sidebar order picks WHERE — see stableDockFeeds for why the
+  // dock must never reorder on a tap.
+  const dockFeeds = stableDockFeeds(feeds, recentFeedIds, MOBILE_DOCK_FEED_CAP);
   const allActive = selectedFeedId === ALL_FEEDS_ID;
 
   return (
