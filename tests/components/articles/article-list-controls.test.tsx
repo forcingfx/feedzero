@@ -16,7 +16,6 @@ import {
   ArticleListControls,
   MobileHeaderPills,
 } from "@/components/articles/article-list-controls.tsx";
-import { getFeeds } from "@/core/storage/db.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
@@ -176,90 +175,63 @@ describe("MobileHeaderPills", () => {
     useArticleStore.setState({ articleSortMode: "newest" });
   });
 
-  it("renders the two pills without a title or sticky positioning", () => {
+  it("renders one consolidated view-options pill — no refresh, no separate cog/sort", () => {
+    // Three same-looking pills of three different scopes (refresh action,
+    // feed settings, list sort) read as inconsistent (user feedback on
+    // PR #237). Refresh is the pull-to-refresh gesture's job on mobile;
+    // sort + contextual settings consolidate into one menu.
     render(
       <MemoryRouter>
         <MobileHeaderPills />
       </MemoryRouter>,
     );
     const wrapper = screen.getByTestId("mobile-header-pills");
-    expect(wrapper).toBeInTheDocument();
-    // Bare wrapper — no sticky / border / title slot.
     expect(wrapper.className).not.toMatch(/sticky/);
-    expect(wrapper.className).not.toMatch(/border-b/);
-    expect(screen.getByTestId("settings-pill")).toBeInTheDocument();
-    expect(screen.getByLabelText(/sort/i)).toBeInTheDocument();
-  });
-
-  it("hides the settings pill on ALL_FEEDS view (sort still renders)", () => {
-    useFeedStore.setState({ selectedFeedId: ALL_FEEDS_ID });
-    render(
-      <MemoryRouter>
-        <MobileHeaderPills />
-      </MemoryRouter>,
-    );
-    expect(screen.queryByTestId("settings-pill")).toBeNull();
-    expect(screen.getByLabelText(/sort/i)).toBeInTheDocument();
-  });
-
-  it("shows a refresh control when feeds exist", () => {
-    render(
-      <MemoryRouter>
-        <MobileHeaderPills />
-      </MemoryRouter>,
-    );
-    expect(screen.getByTestId("mobile-refresh")).toBeInTheDocument();
-  });
-
-  it("hides the refresh control when there are no feeds", () => {
-    useFeedStore.setState({ feeds: [], selectedFeedId: ALL_FEEDS_ID });
-    render(
-      <MemoryRouter>
-        <MobileHeaderPills />
-      </MemoryRouter>,
-    );
+    expect(screen.getByTestId("view-options-pill")).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-refresh")).toBeNull();
+    expect(screen.queryByTestId("settings-pill")).toBeNull();
   });
 
-  it("tapping refresh on a single feed view refreshes only that feed", async () => {
-    const { refreshFeed, refreshAllFeeds } = await import(
-      "@/core/feeds/feed-service.ts"
-    );
-    vi.mocked(getFeeds).mockResolvedValue({
-      ok: true,
-      value: [feed("f-tech", "Tech Crunchies")],
-    });
+  it("menu offers the sort modes; selecting one updates the store", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
         <MobileHeaderPills />
       </MemoryRouter>,
     );
-    await user.click(screen.getByTestId("mobile-refresh"));
-    expect(refreshFeed).toHaveBeenCalledTimes(1);
-    expect(refreshAllFeeds).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("view-options-pill"));
+    await user.click(await screen.findByText(/oldest first/i));
+
+    expect(useArticleStore.getState().articleSortMode).toBe("oldest");
   });
 
-  it("tapping refresh on the All-items view refreshes every feed", async () => {
+  it("menu offers Feed settings on a feed view and opens the dialog", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <MobileHeaderPills />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("view-options-pill"));
+    await user.click(await screen.findByText(/feed settings/i));
+
+    expect(useFeedStore.getState().feedSettingsDialogId).toBe("f-tech");
+  });
+
+  it("omits the settings item on aggregated views (nothing to configure)", async () => {
     useFeedStore.setState({ selectedFeedId: ALL_FEEDS_ID });
-    const { refreshAllFeeds } = await import("@/core/feeds/feed-service.ts");
     const user = userEvent.setup();
     render(
       <MemoryRouter>
         <MobileHeaderPills />
       </MemoryRouter>,
     );
-    await user.click(screen.getByTestId("mobile-refresh"));
-    expect(refreshAllFeeds).toHaveBeenCalled();
-  });
 
-  it("disables the refresh control while a refresh is in flight", () => {
-    useFeedStore.setState({ isRefreshingAll: true });
-    render(
-      <MemoryRouter>
-        <MobileHeaderPills />
-      </MemoryRouter>,
-    );
-    expect(screen.getByTestId("mobile-refresh")).toBeDisabled();
+    await user.click(screen.getByTestId("view-options-pill"));
+
+    expect(await screen.findByText(/newest first/i)).toBeInTheDocument();
+    expect(screen.queryByText(/feed settings/i)).toBeNull();
   });
 });
