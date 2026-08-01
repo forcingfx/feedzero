@@ -133,10 +133,21 @@ describe("buildCommandActions", () => {
       ["open-settings", "/settings"],
       ["open-subscription", "/settings?tab=subscription"],
       ["open-sync", "/settings?tab=sync-and-data"],
-      ["open-shortcuts", "/settings?tab=help"],
     ])("%s navigates to %s", (id, path) => {
       findAction(id)?.run();
       expect(navigate).toHaveBeenCalledWith(path);
+    });
+
+    it("open-shortcuts opens the shortcuts overlay instead of burying it in Settings", async () => {
+      const { useShortcutsDialogStore } = await import(
+        "@/stores/shortcuts-dialog-store.ts"
+      );
+      useShortcutsDialogStore.setState({ isOpen: false });
+
+      findAction("open-shortcuts")?.run();
+
+      expect(useShortcutsDialogStore.getState().isOpen).toBe(true);
+      expect(navigate).not.toHaveBeenCalled();
     });
   });
 

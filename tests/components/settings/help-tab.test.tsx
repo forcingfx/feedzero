@@ -31,6 +31,9 @@ describe("<HelpTab>", () => {
     expect(screen.getByText(/navigation/i)).toBeInTheDocument();
     expect(screen.getByText(/next article/i)).toBeInTheDocument();
     expect(screen.getByText(/toggle sidebar/i)).toBeInTheDocument();
+    // Comes from the shared SHORTCUT_GROUPS module — proves this tab and
+    // the `?` overlay render the same single source (drift killer).
+    expect(screen.getByText(/star article/i)).toBeInTheDocument();
   });
 
   it("Send feedback button opens the FeedbackDialog", () => {
