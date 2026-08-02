@@ -17,7 +17,28 @@ permissions:
   packages: write
 
 jobs:
+  # Fail in seconds — before checkout/npm ci — if the two-repo ordering
+  # invariant is violated: the landing changelog feed must already serve the
+  # target version as its TOP entry (landing merges first; the app vendors
+  # the feed). Encodes what was previously prose in the release runbook.
+  # curl -L matters: feedzero.app 307-redirects to www.feedzero.app.
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Landing feed serves ${{ inputs.version }} as the newest release
+        run: |
+          set -euo pipefail
+          TOP="$(curl -fsSL https://feedzero.app/releases.xml \
+            | grep -oE 'feedzero:release:[0-9.]+' | head -1 | cut -d: -f3)"
+          if [ "$TOP" != "${{ inputs.version }}" ]; then
+            echo "::error::Landing feed top entry is '$TOP', expected '${{ inputs.version }}'. Merge the landing release PR and wait for its deploy before running this workflow."
+            exit 1
+          fi
+          echo "Feed top entry matches: $TOP"
+
   prepare:
+    needs: preflight
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
