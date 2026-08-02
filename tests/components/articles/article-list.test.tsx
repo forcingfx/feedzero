@@ -363,6 +363,27 @@ describe("ArticleList", () => {
     expect(list!.className).toContain("pb-12");
   });
 
+  it("shows a row skeleton during the initial silent load instead of a blank panel", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("f1", "Feed 1")],
+      selectedFeedId: "f1",
+      isLoading: false,
+      isRefreshingAll: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: true,
+    });
+
+    render(<ArticleList />);
+
+    // Blank reads as "broken"; a pulsing list reads as "already loading".
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByText(/no articles here yet/i)).toBeNull();
+  });
+
   it("clicking the 'Mark N read' pill marks everything read and offers Undo", async () => {
     const { toast } = await import("sonner");
     const user = userEvent.setup();

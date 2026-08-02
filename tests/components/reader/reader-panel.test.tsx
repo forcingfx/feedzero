@@ -57,6 +57,119 @@ describe("ReaderPanel", () => {
     expect(screen.getByText("Select an article to read.")).toBeInTheDocument();
   });
 
+  describe("share button", () => {
+    it("shares the article via the native share sheet when supported", async () => {
+      const user = userEvent.setup();
+      const shareSpy = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "share", {
+        value: shareSpy,
+        configurable: true,
+      });
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+      await user.click(
+        screen.getByRole("button", { name: /share article/i }),
+      );
+
+      expect(shareSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ url: mockArticle().link }),
+      );
+      delete (navigator as { share?: unknown }).share;
+    });
+
+    it("sits in the action row beside the star toggle", () => {
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+      const row = screen.getByTestId("reader-action-row");
+      const share = screen.getByRole("button", { name: /share article/i });
+      expect(row.contains(share)).toBe(true);
+    });
+  });
+
+  describe("reading measure + text size", () => {
+    it("centers the article column at the existing max measure", () => {
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+      render(<ReaderPanel />);
+      const articleEl = screen
+        .getByRole("heading", { level: 2 })
+        .closest("article");
+      expect(articleEl!.className).toContain("max-w-180");
+      expect(articleEl!.className).toContain("mx-auto");
+    });
+
+    it.each([
+      ["small", "text-sm"],
+      ["large", "text-lg"],
+    ] as const)(
+      "applies the persisted %s reader text size",
+      async (size, expectedClass) => {
+        const { usePreferencesStore } = await import(
+          "@/stores/preferences-store.ts"
+        );
+        const { DEFAULT_PREFERENCES } = await import("@feedzero/core/types");
+        usePreferencesStore.setState({
+          preferences: { ...DEFAULT_PREFERENCES, readerTextSize: size },
+        });
+        useArticleStore.setState({
+          selectedArticle: mockArticle(),
+          articles: [],
+          isLoading: false,
+        });
+
+        render(<ReaderPanel />);
+
+        const articleEl = screen
+          .getByRole("heading", { level: 2 })
+          .closest("article");
+        expect(articleEl!.className).toContain(expectedClass);
+        usePreferencesStore.setState({
+          preferences: { ...DEFAULT_PREFERENCES },
+        });
+      },
+    );
+  });
+
+  describe("tap targets (≥44px effective, Apple HIG)", () => {
+    beforeEach(() => {
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+    });
+
+    it("star and share keep their compact look but expand the hit area", () => {
+      render(<ReaderPanel />);
+      for (const name of [/star article/i, /share article/i]) {
+        const btn = screen.getByRole("button", { name });
+        // h-7 (28px) + after:-inset-2 (2×8px) = 44px effective.
+        expect(btn.className).toContain("h-7");
+        expect(btn.className).toContain("after:-inset-2");
+      }
+    });
+
+    it("view-mode segments expand vertically only (no cross-segment overlap)", () => {
+      render(<ReaderPanel />);
+      const feedSegment = screen.getByRole("button", { name: "Feed" });
+      expect(feedSegment.className).toContain("after:-inset-y-2");
+      expect(feedSegment.className).not.toContain("after:-inset-2");
+    });
+  });
+
   it("renders article title and content", () => {
     useArticleStore.setState({
       selectedArticle: mockArticle(),

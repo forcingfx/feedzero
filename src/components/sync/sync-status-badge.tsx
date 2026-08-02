@@ -51,7 +51,18 @@ const TICK_INTERVAL_MS = 30 * 1000;
 
 type DisplayState = "local-only" | "syncing" | "synced" | "error";
 
-export function SyncStatusBadge() {
+interface SyncStatusBadgeProps {
+  /**
+   * Dot-only rendering for the mobile header: the color carries the
+   * state, the full text stays in the accessible label, and the
+   * verbose "Refreshed X ago · mode" line lives in the drawer footer.
+   */
+  compact?: boolean;
+  /** Optional click hook (e.g. close the drawer before navigating). */
+  onClick?: () => void;
+}
+
+export function SyncStatusBadge({ compact = false, onClick }: SyncStatusBadgeProps = {}) {
   const status = useSyncStore((s) => s.status);
   const lastRefreshAllAt = useFeedStore((s) => s.lastRefreshAllAt);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
@@ -116,9 +127,11 @@ export function SyncStatusBadge() {
       data-testid="sync-status-badge"
       data-state={displayState}
       aria-label={`Cloud sync: ${label}`}
+      onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full text-xs font-medium",
         "hover:text-foreground transition-colors",
+        compact ? "p-2" : "px-2.5 py-1",
         tone,
       )}
     >
@@ -127,10 +140,14 @@ export function SyncStatusBadge() {
       ) : (
         <span
           aria-hidden
-          className={cn("size-1.5 rounded-full", dotColor)}
+          className={cn(
+            "rounded-full",
+            compact ? "size-2" : "size-1.5",
+            dotColor,
+          )}
         />
       )}
-      <span className="leading-none">{label}</span>
+      {!compact && <span className="leading-none">{label}</span>}
     </Link>
   );
 }
