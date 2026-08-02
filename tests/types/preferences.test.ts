@@ -16,6 +16,7 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       articleSortMode: "newest",
       groupArticleFloods: true,
       theme: "system",
+      readerTextSize: "medium",
     });
   });
 

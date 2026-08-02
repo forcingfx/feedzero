@@ -154,7 +154,7 @@ describe("MobileNavDrawer", () => {
       expect(onFeedSelect).toHaveBeenCalledWith("all");
     });
 
-    it("orders dock favicons most-recently-viewed first", () => {
+    it("dock keeps sidebar order regardless of recency (no reorder under the thumb)", () => {
       useFeedStore.setState({
         feeds: [makeFeed("f1", "Alpha"), makeFeed("f2", "Bravo"), makeFeed("f3", "Charlie")],
         recentFeedIds: ["f3", "f1"],
@@ -164,13 +164,17 @@ describe("MobileNavDrawer", () => {
       const labels = within(strip)
         .getAllByRole("button")
         .map((b) => b.getAttribute("aria-label"));
-      // After the anchored "All items", recency order wins: f3, f1, then the
-      // never-viewed f2; the open-list chevron trails.
+      // Recency only decides WHICH feeds occupy dock slots; POSITION is
+      // sidebar order. Earlier the dock re-sorted most-recent-first, which
+      // shuffled the buttons on every tap — jarring on a strip you tap
+      // by muscle memory (user feedback on PR #237).
       expect(labels).toEqual([
         "All items",
-        "Charlie",
         "Alpha",
         "Bravo",
+        "Charlie",
+        "Explore",
+        "Settings",
         "Open feed list",
       ]);
     });
@@ -200,6 +204,86 @@ describe("MobileNavDrawer", () => {
         within(strip).getByRole("button", { name: "Hacker News" }),
       ).toHaveAttribute("aria-pressed", "true");
     });
+
+    it("dock buttons meet the 44px tap-target floor (size-11)", () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("f1", "Feed 1")],
+        recentFeedIds: ["f1"],
+      });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+      for (const btn of within(strip).getAllByRole("button")) {
+        expect(btn.className).toContain("size-11");
+      }
+    });
+
+    it("swiping up on the dock strip opens the drawer (the handle pill advertises it)", async () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      renderDrawer();
+      const strip = screen.getByTestId("drawer-handle-strip");
+
+      const touch = (type: string, y: number) =>
+        strip.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches:
+              type === "touchend"
+                ? []
+                : [new Touch({ identifier: 1, target: strip, clientX: 200, clientY: y })],
+          }),
+        );
+
+      touch("touchstart", 800);
+      touch("touchmove", 760);
+      touch("touchend", 760);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("drawer-content")).toBeInTheDocument();
+      });
+    });
+
+    it("has a fixed Explore shortcut that navigates without opening the drawer", async () => {
+      const user = userEvent.setup();
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      renderDrawer();
+
+      const strip = screen.getByTestId("drawer-handle-strip");
+      await user.click(
+        within(strip).getByRole("button", { name: /explore/i }),
+      );
+
+      expect(screen.getByTestId("probe-path")).toHaveTextContent("/explore");
+      expect(screen.queryByTestId("drawer-content")).toBeNull();
+    });
+
+    it("has a fixed Settings shortcut that navigates without opening the drawer", async () => {
+      const user = userEvent.setup();
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      renderDrawer();
+
+      const strip = screen.getByTestId("drawer-handle-strip");
+      await user.click(
+        within(strip).getByRole("button", { name: /settings/i }),
+      );
+
+      expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings");
+      expect(screen.queryByTestId("drawer-content")).toBeNull();
+    });
+  });
+
+  it("drawer footer carries the full 'Refreshed X ago' status (moved out of the header)", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [makeFeed("f1", "Feed 1")],
+      lastRefreshAllAt: Date.now() - 5 * 60 * 1000,
+    });
+    renderDrawer();
+
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
+
+    const drawer = await screen.findByTestId("drawer-content");
+    expect(within(drawer).getByText(/refreshed .* ago/i)).toBeInTheDocument();
   });
 
   it("renders 'All items' entry when drawer is open and there are feeds", async () => {

@@ -36,6 +36,29 @@ describe("Toaster theming", () => {
     });
   });
 
+  it("lifts toasts above the mobile dock (60px strip + safe area)", async () => {
+    render(
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <Toaster />
+      </ThemeProvider>,
+    );
+    act(() => {
+      toast("Offset check");
+    });
+
+    await waitFor(() => {
+      const toaster = document.querySelector(
+        "[data-sonner-toaster]",
+      ) as HTMLElement | null;
+      expect(toaster).not.toBeNull();
+      const style = toaster!.getAttribute("style") ?? "";
+      // bottom-center toasts must clear the persistent dock strip
+      // (60px + env(safe-area-inset-bottom)) instead of covering it.
+      expect(style).toContain("--mobile-offset-bottom");
+      expect(style).toContain("safe-area-inset-bottom");
+    });
+  });
+
   it("uses theme tokens for toast colors, not hardcoded hex values", async () => {
     render(
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>

@@ -5,9 +5,25 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
+  Share2,
   Star,
 } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
+import { shareArticle } from "@/lib/share-article.ts";
+import { TAP_TARGET_EXPAND, TAP_TARGET_EXPAND_Y } from "@/lib/tap-target.ts";
+import { usePreferencesStore } from "@/stores/preferences-store.ts";
+import type { ReaderTextSize } from "@feedzero/core/types";
+
+/**
+ * Body scale per readerTextSize preference. Headings keep their absolute
+ * sizes from ArticleContent — the preference tunes reading comfort of
+ * body copy, not the whole hierarchy.
+ */
+const TEXT_SIZE_CLASS: Record<ReaderTextSize, string> = {
+  small: "text-sm",
+  medium: "",
+  large: "text-lg",
+};
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
@@ -58,6 +74,9 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   const isDesktop = useIsDesktop();
   const article = useArticleStore((s) => s.selectedArticle);
   const toggleStar = useArticleStore((s) => s.toggleStar);
+  const readerTextSize = usePreferencesStore(
+    (s) => s.preferences.readerTextSize ?? "medium",
+  );
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
@@ -255,7 +274,15 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
 
   const articleBody = (
     <div data-testid="article-content-area" className="overflow-x-hidden">
-      <article className="p-4 px-6">
+      {/* max-w-180 matches ArticleContent's internal measure; mx-auto
+          centers the column so wide desktop panels get margins instead
+          of left-hugging text with dead space on the right. */}
+      <article
+        className={cn(
+          "p-4 px-6 max-w-180 mx-auto",
+          TEXT_SIZE_CLASS[readerTextSize],
+        )}
+      >
         <header className="mb-3">
           <h2 className="text-2xl font-semibold tracking-tight mb-2 break-words">
             {article.link ? (
@@ -318,6 +345,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
               onClick={() => handleModeChange("feed")}
               className={cn(
                 "px-3 py-1 transition-colors",
+                TAP_TARGET_EXPAND_Y,
                 viewMode === "feed"
                   ? "bg-foreground text-background font-medium"
                   : "text-muted-foreground hover:text-foreground",
@@ -339,6 +367,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                   }
                   className={cn(
                     "inline-flex items-center gap-1 px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    TAP_TARGET_EXPAND_Y,
                     viewMode === "extracted"
                       ? "bg-foreground text-background font-medium"
                       : "text-muted-foreground hover:text-foreground",
@@ -355,6 +384,25 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
               </TooltipContent>
             </Tooltip>
           </div>
+          {article.link && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  data-testid="share-button"
+                  type="button"
+                  onClick={() => void shareArticle(article)}
+                  aria-label="Share article"
+                  className={cn(
+                    "inline-flex items-center justify-center h-7 w-7 rounded-full border border-border text-muted-foreground/70 hover:text-foreground hover:bg-accent transition-colors",
+                    TAP_TARGET_EXPAND,
+                  )}
+                >
+                  <Share2 className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Share</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -365,6 +413,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                 aria-pressed={Boolean(article.starred)}
                 className={cn(
                   "inline-flex items-center justify-center h-7 w-7 rounded-full border border-border transition-colors",
+                  TAP_TARGET_EXPAND,
                   article.starred
                     ? "text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
                     : "text-muted-foreground/70 hover:text-foreground hover:bg-accent",
