@@ -22,6 +22,10 @@ import {
   clearLicenseToken,
 } from "@/core/license/license-token-store";
 import { useLicenseStore } from "@/stores/license-store";
+import {
+  describeLicenseError,
+  type LicenseErrorDescription,
+} from "@/lib/describe-license-error";
 
 interface LicenseTokenPasteFormProps {
   onSuccess?: () => void;
@@ -41,14 +45,16 @@ export function LicenseTokenPasteForm({
   submitLabel = "Continue",
 }: LicenseTokenPasteFormProps) {
   const [token, setToken] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LicenseErrorDescription | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function handleVerify() {
     setError(null);
     const trimmed = token.trim();
     if (!isWellFormedToken(trimmed)) {
-      setError("Invalid license token. Expected format: fz_<...>.<...>");
+      setError({
+        message: "Invalid license token. Expected format: fz_<...>.<...>",
+      });
       return;
     }
     setBusy(true);
@@ -62,7 +68,13 @@ export function LicenseTokenPasteForm({
       const body = await res.json();
       if (!res.ok || !body.ok) {
         clearLicenseToken();
-        setError(body.error ?? `License verification failed (${res.status})`);
+        // The verifier reports in epochs for logs/triage; translate for
+        // the human staring at the dialog.
+        setError(
+          describeLicenseError(
+            body.error ?? `License verification failed (${res.status})`,
+          ),
+        );
         return;
       }
       void useLicenseStore.getState().refresh();
@@ -70,7 +82,7 @@ export function LicenseTokenPasteForm({
       onSuccess?.();
     } catch (e) {
       clearLicenseToken();
-      setError((e as Error).message);
+      setError({ message: (e as Error).message });
     } finally {
       setBusy(false);
     }
@@ -103,7 +115,22 @@ export function LicenseTokenPasteForm({
 
       {error && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            {error.message}
+            {error.action === "recover" && (
+              <>
+                {" "}
+                <a
+                  href="/billing/recover"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline font-medium"
+                >
+                  Recover by email →
+                </a>
+              </>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 

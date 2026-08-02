@@ -13,6 +13,12 @@ name: E2E
 #   - rollback is one click in the Vercel dashboard
 #   - the alternative (waiting 5-10 minutes per PR for E2E) hurts every
 #     iteration and discourages small commits
+#
+# BUT: a post-merge-only net must be LOUD when it tears. This workflow
+# was red on every main push for ~2 months (stale skipOnboarding
+# fixture) and nothing surfaced it — see the 2026-08-01 SDLC retro.
+# The `notify-red` job below files/updates a tracking issue on failure
+# so silent rust is structurally impossible.
 on:
   push:
     branches: [main]
@@ -70,12 +76,12 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      # Desktop-only on push to main. Mobile-specific failures are rare and
-      # caught by manual smoke testing on the deployed preview before the next
-      # merge. Re-enable mobile in a separate workflow if a regression class
-      # emerges.
+      # Both projects (desktop + mobile). This was desktop-only with
+      # "re-enable mobile if a regression class emerges" — the 2026-08
+      # mobile-UX rounds were exactly that class (gesture and layout
+      # regressions only visible in the mobile viewport).
       - name: Run E2E tests
-        run: npx playwright test --project=desktop --shard=${{ matrix.shard }}/6 --max-failures=5
+        run: npx playwright test --shard=${{ matrix.shard }}/6 --max-failures=5
 
       - name: Upload Playwright report on failure
         if: failure()
@@ -84,3 +90,36 @@ jobs:
           name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 14
+
+  # A post-merge safety net that fails silently is worse than none:
+  # it reads as coverage while providing zero. Keep the red loud.
+  notify-red:
+    name: File tracking issue on E2E failure
+    runs-on: ubuntu-latest
+    needs: e2e
+    if: failure()
+    permissions:
+      issues: write
+    steps:
+      - name: Open or bump the e2e-red tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gh label create e2e-red --repo "$GITHUB_REPOSITORY" \
+            --color B60205 --description "Post-merge E2E is red on main" \
+            --force
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label e2e-red --state open --json number --jq '.[0].number // empty')
+          body="Post-merge E2E failed on \`$SHA\`: $RUN_URL"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "E2E red on main" \
+              --label e2e-red \
+              --body "$body
+
+The post-merge E2E net has torn. Fix or revert before the next merge — a red net provides zero protection while reading as coverage (2026-08-01 SDLC retro)."
+          fi

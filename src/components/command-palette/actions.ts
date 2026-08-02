@@ -18,8 +18,9 @@ import {
 } from "lucide-react";
 import type { NavigateFunction } from "react-router";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { useArticleStore } from "@/stores/article-store.ts";
 import { goToSettings } from "@/lib/go-to-settings.ts";
+import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
+import { useShortcutsDialogStore } from "@/stores/shortcuts-dialog-store.ts";
 
 /**
  * A single command palette entry.
@@ -73,7 +74,6 @@ export function buildCommandActions(ctx: ActionContext): CommandAction[] {
       label: "Go to Feeds",
       group: "Navigate",
       icon: Rss,
-      shortcut: "G F",
       keywords: ["home", "reader"],
       run: () => navigate("/feeds"),
     },
@@ -133,7 +133,7 @@ export function buildCommandActions(ctx: ActionContext): CommandAction[] {
       icon: CheckCheck,
       keywords: ["clear", "inbox zero"],
       run: () => {
-        void useArticleStore.getState().markAllAsRead();
+        void markAllReadWithUndo();
       },
     },
     {
@@ -207,7 +207,7 @@ export function buildCommandActions(ctx: ActionContext): CommandAction[] {
       icon: Keyboard,
       shortcut: "?",
       keywords: ["help", "hotkeys", "kbd"],
-      run: () => goToSettings(navigate, "help"),
+      run: () => useShortcutsDialogStore.getState().open(),
     },
   ];
 }

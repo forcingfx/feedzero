@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "fs";
+import { skipOnboarding } from "./fixtures";
 
 /**
  * E2E test for the first-launch auto-subscribe flow.
@@ -23,11 +24,11 @@ test.describe("Release notes auto-subscribe", () => {
   test("first-launch subscribes to release notes and shows it in sidebar", async ({
     page,
   }) => {
-    // Bypass onboarding — simulate a returning local user with an empty DB.
-    await page.addInitScript(() => {
-      localStorage.setItem("feedzero:onboarding-complete", "true");
-      localStorage.setItem("feedzero:storage-mode", "local");
-    });
+    // Bypass onboarding — simulate a healthy returning local user with an
+    // empty DB (flag + stored derived keys; flag alone means "keys lost"
+    // and re-onboards). Deliberately NOT the feedPage fixture: this test
+    // needs the auto-subscribe request to go through, not be blocked.
+    await skipOnboarding(page);
 
     // Mock the feed proxy BEFORE navigating so the auto-subscribe request
     // (POST /api/feed with body {"url":"https://feedzero.app/releases.xml"})

@@ -12,6 +12,12 @@ export default defineConfig({
     environment: "happy-dom",
     include: ["tests/**/*.test.{js,ts,tsx}"],
     setupFiles: ["tests/setup.ts"],
+    // Unhandled rejections FAIL the run rather than printing "Errors 1"
+    // beside a zero exit code. Vitest's default let a missing module
+    // mock (an async store write rejecting after its test resolved)
+    // pass `npm test` locally and only trip the pre-push hook — the
+    // local gate must mean what the hook means (2026-08-01 SDLC retro).
+    dangerouslyIgnoreUnhandledErrors: false,
     coverage: {
       provider: "v8",
       include: [

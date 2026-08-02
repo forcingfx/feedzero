@@ -9,17 +9,27 @@ Power users can navigate the feed reader entirely via keyboard shortcuts. All sh
 
 ## Shortcuts Reference
 
+> The canonical, user-facing shortcut list lives in
+> `src/lib/keyboard-shortcuts.ts` — the single source rendered by both
+> the `?` overlay and Settings → Help. This table mirrors it; when they
+> disagree, the module (and `use-keyboard-nav.ts`) win.
+
 | Key | Action | UI Equivalent |
 |-----|--------|---------------|
-| **J** | Next article | Click article in list |
-| **K** | Previous article | Click article in list |
+| **J** / ↓ | Next article | Click article in list |
+| **K** / ↑ | Previous article | Click article in list |
 | **U** | Next feed | Click feed in sidebar |
 | **I** | Previous feed | Click feed in sidebar |
 | **O** | Open original in new tab | Click "Original" link |
-| **E** | Toggle Feed/Extracted view | Click view toggle buttons |
-| **N** | Open add feed form | Click "Add Feed" button |
+| **H** | Toggle Feed/Full text view | Click view toggle pill |
+| **S** | Star/unstar selected article | Click star button |
+| **N** | Go to Explore (add feed) | Click "Add Feed" button |
+| **Space** / **Shift+Space** | Scroll reader down / up | Scroll |
 | **[** | Toggle sidebar | Click sidebar trigger |
 | **R** | Refresh all feeds | Click "Refresh" button |
+| **?** | Keyboard shortcuts overlay | Palette → "Show keyboard shortcuts" |
+| **⌘K** / **Ctrl+K** | Command palette | — |
+| **⌘,** / **Ctrl+,** | Open settings | Click settings |
 
 ## Behaviour
 
