@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Merge queue refs must produce the required checks (Build, Tests, Coverage)
+  # or queued PRs stall waiting on checks that never run.
+  merge_group:
 
 concurrency:
   group: ci-${{ github.ref }}
