@@ -51,6 +51,40 @@ if (typeof globalThis.isSecureContext === "undefined" || globalThis.isSecureCont
   });
 }
 
+// Per the DOM spec, `nodeName` is a property of the Node interface — browsers
+// define its getter once on Node.prototype. happy-dom instead puts a stub
+// getter on Node.prototype that returns "" and shadows the real implementations
+// on Element.prototype / Text.prototype / etc. DOMPurify >= 3.4.8 hardens
+// against DOM clobbering by caching `lookupGetter(Node.prototype, "nodeName")`
+// at init and using it for every tag-name read, so under happy-dom every node's
+// name reads as "" — DOMPurify then removes <body> itself, which invalidates
+// its NodeIterator mid-walk and lets later nodes (including <script>) escape
+// sanitization entirely. Verified browser-fine in real Chromium; this is a
+// happy-dom spec-compliance gap, so we make Node.prototype.nodeName delegate
+// to the most-derived shadow getter, matching browser behavior.
+const nodeNameStub =
+  typeof Node === "undefined"
+    ? undefined
+    : Object.getOwnPropertyDescriptor(Node.prototype, "nodeName");
+if (nodeNameStub?.get) {
+  const stubGetter = nodeNameStub.get;
+  Object.defineProperty(Node.prototype, "nodeName", {
+    configurable: true,
+    enumerable: nodeNameStub.enumerable,
+    get(this: Node): string {
+      let proto = Object.getPrototypeOf(this) as object | null;
+      while (proto && proto !== Node.prototype) {
+        const shadow = Object.getOwnPropertyDescriptor(proto, "nodeName");
+        if (shadow?.get) {
+          return shadow.get.call(this) as string;
+        }
+        proto = Object.getPrototypeOf(proto);
+      }
+      return stubGetter.call(this) as string;
+    },
+  });
+}
+
 afterEach(() => {
   cleanup();
 });
