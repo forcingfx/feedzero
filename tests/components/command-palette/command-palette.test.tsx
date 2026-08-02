@@ -12,13 +12,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import * as ReactRouter from "react-router";
 import { CommandPalette } from "@/components/command-palette/command-palette.tsx";
 import { useCommandPaletteStore } from "@/stores/command-palette-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 
-const navigateSpy = vi.fn();
+// react-router 8 ships ESM-only; module namespaces are not configurable, so
+// vi.spyOn(ReactRouter, "useNavigate") throws. Partial-mock the module instead.
+const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }));
+
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return { ...actual, useNavigate: () => navigateSpy };
+});
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({ setTheme: vi.fn(), theme: "system" }),
@@ -30,7 +36,6 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 beforeEach(() => {
   navigateSpy.mockReset();
-  vi.spyOn(ReactRouter, "useNavigate").mockReturnValue(navigateSpy);
   useCommandPaletteStore.setState({ isOpen: false });
   useFeedStore.setState({ feeds: [] } as never);
   useArticleStore.setState({ articles: [] } as never);
