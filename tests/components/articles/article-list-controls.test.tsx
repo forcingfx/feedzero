@@ -39,6 +39,9 @@ vi.mock("@/core/storage/db.ts", () => ({
   getSmartFilters: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  // Selecting a sort mode persists through the preferences row.
+  getPreferences: vi.fn().mockResolvedValue({ ok: true, value: null }),
+  putPreferences: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
 vi.mock("@/core/sync/sync-service", () => ({
