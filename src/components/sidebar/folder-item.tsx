@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { cn } from "@/lib/utils.ts";
 import { ChevronRight, GripVertical } from "lucide-react";
 import * as Collapsible from "@radix-ui/react-collapsible";
@@ -5,8 +6,14 @@ import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { formatUnreadBadge } from "@/lib/format-unread-badge.ts";
+import {
+  useArticleStore,
+  selectUnreadCountForFeeds,
+} from "@/stores/article-store.ts";
 import {
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
 } from "@/components/ui/sidebar.tsx";
 import type { Folder } from "@feedzero/core/types";
@@ -38,6 +45,14 @@ export function FolderItem({
 }: FolderItemProps) {
   const open = useFeedStore((s) => s.folderOpenState[folder.id] ?? true);
   const setFolderOpen = useFeedStore((s) => s.setFolderOpen);
+  const feeds = useFeedStore((s) => s.feeds);
+  const folderFeedIds = useMemo(
+    () => feeds.filter((f) => f.folderId === folder.id).map((f) => f.id),
+    [feeds, folder.id],
+  );
+  const unreadCount = useArticleStore((s) =>
+    selectUnreadCountForFeeds(s, folderFeedIds),
+  );
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: folder.id });
   const sortableHook = useSortable({ id: folder.id, disabled: !sortable });
   const sortStyle: React.CSSProperties =
@@ -95,6 +110,18 @@ export function FolderItem({
           >
             <span className="truncate">{folder.name}</span>
           </SidebarMenuButton>
+          {unreadCount > 0 && (
+            <SidebarMenuBadge
+              className={cn(
+                "rounded-lg text-[10px] font-semibold",
+                folder.color
+                  ? "bg-white/20 text-white"
+                  : "bg-primary/10 text-primary",
+              )}
+            >
+              {formatUnreadBadge(unreadCount)}
+            </SidebarMenuBadge>
+          )}
           <Collapsible.Trigger asChild>
             <button
               type="button"

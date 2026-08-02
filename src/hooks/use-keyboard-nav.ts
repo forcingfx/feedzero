@@ -4,6 +4,7 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { useCommandPaletteStore } from "@/stores/command-palette-store.ts";
+import { useShortcutsDialogStore } from "@/stores/shortcuts-dialog-store.ts";
 import { toFolderFeedId } from "@feedzero/core/utils/constants";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 
@@ -14,7 +15,11 @@ import { goToSettings } from "@/lib/go-to-settings.ts";
  * Feed nav:     u/i (next/prev feed)
  * Actions:      o (open original), h (toggle view), n (explore/add feed),
  *               s (star/unstar selected), [ (toggle sidebar), r (refresh),
- *               Space / Shift+Space (scroll reader by viewport)
+ *               Space / Shift+Space (scroll reader by viewport),
+ *               ? (keyboard shortcuts overlay)
+ *
+ * Advertised bindings live in lib/keyboard-shortcuts.ts — update it
+ * whenever a case is added or changed here.
  *
  * Navigation goes through `useNavigate()` directly. The sidebar toggle
  * still uses a DOM CustomEvent because `useKeyboardNav` is called above
@@ -92,6 +97,9 @@ export function useKeyboardNav() {
         break;
       case "r":
         refreshAllFeeds();
+        break;
+      case "?":
+        useShortcutsDialogStore.getState().toggle();
         break;
       default:
         return;

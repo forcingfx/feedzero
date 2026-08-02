@@ -255,8 +255,9 @@ describe("SidebarFeedList", () => {
       expect(screen.getByText("12")).toBeInTheDocument();
       // Foldered feeds
       expect(screen.getByText("7")).toBeInTheDocument();
-      // Count > 99 renders as 99+
-      expect(screen.getByText("99+")).toBeInTheDocument();
+      // f4 renders 99+ (count > 99); the folder aggregate (7 + 101 = 108)
+      // also renders 99+ on the folder header — two badges, same text.
+      expect(screen.getAllByText("99+")).toHaveLength(2);
     });
 
     /**
@@ -266,13 +267,13 @@ describe("SidebarFeedList", () => {
      * cog above the article list owns settings now, so badges no
      * longer need to vanish on hover.
      */
-    it("every feed renders exactly one SidebarMenuBadge", () => {
+    it("every feed renders exactly one SidebarMenuBadge, plus one folder aggregate", () => {
       renderList();
       const badges = document.querySelectorAll(
         "[data-sidebar='menu-badge']",
       );
-      // Four feeds, four badges.
-      expect(badges.length).toBe(4);
+      // Four feeds, four badges — plus the folder header's aggregate badge.
+      expect(badges.length).toBe(5);
     });
   });
 

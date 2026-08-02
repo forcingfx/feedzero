@@ -19,6 +19,7 @@ import { FeedSettingsDialog } from "@/components/feeds/feed-settings-dialog.tsx"
 import { FolderSettingsDialog } from "@/components/folders/folder-settings-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { CommandPalette } from "@/components/command-palette/command-palette.tsx";
+import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { AppLayout } from "@/pages/app-layout.tsx";
 import { FeedsRoute } from "@/pages/feeds-route.tsx";
@@ -345,6 +346,7 @@ export function App() {
         <FeedSettingsDialog />
         <FolderSettingsDialog />
         <CommandPalette />
+        <KeyboardShortcutsDialog />
         <Toaster position="bottom-center" />
       </BrowserRouter>
     </>

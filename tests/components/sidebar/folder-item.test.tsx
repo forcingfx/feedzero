@@ -212,6 +212,96 @@ describe("FolderItem", () => {
     expect(badge!.textContent).toContain("24");
   });
 
+  describe("aggregate unread badge", () => {
+    const secondFeed = { ...mockFeed, id: "f2", title: "Second Feed" };
+
+    it("shows the summed unread count of the folder's feeds on the header row", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed, secondFeed],
+        folders: [mockFolder],
+        folderOpenState: {},
+      });
+      useArticleStore.setState({
+        articlesByFeedId: {
+          f1: [
+            articleFixture("a1", false),
+            articleFixture("a2", false),
+            articleFixture("a3", true),
+          ],
+          f2: [
+            articleFixture("b1", false, "f2"),
+            articleFixture("b2", true, "f2"),
+          ],
+        },
+      });
+      renderFolder();
+      const folderMenuItem = screen
+        .getByText("Tech News")
+        .closest("[data-sidebar='menu-item']");
+      const badge = folderMenuItem!.querySelector("[data-sidebar='menu-badge']");
+      expect(badge).not.toBeNull();
+      expect(badge!.textContent).toBe("3");
+    });
+
+    it("shows no badge when every article in the folder is read", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed],
+        folders: [mockFolder],
+        folderOpenState: {},
+      });
+      useArticleStore.setState({
+        articlesByFeedId: { f1: [articleFixture("a1", true)] },
+      });
+      renderFolder();
+      const folderMenuItem = screen
+        .getByText("Tech News")
+        .closest("[data-sidebar='menu-item']");
+      expect(
+        folderMenuItem!.querySelector("[data-sidebar='menu-badge']"),
+      ).toBeNull();
+    });
+
+    it("caps the aggregate at 99+ like feed badges", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed],
+        folders: [mockFolder],
+        folderOpenState: {},
+      });
+      useArticleStore.setState({
+        articlesByFeedId: {
+          f1: Array.from({ length: 120 }, (_, i) => articleFixture(`a${i}`, false)),
+        },
+      });
+      renderFolder();
+      const folderMenuItem = screen
+        .getByText("Tech News")
+        .closest("[data-sidebar='menu-item']");
+      const badge = folderMenuItem!.querySelector("[data-sidebar='menu-badge']");
+      expect(badge!.textContent).toBe("99+");
+    });
+
+    it("does not count feeds outside the folder", () => {
+      const strayFeed = { ...mockFeed, id: "f3", title: "Stray", folderId: undefined };
+      useFeedStore.setState({
+        feeds: [mockFeed, strayFeed],
+        folders: [mockFolder],
+        folderOpenState: {},
+      });
+      useArticleStore.setState({
+        articlesByFeedId: {
+          f1: [articleFixture("a1", false)],
+          f3: [articleFixture("c1", false, "f3"), articleFixture("c2", false, "f3")],
+        },
+      });
+      renderFolder();
+      const folderMenuItem = screen
+        .getByText("Tech News")
+        .closest("[data-sidebar='menu-item']");
+      const badge = folderMenuItem!.querySelector("[data-sidebar='menu-badge']");
+      expect(badge!.textContent).toBe("1");
+    });
+  });
+
   it("renders neither a folder dropdown nor a per-feed dropdown — cog above article list owns settings", () => {
     renderFolderWithFeed();
     const moreButtons = screen.queryAllByRole("button", {
