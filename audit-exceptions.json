@@ -1,0 +1,4 @@
+{
+  "//": "Dated waivers for triaged npm audit advisories. Every entry needs: advisory (GHSA id), package, expires (YYYY-MM-DD — forces re-triage), reason (why the app is not affected). Consumed by scripts/audit-gate.mjs in the 'npm audit + gitleaks' required check. An expired or missing waiver for a high/critical production advisory fails the gate.",
+  "exceptions": []
+}
