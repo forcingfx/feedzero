@@ -1,0 +1,43 @@
+name: Dependabot auto-merge
+
+# Arms GitHub auto-merge on low-risk Dependabot PRs so they land themselves
+# once every required check is green — instead of rotting in the PR list
+# until they're stale and conflicted (the #235/#238 failure mode).
+#
+# Eligible: patch/minor updates to devDependencies, and any non-major
+# GitHub Actions bump. NOT eligible (require a human): semver-major
+# anything, and ALL production dependency updates — production deps are the
+# app's attack surface (DOMPurify, react-router, hono …) and get reviewed
+# even for patches. Majors are triaged in the quarterly audit lap
+# (docs/operations/audit-lap.md).
+#
+# Auto-merge still goes through the full required-check gauntlet (build,
+# 3 test shards, coverage, audit gate, sync smoke) — this only removes the
+# human click, not the verification.
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch update metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Arm auto-merge for low-risk updates
+        if: >-
+          steps.meta.outputs.update-type != 'version-update:semver-major' &&
+          (steps.meta.outputs.dependency-type == 'direct:development' ||
+           startsWith(github.head_ref, 'dependabot/github_actions/'))
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
