@@ -41,6 +41,14 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
       - name: Commit bump + fixture, then tag
+        # HUSKY=0 disables the local dev hooks that `npm ci` installs via the
+        # `prepare` script. Without it this step fails: the commit-msg hook
+        # rejects `release:` (allowed types are feat|fix|chore|refactor|docs|
+        # test|ci|build|perf|style|revert), so the bot's own commit message
+        # trips a gate meant for humans. This workflow had never run, so the
+        # blocker was latent — found while cutting 0.13.0.
+        env:
+          HUSKY: "0"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
