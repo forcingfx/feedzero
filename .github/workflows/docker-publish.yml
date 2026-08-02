@@ -56,7 +56,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Resolve the release version from the trigger and (except for the
       # SHA-only manual dispatch) refuse to publish if it disagrees with
