@@ -45,6 +45,19 @@ grep -rln 'vi.mock.*"@/core/storage/db' tests/stores/
 # Boundary-violation detector — core/stores must never import UI.
 grep -rln 'from "@/components"' src/core src/stores
 # Empty means clean. Any hit is a structural rule break.
+
+# Platform-drift check — pending dependency majors and runtime EOL.
+# Dependabot auto-merges patch/minor dev-deps; MAJORS land here for
+# triage (evaluate, schedule, or close-with-reason). Node 20 sat EOL in
+# CI until 2026-08-02 because nothing owned this check.
+gh pr list --search "author:app/dependabot" --json number,title \
+  --jq '.[] | "\(.number) \(.title)"'
+grep -rn "node-version" .github/workflows/ | sort | uniq -c
+# Cross-check runtime versions against https://endoflife.date/nodejs.
+
+# Audit-waiver hygiene — every waiver re-justifies itself each lap.
+# Expired waivers already fail CI; this catches "renewed by reflex".
+cat audit-exceptions.json
 ```
 
 If any of these scream — fix-ratio above 25%, a boundary violation, a
