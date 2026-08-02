@@ -116,10 +116,10 @@ jobs:
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
+            printf -v full_body '%s\n\n%s' "$body" \
+              "The post-merge E2E net has torn. Fix or revert before the next merge — a red net provides zero protection while reading as coverage (2026-08-01 SDLC retro)."
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "E2E red on main" \
               --label e2e-red \
-              --body "$body
-
-The post-merge E2E net has torn. Fix or revert before the next merge — a red net provides zero protection while reading as coverage (2026-08-01 SDLC retro)."
+              --body "$full_body"
           fi
