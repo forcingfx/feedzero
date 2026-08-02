@@ -3,10 +3,17 @@ import { buildCommandActions } from "@/components/command-palette/actions.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 
+vi.mock("sonner", () => ({
+  toast: vi.fn(),
+}));
+
+vi.mock("@/core/storage/db.ts", () => ({
+  updateArticle: vi.fn().mockResolvedValue({ ok: true, value: true }),
+}));
+
 const navigate = vi.fn();
 const setTheme = vi.fn();
 const refreshAll = vi.fn();
-const markAllAsRead = vi.fn();
 
 function findAction(id: string) {
   return buildCommandActions({
@@ -20,9 +27,7 @@ describe("buildCommandActions", () => {
     navigate.mockReset();
     setTheme.mockReset();
     refreshAll.mockReset();
-    markAllAsRead.mockReset();
     useFeedStore.setState({ refreshAll } as never);
-    useArticleStore.setState({ markAllAsRead } as never);
   });
 
   it("returns a deterministic, non-empty list", () => {
@@ -77,9 +82,30 @@ describe("buildCommandActions", () => {
   });
 
   describe("read actions", () => {
-    it("mark-all-read calls article-store.markAllAsRead", () => {
+    it("mark-all-read marks the visible articles read (real store, observable outcome)", async () => {
+      const article = {
+        id: "a1",
+        feedId: "f1",
+        guid: "a1",
+        title: "Article",
+        link: "https://example.com/a1",
+        content: "",
+        summary: "",
+        author: "",
+        publishedAt: Date.now(),
+        read: false,
+        createdAt: Date.now(),
+      };
+      useArticleStore.setState({
+        articles: [article],
+        articlesByFeedId: { f1: [article] },
+      });
+
       findAction("mark-all-read")?.run();
-      expect(markAllAsRead).toHaveBeenCalledTimes(1);
+
+      await vi.waitFor(() => {
+        expect(useArticleStore.getState().articles[0].read).toBe(true);
+      });
     });
 
     it("toggle-sidebar dispatches the established CustomEvent", () => {
@@ -107,10 +133,21 @@ describe("buildCommandActions", () => {
       ["open-settings", "/settings"],
       ["open-subscription", "/settings?tab=subscription"],
       ["open-sync", "/settings?tab=sync-and-data"],
-      ["open-shortcuts", "/settings?tab=help"],
     ])("%s navigates to %s", (id, path) => {
       findAction(id)?.run();
       expect(navigate).toHaveBeenCalledWith(path);
+    });
+
+    it("open-shortcuts opens the shortcuts overlay instead of burying it in Settings", async () => {
+      const { useShortcutsDialogStore } = await import(
+        "@/stores/shortcuts-dialog-store.ts"
+      );
+      useShortcutsDialogStore.setState({ isOpen: false });
+
+      findAction("open-shortcuts")?.run();
+
+      expect(useShortcutsDialogStore.getState().isOpen).toBe(true);
+      expect(navigate).not.toHaveBeenCalled();
     });
   });
 

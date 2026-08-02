@@ -27,6 +27,10 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
   refreshAllFeeds: vi.fn(),
 }));
 
+vi.mock("sonner", () => ({
+  toast: vi.fn(),
+}));
+
 const mockArticle = (
   id: string,
   title: string,
@@ -357,6 +361,42 @@ describe("ArticleList", () => {
     expect(list).not.toBeNull();
     // pb-12 = 48px ≥ pill height (h-7 = 28px) + bottom offset (bottom-3 = 12px).
     expect(list!.className).toContain("pb-12");
+  });
+
+  it("clicking the 'Mark N read' pill marks everything read and offers Undo", async () => {
+    const { toast } = await import("sonner");
+    const user = userEvent.setup();
+    const a1 = mockArticle("a1", "First", false);
+    const a2 = mockArticle("a2", "Second", false);
+    useFeedStore.setState({
+      feeds: [mockFeed("f1", "Feed 1")],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [a1, a2],
+      articlesByFeedId: { f1: [a1, a2] },
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    render(<ArticleList />);
+    await user.click(screen.getByRole("button", { name: /mark 2 read/i }));
+
+    await vi.waitFor(() => {
+      expect(useArticleStore.getState().articles.every((a) => a.read)).toBe(
+        true,
+      );
+    });
+    // Mistaken sweeps must be recoverable without a confirmation dialog
+    // taxing the common case — the toast carries the escape hatch.
+    expect(toast).toHaveBeenCalledWith(
+      "Marked 2 read",
+      expect.objectContaining({
+        action: expect.objectContaining({ label: "Undo" }),
+      }),
+    );
   });
 
   it("changing selection to a visible article does not scroll the list (regardless of which call site triggers the change)", async () => {

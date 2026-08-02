@@ -705,4 +705,34 @@ describe("useKeyboardNav", () => {
       expect(useCommandPaletteStore.getState().isOpen).toBe(false);
     });
   });
+
+  describe("keyboard shortcuts overlay (?)", () => {
+    it("opens the shortcuts dialog on '?'", async () => {
+      const { useShortcutsDialogStore } = await import(
+        "@/stores/shortcuts-dialog-store.ts"
+      );
+      useShortcutsDialogStore.setState({ isOpen: false });
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      pressKey("?");
+
+      expect(useShortcutsDialogStore.getState().isOpen).toBe(true);
+    });
+
+    it("does not fire while typing in an input", async () => {
+      const { useShortcutsDialogStore } = await import(
+        "@/stores/shortcuts-dialog-store.ts"
+      );
+      useShortcutsDialogStore.setState({ isOpen: false });
+      renderHook(() => useKeyboardNav(), { wrapper: Wrapper });
+
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      input.focus();
+      pressKey("?", input);
+
+      expect(useShortcutsDialogStore.getState().isOpen).toBe(false);
+      input.remove();
+    });
+  });
 });

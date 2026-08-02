@@ -341,6 +341,68 @@ describe("article-store", () => {
 
       expect(updateArticle).not.toHaveBeenCalled();
     });
+
+    it("returns the previously-unread articles as an undo snapshot", async () => {
+      const articles = [
+        mockArticle("a1", false),
+        mockArticle("a2", true),
+        mockArticle("a3", false),
+      ];
+      useArticleStore.setState({ articles });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      const undone = await useArticleStore.getState().markAllAsRead();
+
+      expect(undone.map((a) => a.id).sort()).toEqual(["a1", "a3"]);
+    });
+
+    it("returns an empty snapshot when nothing was unread", async () => {
+      useArticleStore.setState({ articles: [mockArticle("a1", true)] });
+
+      const undone = await useArticleStore.getState().markAllAsRead();
+
+      expect(undone).toEqual([]);
+    });
+  });
+
+  describe("markUnread", () => {
+    it("restores unread state for the given ids and persists", async () => {
+      const a1 = mockArticle("a1", true);
+      const a2 = mockArticle("a2", true);
+      useArticleStore.setState({
+        articles: [a1, a2],
+        articlesByFeedId: { f1: [a1, a2] },
+      });
+      vi.mocked(updateArticle).mockClear();
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().markUnread(["a1"]);
+
+      const state = useArticleStore.getState();
+      expect(state.articles.find((a) => a.id === "a1")?.read).toBe(false);
+      expect(state.articles.find((a) => a.id === "a2")?.read).toBe(true);
+      expect(state.articlesByFeedId.f1.find((a) => a.id === "a1")?.read).toBe(
+        false,
+      );
+      expect(updateArticle).toHaveBeenCalledTimes(1);
+      expect(updateArticle).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "a1", read: false }),
+      );
+    });
+
+    it("ignores unknown ids and does not persist anything for them", async () => {
+      const a1 = mockArticle("a1", true);
+      useArticleStore.setState({
+        articles: [a1],
+        articlesByFeedId: { f1: [a1] },
+      });
+      vi.mocked(updateArticle).mockClear();
+
+      await useArticleStore.getState().markUnread(["ghost"]);
+
+      expect(updateArticle).not.toHaveBeenCalled();
+      expect(useArticleStore.getState().articles[0].read).toBe(true);
+    });
   });
 
   describe("sync triggers", () => {
