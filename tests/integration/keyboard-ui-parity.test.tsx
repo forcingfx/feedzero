@@ -5,17 +5,23 @@
  * UI click counterparts. This prevents bugs where keyboard and mouse
  * paths diverge over time.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import * as ReactRouter from "react-router";
 import { useKeyboardNav } from "../../src/hooks/use-keyboard-nav.ts";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useExtractionStore } from "../../src/stores/extraction-store.ts";
 import type { Article } from "@feedzero/core/types";
 
-const navigateSpy = vi.fn();
+// react-router 8 ships ESM-only; module namespaces are not configurable, so
+// vi.spyOn(ReactRouter, "useNavigate") throws. Partial-mock the module instead.
+const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }));
+
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return { ...actual, useNavigate: () => navigateSpy };
+});
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return <MemoryRouter initialEntries={["/feeds"]}>{children}</MemoryRouter>;
@@ -80,8 +86,6 @@ function pressKey(key: string) {
 }
 
 describe("keyboard-UI behavior parity", () => {
-  let useNavigateSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = "";
@@ -107,11 +111,6 @@ describe("keyboard-UI behavior parity", () => {
     });
 
     navigateSpy.mockReset();
-    useNavigateSpy = vi.spyOn(ReactRouter, "useNavigate").mockReturnValue(navigateSpy);
-  });
-
-  afterEach(() => {
-    useNavigateSpy.mockRestore();
   });
 
   describe("R key vs Refresh button", () => {

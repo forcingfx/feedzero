@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import * as ReactRouter from "react-router";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { toFolderFeedId } from "@feedzero/core/utils/constants";
 
-const navigateSpy = vi.fn();
+// react-router 8 ships ESM-only; module namespaces are not configurable, so
+// vi.spyOn(ReactRouter, "useNavigate") throws. Partial-mock the module instead.
+const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }));
+
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return { ...actual, useNavigate: () => navigateSpy };
+});
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return <MemoryRouter initialEntries={["/feeds"]}>{children}</MemoryRouter>;
@@ -63,17 +69,13 @@ function pressKey(key: string, target: EventTarget = document) {
 }
 
 describe("useKeyboardNav", () => {
-  let useNavigateSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
     document.body.innerHTML = "";
     navigateSpy.mockReset();
-    useNavigateSpy = vi.spyOn(ReactRouter, "useNavigate").mockReturnValue(navigateSpy);
   });
 
   afterEach(() => {
     document.body.innerHTML = "";
-    useNavigateSpy.mockRestore();
   });
 
   describe("article navigation (j/k)", () => {
