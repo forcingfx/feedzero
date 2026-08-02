@@ -142,6 +142,8 @@ Three-tier strategy. See [docs/testing-strategy.md](docs/testing-strategy.md) fo
 **Coverage thresholds** (`npm run test:coverage`): Statements/Lines/Functions 90%; Branches 83%. Excluded: `src/workers/**`, `src/main.tsx`, `*.d.ts`, `src/types/**`, `src/core/extractor/adapters/types.ts`, `src/core/sync/types.ts`, `src/components/ui/**`.
 
 **Test behavior, not implementation**: Verify user-observable outcomes, not internal mechanisms.
+
+**Pin-tests must state their rationale.** A test that freezes a *product decision* (rather than a correctness property) has to say which trade-off it encodes, in a comment or the test name — because the next person to touch it is trying to decide whether reversing it is legitimate. `"badge hidden on mobile (max-md:hidden) to keep the row compact"` tells you exactly what you're giving up; `"orders dock favicons most-recently-viewed first"` tells you nothing and reads as load-bearing when it was a guess. The 2026-08 UX rounds reversed six such decisions; the annotated ones took seconds, the bare ones needed archaeology. Cost at write time: one line.
 - Bad: "toggleView sets viewMode to extracted" — only checks state change.
 - Good: "pressing E triggers content extraction" — verifies the user action.
 - If a user action has multiple code paths (click + keyboard), test both.
@@ -239,6 +241,7 @@ This project follows **Red-Green-Refactor-Smoke (RGR+S)**. Every change follows 
 5. **REFACTOR** — Mandatory. Extract unclear blocks; remove duplication; one thing per function; intention-revealing names; Boy Scout Rule. Re-run `npm test` after.
 6. **DOCUMENT** — Update `docs/architecture.md`, `docs/data-schema.md`, and `docs/features/*` for changed behavior. New feature → new doc from `docs/features/TEMPLATE.md`. New architectural decisions → ADR in `docs/decisions/`.
 7. **SMOKE** — For any change affecting production behavior (endpoint handlers, data layer, adapter resolution, deployment artifacts), add a smoke test under `tests/smoke/` exercising the **live deployed system** after merge. Run via `SMOKE_TESTS=1 npx vitest run tests/smoke/<name>` once Vercel reports Ready. A PR introducing a production code path without a smoke test is incomplete. ⛔ If it fails after deploy, revert or roll forward immediately.
+8. **DEVICE** — For any change to touch gestures, viewport-dependent layout, or safe-area handling: verify on **real mobile hardware** via the PR's Vercel preview URL (a QR of the branch-alias URL makes this a 5-second loop). ⛔ Emulation is not sufficient — see [Gesture work](#gesture-work).
 
 ## Smoke tests
 
@@ -257,6 +260,16 @@ What NOT to assert:
 - Anything that would log raw IPs, user emails, license tokens, or vault ciphertext. Same anonymity floor as production logs.
 
 Reference: `tests/smoke/release-feed.test.ts`, `tests/smoke/rate-limiter.test.ts`.
+
+## Gesture work
+
+Touch gestures have **three arbiters**, and you only get what the other two cede: the **OS** (screen edges, home indicator), the **browser** (scroll, back-swipe, pull-to-refresh), and **your JS**. Both mobile-UX rounds on 2026-08-01 shipped gestures that passed every local gate and failed on real glass.
+
+- **Emulation cannot validate a gesture.** Synthetic `TouchEvent`s — from Vitest, and from Playwright/CDP in device emulation — bypass the browser's gesture recognizer entirely. They test *your* state machine; the thing that breaks is the *browser's*. Unit + emulation green means "not obviously wrong", never "works".
+- **Declare `touch-action` or lose the race.** Without it, mobile browsers claim a drag as a native scroll after their own slop and stop dispatching `touchmove`; JS arming logic never runs. Use `touch-pan-y` for horizontal gestures on vertically scrolling surfaces, and re-enable `touch-auto` on descendants that legitimately pan (e.g. `<pre>` code blocks).
+- **The screen edges are not yours.** Chrome and Safari run back-navigation gestures there. An edge-gated affordance is unreachable on device — arm on direction, not on origin.
+- **`preventDefault` needs a non-passive native listener.** React's root touch handlers are passive, so `onTouchMove` cannot cancel browser panning; attach via `addEventListener(..., { passive: false })` in an effect.
+- **Write the ownership map before the gesture.** Before building any interaction, state which surface owns which direction — and what the OS/browser already reserve. When a new gesture has no free direction, that's a signal the *layout* is wrong, not that the gesture needs cleverness: the snap-pager's claim on leftward swipes was the real defect behind an elaborately-arbitrated row swipe. Record the map in the relevant `docs/features/*` (`010-mobile-navigation.md` is the model).
 
 ## Operations
 
