@@ -27,7 +27,10 @@ const buttonVariants = cva(
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
         icon: "size-9",
         "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
+        // size-8 (32px) + after:-inset-1.5 (2×6px) = 44px effective tap
+        // target (Apple HIG floor) while the button stays visually compact.
+        "icon-sm":
+          "size-8 relative after:absolute after:-inset-1.5 after:content-['']",
         "icon-lg": "size-10",
       },
     },

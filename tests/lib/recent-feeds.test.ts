@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   recordRecentFeed,
-  orderFeedsByRecency,
+  stableDockFeeds,
   MOBILE_DOCK_FEED_CAP,
   RECENT_LIST_CAP,
 } from "../../src/lib/recent-feeds.ts";
@@ -38,34 +38,56 @@ describe("recordRecentFeed", () => {
   });
 });
 
-describe("orderFeedsByRecency", () => {
-  it("orders feeds most-recently-viewed first", () => {
-    const feeds = [feed("a"), feed("b"), feed("c")];
-    const ordered = orderFeedsByRecency(feeds, ["c", "a"]);
-    expect(ordered.map((f) => f.id)).toEqual(["c", "a", "b"]);
-  });
-
-  it("appends never-viewed feeds in their incoming order after recent ones", () => {
-    const feeds = [feed("a"), feed("b"), feed("c"), feed("d")];
-    const ordered = orderFeedsByRecency(feeds, ["d"]);
-    expect(ordered.map((f) => f.id)).toEqual(["d", "a", "b", "c"]);
-  });
-
-  it("drops recency ids that no longer correspond to a feed", () => {
-    const feeds = [feed("a"), feed("b")];
-    const ordered = orderFeedsByRecency(feeds, ["gone", "b"]);
-    expect(ordered.map((f) => f.id)).toEqual(["b", "a"]);
-  });
-
-  it("returns feeds in their original order when nothing has been viewed", () => {
-    const feeds = [feed("a"), feed("b")];
-    expect(orderFeedsByRecency(feeds, []).map((f) => f.id)).toEqual(["a", "b"]);
-  });
-});
-
 describe("MOBILE_DOCK_FEED_CAP", () => {
   it("is a small positive cap so the closed dock never overflows the strip", () => {
     expect(MOBILE_DOCK_FEED_CAP).toBeGreaterThan(0);
     expect(MOBILE_DOCK_FEED_CAP).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("stableDockFeeds", () => {
+  const feeds = [feed("a"), feed("b"), feed("c"), feed("d"), feed("e"), feed("f")];
+
+  it("recency decides membership, sidebar order decides position", () => {
+    // e and c are the most recent — both make the dock — but they render
+    // in feeds order (c before e), not recency order.
+    const dock = stableDockFeeds(feeds, ["e", "c"], 4);
+    expect(dock.map((f) => f.id)).toEqual(["a", "b", "c", "e"]);
+  });
+
+  it("tapping a feed already in the dock never reorders the dock", () => {
+    const before = stableDockFeeds(feeds, ["e", "c", "a", "b"], 4);
+    // Viewing "c" promotes it in the recency list…
+    const after = stableDockFeeds(
+      feeds,
+      recordRecentFeed(["e", "c", "a", "b"], "c"),
+      4,
+    );
+    // …but the dock must not move under the user's thumb.
+    expect(after.map((f) => f.id)).toEqual(before.map((f) => f.id));
+  });
+
+  it("viewing a feed outside the dock swaps out the least-recent member only", () => {
+    const before = stableDockFeeds(feeds, ["a", "b", "c", "d"], 4);
+    expect(before.map((f) => f.id)).toEqual(["a", "b", "c", "d"]);
+
+    const after = stableDockFeeds(
+      feeds,
+      recordRecentFeed(["a", "b", "c", "d"], "f"),
+      4,
+    );
+    // f enters (at its sidebar-order slot), d — least recent — leaves;
+    // a, b, c keep their relative positions.
+    expect(after.map((f) => f.id)).toEqual(["a", "b", "c", "f"]);
+  });
+
+  it("fills spare slots with never-viewed feeds in sidebar order", () => {
+    const dock = stableDockFeeds(feeds, ["d"], 3);
+    expect(dock.map((f) => f.id)).toEqual(["a", "b", "d"]);
+  });
+
+  it("ignores recency ids for deleted feeds", () => {
+    const dock = stableDockFeeds(feeds.slice(0, 2), ["ghost", "b"], 2);
+    expect(dock.map((f) => f.id)).toEqual(["a", "b"]);
   });
 });

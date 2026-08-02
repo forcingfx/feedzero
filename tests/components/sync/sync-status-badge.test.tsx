@@ -46,6 +46,34 @@ describe("SyncStatusBadge", () => {
     vi.useRealTimers();
   });
 
+  describe("compact mode (mobile header)", () => {
+    it("renders the color dot only — no text label", () => {
+      useSyncStore.setState({ status: "local-only" });
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() - 5 * 60 * 1000 });
+      render(
+        <MemoryRouter>
+          <SyncStatusBadge compact />
+        </MemoryRouter>,
+      );
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge.textContent).toBe("");
+      expect(screen.queryByText(/refreshed/i)).toBeNull();
+    });
+
+    it("keeps the full status in the accessible label", () => {
+      useSyncStore.setState({ status: "local-only" });
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() - 5 * 60 * 1000 });
+      render(
+        <MemoryRouter>
+          <SyncStatusBadge compact />
+        </MemoryRouter>,
+      );
+      expect(
+        screen.getByLabelText(/refreshed 5 min ago · local/i),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("idle states", () => {
     it("shows just 'Local' when local-only with no refresh history", () => {
       useSyncStore.setState({ status: "local-only", lastSyncedAt: null });

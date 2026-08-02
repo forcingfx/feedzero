@@ -47,6 +47,32 @@ describe("<ReadingTab>", () => {
     useSignalModeStore.setState({ mode: "ml", hidden: false, nightly: false });
   });
 
+  describe("text size", () => {
+    it("renders a three-way text size control defaulting to Medium", () => {
+      renderTab();
+      const medium = screen.getByRole("button", { name: /^medium$/i });
+      expect(medium).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: /^small$/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^large$/i })).toBeInTheDocument();
+    });
+
+    it("selecting Large persists the preference", async () => {
+      const { usePreferencesStore } = await import(
+        "@/stores/preferences-store.ts"
+      );
+      renderTab();
+
+      fireEvent.click(screen.getByRole("button", { name: /^large$/i }));
+
+      expect(
+        usePreferencesStore.getState().preferences.readerTextSize,
+      ).toBe("large");
+      expect(
+        screen.getByRole("button", { name: /^large$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+  });
+
   it("renders a Group floods toggle reflecting useAppStore state", () => {
     useAppStore.setState({ groupArticleFloods: true });
     renderTab();

@@ -582,57 +582,53 @@ describe("FeedsPage behavior — mobile", () => {
     });
   });
 
-  it("does NOT scroll to reader on initial mobile load with articleId in URL", async () => {
-    // When the URL contains an articleId on initial load (e.g. user resized from
-    // desktop or opened a bookmarked article URL), the snap container must stay
-    // at position 0 (article list). The scroll-to-reader effect must only fire
-    // when the user explicitly selects an article — not on mount.
+  // ── Reader-as-overlay model ─────────────────────────────────────────
+  // The mobile reader is a LAYER over the article list, not a sibling
+  // snap-pager panel. The old snap-x model made the list feel physically
+  // connected to the reader — swiping left on the list dragged the reader
+  // in, which fought row swipe-actions and misread the mental model
+  // (user feedback on PR #237): tap goes IN, swipe goes OUT, and the
+  // list underneath never moves or unmounts.
+
+  it("mobile: reader renders as an overlay only when an article is open; the list stays mounted beneath", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    useArticleStore.setState({ articles: [makeArticle("art-1")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
 
-    // Spy on HTMLElement.prototype.scrollTo to capture scroll-left calls
-    const snapScrollCalls: number[] = [];
-    const origScrollTo = HTMLElement.prototype.scrollTo;
-    HTMLElement.prototype.scrollTo = function (optionsOrX?: ScrollToOptions | number) {
-      const left = typeof optionsOrX === "number"
-        ? optionsOrX
-        : (optionsOrX as ScrollToOptions)?.left ?? 0;
-      if ((this as HTMLElement).classList?.contains("snap-x")) {
-        snapScrollCalls.push(left);
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (origScrollTo as any).call(this, optionsOrX);
-    };
+    const closed = renderPage("/feeds/feed-1");
+    expect(closed.container.querySelector("[data-testid='reader-layer']")).toBeNull();
+    closed.unmount();
 
-    renderPage("/feeds/feed-1/articles/art-1");
-    // Wait for any requestAnimationFrame callbacks to settle
-    await new Promise((r) => setTimeout(r, 50));
-
-    HTMLElement.prototype.scrollTo = origScrollTo;
-
-    // scrollTo with left > 0 should NOT have been called on the snap container
-    expect(snapScrollCalls.filter((l) => l > 0)).toHaveLength(0);
+    const open = renderPage("/feeds/feed-1/articles/art-1");
+    expect(open.container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+    // The list is still in the DOM underneath — scroll position survives.
+    expect(open.container.querySelector("[role='main']")).not.toBeNull();
   });
 
-  it("navigating to a different feed scrolls the snap container back to the article list", async () => {
-    // If the user is on the reader panel (panel 2) and navigates to a different
-    // feed, the snap container must scroll back to panel 1 (article list).
-    // Without this, the reader shows empty state for the new feed.
-    useFeedStore.setState({ feeds: [makeFeed("feed-1"), makeFeed("feed-2")] });
-    useArticleStore.setState({ articles: [makeArticle("art-1")], selectedArticle: makeArticle("art-1") });
+  it("mobile: the horizontal snap pager is gone — the list cannot swipe into the reader", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    const { container } = renderPage("/feeds/feed-1");
+    expect(container.querySelector(".snap-x")).toBeNull();
+  });
 
-    const snapScrollToLeft: number[] = [];
-    const origScrollTo = HTMLElement.prototype.scrollTo;
-    HTMLElement.prototype.scrollTo = function (optionsOrX?: ScrollToOptions | number) {
-      const left = typeof optionsOrX === "number"
-        ? optionsOrX
-        : (optionsOrX as ScrollToOptions)?.left ?? 0;
-      if ((this as HTMLElement).classList?.contains("snap-x")) {
-        snapScrollToLeft.push(left);
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (origScrollTo as any).call(this, optionsOrX);
-    };
+  it("mobile: a deeplink with articleId shows the reader overlay immediately", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+    expect(container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+  });
+
+  it("mobile: navigating to a different feed closes the reader overlay", async () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1"), makeFeed("feed-2")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
 
     const user = userEvent.setup();
     const { container } = render(
@@ -646,18 +642,153 @@ describe("FeedsPage behavior — mobile", () => {
         </Routes>
       </MemoryRouter>
     );
-
-    // Simulate snap container being at panel 2
-    const snapEl = container.querySelector(".snap-x") as HTMLElement;
-    if (snapEl) Object.defineProperty(snapEl, "scrollLeft", { value: 400, writable: true });
+    expect(container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
 
     await user.click(screen.getByTestId("nav-to-go-feed-2"));
 
-    HTMLElement.prototype.scrollTo = origScrollTo;
+    await waitFor(() => {
+      expect(container.querySelector("[data-testid='reader-layer']")).toBeNull();
+    });
+  });
+
+  it("mobile: edge-swipe right dismisses the reader back to the list", async () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    // Keep the article present through loadArticles, otherwise the
+    // vanished-article guard navigates back on its own and this test
+    // would pass without the gesture doing anything.
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [makeArticle("art-1")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+    const layer = container.querySelector(
+      "[data-testid='reader-layer']",
+    ) as HTMLElement;
+
+    const touch = (type: string, x: number) =>
+      act(() => {
+        layer.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches:
+              type === "touchend"
+                ? []
+                : [new Touch({ identifier: 1, target: layer, clientX: x, clientY: 300 })],
+          }),
+        );
+      });
+
+    touch("touchstart", 8); // within the left edge zone
+    touch("touchmove", 80);
+    touch("touchmove", 180);
+    touch("touchend", 180);
 
     await waitFor(() => {
-      expect(snapScrollToLeft.filter((l) => l === 0)).toHaveLength(1);
+      expect(currentUrl).toBe("/feeds/feed-1");
     });
+  });
+
+  it("mobile: a rightward drag anywhere on the reader dismisses it (browsers own the edge)", async () => {
+    // Real mobile browsers run their OWN back gesture in the left edge
+    // zone, so an edge-only dismiss is unreachable on device. Any
+    // rightward-dominant drag on the reader goes back (Reeder model).
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [makeArticle("art-1")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+    const layer = container.querySelector(
+      "[data-testid='reader-layer']",
+    ) as HTMLElement;
+
+    const touch = (type: string, x: number, y = 300) =>
+      act(() => {
+        layer.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches:
+              type === "touchend"
+                ? []
+                : [new Touch({ identifier: 1, target: layer, clientX: x, clientY: y })],
+          }),
+        );
+      });
+
+    touch("touchstart", 180); // mid-screen
+    touch("touchmove", 260);
+    touch("touchmove", 340);
+    touch("touchend", 340);
+
+    await waitFor(() => {
+      expect(currentUrl).toBe("/feeds/feed-1");
+    });
+  });
+
+  it("mobile: a vertical-dominant drag does not dismiss the reader", async () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [makeArticle("art-1")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+    const layer = container.querySelector(
+      "[data-testid='reader-layer']",
+    ) as HTMLElement;
+
+    const touch = (type: string, x: number) =>
+      act(() => {
+        layer.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches:
+              type === "touchend"
+                ? []
+                : [new Touch({ identifier: 1, target: layer, clientX: x, clientY: 300 })],
+          }),
+        );
+      });
+
+    touch("touchstart", 150);
+    act(() => {
+      layer.dispatchEvent(
+        new TouchEvent("touchmove", {
+          bubbles: true,
+          cancelable: true,
+          touches: [new Touch({ identifier: 1, target: layer, clientX: 190, clientY: 460 })],
+        }),
+      );
+    });
+    touch("touchend", 190);
+
+    await new Promise((r) => setTimeout(r, 30));
+    expect(currentUrl).toBe("/feeds/feed-1/articles/art-1");
+  });
+
+  it("mobile header: dot-only status indicator, view options pinned to the right corner", () => {
+    // "Refreshed X ago · local" moved into the drawer footer; the header
+    // keeps a compact color dot and puts the single view-options control
+    // in the right corner (user feedback on PR #237).
+    useFeedStore.setState({
+      feeds: [makeFeed("feed-1")],
+      lastRefreshAllAt: Date.now() - 5 * 60 * 1000,
+    });
+    const { container } = renderPage("/feeds/feed-1");
+    const header = container.querySelector("header")!;
+
+    expect(header.textContent).not.toMatch(/refreshed/i);
+    expect(
+      header.querySelector("[data-testid='sync-status-badge']"),
+    ).not.toBeNull();
+    const pills = header.querySelector("[data-testid='mobile-header-pills']");
+    expect(pills).not.toBeNull();
+    expect(header.lastElementChild).toBe(pills);
   });
 
   it("mobile header does not have a sidebar trigger (replaced by bottom drawer)", () => {

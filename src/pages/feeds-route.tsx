@@ -1,5 +1,6 @@
-import { useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import { useEffect, useRef, lazy, Suspense, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router";
+import { useSwipeBack } from "@/hooks/use-swipe-back.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
@@ -24,10 +25,16 @@ const ExploreCatalog = lazy(() =>
  * The feeds surface: article list + reader pane.
  *
  * Desktop: inner ResizablePanelGroup [article-list | reader].
- * Mobile: horizontal scroll-snap container [list | reader].
+ * Mobile: the list fills the viewport; the reader is an OVERLAY LAYER
+ * on top of it whenever the URL carries an articleId. Tap goes in,
+ * edge-swipe-right (or the back pill) goes out — the list never
+ * horizontal-swipes into the reader and never unmounts, so its scroll
+ * position survives reading. (Replaces the earlier snap-x pager,
+ * which made the two panels feel physically connected and fought the
+ * row swipe-actions — user feedback on PR #237.)
  *
- * Drives article selection from URL params, auto-selects the first
- * article on desktop, and handles the mobile back-swipe gesture.
+ * Drives article selection from URL params and auto-selects the first
+ * article on desktop.
  *
  * When the user has no feeds, redirects to /explore — the empty state
  * for "feeds" is the catalog itself.
@@ -60,25 +67,6 @@ export function FeedsRoute() {
   // loads when the effect re-fires for the same param.
   const loadedFeedRef = useRef<string | null>(null);
 
-  // Scroll-snap container ref (mobile only)
-  const snapContainerRef = useRef<HTMLDivElement>(null);
-  const programmaticScrollRef = useRef(false);
-
-  const scrollToReader = useCallback(() => {
-    const el = snapContainerRef.current;
-    if (!el) return;
-    programmaticScrollRef.current = true;
-    el.scrollTo({ left: el.clientWidth, behavior: "smooth" });
-  }, []);
-
-  const scrollToList = useCallback(() => {
-    const el = snapContainerRef.current;
-    if (!el) return;
-    programmaticScrollRef.current = true;
-    skipAutoSelectRef.current = true;
-    el.scrollTo({ left: 0, behavior: "smooth" });
-  }, []);
-
   // Feed switch: select feed and start loading when feedId changes
   useEffect(() => {
     if (!feedId || feedId === loadedFeedRef.current) return;
@@ -86,10 +74,6 @@ export function FeedsRoute() {
     lastSyncedArticleIdRef.current = undefined;
     selectFeed(feedId);
     selectArticle(null);
-    // On mobile, if the reader panel is visible (container scrolled right),
-    // snap back to the article list so the user lands on panel 1 for the
-    // new feed.
-    if (snapContainerRef.current?.scrollLeft) scrollToList();
     loadArticles(feedId).then(() => {
       // Only auto-select the first article on desktop, where the 3-panel
       // layout would otherwise show an empty reader pane. On mobile the
@@ -103,7 +87,7 @@ export function FeedsRoute() {
         });
       }
     });
-  }, [feedId, selectFeed, selectArticle, loadArticles, articleId, navigate, isDesktop, scrollToList]);
+  }, [feedId, selectFeed, selectArticle, loadArticles, articleId, navigate, isDesktop]);
 
   // Article sync + auto-select. Waits until loading completes, then either
   // syncs articleId from URL or auto-selects the first article on desktop.
@@ -148,49 +132,8 @@ export function FeedsRoute() {
     if (!viewedArticlePresentRef.current) return;
     viewedArticlePresentRef.current = false;
     skipAutoSelectRef.current = true;
-    scrollToList();
     navigate(`/feeds/${feedId}`, { replace: true });
-  }, [isDesktop, feedId, articleId, articles, isLoadingArticles, navigate, scrollToList]);
-
-  // Scroll to the reader panel when the user explicitly navigates to an article.
-  // snapScrollMountedRef skips the initial render so loading the app with an
-  // articleId already in the URL lands on the article list, not the reader.
-  // Depending only on articleId means a desktop→mobile viewport transition
-  // never fires this scroll.
-  const snapScrollMountedRef = useRef(false);
-  useEffect(() => {
-    if (!snapScrollMountedRef.current) {
-      snapScrollMountedRef.current = true;
-      return;
-    }
-    if (!isDesktop && articleId && feedId) {
-      requestAnimationFrame(() => scrollToReader());
-    }
-    // isDesktop intentionally excluded: viewport changes should not trigger scroll.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [articleId]);
-
-  // Detect user-initiated swipe-back via scrollend. When the user swipes
-  // from the reader panel back to the list, drop the articleId from the URL
-  // so the back navigation is reflected in history.
-  useEffect(() => {
-    const el = snapContainerRef.current;
-    if (!el || isDesktop) return;
-
-    function handleScrollEnd() {
-      if (programmaticScrollRef.current) {
-        programmaticScrollRef.current = false;
-        return;
-      }
-      if (el!.scrollLeft < el!.clientWidth / 2 && articleId && feedId) {
-        skipAutoSelectRef.current = true;
-        navigate(`/feeds/${feedId}`, { replace: true });
-      }
-    }
-
-    el.addEventListener("scrollend", handleScrollEnd);
-    return () => el.removeEventListener("scrollend", handleScrollEnd);
-  }, [isDesktop, articleId, feedId, navigate]);
+  }, [isDesktop, feedId, articleId, articles, isLoadingArticles, navigate]);
 
   function handleArticleSelect(article: { id: string }) {
     if (!feedId) return;
@@ -219,32 +162,30 @@ export function FeedsRoute() {
   }
 
   if (!isDesktop) {
+    const closeReader = () => {
+      skipAutoSelectRef.current = true;
+      navigate(`/feeds/${feedId}`);
+    };
     return (
-      <div
-        ref={snapContainerRef}
-        className="flex flex-1 min-h-0 overflow-x-auto snap-x snap-mandatory"
-        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
-      >
-        {/* Panel 1: Article list — owns its own scroll for virtualization */}
-        <main role="main" className="shrink-0 w-full snap-start">
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        {/* The list fills the viewport and stays mounted while reading,
+            so its scroll position survives the round trip. */}
+        <main role="main" className="h-full">
           <ArticleList onArticleSelect={handleArticleSelect} />
         </main>
 
-        {/* Panel 2: Reader — ReaderPanel owns its own scroll and nav bar */}
-        <div
-          data-testid="reader-scroll-mobile"
-          className="shrink-0 w-full snap-start h-full"
-        >
-          <ReaderPanel
-            nextArticle={nextArticle}
-            prevArticle={prevArticle}
-            onNavigate={handleArticleSelect}
-            onBack={articleId ? () => {
-              scrollToList();
-              navigate(`/feeds/${feedId}`);
-            } : undefined}
-          />
-        </div>
+        {articleId && feedId && (
+          <MobileReaderLayer onBack={closeReader}>
+            <div data-testid="reader-scroll-mobile" className="h-full">
+              <ReaderPanel
+                nextArticle={nextArticle}
+                prevArticle={prevArticle}
+                onNavigate={handleArticleSelect}
+                onBack={closeReader}
+              />
+            </div>
+          </MobileReaderLayer>
+        )}
       </div>
     );
   }
@@ -277,5 +218,40 @@ export function FeedsRoute() {
         />
       </ResizablePanel>
     </ResizablePanelGroup>
+  );
+}
+
+/**
+ * Full-viewport layer hosting the mobile reader above the article
+ * list. Slides in from the right on mount; an edge-swipe-right drag
+ * follows the finger and dismisses via `onBack` (the same exit the
+ * back pill uses), snapping back if released early.
+ */
+function MobileReaderLayer({
+  onBack,
+  children,
+}: {
+  onBack: () => void;
+  children: ReactNode;
+}) {
+  const layerRef = useRef<HTMLDivElement>(null);
+  const { dragX } = useSwipeBack({ ref: layerRef, enabled: true, onBack });
+
+  return (
+    <div
+      ref={layerRef}
+      data-testid="reader-layer"
+      // touch-pan-y hands horizontal drags to the back-swipe hook on
+      // real hardware (browsers otherwise claim them as scrolls);
+      // <pre> re-enables native panning for wide code blocks, matching
+      // the hook's own pre-guard.
+      className="absolute inset-0 z-20 bg-background animate-in slide-in-from-right duration-200 touch-pan-y [&_pre]:touch-auto"
+      style={{
+        transform: dragX > 0 ? `translateX(${dragX}px)` : undefined,
+        transition: dragX === 0 ? "transform 150ms ease-out" : "none",
+      }}
+    >
+      {children}
+    </div>
   );
 }
