@@ -62,15 +62,35 @@ test.describe("Feed refresh", () => {
     });
   });
 
-  test("refresh shows spinner", async ({ feedPage: page }) => {
+  test("refresh shows spinner", async ({ feedPage: page }, testInfo) => {
+    // The Refresh button is a desktop affordance. Mobile replaced the old
+    // row of pills with pull-to-refresh (see ViewOptionsPill), so there is
+    // no button to click or disable there.
+    test.skip(
+      testInfo.project.name === "mobile",
+      "Mobile refreshes by pull-to-refresh, not a Refresh button",
+    );
+
     await mockFeedEndpoint(page, SAMPLE_RSS);
     await addFeedViaUI(page, "https://example.com/feed");
 
-    // Add a delay to the feed response so we can observe the spinner
+    // The Refresh button only renders once the store has a feed
+    // (`feeds.length > 0` in app-sidebar). addFeedViaUI can return on the
+    // success toast before that lands, so wait for the button itself rather
+    // than assuming it is there — under parallel load it was not.
+    const refreshButton = page.getByRole("button", { name: "Refresh" });
+    await refreshButton.waitFor({ state: "visible", timeout: 15000 });
+
+    // Delay the feed response so the spinner is observable. The delay must
+    // comfortably exceed the assertion timeouts below: at 1s it raced them
+    // whenever parallel workers loaded the machine, which is what made this
+    // spec flaky. Holding the response open indefinitely instead is NOT an
+    // option — the app's boot refresh hits this same route, so an unreleased
+    // request stalls the UI before the Refresh button ever renders.
     await page.unroute("**/api/feed*");
     await page.route("**/api/feed*", async (route) => {
-      await new Promise((r) => setTimeout(r, 1000));
-      route.fulfill({
+      await new Promise((r) => setTimeout(r, 4000));
+      await route.fulfill({
         status: 200,
         contentType: "text/xml",
         body: SAMPLE_RSS,
@@ -83,13 +103,19 @@ test.describe("Feed refresh", () => {
     // Refresh button should be disabled during refresh
     await expect(
       page.getByRole("button", { name: "Refresh" }),
-    ).toBeDisabled({ timeout: 2000 });
+    ).toBeDisabled({ timeout: 3000 });
 
     // The icon inside the button should have animate-spin
     const svg = page
       .getByRole("button", { name: "Refresh" })
       .locator("svg");
-    await expect(svg).toHaveClass(/animate-spin/, { timeout: 2000 });
+    await expect(svg).toHaveClass(/animate-spin/, { timeout: 3000 });
+
+    // Let the in-flight refresh settle so the route handler doesn't outlive
+    // the test and leak into teardown.
+    await expect(
+      page.getByRole("button", { name: "Refresh" }),
+    ).toBeEnabled({ timeout: 15000 });
   });
 
   test("duplicate articles not added on refresh", async ({

@@ -30,7 +30,7 @@ import {
 } from "../src/core/env-audit/audit.ts";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "../..");
-const SCAN_DIRS = ["src", "api", "scripts"];
+const SCAN_DIRS = ["src", "api", "scripts", "packages"];
 const SCAN_FILES = ["server.ts", "vite.config.js"];
 const SKIP_DIRS = new Set(["node_modules", "dist", ".vercel", "coverage"]);
 const SCAN_EXTENSIONS = [".ts", ".tsx", ".js", ".cjs", ".mjs"];

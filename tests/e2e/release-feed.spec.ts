@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "fs";
-import { skipOnboarding } from "./fixtures";
+import { openSidebar, skipOnboarding } from "./fixtures";
 
 /**
  * E2E test for the first-launch auto-subscribe flow.
@@ -50,11 +50,10 @@ test.describe("Release notes auto-subscribe", () => {
       page.locator("text=FeedZero Release Notes"),
     ).toBeVisible({ timeout: 15000 });
 
-    // On mobile the sidebar is offcanvas — open it to verify the feed button.
-    const trigger = page.locator('[data-sidebar="trigger"]');
-    if (await trigger.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await trigger.click();
-    }
+    // On mobile the feed list is a vaul drawer. This used to click the
+    // legacy [data-sidebar="trigger"], which no longer exists, so the
+    // assertion below ran against a closed drawer.
+    await openSidebar(page);
 
     const releaseFeedButton = page.locator('[data-sidebar="menu-button"]', {
       hasText: "FeedZero Release Notes",

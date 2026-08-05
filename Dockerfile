@@ -32,7 +32,7 @@ WORKDIR /app
 ENV NODE_ENV=production \
     SELF_HOSTED=1 \
     SYNC_STORAGE=filesystem \
-    SYNC_FILESYSTEM_DIR=/data/vaults \
+    DATA_DIR=/data \
     PORT=3000
 
 # Production deps only. `tsx` is needed at runtime because `serve`

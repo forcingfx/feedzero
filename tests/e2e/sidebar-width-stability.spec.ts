@@ -31,7 +31,11 @@ async function sidebarWidth(page: import("@playwright/test").Page) {
 test.describe("Sidebar width stability across routes (ADR 013)", () => {
   test.skip(({ viewport }) => (viewport?.width ?? 1280) < 1024, "Desktop only");
 
-  test("sidebar width survives Feed → Explore → Feed navigation", async ({ page }) => {
+  // `feedPage`, not the bare `page`: the raw fixture leaves onboarding up,
+  // so Explore never rendered and addFeedViaUI timed out on its search input.
+  test("sidebar width survives Feed → Explore → Feed navigation", async ({
+    feedPage: page,
+  }) => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
     await addFeedViaUI(page, "https://example.com/feed");
     await selectFeedInSidebar(page, "Test Feed");
