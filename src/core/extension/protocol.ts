@@ -43,8 +43,8 @@ export type PingResponse = {
 /**
  * The extension's reply for a fetch-article request. `ok: true` carries the
  * raw HTML the extension received with the user's session; the web app then
- * runs paywall detection + Defuddle on it. `ok: false` reasons are
- * extension-side failures only — paywall detection is the web app's job.
+ * runs Defuddle on it (a retry that won't extract is treated as a paywall
+ * session-expired). `ok: false` reasons are extension-side failures only.
  */
 export type FetchArticleResponse =
   | {

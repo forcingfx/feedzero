@@ -19,6 +19,32 @@ import {
  * references (folder/filter whose target was deleted).
  */
 export function SettingsPill() {
+  const { target, open } = useSettingsTarget();
+
+  if (!target) return null;
+
+  return (
+    <ExpandingPill
+      icon={<SettingsIcon />}
+      label={target.label}
+      aria-label={target.label}
+      dataTestId="settings-pill"
+      onClick={open}
+    />
+  );
+}
+
+/**
+ * Context-aware settings dispatch for the current view. `target` is
+ * null on aggregated views with nothing to configure (All / Starred)
+ * and on broken references; `open` routes to the matching dialog.
+ * Shared by the desktop SettingsPill and the mobile ViewOptionsPill so
+ * both surfaces agree on what "settings for this view" means.
+ */
+export function useSettingsTarget(): {
+  target: Target | null;
+  open: () => void;
+} {
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
   const folders = useFeedStore((s) => s.folders);
@@ -34,9 +60,7 @@ export function SettingsPill() {
     filters,
   });
 
-  if (!target) return null;
-
-  function handleClick() {
+  function open() {
     if (!target) return;
     switch (target.kind) {
       case "feed":
@@ -51,15 +75,7 @@ export function SettingsPill() {
     }
   }
 
-  return (
-    <ExpandingPill
-      icon={<SettingsIcon />}
-      label={target.label}
-      aria-label={target.label}
-      dataTestId="settings-pill"
-      onClick={handleClick}
-    />
-  );
+  return { target, open };
 }
 
 type Target =

@@ -11,7 +11,10 @@
  * to retry fetching the feed(s) later via the refresh button or the
  * 'r' key."
  */
-import { test, expect } from "./fixtures";
+import { test, expect,
+  openSidebar,
+  waitForRefreshIdle,
+} from "./fixtures";
 import { SAMPLE_RSS, readTargetUrlFromBody } from "./feed-fixtures";
 
 const URL_LIST = `https://ok.example.com/feed
@@ -102,9 +105,15 @@ test.describe("Import recovery — placeholder for rate-limited URLs", () => {
     await page.goto("/feeds");
 
     // Placeholder sidebar label is the URL host because metadata hasn't
-    // been fetched yet. The OK feed shows its parsed <title>.
-    await expect(page.getByText("Test Feed")).toBeVisible();
-    await expect(page.getByText("rate-limited.example.com")).toBeVisible();
+    // been fetched yet. The OK feed shows its parsed <title>. Scope to the
+    // sidebar: "Test Feed" also appears in the breadcrumb and the mobile
+    // dock, so an unscoped getByText matches several nodes.
+    await openSidebar(page);
+    const sidebarFeeds = page.locator('[data-sidebar="menu-button"]');
+    await expect(sidebarFeeds.filter({ hasText: "Test Feed" })).toBeVisible();
+    await expect(
+      sidebarFeeds.filter({ hasText: "rate-limited.example.com" }),
+    ).toBeVisible();
 
     // The placeholder carries the red failed-feed indicator.
     const failedIndicator = page.getByTestId("failed-feed-indicator");
@@ -119,9 +128,7 @@ test.describe("Import recovery — placeholder for rate-limited URLs", () => {
     // feed would never get re-fetched in the recovered phase. Wait for the
     // in-flight refresh to finish (the sidebar Refresh button re-enables)
     // before flipping the phase, so the keypress drives a real refresh.
-    await expect(
-      page.getByRole("button", { name: "Refresh", exact: true }),
-    ).toBeEnabled({ timeout: 15000 });
+    await waitForRefreshIdle(page);
 
     // The boot refresh's 429 registered a host-pause for ~1s (see the
     // Retry-After header on the mock). Wait it out before pressing "r"

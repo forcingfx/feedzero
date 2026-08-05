@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -189,6 +189,18 @@ describe("RulesEditorDialog", () => {
       expect(toggle.getAttribute("aria-checked")).toBe("true");
     });
 
+    // vitest 4 returns the existing spy when spyOn is called again on an
+    // already-spied method (v3 wrapped it afresh with a zeroed count), and
+    // the Zustand state object is shared across tests. Without restoring,
+    // the "does NOT call" test below sees the previous test's invocation.
+    // Targeted restore, not vi.restoreAllMocks(): that would also reset the
+    // module-factory mocks this file relies on (see CLAUDE.md).
+    let applySpy: ReturnType<typeof vi.spyOn> | undefined;
+    afterEach(() => {
+      applySpy?.mockRestore();
+      applySpy = undefined;
+    });
+
     it("calls applyRuleToExistingArticles after save when toggle is on", async () => {
       const user = userEvent.setup();
       dbMock._seed(feed());
@@ -196,6 +208,7 @@ describe("RulesEditorDialog", () => {
       const spy = vi
         .spyOn(useFeedStore.getState(), "applyRuleToExistingArticles")
         .mockResolvedValue({ ok: true, value: { changed: 3, total: 10 } });
+      applySpy = spy;
 
       renderDialog();
       await user.click(screen.getByTestId("rule-add"));
@@ -214,6 +227,7 @@ describe("RulesEditorDialog", () => {
       const spy = vi
         .spyOn(useFeedStore.getState(), "applyRuleToExistingArticles")
         .mockResolvedValue({ ok: true, value: { changed: 0, total: 0 } });
+      applySpy = spy;
 
       renderDialog();
       await user.click(screen.getByTestId("rule-add"));

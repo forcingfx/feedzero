@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Mock } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useLicenseRefresh } from "@/hooks/use-license-refresh.ts";
 import { useLicenseStore } from "@/stores/license-store.ts";
@@ -21,11 +22,11 @@ function setOnline(value: boolean) {
 }
 
 describe("useLicenseRefresh", () => {
-  let refresh: ReturnType<typeof vi.fn>;
+  let refresh: Mock<() => Promise<void>>;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    refresh = vi.fn().mockResolvedValue(undefined);
+    refresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     useLicenseStore.setState({ refresh, lastCheckedAt: null });
     setOnline(true);
   });

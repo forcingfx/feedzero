@@ -6,6 +6,7 @@ import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { isFeedStale } from "@/lib/stale-feed.ts";
+import { formatUnreadBadge } from "@/lib/format-unread-badge.ts";
 import {
   SidebarMenuBadge,
   SidebarMenuButton,
@@ -86,8 +87,8 @@ export function FeedItem({
         )}
       </SidebarMenuButton>
       {!isRefreshing && unreadCount > 0 && (
-        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold max-md:hidden">
-          {unreadCount > 99 ? "99+" : unreadCount}
+        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold">
+          {formatUnreadBadge(unreadCount)}
         </SidebarMenuBadge>
       )}
     </SidebarMenuItem>

@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -60,14 +61,14 @@ function renderDialog() {
 }
 
 describe("FolderSettingsDialog", () => {
-  let renameFolder: ReturnType<typeof vi.fn>;
-  let updateFolderColor: ReturnType<typeof vi.fn>;
-  let deleteFolder: ReturnType<typeof vi.fn>;
+  let renameFolder: Mock<(folderId: string, name: string) => Promise<void>>;
+  let updateFolderColor: Mock<(folderId: string, color: string | undefined) => Promise<void>>;
+  let deleteFolder: Mock<(folderId: string) => Promise<void>>;
 
   beforeEach(() => {
-    renameFolder = vi.fn().mockResolvedValue(undefined);
-    updateFolderColor = vi.fn().mockResolvedValue(undefined);
-    deleteFolder = vi.fn().mockResolvedValue(undefined);
+    renameFolder = vi.fn<(folderId: string, name: string) => Promise<void>>().mockResolvedValue(undefined);
+    updateFolderColor = vi.fn<(folderId: string, color: string | undefined) => Promise<void>>().mockResolvedValue(undefined);
+    deleteFolder = vi.fn<(folderId: string) => Promise<void>>().mockResolvedValue(undefined);
 
     useFeedStore.setState({
       folders: [folder()],

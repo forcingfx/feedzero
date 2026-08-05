@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Mock } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -28,11 +29,11 @@ function setVisibility(state: DocumentVisibilityState) {
 }
 
 describe("useAutoRefresh", () => {
-  let refreshAll: ReturnType<typeof vi.fn>;
+  let refreshAll: Mock<(options?: { respectBackoff?: boolean | undefined; intervalMs?: number | undefined; } | undefined) => Promise<void>>;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    refreshAll = vi.fn().mockResolvedValue(undefined);
+    refreshAll = vi.fn<(options?: { respectBackoff?: boolean | undefined; intervalMs?: number | undefined; } | undefined) => Promise<void>>().mockResolvedValue(undefined);
     useFeedStore.setState({ refreshAll, lastRefreshAllAt: null });
     setOnline(true);
     setVisibility("visible");

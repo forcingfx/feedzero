@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
@@ -74,13 +75,13 @@ function renderDialog() {
 }
 
 describe("FeedSettingsDialog — tier gating", () => {
-  let openRulesEditor: ReturnType<typeof vi.fn>;
-  let setFeedPrefetchEnabled: ReturnType<typeof vi.fn>;
+  let openRulesEditor: Mock<(feedId: string) => void>;
+  let setFeedPrefetchEnabled: Mock<(feedId: string, value: boolean) => Promise<void>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    openRulesEditor = vi.fn();
-    setFeedPrefetchEnabled = vi.fn().mockResolvedValue(undefined);
+    openRulesEditor = vi.fn<(feedId: string) => void>();
+    setFeedPrefetchEnabled = vi.fn<(feedId: string, value: boolean) => Promise<void>>().mockResolvedValue(undefined);
     useFeedStore.setState({
       feeds: [feed()],
       folders: [],

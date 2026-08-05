@@ -17,6 +17,7 @@
  * derived from store state changes) is the follow-up; see ADR 026.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type { Mock } from "vitest";
 import {
   notifyChange,
   clearPending,
@@ -48,12 +49,12 @@ Object.defineProperty(globalThis, "localStorage", {
 });
 
 describe("sync-coordinator", () => {
-  let push: ReturnType<typeof vi.fn>;
+  let push: Mock<() => void | Promise<void>>;
 
   beforeEach(() => {
     vi.useFakeTimers();
     localStorageMock.clear();
-    push = vi.fn().mockResolvedValue(undefined);
+    push = vi.fn<() => void | Promise<void>>().mockResolvedValue(undefined);
     resetForTest();
   });
 

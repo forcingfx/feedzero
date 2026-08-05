@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, openSidebar } from "./fixtures";
 import { mockFeedEndpoint, SAMPLE_RSS } from "./feed-fixtures";
 
 // 1x1 red PNG (68 bytes) — a real decodable image for the browser
@@ -42,6 +42,10 @@ test.describe("Favicon rendering", () => {
 
     await addFeedViaExplore(page, "https://example.com/feed");
 
+    // Mobile keeps the feed list in a closed drawer; open it before
+    // asserting on sidebar contents.
+    await openSidebar(page);
+
     // Wait for the feed to appear in the sidebar
     await expect(
       page.locator('[data-sidebar="menu-button"]', { hasText: "Test Feed" }),
@@ -83,6 +87,9 @@ test.describe("Favicon rendering", () => {
 
     await addFeedViaExplore(page, "https://example.com/feed");
 
+    // Mobile keeps the feed list in a closed drawer.
+    await openSidebar(page);
+
     await expect(
       page.locator('[data-sidebar="menu-button"]', { hasText: "Test Feed" }),
     ).toBeVisible({ timeout: 10000 });
@@ -112,6 +119,9 @@ test.describe("Favicon rendering", () => {
     });
 
     await addFeedViaExplore(page, "https://example.com/feed");
+
+    // Mobile keeps the feed list in a closed drawer.
+    await openSidebar(page);
 
     await expect(
       page.locator('[data-sidebar="menu-button"]', { hasText: "Test Feed" }),

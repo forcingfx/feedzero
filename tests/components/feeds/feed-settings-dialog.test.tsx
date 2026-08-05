@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -75,24 +76,24 @@ function renderDialog() {
 }
 
 describe("FeedSettingsDialog", () => {
-  let renameFeed: ReturnType<typeof vi.fn>;
-  let setFeedPreferFullText: ReturnType<typeof vi.fn>;
-  let setFeedPrefetchEnabled: ReturnType<typeof vi.fn>;
-  let moveFeedToFolder: ReturnType<typeof vi.fn>;
-  let refreshSingleFeed: ReturnType<typeof vi.fn>;
-  let reloadSingleFeed: ReturnType<typeof vi.fn>;
-  let removeFeed: ReturnType<typeof vi.fn>;
-  let openRulesEditor: ReturnType<typeof vi.fn>;
+  let renameFeed: Mock<(feedId: string, newTitle: string) => Promise<void>>;
+  let setFeedPreferFullText: Mock<(feedId: string, value: boolean) => Promise<void>>;
+  let setFeedPrefetchEnabled: Mock<(feedId: string, value: boolean) => Promise<void>>;
+  let moveFeedToFolder: Mock<(feedId: string, folderId: string | null) => Promise<void>>;
+  let refreshSingleFeed: Mock<(feedId: string) => Promise<void>>;
+  let reloadSingleFeed: Mock<(feedId: string) => Promise<void>>;
+  let removeFeed: Mock<(feedId: string) => Promise<void>>;
+  let openRulesEditor: Mock<(feedId: string) => void>;
 
   beforeEach(() => {
-    renameFeed = vi.fn().mockResolvedValue(undefined);
-    setFeedPreferFullText = vi.fn().mockResolvedValue(undefined);
-    setFeedPrefetchEnabled = vi.fn().mockResolvedValue(undefined);
-    moveFeedToFolder = vi.fn().mockResolvedValue(undefined);
-    refreshSingleFeed = vi.fn().mockResolvedValue(undefined);
-    reloadSingleFeed = vi.fn().mockResolvedValue(undefined);
-    removeFeed = vi.fn().mockResolvedValue(undefined);
-    openRulesEditor = vi.fn();
+    renameFeed = vi.fn<(feedId: string, newTitle: string) => Promise<void>>().mockResolvedValue(undefined);
+    setFeedPreferFullText = vi.fn<(feedId: string, value: boolean) => Promise<void>>().mockResolvedValue(undefined);
+    setFeedPrefetchEnabled = vi.fn<(feedId: string, value: boolean) => Promise<void>>().mockResolvedValue(undefined);
+    moveFeedToFolder = vi.fn<(feedId: string, folderId: string | null) => Promise<void>>().mockResolvedValue(undefined);
+    refreshSingleFeed = vi.fn<(feedId: string) => Promise<void>>().mockResolvedValue(undefined);
+    reloadSingleFeed = vi.fn<(feedId: string) => Promise<void>>().mockResolvedValue(undefined);
+    removeFeed = vi.fn<(feedId: string) => Promise<void>>().mockResolvedValue(undefined);
+    openRulesEditor = vi.fn<(feedId: string) => void>();
 
     useFeedStore.setState({
       feeds: [feed()],

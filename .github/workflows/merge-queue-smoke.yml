@@ -1,0 +1,28 @@
+name: Merge queue smoke pass-through
+
+# The real "Sync cross-device smoke" (preview-smoke.yml) runs against a
+# deployed Vercel preview URL, triggered by deployment_status. Merge-queue
+# temporary refs (gh-readonly-queue/*) get no preview deployment, so that
+# workflow can never report on them — and a required check that never
+# reports stalls the queue forever.
+#
+# This job provides a same-named check on merge_group that passes trivially.
+# The trade-off is explicit: the smoke verified the PR's own head against
+# real infrastructure before the PR could enter the queue; the queue ref
+# (PR + newer main) skips re-verification. Cross-device sync is re-verified
+# post-merge by the production deployment's operator smoke (CLAUDE.md RGR+S
+# step 7).
+on:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-cross-device:
+    name: Sync cross-device smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Pass-through for merge queue
+        run: echo "Verified on the PR's preview deployment before queueing; see workflow header."

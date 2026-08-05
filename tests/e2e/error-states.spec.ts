@@ -1,4 +1,10 @@
-import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
+import {
+  test,
+  expect,
+  addFeedViaUI,
+  openArticle,
+  selectFeedInSidebar,
+} from "./fixtures";
 import {
   mockFeedEndpointError,
   mockFeedEndpointHtml,
@@ -47,6 +53,10 @@ test.describe("Error states", () => {
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
+
+    // Desktop auto-selects the first article; mobile does not, so the reader
+    // (and the Full text toggle in it) only exists after opening one.
+    await openArticle(page, "First Article");
 
     // The auto-extract triggers in background for short content articles.
     // Since the mock returns 500, extraction fails and disables the Full text toggle.

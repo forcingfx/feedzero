@@ -1,0 +1,128 @@
+name: Release rehearsal
+
+# Exercises the release chain on an ordinary night so its defects surface
+# then, instead of during a release.
+#
+# The 0.13.0 release hit three latent workflow bugs in a row, each of which
+# could only be found by running the thing for real:
+#   * docker-publish.yml resolved its version from `github.event_name`, which
+#     in a REUSABLE workflow reports the CALLER's event and so never equals
+#     `workflow_call` — the passed-in version was ignored.
+#   * the same idiom gated the release image tags, so the first successful
+#     publish pushed only a sha tag.
+#   * release.yml pushed to main, which the ruleset forbids (GH013).
+# The first two are exactly what this rehearsal reproduces. The third is gone
+# by construction: nothing pushes to main any more.
+#
+# The rehearsal must never publish a release image or move a tag. It runs the
+# real code paths in their throwaway modes and asserts they report what they
+# should.
+on:
+  schedule:
+    # 03:00 UTC daily — after Dependabot, before the working day.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: release-rehearsal
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  rehearse:
+    name: Rehearse the release chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Tag list must be complete for the tag-decision no-op assertion.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Tag decision is a quiet no-op on an already-released main
+        run: |
+          set -euo pipefail
+          node scripts/release/tag-decision.mjs > /tmp/decision.txt
+          cat /tmp/decision.txt
+          # main's version is already tagged, so the workflow must decline to
+          # tag AND exit 0. A non-zero exit here means the release path would
+          # fail spuriously on the next merge that touches package.json.
+          grep -qx 'should_tag=false' /tmp/decision.txt
+
+      - name: Image version resolves from an explicit input (reusable-call shape)
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').version")"
+          # This is the call shape release-tag.yml uses. It regressed once by
+          # resolving to the branch name instead of the input.
+          node scripts/resolve-image-version.mjs "$PKG" "main" > /tmp/ver.txt
+          cat /tmp/ver.txt
+          grep -qx "version=${PKG}" /tmp/ver.txt
+          grep -qx 'release=true' /tmp/ver.txt
+
+      - name: Image version resolves from a v-tag ref
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').version")"
+          node scripts/resolve-image-version.mjs "" "v${PKG}" > /tmp/ver-tag.txt
+          grep -qx "version=${PKG}" /tmp/ver-tag.txt
+          grep -qx 'release=true' /tmp/ver-tag.txt
+
+      - name: A bare branch build stays throwaway
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').version")"
+          node scripts/resolve-image-version.mjs "" "main" > /tmp/ver-branch.txt
+          # Must NOT claim a release, or a smoke build would overwrite `latest`.
+          grep -qx 'release=false' /tmp/ver-branch.txt
+          grep -qx "version=${PKG}" /tmp/ver-branch.txt
+
+      - name: A drifting tag is rejected
+        run: |
+          set -euo pipefail
+          # The #211/#212 shape: a tag that disagrees with package.json must
+          # fail rather than publish a mislabelled image.
+          if node scripts/resolve-image-version.mjs "" "v0.0.1-drift" \
+            > /tmp/ver-drift.txt 2>&1; then
+            echo "::error::resolver accepted a drifting tag"; exit 1
+          fi
+
+  # A rehearsal that fails silently is worse than none: it reads as coverage
+  # while providing nothing. Same pattern as the e2e-red net.
+  notify-red:
+    name: File tracking issue on rehearsal failure
+    runs-on: ubuntu-latest
+    needs: rehearse
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - name: Open or bump the release-rehearsal-red issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create release-rehearsal-red --repo "$GITHUB_REPOSITORY" \
+            --color B60205 --description "The release chain is broken" --force
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label release-rehearsal-red --state open --json number \
+            --jq '.[0].number // empty')
+          body="Release rehearsal failed: $RUN_URL"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            printf -v full_body '%s\n\n%s' "$body" \
+              "The release chain is broken NOW, before anyone tries to cut a release. Fix it before the next release rather than discovering it at minute ten (2026-08-05 shipping design)."
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "Release rehearsal red" \
+              --label release-rehearsal-red \
+              --body "$full_body"
+          fi

@@ -142,6 +142,8 @@ Three-tier strategy. See [docs/testing-strategy.md](docs/testing-strategy.md) fo
 **Coverage thresholds** (`npm run test:coverage`): Statements/Lines/Functions 90%; Branches 83%. Excluded: `src/workers/**`, `src/main.tsx`, `*.d.ts`, `src/types/**`, `src/core/extractor/adapters/types.ts`, `src/core/sync/types.ts`, `src/components/ui/**`.
 
 **Test behavior, not implementation**: Verify user-observable outcomes, not internal mechanisms.
+
+**Pin-tests must state their rationale.** A test that freezes a *product decision* (rather than a correctness property) has to say which trade-off it encodes, in a comment or the test name — because the next person to touch it is trying to decide whether reversing it is legitimate. `"badge hidden on mobile (max-md:hidden) to keep the row compact"` tells you exactly what you're giving up; `"orders dock favicons most-recently-viewed first"` tells you nothing and reads as load-bearing when it was a guess. The 2026-08 UX rounds reversed six such decisions; the annotated ones took seconds, the bare ones needed archaeology. Cost at write time: one line.
 - Bad: "toggleView sets viewMode to extracted" — only checks state change.
 - Good: "pressing E triggers content extraction" — verifies the user action.
 - If a user action has multiple code paths (click + keyboard), test both.
@@ -163,6 +165,7 @@ Three-tier strategy. See [docs/testing-strategy.md](docs/testing-strategy.md) fo
 - CDATA with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead.
 - `isContentEditable` may differ from browsers. Dispatch keyboard events from the target element, not `document`.
 - Radix `AlertDialog` renders curly quotes (`“`/`”`). Use flexible regex matchers.
+- happy-dom puts a stub `nodeName` getter on `Node.prototype` (returns `""`) and shadows the real one per subclass; browsers define it once on `Node.prototype` per WebIDL. DOMPurify ≥3.4.8 caches the Node-level getter (anti-clobbering hardening), so under unpatched happy-dom every tag name reads `""` and `<script>` can pass through **while `isSupported` stays `true`** — browsers are unaffected. `tests/setup.ts` shims `Node.prototype.nodeName` to delegate to the shadow getter. If sanitization tests ever fail en masse after a DOMPurify bump, suspect this class of environment-detection drift first and verify in a real browser before touching the library version.
 
 **Tier 2.5 — Smoke against real external services**: When a feature depends on external data (favicons, feeds, extraction), mocked tests alone are insufficient. Mocks encode your *belief* about what the service returns; if that belief is wrong, all mocked tests pass while the feature is broken (e.g. TechCrunch's `favicon.ico` is a 198-byte placeholder).
 - **Rule**: Before deploying a feature that fetches externally, `curl` the real endpoint and verify the response matches your fixtures.
@@ -181,7 +184,7 @@ Three-tier strategy. See [docs/testing-strategy.md](docs/testing-strategy.md) fo
 
 **Vitest gotchas**:
 - `vi.restoreAllMocks()` calls `.mockRestore()` on **every** mock — including the `vi.fn().mockResolvedValue(...)` returns from module factories like `vi.mock("@/core/storage/db.ts", () => ({ getFeeds: vi.fn().mockResolvedValue(...) }))`. After a single `restoreAllMocks`, the next test sees `getFeeds()` return `undefined` and you spend twenty minutes chasing an "unhandled rejection" trace. Use targeted `mySpy.mockRestore()` on the specific spy you created in the test.
-- When asserting "this hook called `navigate()`", spy on `useNavigate` directly rather than rendering a `<LocationProbe>` and reading `useLocation()` from a module-level variable. `renderHook` doesn't flush the route-driven re-render synchronously, so the probe captures stale state. Pattern: `vi.spyOn(ReactRouter, "useNavigate").mockReturnValue(navigateSpy)` in `beforeEach`, `expect(navigateSpy).toHaveBeenCalledWith("/feeds/b")` in the assertion.
+- When asserting "this hook called `navigate()`", mock `useNavigate` directly rather than rendering a `<LocationProbe>` and reading `useLocation()` from a module-level variable. `renderHook` doesn't flush the route-driven re-render synchronously, so the probe captures stale state. react-router 8 is ESM-only, so `vi.spyOn(ReactRouter, "useNavigate")` throws (`Module namespace is not configurable`); partial-mock instead: `const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }));` then `vi.mock("react-router", async (importOriginal) => ({ ...(await importOriginal<typeof import("react-router")>()), useNavigate: () => navigateSpy }))`, and `expect(navigateSpy).toHaveBeenCalledWith("/feeds/b")` in the assertion. Templates: `tests/hooks/use-keyboard-nav.test.tsx`, `tests/components/command-palette/command-palette.test.tsx`.
 
 ### App Initialization Flow
 
@@ -238,6 +241,7 @@ This project follows **Red-Green-Refactor-Smoke (RGR+S)**. Every change follows 
 5. **REFACTOR** — Mandatory. Extract unclear blocks; remove duplication; one thing per function; intention-revealing names; Boy Scout Rule. Re-run `npm test` after.
 6. **DOCUMENT** — Update `docs/architecture.md`, `docs/data-schema.md`, and `docs/features/*` for changed behavior. New feature → new doc from `docs/features/TEMPLATE.md`. New architectural decisions → ADR in `docs/decisions/`.
 7. **SMOKE** — For any change affecting production behavior (endpoint handlers, data layer, adapter resolution, deployment artifacts), add a smoke test under `tests/smoke/` exercising the **live deployed system** after merge. Run via `SMOKE_TESTS=1 npx vitest run tests/smoke/<name>` once Vercel reports Ready. A PR introducing a production code path without a smoke test is incomplete. ⛔ If it fails after deploy, revert or roll forward immediately.
+8. **DEVICE** — For any change to touch gestures, viewport-dependent layout, or safe-area handling: verify on **real mobile hardware** via the PR's Vercel preview URL (a QR of the branch-alias URL makes this a 5-second loop). ⛔ Emulation is not sufficient — see [Gesture work](#gesture-work).
 
 ## Smoke tests
 
@@ -256,6 +260,16 @@ What NOT to assert:
 - Anything that would log raw IPs, user emails, license tokens, or vault ciphertext. Same anonymity floor as production logs.
 
 Reference: `tests/smoke/release-feed.test.ts`, `tests/smoke/rate-limiter.test.ts`.
+
+## Gesture work
+
+Touch gestures have **three arbiters**, and you only get what the other two cede: the **OS** (screen edges, home indicator), the **browser** (scroll, back-swipe, pull-to-refresh), and **your JS**. Both mobile-UX rounds on 2026-08-01 shipped gestures that passed every local gate and failed on real glass.
+
+- **Emulation cannot validate a gesture.** Synthetic `TouchEvent`s — from Vitest, and from Playwright/CDP in device emulation — bypass the browser's gesture recognizer entirely. They test *your* state machine; the thing that breaks is the *browser's*. Unit + emulation green means "not obviously wrong", never "works".
+- **Declare `touch-action` or lose the race.** Without it, mobile browsers claim a drag as a native scroll after their own slop and stop dispatching `touchmove`; JS arming logic never runs. Use `touch-pan-y` for horizontal gestures on vertically scrolling surfaces, and re-enable `touch-auto` on descendants that legitimately pan (e.g. `<pre>` code blocks).
+- **The screen edges are not yours.** Chrome and Safari run back-navigation gestures there. An edge-gated affordance is unreachable on device — arm on direction, not on origin.
+- **`preventDefault` needs a non-passive native listener.** React's root touch handlers are passive, so `onTouchMove` cannot cancel browser panning; attach via `addEventListener(..., { passive: false })` in an effect.
+- **Write the ownership map before the gesture.** Before building any interaction, state which surface owns which direction — and what the OS/browser already reserve. When a new gesture has no free direction, that's a signal the *layout* is wrong, not that the gesture needs cleverness: the snap-pager's claim on leftward swipes was the real defect behind an elaborately-arbitrated row swipe. Record the map in the relevant `docs/features/*` (`010-mobile-navigation.md` is the model).
 
 ## Operations
 
@@ -349,9 +363,11 @@ For worktrees that need a dev server (`npm run dev`), run `npm install` in the w
 - **Commit after every successful GREEN.** Small conventional commits; never batch unrelated RGR cycles. The reflog survives `reset --hard` for ~90 days; uncommitted work survives nothing.
 - **Before any destructive git op** (`reset --hard`, `clean -fd`, `checkout .`, `stash drop`, force-push, branch delete): run `git status` and describe what you see. If there are modifications you did not author, stop and ask. Default to preserve, not clear.
 - **Delegated subagents always isolate.** Pass `isolation: "worktree"` to the Agent tool for any task that touches the codebase. The runtime auto-creates and cleans up.
-- **Landing/feedzero contract changes are serialized.** When a change spans both repos (landing serves `https://feedzero.app/releases.xml`; feedzero consumes), ship landing first, then feedzero. The first-launch auto-subscribe is try/catch so a stale URL is non-fatal, but new users silently miss the release feed until the next refresh. The `feedzero-landing/` sister repo stays shared (runtime coupling only — the app fetches the feed over HTTP, not from disk).
+- **Releases are one PR in this repo.** `release-notes.mjs` here is the source of truth; `scripts/release/build-feed.mjs` emits `public/releases.xml` during the build, and landing *rewrites* `feedzero.app/releases.xml` to `my.feedzero.app/releases.xml` so the public URL and every entry id are unchanged for subscribers. The notes entry and the version bump land in the same commit, so there is no ordering to get right and nothing to poll — the landing-first rule this replaced cost the 0.13.0 release a polling loop, a preflight guard, and a window where the two repos disagreed. Landing's homepage accordion renders from its own `releases.mjs` mirror; it is not on the release path, and a stale accordion corrects itself on landing's next deploy without ever affecting the feed. **Never** re-add a static `releases.xml` to landing: Vercel matches the filesystem before rewrites, so the file would shadow the real feed.
 - **Don't touch code you didn't author.** If `git status` shows files modified by another agent or pre-existing user WIP: don't stage, don't revert, don't include in your commits.
 - **When splitting one uncommitted tree across multiple commits**, prefer `git add -p`. Create a safety stash (`git stash push -u && git stash apply`) first — but if the rules above triggered, use a worktree instead, not a stash split.
+- **Stacked PRs + squash merges: retarget before merging the upper PR.** When PR B stacks on PR A's branch and A squash-merges into main, A's branch is dead — its history never reaches main. Merging B into that branch strands B's entire diff silently (the 2026-08-02 batch-2 incident: 1.7k lines marked "merged" that never landed; rescued by #245). Rule: after the lower PR merges, retarget the upper PR's base to main and let its checks re-run BEFORE merging it. Never merge a PR whose base is not main unless you are deliberately extending a still-open stack. The merge queue only accepts main-based PRs, which enforces this structurally.
+- **`npm audit` advisories are triaged, not repo-freezing.** The `npm audit + gitleaks` required check runs `scripts/audit-gate.mjs`: high/critical production advisories fail the gate unless `audit-exceptions.json` carries a dated waiver (advisory id + expiry + reason). Triage flow: new advisory → daily scheduled run files a `security-audit` issue → either fix the dependency or add a waiver with an expiry that forces re-triage. Never waive without a reason naming why the app is unaffected.
 - **`gh pr create` after a branch operation must use `--head <branch>` explicitly.** gh defaults to the current branch and that can shift if a parallel command swaps it mid-flight (lesson from the deeplink-hotfix incident).
 
 ## Principles

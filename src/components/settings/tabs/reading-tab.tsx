@@ -10,11 +10,20 @@
  * own surface. Reading tab is the launcher.
  */
 import { useState } from "react";
-import { Layers, Wand2, Palette } from "lucide-react";
+import { Layers, Type, Wand2, Palette } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
+import { usePreferencesStore } from "@/stores/preferences-store";
+import type { ReaderTextSize } from "@feedzero/core/types";
+
+const TEXT_SIZES: { value: ReaderTextSize; label: string }[] = [
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+];
 import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
 import { ThemeToggle } from "../theme-toggle";
 import { RulesAuditPanel } from "./rules-audit-panel";
@@ -23,6 +32,10 @@ import { SignalSection } from "../signal-section";
 export function ReadingTab() {
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
   const setGroupArticleFloods = useAppStore((s) => s.setGroupArticleFloods);
+  const readerTextSize = usePreferencesStore(
+    (s) => s.preferences.readerTextSize ?? "medium",
+  );
+  const updatePreferences = usePreferencesStore((s) => s.update);
   const hasFeeds = useFeedStore((s) => s.feeds.length > 0);
   const [autoOrganizeOpen, setAutoOrganizeOpen] = useState(false);
 
@@ -37,6 +50,34 @@ export function ReadingTab() {
           Light, dark, or follow your system.
         </p>
         <ThemeToggle />
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Type className="size-4 text-muted-foreground" />
+          <p className="text-sm font-medium">Text size</p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Body text size in the reader.
+        </p>
+        <div className="flex rounded-md border border-border overflow-hidden w-fit">
+          {TEXT_SIZES.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={readerTextSize === value}
+              onClick={() => void updatePreferences({ readerTextSize: value })}
+              className={cn(
+                "px-3 py-1.5 text-xs transition-colors",
+                readerTextSize === value
+                  ? "bg-foreground text-background font-medium"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">

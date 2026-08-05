@@ -208,8 +208,21 @@ describe("useLicenseStore", () => {
   });
 
   describe("cross-tab storage events", () => {
+    // vitest 4 returns the EXISTING spy when spyOn is called again on an
+    // already-spied method (v3 wrapped it afresh with a zeroed count), and
+    // the Zustand state object is shared across tests. Without restoring,
+    // the "ignores unrelated keys" test below inherits this test's call.
+    // Targeted restore rather than vi.restoreAllMocks(), which would also
+    // reset the module-factory mocks in this file (see CLAUDE.md).
+    let refreshSpyRef: ReturnType<typeof vi.spyOn> | undefined;
+    afterEach(() => {
+      refreshSpyRef?.mockRestore();
+      refreshSpyRef = undefined;
+    });
+
     it("re-runs refresh when the license-token key changes in another tab", () => {
       const refreshSpy = vi.spyOn(useLicenseStore.getState(), "refresh");
+      refreshSpyRef = refreshSpy;
 
       window.dispatchEvent(
         new StorageEvent("storage", {
@@ -225,6 +238,7 @@ describe("useLicenseStore", () => {
 
     it("ignores storage events for unrelated keys", () => {
       const refreshSpy = vi.spyOn(useLicenseStore.getState(), "refresh");
+      refreshSpyRef = refreshSpy;
 
       window.dispatchEvent(
         new StorageEvent("storage", {

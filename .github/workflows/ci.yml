@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Merge queue refs must produce the required checks (Build, Tests, Coverage)
+  # or queued PRs stall waiting on checks that never run.
+  merge_group:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -13,16 +16,33 @@ permissions:
   contents: read
 
 jobs:
+  # Workflows are only exercised by running them, so their defects surface in
+  # production — three did during the 0.13.0 release, one of which (invalid
+  # YAML in e2e.yml) had silently disabled post-merge E2E from the moment it
+  # merged. actionlint parses every workflow and type-checks the expression
+  # contexts, catching that class in seconds.
+  workflow-lint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: actionlint
+        uses: docker://rhysd/actionlint:latest
+        with:
+          args: -color
+
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -43,11 +63,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -71,11 +91,11 @@ jobs:
       matrix:
         shard: [1, 2, 3]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -110,11 +130,11 @@ jobs:
     timeout-minutes: 10
     needs: test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -138,8 +158,12 @@ jobs:
           path: coverage/
           retention-days: 14
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      # npm audit intentionally NOT here: it lives solely in
+      # security.yml ("npm audit + gitleaks"). When it was duplicated
+      # in this job, a single new upstream advisory turned BOTH checks
+      # red and made the Coverage verdict unreadable — a real coverage
+      # regression would have been indistinguishable from advisory
+      # noise (2026-08-01 SDLC retro, PRs #236/#237).
 
   build:
     name: Build (SPA + serverless functions)
@@ -147,11 +171,11 @@ jobs:
     timeout-minutes: 10
     needs: [typecheck, coverage]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -173,11 +197,11 @@ jobs:
     # build artifact compiles under the flag, so a self-host-specific
     # regression cannot pass CI silently.
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -205,10 +229,11 @@ jobs:
         run: |
           npm run serve >/tmp/fz-serve.log 2>&1 &
           SERVE_PID=$!
-          trap "kill $SERVE_PID 2>/dev/null || true" EXIT
+          # Single quotes: $SERVE_PID must expand when the trap fires, not now.
+          trap 'kill $SERVE_PID 2>/dev/null || true' EXIT
           # Wait for the server to bind. Up to ~10s; fail fast if it never
           # answers so the job doesn't sit until timeout.
-          for i in {1..20}; do
+          for _ in {1..20}; do
             if curl -fsS -o /dev/null http://localhost:3100/; then break; fi
             sleep 0.5
           done
@@ -242,7 +267,7 @@ jobs:
     # guard, a Caddyfile parse error) precisely because nothing here built
     # and ran the image. This job closes that gap.
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Build the self-host image (amd64, native)
         run: docker build -t feedzero:smoke .

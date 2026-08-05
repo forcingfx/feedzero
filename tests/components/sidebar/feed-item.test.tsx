@@ -148,7 +148,10 @@ describe("FeedItem", () => {
     expect(onSelect).toHaveBeenCalled();
   });
 
-  it("unread badge is hidden on mobile (max-md:hidden) to keep the row compact", () => {
+  it("unread badge stays visible on mobile (visibility of system status on every viewport)", () => {
+    // Reversal of an earlier "keep the row compact" decision: an
+    // unread-count reader that hides unread counts on phones fails its
+    // core status display (UX batch 2026-08, finding #2).
     useArticleStore.setState({
       articlesByFeedId: {
         f1: Array.from({ length: 3 }, (_, i) => articleFixture(`a${i}`, false)),
@@ -157,7 +160,7 @@ describe("FeedItem", () => {
     renderFeedItem();
     const badge = screen.getByText("3").closest("[data-sidebar='menu-badge']");
     expect(badge).not.toBeNull();
-    expect(badge!.className).toContain("max-md:hidden");
+    expect(badge!.className).not.toContain("max-md:hidden");
   });
 
   it("no longer renders any three-dot dropdown trigger (cog at top of article list owns settings now)", () => {

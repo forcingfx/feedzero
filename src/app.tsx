@@ -19,6 +19,7 @@ import { FeedSettingsDialog } from "@/components/feeds/feed-settings-dialog.tsx"
 import { FolderSettingsDialog } from "@/components/folders/folder-settings-dialog.tsx";
 import { DeviceSetupWizard } from "@/components/billing/device-setup-wizard.tsx";
 import { CommandPalette } from "@/components/command-palette/command-palette.tsx";
+import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { AppLayout } from "@/pages/app-layout.tsx";
 import { FeedsRoute } from "@/pages/feeds-route.tsx";
@@ -34,6 +35,7 @@ import { isExtensionEnabled } from "@/core/extension/extension-enabled.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { InvalidKeysScreen } from "@/components/recovery/invalid-keys-screen";
 import { AppShellSkeleton } from "@/components/loading/app-shell-skeleton.tsx";
+import { StageSkeleton } from "@/components/loading/stage-skeleton.tsx";
 import { OnboardingModal } from "@/components/onboarding/onboarding-modal.tsx";
 
 const ExploreCatalog = lazy(() =>
@@ -66,7 +68,7 @@ function ExploreRoute() {
   const navigate = useNavigate();
   return (
     <StageView>
-      <Suspense>
+      <Suspense fallback={<StageSkeleton />}>
         <ExploreCatalog onFeedAdded={(id) => navigate(`/feeds/${id}`)} />
       </Suspense>
     </StageView>
@@ -76,7 +78,7 @@ function ExploreRoute() {
 function StatsRoute() {
   return (
     <StageView>
-      <Suspense>
+      <Suspense fallback={<StageSkeleton />}>
         <StatsPage />
       </Suspense>
     </StageView>
@@ -86,7 +88,7 @@ function StatsRoute() {
 function SettingsRoute() {
   return (
     <StageView>
-      <Suspense>
+      <Suspense fallback={<StageSkeleton />}>
         <SettingsPage />
       </Suspense>
     </StageView>
@@ -96,7 +98,7 @@ function SettingsRoute() {
 function SignalRoute() {
   return (
     <StageView>
-      <Suspense>
+      <Suspense fallback={<StageSkeleton />}>
         <SignalPage />
       </Suspense>
     </StageView>
@@ -106,7 +108,7 @@ function SignalRoute() {
 function BriefingRoute() {
   return (
     <StageView>
-      <Suspense>
+      <Suspense fallback={<StageSkeleton />}>
         <BriefingPage />
       </Suspense>
     </StageView>
@@ -345,6 +347,7 @@ export function App() {
         <FeedSettingsDialog />
         <FolderSettingsDialog />
         <CommandPalette />
+        <KeyboardShortcutsDialog />
         <Toaster position="bottom-center" />
       </BrowserRouter>
     </>

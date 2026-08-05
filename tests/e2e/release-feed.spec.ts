@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "fs";
+import { openSidebar, skipOnboarding } from "./fixtures";
 
 /**
  * E2E test for the first-launch auto-subscribe flow.
@@ -23,11 +24,11 @@ test.describe("Release notes auto-subscribe", () => {
   test("first-launch subscribes to release notes and shows it in sidebar", async ({
     page,
   }) => {
-    // Bypass onboarding — simulate a returning local user with an empty DB.
-    await page.addInitScript(() => {
-      localStorage.setItem("feedzero:onboarding-complete", "true");
-      localStorage.setItem("feedzero:storage-mode", "local");
-    });
+    // Bypass onboarding — simulate a healthy returning local user with an
+    // empty DB (flag + stored derived keys; flag alone means "keys lost"
+    // and re-onboards). Deliberately NOT the feedPage fixture: this test
+    // needs the auto-subscribe request to go through, not be blocked.
+    await skipOnboarding(page);
 
     // Mock the feed proxy BEFORE navigating so the auto-subscribe request
     // (POST /api/feed with body {"url":"https://feedzero.app/releases.xml"})
@@ -49,11 +50,10 @@ test.describe("Release notes auto-subscribe", () => {
       page.locator("text=FeedZero Release Notes"),
     ).toBeVisible({ timeout: 15000 });
 
-    // On mobile the sidebar is offcanvas — open it to verify the feed button.
-    const trigger = page.locator('[data-sidebar="trigger"]');
-    if (await trigger.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await trigger.click();
-    }
+    // On mobile the feed list is a vaul drawer. This used to click the
+    // legacy [data-sidebar="trigger"], which no longer exists, so the
+    // assertion below ran against a closed drawer.
+    await openSidebar(page);
 
     const releaseFeedButton = page.locator('[data-sidebar="menu-button"]', {
       hasText: "FeedZero Release Notes",

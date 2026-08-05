@@ -21,7 +21,7 @@
  * skip is the bug.
  */
 import { test, expect } from "@playwright/test";
-import { blockReleaseAutoSubscribe } from "./fixtures";
+import { blockReleaseAutoSubscribe, skipOnboarding } from "./fixtures";
 
 async function freshBrowser(page: import("@playwright/test").Page) {
   // Clear localStorage so the app boots into the never-onboarded path.
@@ -89,18 +89,26 @@ test.describe("onboarding", () => {
       page.getByRole("heading", { name: /where should we store/i }),
     ).not.toBeVisible();
 
-    // Flag flipped now (legitimate completion).
-    const flag = await page.evaluate(() =>
-      localStorage.getItem("feedzero:onboarding-complete"),
-    );
-    expect(flag).toBe("true");
+    // Flag flips once the async initialize() → completeOnboarding chain
+    // lands — the storage-choice heading disappears one FSM step earlier
+    // (initializing), so poll instead of reading immediately.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            localStorage.getItem("feedzero:onboarding-complete"),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe("true");
   });
 
   test("a returning user does not see the welcome step", async ({ page }) => {
     // Negative control: the modal must not leak into normal use.
+    // Uses the shared fixture: a healthy returning user is flag + stored
+    // derived keys. Flag alone means "keys lost" and correctly re-onboards.
+    await skipOnboarding(page);
     await page.addInitScript(() => {
-      localStorage.setItem("feedzero:onboarding-complete", "true");
-      localStorage.setItem("feedzero:storage-mode", "local");
       localStorage.setItem("feedzero:last-seen-version", "999.0.0");
     });
     await blockReleaseAutoSubscribe(page);

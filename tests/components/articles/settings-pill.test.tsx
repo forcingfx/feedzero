@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsPill } from "@/components/articles/settings-pill.tsx";
@@ -67,14 +68,14 @@ function smartFilter(id: string, name: string): SmartFilter {
 }
 
 describe("SettingsPill", () => {
-  let openFeedSettings: ReturnType<typeof vi.fn>;
-  let openFolderSettings: ReturnType<typeof vi.fn>;
-  let openEditor: ReturnType<typeof vi.fn>;
+  let openFeedSettings: Mock<(feedId: string) => void>;
+  let openFolderSettings: Mock<(folderId: string) => void>;
+  let openEditor: Mock<(target?: SmartFilter | null | undefined) => void>;
 
   beforeEach(() => {
-    openFeedSettings = vi.fn();
-    openFolderSettings = vi.fn();
-    openEditor = vi.fn();
+    openFeedSettings = vi.fn<(feedId: string) => void>();
+    openFolderSettings = vi.fn<(folderId: string) => void>();
+    openEditor = vi.fn<(target?: SmartFilter | null | undefined) => void>();
     useFeedStore.setState({
       feeds: [feed("f-tech", "Tech Crunchies")],
       folders: [folder("folder-tech", "Tech")],

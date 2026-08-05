@@ -5,9 +5,12 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Merge queue refs must produce this required check or queued PRs stall.
+  merge_group:
   schedule:
-    # Weekly Monday 06:00 UTC — catches new advisories against the locked tree.
-    - cron: '0 6 * * 1'
+    # Daily 06:00 UTC — new advisories get triaged (waiver or fix) via the
+    # issue this workflow files, instead of silently turning PRs red.
+    - cron: '0 6 * * *'
 
 concurrency:
   group: security-${{ github.ref }}
@@ -23,7 +26,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -45,23 +48,46 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      # The scheduled run files/updates a triage issue on new advisories.
+      issues: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # gitleaks history scan needs full git history.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      # Matches the existing CI gate in ci.yml — production deps only, high+.
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      # Production deps only, high+ — with dated waivers from
+      # audit-exceptions.json so a triaged upstream advisory doesn't freeze
+      # every unrelated merge (the pre-2026-08-02 failure mode; PR #242).
+      - name: Audit production dependencies (gate with waivers)
+        run: node scripts/audit-gate.mjs
+
+      - name: File triage issue for new advisories (scheduled runs only)
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh label create security-audit --force \
+            --description "npm audit advisory needs triage" --color B60205
+          existing=$(gh issue list --label security-audit --state open \
+            --json number --jq '.[0].number // empty')
+          body="Scheduled audit gate failed on $(date -u +%F). Run \`node scripts/audit-gate.mjs\` locally, then either fix the dependency or add a dated waiver with a reason to audit-exceptions.json. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ -z "$existing" ]; then
+            gh issue create --label security-audit \
+              --title "npm audit: new production advisories need triage" \
+              --body "$body"
+          else
+            gh issue comment "$existing" --body "$body"
+          fi
 
       - name: Gitleaks history scan
         env:

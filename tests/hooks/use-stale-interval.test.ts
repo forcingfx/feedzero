@@ -8,6 +8,7 @@
  * copy.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Mock } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useStaleInterval } from "@/hooks/use-stale-interval";
 
@@ -25,12 +26,12 @@ function setVisibility(state: DocumentVisibilityState) {
 }
 
 describe("useStaleInterval", () => {
-  let run: ReturnType<typeof vi.fn>;
+  let run: Mock<() => void | Promise<void>>;
   let lastAt: number | null;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    run = vi.fn().mockResolvedValue(undefined);
+    run = vi.fn<() => void | Promise<void>>().mockResolvedValue(undefined);
     lastAt = null;
     setOnline(true);
     setVisibility("visible");

@@ -595,11 +595,26 @@ describe("FeedsPage layout — mobile", () => {
     }
   });
 
-  it("mobile reader snap panel delegates to ReaderPanel (no overflow-y-auto on the wrapper)", () => {
-    // ReaderPanel now owns its own scroll container and nav bar. The outer snap
-    // panel is a geometry wrapper only — it must not double-scroll.
+  it("mobile reader overlay delegates to ReaderPanel (no overflow-y-auto on the wrapper)", () => {
+    // ReaderPanel owns its own scroll container and nav bar. The overlay
+    // wrapper is a geometry layer only — it must not double-scroll. It
+    // mounts only while an article is open (reader-as-overlay model).
+    const article = {
+      id: "a1",
+      feedId: "f1",
+      guid: "a1",
+      title: "Article",
+      link: "https://example.com/a1",
+      content: "<p>c</p>",
+      summary: "",
+      author: "",
+      read: false,
+      publishedAt: Date.now(),
+      createdAt: Date.now(),
+    };
     useFeedStore.setState({ feeds: [defaultFeed], selectedFeedId: "f1" });
-    const { container } = renderPage("/feeds/f1");
+    useArticleStore.setState({ articles: [article], selectedArticle: article });
+    const { container } = renderPage("/feeds/f1/articles/a1");
     const reader = container.querySelector('[data-testid="reader-scroll-mobile"]');
     expect(reader).not.toBeNull();
     expect((reader as HTMLElement).className).not.toContain("overflow-y-auto");

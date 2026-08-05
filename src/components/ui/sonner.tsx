@@ -5,13 +5,22 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { resolvedTheme } = useTheme();
+
   return (
     <Sonner
-      theme="light"
+      theme={(resolvedTheme ?? "system") as ToasterProps["theme"]}
       className="toaster group"
+      // On phones the persistent dock strip owns the bottom edge
+      // (60px + home-indicator inset); bottom-center toasts must land
+      // above it, not on it.
+      mobileOffset={{
+        bottom: "calc(76px + env(safe-area-inset-bottom))",
+      }}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
@@ -21,9 +30,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
-          "--normal-bg": "#18181b",
-          "--normal-text": "#fafafa",
-          "--normal-border": "#27272a",
+          "--normal-bg": "var(--popover)",
+          "--normal-text": "var(--popover-foreground)",
+          "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
         } as React.CSSProperties
       }
