@@ -63,6 +63,43 @@ describe("resolveImageVersion", () => {
     ).toBe(false);
   });
 
+  // Whether an invocation publishes release tags (vX.Y.Z / X.Y / latest) or
+  // just a throwaway sha tag must follow the SAME precedence as the version
+  // itself. docker-publish.yml gated that on `github.event_name !=
+  // 'workflow_dispatch'` — the identical event-name trap that broke version
+  // resolution, and one that left no way to republish a release image.
+  describe("release vs throwaway builds", () => {
+    it("treats an explicit input as a release", () => {
+      expect(
+        resolveImageVersion({
+          input: "0.13.0",
+          refName: "main",
+          pkgVersion: "0.13.0",
+        }).release,
+      ).toBe(true);
+    });
+
+    it("treats a v-tag ref as a release", () => {
+      expect(
+        resolveImageVersion({
+          input: "",
+          refName: "v0.13.0",
+          pkgVersion: "0.13.0",
+        }).release,
+      ).toBe(true);
+    });
+
+    it("treats a bare branch build as throwaway (sha tag only)", () => {
+      expect(
+        resolveImageVersion({
+          input: "",
+          refName: "main",
+          pkgVersion: "0.13.0",
+        }).release,
+      ).toBe(false);
+    });
+  });
+
   it("derives the minor tag alongside the full version", () => {
     expect(
       resolveImageVersion({

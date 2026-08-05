@@ -27,6 +27,11 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Republish this release version (e.g. 0.13.0). Leave empty for a throwaway sha-tagged smoke build."
+        required: false
+        type: string
   workflow_call:
     inputs:
       version:
@@ -110,15 +115,15 @@ jobs:
           images: |
             ghcr.io/${{ github.repository_owner }}/feedzero
             ${{ secrets.DOCKERHUB_TOKEN != '' && format('docker.io/{0}/feedzero', github.repository_owner) || '' }}
-          # Tags (driven by the resolved version so tag-push and
-          # workflow_call behave identically):
-          #   * Release (tag push or workflow_call): vX.Y.Z, X.Y, latest
-          #   * Manual dispatch: short SHA only (a throwaway smoke build)
+          # Tags follow the resolver's `release` verdict, NOT the event name
+          # (see scripts/resolve-image-version.mjs):
+          #   * release (explicit version input, or a v-tag ref): vX.Y.Z, X.Y, latest
+          #   * otherwise (bare branch build): short SHA only, a throwaway smoke build
           tags: |
-            type=raw,value=v${{ steps.ver.outputs.version }},enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=raw,value=${{ steps.ver.outputs.minor }},enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=raw,value=latest,enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=sha,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=v${{ steps.ver.outputs.version }},enable=${{ steps.ver.outputs.release == 'true' }}
+            type=raw,value=${{ steps.ver.outputs.minor }},enable=${{ steps.ver.outputs.release == 'true' }}
+            type=raw,value=latest,enable=${{ steps.ver.outputs.release == 'true' }}
+            type=sha,enable=${{ steps.ver.outputs.release != 'true' }}
 
       - name: Build + push
         uses: docker/build-push-action@v7
