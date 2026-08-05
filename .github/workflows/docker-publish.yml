@@ -63,18 +63,13 @@ jobs:
       # package.json. Closes the drift class behind issues #211/#212.
       - name: Resolve + verify release version
         id: ver
+        # Resolution order (input -> v-tag -> package.json) and the
+        # equality guard live in the script, which is unit-tested; see its
+        # header for why `github.event_name` cannot be used to detect a
+        # reusable-workflow call. stdout carries key=value pairs.
         run: |
-          if [ "${{ github.event_name }}" = "workflow_call" ]; then
-            VER="${{ inputs.version }}"
-          else
-            VER="${GITHUB_REF_NAME#v}"
-          fi
-          PKG="$(node -p "require('./package.json').version")"
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$VER" != "$PKG" ]; then
-            echo "::error::version mismatch: ref/input=$VER package.json=$PKG"; exit 1
-          fi
-          echo "version=$VER" >> "$GITHUB_OUTPUT"
-          echo "minor=${VER%.*}" >> "$GITHUB_OUTPUT"
+          node scripts/resolve-image-version.mjs \
+            "${{ inputs.version }}" "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU (arm64 emulation for cross-arch builds)
         uses: docker/setup-qemu-action@v4
