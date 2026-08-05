@@ -50,10 +50,15 @@ export function isDeployLive({ health, targetCommit }) {
   return { live: true, reason: `${health.commit} is live` };
 }
 
-async function fetchHealth(baseUrl) {
+async function fetchHealth(baseUrl, bypassToken) {
   try {
+    const headers = { "Cache-Control": "no-cache" };
+    // Vercel Preview Deployment Protection 302s every request at the edge
+    // before app code runs; the automation bypass token exempts CI.
+    if (bypassToken) headers["x-vercel-protection-bypass"] = bypassToken;
+
     const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/health`, {
-      headers: { "Cache-Control": "no-cache" },
+      headers,
     });
     // 503 is a maintenance response with a valid body; parse it either way.
     return await res.json();
@@ -65,10 +70,11 @@ async function fetchHealth(baseUrl) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function runCli() {
-  const [baseUrl, targetCommit, timeoutArg] = process.argv.slice(2);
+  const [baseUrl, targetCommit, timeoutArg, bypassToken] =
+    process.argv.slice(2);
   if (!baseUrl || !targetCommit) {
     console.error(
-      "usage: verify-deploy.mjs <baseUrl> <targetCommit> [timeoutSeconds]",
+      "usage: verify-deploy.mjs <baseUrl> <targetCommit> [timeoutSeconds] [vercelBypassToken]",
     );
     process.exit(2);
   }
@@ -79,7 +85,7 @@ async function runCli() {
   let verdict = { live: false, reason: "not started" };
   while (Date.now() - startedAt < timeoutMs) {
     verdict = isDeployLive({
-      health: await fetchHealth(baseUrl),
+      health: await fetchHealth(baseUrl, bypassToken),
       targetCommit,
     });
     const elapsed = Math.round((Date.now() - startedAt) / 1000);
