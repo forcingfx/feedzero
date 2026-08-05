@@ -77,3 +77,44 @@ describe("docker build / prod install contract (#212)", () => {
     expect(lan, "Caddyfile.lan must use internal TLS").toContain("tls internal");
   });
 });
+
+/**
+ * Regression contract for issue #224: enabling sync in the Docker image
+ * failed with `EACCES: permission denied, mkdir 'data/vaults'`.
+ *
+ * The vault directory is chosen by `resolveAdapter`, which reads `DATA_DIR`
+ * and falls back to the RELATIVE "./data". Both the Dockerfile and
+ * docker-compose.yml instead set `SYNC_FILESYSTEM_DIR`, which nothing in the
+ * codebase reads. So the container resolved "./data" against WORKDIR /app and
+ * tried to mkdir /app/data/vaults as the unprivileged `node` user — which
+ * cannot write there. The /data volume it was supposed to use sat empty.
+ *
+ * These assert the deployment artefacts configure the variable the code
+ * actually reads, and that it points at the prepared, writable volume.
+ */
+describe("self-host sync storage contract (#224)", () => {
+  const dockerfile = readFileSync(path.join(REPO, "Dockerfile"), "utf8");
+  const compose = readFileSync(path.join(REPO, "docker-compose.yml"), "utf8");
+
+  it("Dockerfile sets DATA_DIR — the variable resolveAdapter reads", () => {
+    expect(dockerfile).toMatch(/DATA_DIR=\/data\b/);
+  });
+
+  it("Dockerfile prepares that directory and gives it to the runtime user", () => {
+    expect(dockerfile).toMatch(/mkdir -p \/data/);
+    expect(dockerfile).toMatch(/chown -R node:node \/data/);
+    expect(dockerfile).toMatch(/^USER node$/m);
+  });
+
+  it("docker-compose sets DATA_DIR for the container", () => {
+    expect(compose).toMatch(/DATA_DIR:\s*\/data\b/);
+  });
+
+  it("neither artefact SETS SYNC_FILESYSTEM_DIR, which nothing reads", () => {
+    // A variable no code consumes reads as configuration while doing nothing,
+    // which is what hid this bug. Match assignment (`NAME=` / `NAME:`) rather
+    // than any mention, so the comments explaining the history don't trip it.
+    expect(dockerfile).not.toMatch(/SYNC_FILESYSTEM_DIR\s*=/);
+    expect(compose).not.toMatch(/^\s*SYNC_FILESYSTEM_DIR\s*:/m);
+  });
+});
