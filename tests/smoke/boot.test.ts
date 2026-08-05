@@ -28,6 +28,29 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
 import type { Browser } from "playwright-core";
 
+/**
+ * Deterministic TEST-ONLY key material, mirroring tests/e2e/fixtures.ts.
+ * Only ever encrypts throwaway data inside an ephemeral browser profile
+ * pointed at production's static bundle; no production data is touched.
+ */
+const E2E_DERIVED_KEYS = {
+  dbKeyJwk: {
+    key_ops: ["encrypt", "decrypt"],
+    ext: true,
+    alg: "A256GCM",
+    kty: "oct",
+    k: "uufadNILu9haiuTZpAV7KkAyLaSplHksqAq3ZWo6zzQ",
+  },
+  hmacKeyJwk: {
+    key_ops: ["sign", "verify"],
+    ext: true,
+    alg: "HS256",
+    kty: "oct",
+    k: "DrC9QNFuBcHuGblZ8MbRyEQ9ajnQqxOf2ikaSSg4D-5YSxxPRXnnDSWPl-kxdB8jMh1Uzlq2wgtliTOOWf23iA",
+  },
+  dbSalt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+};
+
 const SKIP = !process.env.SMOKE_TESTS;
 const BASE_URL = process.env.SMOKE_BASE_URL ?? "https://my.feedzero.app";
 
@@ -60,6 +83,19 @@ describe.skipIf(SKIP)("production bundle boot smoke test (live browser)", () => 
     "loads the home page and reaches a working sidebar within the boot budget",
     async () => {
       const page = await browser.newPage();
+
+      // Boot as a HEALTHY RETURNING user. A fresh profile lands on the
+      // onboarding dialog, where no sidebar exists — so this test could
+      // never reach its "good state" and timed out reporting a boot failure
+      // that wasn't happening. Since the derived-keys boot FSM, the
+      // onboarding flag alone describes a user whose keys were LOST, which
+      // correctly re-onboards; a returning user needs flag + stored keys
+      // (same shape as tests/e2e/fixtures.ts skipOnboarding).
+      await page.addInitScript((keys) => {
+        localStorage.setItem("feedzero:onboarding-complete", "true");
+        localStorage.setItem("feedzero:storage-mode", "local");
+        localStorage.setItem("feedzero:derived-keys", JSON.stringify(keys));
+      }, E2E_DERIVED_KEYS);
       const consoleErrors: string[] = [];
       const pageErrors: string[] = [];
       page.on("console", (m) => {
