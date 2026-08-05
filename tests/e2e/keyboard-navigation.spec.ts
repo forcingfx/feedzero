@@ -16,6 +16,10 @@ async function setupFeed(page: import("@playwright/test").Page) {
   await selectFeedInSidebar(page, "Test Feed");
   const firstArticle = articleOption(page, "First Article");
   await expect(firstArticle).toBeVisible({ timeout: 10000 });
+  // Deliberately NOT { force: true }: forcing also skips the pointer-events
+  // check, so on mobile the click can land on the still-closing nav drawer
+  // and silently do nothing, leaving the reader empty. Observed while fixing
+  // the flake below — the cure was worse than the disease.
   await firstArticle.click();
   await expect(
     page.getByRole("heading", { name: "First Article" }),
@@ -100,11 +104,10 @@ test.describe("Keyboard navigation", () => {
   test("o opens original link in new tab", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // Select an article first
-    await articleOption(page, "First Article").click();
-    await expect(
-      page.getByRole("heading", { name: "First Article" }),
-    ).toBeVisible({ timeout: 10000 });
+    // setupFeed already selected the first article and waited for its
+    // heading; clicking it again here was redundant and was the source of a
+    // CI flake (the row is already aria-selected, and the re-click waited on
+    // a colour transition that never settled).
 
     // Press o — should open the original link
     const popupPromise = page.waitForEvent("popup");
