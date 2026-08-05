@@ -12,26 +12,17 @@ import type { Page } from "@playwright/test";
  * self-host-gated path, so anchoring on Danger zone keeps this helper
  * robust across both modes.
  *
- * On mobile, the sidebar Settings button is inside the bottom drawer which
- * we open first.
+ * Desktop puts Settings in the sidebar menu; mobile puts it in the
+ * always-visible dock as an icon button carrying only an aria-label. The
+ * previous "open the drawer and look for a menu-button" path found nothing
+ * there, which is what kept the mobile sync specs red.
  */
 async function goToSyncSection(page: Page) {
-  const settingsBtn = page.locator('[data-sidebar="menu-button"]', {
-    hasText: "Settings",
-  });
-  if (!(await settingsBtn.isVisible())) {
-    // Mobile: settings is inside the bottom drawer.
-    const drawerHandle = page.getByRole("button", { name: /open feed list/i });
-    if (await drawerHandle.isVisible()) {
-      await drawerHandle.click();
-    } else {
-      const sidebarTrigger = page
-        .getByRole("main")
-        .getByRole("button", { name: /toggle sidebar/i });
-      await sidebarTrigger.click();
-    }
-    await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
-  }
+  const settingsBtn = page
+    .locator('[data-sidebar="menu-button"]', { hasText: "Settings" })
+    .or(page.getByRole("button", { name: "Settings", exact: true }))
+    .first();
+  await settingsBtn.waitFor({ state: "visible", timeout: 10000 });
 
   await settingsBtn.click();
   await page.waitForURL(/\/settings/, { timeout: 5000 });
@@ -59,16 +50,14 @@ test.describe("Sync", () => {
   test("clicking the sidebar Settings button navigates to /settings", async ({
     feedPage: page,
   }) => {
-    const settingsBtn = page.locator('[data-sidebar="menu-button"]', {
-      hasText: "Settings",
-    });
-    if (!(await settingsBtn.isVisible())) {
-      const drawerHandle = page.getByRole("button", { name: /open feed list/i });
-      if (await drawerHandle.isVisible()) {
-        await drawerHandle.click();
-      }
-      await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
-    }
+    // Desktop puts Settings in the sidebar menu; mobile puts it in the
+    // always-visible dock as an icon button (aria-label only), so the old
+    // "open the drawer and look for a menu-button" path found nothing.
+    const settingsBtn = page
+      .locator('[data-sidebar="menu-button"]', { hasText: "Settings" })
+      .or(page.getByRole("button", { name: "Settings", exact: true }))
+      .first();
+    await settingsBtn.waitFor({ state: "visible", timeout: 10000 });
     await settingsBtn.click();
     await page.waitForURL(/\/settings/, { timeout: 5000 });
   });
@@ -89,10 +78,16 @@ test.describe("Sync", () => {
     ).toBeVisible({ timeout: 5000 });
     await confirm.getByRole("button", { name: /delete everything/i }).click();
 
-    // resetApp() doesn't navigate — it just clears the DB and re-onboards
-    // silently. The deterministic post-reset signal is the dialog closing,
-    // and the previously-added Test Feed no longer appearing in the sidebar.
-    await expect(confirm).toBeHidden({ timeout: 15000 });
+    // resetApp() clears the DB and drops the user back into onboarding. The
+    // deterministic post-reset signal is that welcome dialog appearing, plus
+    // the previously-added Test Feed being gone.
+    //
+    // This used to assert `getByRole("dialog")` became hidden, which cannot
+    // hold: the confirm dialog closes but the onboarding dialog opens in its
+    // place, so the generic role query keeps matching.
+    await expect(
+      page.getByRole("dialog", { name: /welcome to feedzero/i }),
+    ).toBeVisible({ timeout: 15000 });
     await expect(
       page.locator('[data-sidebar="menu-button"]', { hasText: "Test Feed" }),
     ).toHaveCount(0, { timeout: 5000 });

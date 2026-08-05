@@ -94,8 +94,11 @@ test.describe("Content viewing", () => {
   test("article title is a link to the original URL", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // The article title is rendered as an <a> linking to the original article.
-    const titleLink = page.getByRole("link", { name: /First Article/ });
+    // Scope to the reader: on mobile the list stays mounted behind the
+    // reader overlay, so an unscoped /First Article/ link matches twice.
+    const titleLink = page
+      .getByTestId("reader-scroll-container")
+      .getByRole("link", { name: /First Article/ });
     await expect(titleLink).toBeVisible({ timeout: 10000 });
     await expect(titleLink).toHaveAttribute("href", "https://example.com/first");
     await expect(titleLink).toHaveAttribute("target", "_blank");
