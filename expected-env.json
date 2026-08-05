@@ -81,13 +81,7 @@
       "required": "optional",
       "description": "Webhook URL (Slack / Discord / generic) that receives operator alerts on 5xx and sync regressions. Optional but recommended.",
       "consumers": [
-        "src/utils/log-error.ts",
-        "api/sync.ts",
-        "api/feed.ts",
-        "api/page.ts",
-        "api/icon.ts",
-        "api/checkout/create-session.ts",
-        "api/stripe/webhook.ts"
+        "packages/core/src/utils/log-error.ts"
       ]
     },
     "PORT": {

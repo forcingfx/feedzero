@@ -42,29 +42,11 @@ const apiFiles = () =>
  * and let the build produce bundles into the deployment only.
  */
 /**
- * Endpoints still frozen as committed bundles, tracked for restoration.
- *
- * Restoring one means reconstructing its wrapper from bundled output —
- * several build adapters from env or pass option objects — and verifying the
- * rebuilt endpoint on a preview deployment before merge. That is per-endpoint
- * work with real blast radius, so it is deliberately not done in bulk.
- *
- * Removing an entry from this list is the definition of done for that
- * endpoint. Do not add to it.
+ * Endpoints exempt from the wrapper rule. EMPTY, and it must stay that way —
+ * every endpoint was restored on 2026-08-05. An entry here means that endpoint
+ * has silently stopped receiving changes from src/.
  */
-const KNOWN_FROZEN = new Set([
-  "api/briefing.ts",
-  "api/catalog.ts",
-  "api/checkout/create-session.ts",
-  "api/feed.ts",
-  "api/feedback.ts",
-  "api/icon.ts",
-  "api/license/[action].ts",
-  "api/page.ts",
-  "api/stats-sync.ts",
-  "api/stripe/webhook.ts",
-  "api/sync.ts",
-]);
+const KNOWN_FROZEN = new Set<string>([]);
 
 describe("api wrappers stay wrappers (ADR 007)", () => {
   const files = apiFiles().filter((f) => !KNOWN_FROZEN.has(f));
