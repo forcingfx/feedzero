@@ -65,7 +65,16 @@ test.describe("Layout and scroll", () => {
     expect(afterScroll).toBe(0);
   });
 
-  test("article list scrolls independently", async ({ feedPage: page }) => {
+  test("article list scrolls independently", async ({ feedPage: page }, testInfo) => {
+    // Desktop-only by construction: the two-pane layout (list beside reader,
+    // each its own scroll container, separated by drag handles) does not
+    // exist on mobile. There the reader is an overlay opened by tapping an
+    // article, so there is no second pane to scroll or handle to drag.
+    test.skip(
+      testInfo.project.name === "mobile",
+      "Two-pane scroll/resize is a desktop layout; mobile uses an overlay reader",
+    );
+
     await setupFeed(page);
 
     // Article-list panel's scroll container is the direct div child of the
@@ -84,7 +93,16 @@ test.describe("Layout and scroll", () => {
     expect(readerAfter).toBe(readerBefore);
   });
 
-  test("reader scrolls independently", async ({ feedPage: page }) => {
+  test("reader scrolls independently", async ({ feedPage: page }, testInfo) => {
+    // Desktop-only by construction: the two-pane layout (list beside reader,
+    // each its own scroll container, separated by drag handles) does not
+    // exist on mobile. There the reader is an overlay opened by tapping an
+    // article, so there is no second pane to scroll or handle to drag.
+    test.skip(
+      testInfo.project.name === "mobile",
+      "Two-pane scroll/resize is a desktop layout; mobile uses an overlay reader",
+    );
+
     await setupFeed(page);
 
     // Inject tall content into the reader so it has somewhere to scroll to.
@@ -110,7 +128,16 @@ test.describe("Layout and scroll", () => {
     expect(listAfter).toBe(listBefore);
   });
 
-  test("outer handle resizes sidebar vs stage", async ({ feedPage: page }) => {
+  test("outer handle resizes sidebar vs stage", async ({ feedPage: page }, testInfo) => {
+    // Desktop-only by construction: the two-pane layout (list beside reader,
+    // each its own scroll container, separated by drag handles) does not
+    // exist on mobile. There the reader is an overlay opened by tapping an
+    // article, so there is no second pane to scroll or handle to drag.
+    test.skip(
+      testInfo.project.name === "mobile",
+      "Two-pane scroll/resize is a desktop layout; mobile uses an overlay reader",
+    );
+
     // Two-tier model: the outer ResizablePanelGroup has [sidebar, stage] —
     // the only place sidebar width changes. Drag the *first* (outer) handle
     // and assert the sidebar panel's width changed. .first() is required
@@ -149,7 +176,16 @@ test.describe("Layout and scroll", () => {
 
   test("inner handle resizes article-list vs reader, leaves sidebar alone", async ({
     feedPage: page,
-  }) => {
+  }, testInfo) => {
+    // Desktop-only by construction: the two-pane layout (list beside reader,
+    // each its own scroll container, separated by drag handles) does not
+    // exist on mobile. There the reader is an overlay opened by tapping an
+    // article, so there is no second pane to scroll or handle to drag.
+    test.skip(
+      testInfo.project.name === "mobile",
+      "Two-pane scroll/resize is a desktop layout; mobile uses an overlay reader",
+    );
+
     // The inner ResizablePanelGroup persists the article-list/reader split
     // independently of the sidebar. Dragging its handle must NOT change the
     // sidebar's width — that's the structural promise of the two-tier model.

@@ -1,4 +1,11 @@
-import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
+import {
+  test,
+  expect,
+  addFeedViaUI,
+  openSidebar,
+  openViewSettings,
+  selectFeedInSidebar,
+} from "./fixtures";
 import {
   SAMPLE_RSS,
   mockFeedEndpoint,
@@ -39,8 +46,9 @@ test.describe("Feed management", () => {
     // Ensure the feed is selected so the context-aware settings pill renders.
     await selectFeedInSidebar(page, "Test Feed");
 
-    // Open per-feed settings via the floating cog above the article list.
-    await page.getByTestId("settings-pill").click();
+    // Desktop shows a dedicated cog; mobile folds the same entry into the
+    // "View options" menu. openViewSettings handles both.
+    await openViewSettings(page);
     await page.getByTestId("feed-settings-delete").click();
 
     // Confirmation dialog should appear with the feed title in the body.
@@ -66,14 +74,21 @@ test.describe("Feed management", () => {
 
     await selectFeedInSidebar(page, "Test Feed");
 
-    await page.getByTestId("settings-pill").click();
+    await openViewSettings(page);
     await page.getByTestId("feed-settings-delete").click();
     await page.getByTestId("feed-settings-delete-cancel").click();
 
-    // Close the settings dialog so the sidebar is uncovered.
-    await page.keyboard.press("Escape");
+    // Close the settings dialog so the sidebar is uncovered. Escape used to
+    // be enough; after cancelling the nested AlertDialog the focus target
+    // changes and the outer dialog stayed open, so click its Done button.
+    await page.getByRole("button", { name: "Done" }).click();
+    // Radix keeps the overlay mounted through its close animation; clicking
+    // the drawer trigger underneath before it unmounts silently does nothing.
+    await expect(page.getByRole("dialog")).toBeHidden({ timeout: 5000 });
 
-    // Feed should still be there
+    // Feed should still be there. On mobile the list lives in a drawer that
+    // the dialog left closed.
+    await openSidebar(page);
     await expect(
       page.locator('[data-sidebar="menu-button"]', { hasText: "Test Feed" }),
     ).toBeVisible();
