@@ -32,9 +32,16 @@ services:
     environment:
       SELF_HOSTED: "1"
       SYNC_STORAGE: filesystem
-      SYNC_FILESYSTEM_DIR: /data/vaults
+      # Inside the container the vault directory is always /data — the
+      # Dockerfile creates it and gives it to the `node` user. This is the
+      # variable resolveAdapter reads; it previously set SYNC_FILESYSTEM_DIR,
+      # which nothing consumes, so sync fell back to a relative ./data under
+      # /app and failed with EACCES (#224).
+      DATA_DIR: /data
       PORT: "3000"
     volumes:
+      # NOTE: this ${DATA_DIR} is the HOST path (from your .env), unrelated
+      # to the container-side DATA_DIR above. Host dir -> container /data.
       - ${DATA_DIR:-./data}:/data
     expose:
       - "3000"
