@@ -1,28 +1,11 @@
 import { describe, it, expect } from "vitest";
-import {
-  newestFeedVersion,
-  decideTag,
-} from "../../../scripts/release/tag-decision.mjs";
-
-const feedWith = (version: string) =>
-  `<feed><entry><id>feedzero:release:${version}</id></entry>
-   <entry><id>feedzero:release:0.12.0</id></entry></feed>`;
-
-describe("newestFeedVersion", () => {
-  it("reads the first release id in document order", () => {
-    expect(newestFeedVersion(feedWith("0.13.0"))).toBe("0.13.0");
-  });
-
-  it("returns null when the feed has no release entries", () => {
-    expect(newestFeedVersion("<feed></feed>")).toBeNull();
-  });
-});
+import { decideTag } from "../../../scripts/release/tag-decision.mjs";
 
 describe("decideTag", () => {
-  it("tags when the version is new and the feed agrees", () => {
+  it("tags when the version is new and the notes agree", () => {
     const decision = decideTag({
       pkgVersion: "0.13.0",
-      feedVersion: "0.13.0",
+      notesVersion: "0.13.0",
       existingTags: ["v0.12.0", "v0.11.0"],
     });
     expect(decision.tag).toBe(true);
@@ -32,7 +15,7 @@ describe("decideTag", () => {
   it("skips silently when the tag already exists (idempotent re-run)", () => {
     const decision = decideTag({
       pkgVersion: "0.12.0",
-      feedVersion: "0.12.0",
+      notesVersion: "0.12.0",
       existingTags: ["v0.12.0"],
     });
     expect(decision.tag).toBe(false);
@@ -42,10 +25,10 @@ describe("decideTag", () => {
     expect(decision.reason).toMatch(/already/i);
   });
 
-  it("refuses to tag when the landing feed disagrees with package.json", () => {
+  it("refuses to tag when release-notes.mjs disagrees with package.json", () => {
     const decision = decideTag({
       pkgVersion: "0.13.0",
-      feedVersion: "0.12.0",
+      notesVersion: "0.12.0",
       existingTags: ["v0.12.0"],
     });
     expect(decision.tag).toBe(false);
@@ -54,10 +37,10 @@ describe("decideTag", () => {
     expect(decision.reason).toMatch(/0\.12\.0/);
   });
 
-  it("refuses to tag when the feed could not be read", () => {
+  it("refuses to tag when the notes list is empty", () => {
     const decision = decideTag({
       pkgVersion: "0.13.0",
-      feedVersion: null,
+      notesVersion: null,
       existingTags: [],
     });
     expect(decision.tag).toBe(false);
