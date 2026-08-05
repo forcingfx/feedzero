@@ -1,0 +1,89 @@
+name: Tag + publish release
+
+# Cuts the git tag and publishes the Docker image once a version bump has
+# LANDED on main — it never writes to main itself.
+#
+# Why not a workflow that bumps and pushes (the old release.yml): this
+# repository is user-owned, so the "main protection" ruleset cannot grant
+# the GitHub Actions app a bypass (GitHub only allows Integration bypass
+# actors for organization-owned repositories). Every push from CI to main
+# was therefore rejected with GH013 "Changes must be made through a pull
+# request" — the workflow could never have succeeded. Both 0.13.0 attempts
+# on 2026-08-02 died there.
+#
+# So the bump travels the same road as every other change: the /release
+# skill opens a release PR, the full required-check gauntlet runs on it
+# (including the version-lock test), it merges, and THIS workflow reacts to
+# the merged result. The tag can only be minted from the package.json that
+# is actually on main, which structurally prevents the "tagged before the
+# bump landed" drift that made v0.11.0's image report 0.9.0 (#211/#212).
+#
+# Tag pushes are unaffected by the ruleset (it targets the default branch,
+# not refs/tags), so GITHUB_TOKEN is sufficient here.
+on:
+  push:
+    branches: [main]
+    paths: ['package.json']
+  # Recovery hatch: re-run against current main if a tag push failed
+  # transiently. The decision logic is idempotent — an existing tag is a
+  # quiet no-op, never a failure.
+  workflow_dispatch:
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  decide:
+    name: Decide whether main is a new release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_tag: ${{ steps.decide.outputs.should_tag }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Tag list must be complete for the "already released" check.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Decide (package.json vs live landing feed vs existing tags)
+        id: decide
+        run: node scripts/release/tag-decision.mjs
+
+  tag:
+    name: Create the release tag
+    needs: decide
+    if: needs.decide.outputs.should_tag == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Tag the merged bump commit
+        env:
+          VERSION: ${{ needs.decide.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
+  publish:
+    name: Publish the Docker image
+    needs: [decide, tag]
+    uses: ./.github/workflows/docker-publish.yml
+    with:
+      version: ${{ needs.decide.outputs.version }}
+    secrets: inherit

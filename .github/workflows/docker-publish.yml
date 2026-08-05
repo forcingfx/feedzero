@@ -30,7 +30,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: "Release version without leading v (e.g. 0.12.0). Set when called by release.yml."
+        description: "Release version without leading v (e.g. 0.12.0). Set when called by release-tag.yml."
         required: true
         type: string
 
