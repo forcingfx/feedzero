@@ -9,10 +9,10 @@
   ],
   "scripts": {
     "dev": "vite --port 3000",
-    "build": "vite build",
+    "build": "npm run build:feed && vite build",
     "build:api": "node scripts/build-api.js",
     "build:extension": "node scripts/build-extension.js",
-    "build:all": "vite build && node scripts/build-api.js",
+    "build:all": "npm run build:feed && vite build && node scripts/build-api.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -20,7 +20,8 @@
     "serve": "node --import tsx server.ts",
     "docs:tier-matrix": "tsx scripts/generate-tier-matrix-doc.ts",
     "check-env": "tsx scripts/check-env.ts",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "build:feed": "node scripts/release/build-feed.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

@@ -16,6 +16,8 @@ export const SUPPORTED_METHODS: readonly string[] = ["GET"];
 interface HealthBody {
   ok: boolean;
   version: string;
+  /** Short SHA of the deployed commit, or "unknown". */
+  commit: string;
   time: string;
   maintenance?: boolean;
 }
@@ -52,6 +54,22 @@ function readViteAppVersion(): string | undefined {
 }
 
 /**
+ * Short SHA of the deployed commit.
+ *
+ * This is what makes deploy verification exact: most changes ship without a
+ * version bump, so `version` cannot answer "is MY change live?" — the commit
+ * can. `/ship` polls this until it matches the SHA it merged.
+ *
+ * Vercel injects `VERCEL_GIT_COMMIT_SHA` at build time. Self-hosted images
+ * have no such variable, so this degrades to "unknown" rather than failing:
+ * health is the one endpoint that must answer even when it knows least.
+ */
+function resolveCommit(): string {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA;
+  return sha ? sha.slice(0, 7) : "unknown";
+}
+
+/**
  * Builds a JSON Response with `Cache-Control: no-store`.
  *
  * Health responses must never be cached — uptime monitors and operators need
@@ -72,9 +90,13 @@ function jsonHealthResponse(body: HealthBody, status: number): Response {
  * Operators want this even in a maintenance response so they can confirm
  * which build they are looking at.
  */
-function currentBuildIdentity(): Pick<HealthBody, "version" | "time"> {
+function currentBuildIdentity(): Pick<
+  HealthBody,
+  "version" | "commit" | "time"
+> {
   return {
     version: resolveVersion(),
+    commit: resolveCommit(),
     time: new Date().toISOString(),
   };
 }
