@@ -57,7 +57,8 @@ jobs:
 
       - name: Decide (package.json vs live landing feed vs existing tags)
         id: decide
-        run: node scripts/release/tag-decision.mjs
+        # key=value lines on stdout -> step outputs; narration on stderr.
+        run: node scripts/release/tag-decision.mjs >> "$GITHUB_OUTPUT"
 
   tag:
     name: Create the release tag

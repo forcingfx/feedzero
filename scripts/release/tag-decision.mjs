@@ -7,13 +7,19 @@
  * the published image reported 0.9.0 (#211/#212); a tag that can only be
  * minted from the merged package.json cannot reproduce that.
  *
- * CLI (used by .github/workflows/release-tag.yml): writes `should_tag` and
- * `version` to $GITHUB_OUTPUT. Exits 1 only on a blocking inconsistency —
- * an already-released version is a quiet no-op, because every push touching
- * package.json re-enters this workflow.
+ * CLI (used by .github/workflows/release-tag.yml): prints `should_tag` and
+ * `version` as key=value lines on STDOUT, which the workflow redirects into
+ * $GITHUB_OUTPUT; human-readable narration goes to stderr. Reading
+ * $GITHUB_OUTPUT here instead would put a runner-injected variable into the
+ * deployment env spec (expected-env.json), which describes what the app
+ * needs in production — a different contract.
+ *
+ * Exits 1 only on a blocking inconsistency — an already-released version is
+ * a quiet no-op, because every push touching package.json re-enters this
+ * workflow.
  */
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -82,14 +88,10 @@ async function runCli() {
     .filter(Boolean);
 
   const decision = decideTag({ pkgVersion, feedVersion, existingTags });
-  console.log(decision.reason);
+  console.error(decision.reason);
+  console.log(`should_tag=${decision.tag}`);
+  console.log(`version=${pkgVersion}`);
 
-  if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(
-      process.env.GITHUB_OUTPUT,
-      `should_tag=${decision.tag}\nversion=${pkgVersion}\n`,
-    );
-  }
   if (decision.blocking) {
     console.error(`::error::${decision.reason}`);
     process.exit(1);
