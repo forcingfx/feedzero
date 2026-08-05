@@ -28,29 +28,45 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 /**
+ * `release` says whether this invocation should carry the release tags
+ * (vX.Y.Z / X.Y / latest) or only a throwaway sha tag. It follows the same
+ * precedence as the version — an explicit input or a v-tag means release, a
+ * bare branch build does not.
+ *
  * @param {{ input: string, refName: string, pkgVersion: string }} params
- * @returns {{ ok: boolean, version: string, minor: string, reason: string }}
+ * @returns {{ ok: boolean, release: boolean, version: string, minor: string, reason: string }}
  */
 export function resolveImageVersion({ input, refName, pkgVersion }) {
   let version;
+  let release = true;
   if (input) {
     version = input;
   } else if (refName.startsWith("v")) {
     version = refName.slice(1);
   } else {
     version = pkgVersion;
+    release = false;
   }
 
   const minor = version.split(".").slice(0, 2).join(".");
   if (version !== pkgVersion) {
     return {
       ok: false,
+      release,
       version,
       minor,
       reason: `version mismatch: resolved ${version} but package.json is ${pkgVersion}`,
     };
   }
-  return { ok: true, version, minor, reason: `Publishing ${version}.` };
+  return {
+    ok: true,
+    release,
+    version,
+    minor,
+    reason: release
+      ? `Publishing release ${version} (tags: v${version}, ${minor}, latest).`
+      : `Throwaway build of ${version} (sha tag only).`,
+  };
 }
 
 function runCli() {
@@ -71,6 +87,7 @@ function runCli() {
   console.error(resolved.reason);
   console.log(`version=${resolved.version}`);
   console.log(`minor=${resolved.minor}`);
+  console.log(`release=${resolved.release}`);
 
   if (!resolved.ok) {
     console.error(`::error::${resolved.reason}`);

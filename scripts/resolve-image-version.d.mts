@@ -10,6 +10,8 @@ export interface ImageVersionInputs {
 
 export interface ResolvedImageVersion {
   ok: boolean;
+  /** True when this build carries release tags rather than only a sha tag. */
+  release: boolean;
   version: string;
   /** Major.minor, for the floating image tag. */
   minor: string;
