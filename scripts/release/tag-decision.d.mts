@@ -2,8 +2,8 @@
 
 export interface TagInputs {
   pkgVersion: string;
-  /** Newest version in the live landing feed, or null if unreadable. */
-  feedVersion: string | null;
+  /** Newest version in release-notes.mjs (same commit as package.json). */
+  notesVersion: string | null;
   existingTags: string[];
 }
 
@@ -14,5 +14,4 @@ export interface TagDecision {
   reason: string;
 }
 
-export function newestFeedVersion(xml: string): string | null;
 export function decideTag(inputs: TagInputs): TagDecision;

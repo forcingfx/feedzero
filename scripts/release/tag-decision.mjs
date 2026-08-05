@@ -22,19 +22,15 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-
-const FEED_URL = "https://feedzero.app/releases.xml";
-
-/** Newest release version in an Atom changelog feed (first entry wins). */
-export function newestFeedVersion(xml) {
-  return /<id>feedzero:release:([0-9][0-9.]*)<\/id>/.exec(xml)?.[1] ?? null;
-}
+// Static import: see the note in build-feed.mjs about Vite and computed
+// dynamic imports.
+import { releases } from "../../release-notes.mjs";
 
 /**
- * @param {{ pkgVersion: string, feedVersion: string | null, existingTags: string[] }} inputs
+ * @param {{ pkgVersion: string, notesVersion: string | null, existingTags: string[] }} inputs
  * @returns {{ tag: boolean, blocking: boolean, reason: string }}
  */
-export function decideTag({ pkgVersion, feedVersion, existingTags }) {
+export function decideTag({ pkgVersion, notesVersion, existingTags }) {
   if (existingTags.includes(`v${pkgVersion}`)) {
     return {
       tag: false,
@@ -42,21 +38,20 @@ export function decideTag({ pkgVersion, feedVersion, existingTags }) {
       reason: `v${pkgVersion} already tagged — nothing to release.`,
     };
   }
-  if (feedVersion === null) {
+  if (notesVersion === null) {
     return {
       tag: false,
       blocking: true,
-      reason:
-        "Could not read a release version from the landing feed; refusing to tag.",
+      reason: "release-notes.mjs has no entries; refusing to tag.",
     };
   }
-  if (feedVersion !== pkgVersion) {
+  if (notesVersion !== pkgVersion) {
     return {
       tag: false,
       blocking: true,
       reason:
-        `Landing feed newest is ${feedVersion} but package.json is ${pkgVersion}. ` +
-        "Publish the landing release notes first (landing-first invariant).",
+        `release-notes.mjs newest is ${notesVersion} but package.json is ${pkgVersion}. ` +
+        "A release commit must bump both together.",
     };
   }
   return { tag: true, blocking: false, reason: `Tagging v${pkgVersion}.` };
@@ -71,14 +66,11 @@ async function runCli() {
     readFileSync(path.join(repoRoot, "package.json"), "utf8"),
   ).version;
 
-  // fetch follows the apex -> www 307 redirect by default.
-  let feedVersion = null;
-  try {
-    const res = await fetch(FEED_URL);
-    if (res.ok) feedVersion = newestFeedVersion(await res.text());
-  } catch (err) {
-    console.error(`Failed to fetch ${FEED_URL}: ${err.message}`);
-  }
+  // Read from the repository, not the network. The notes and the bump land in
+  // the same commit, so a live fetch could only introduce a way for them to
+  // disagree — which is exactly the window that used to force landing-first
+  // ordering and feed polling.
+  const notesVersion = releases[0]?.version ?? null;
 
   const existingTags = execFileSync("git", ["tag", "-l", "v*"], {
     cwd: repoRoot,
@@ -87,7 +79,7 @@ async function runCli() {
     .split("\n")
     .filter(Boolean);
 
-  const decision = decideTag({ pkgVersion, feedVersion, existingTags });
+  const decision = decideTag({ pkgVersion, notesVersion, existingTags });
   console.error(decision.reason);
   console.log(`should_tag=${decision.tag}`);
   console.log(`version=${pkgVersion}`);
