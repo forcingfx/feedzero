@@ -16,6 +16,23 @@ permissions:
   contents: read
 
 jobs:
+  # Workflows are only exercised by running them, so their defects surface in
+  # production — three did during the 0.13.0 release, one of which (invalid
+  # YAML in e2e.yml) had silently disabled post-merge E2E from the moment it
+  # merged. actionlint parses every workflow and type-checks the expression
+  # contexts, catching that class in seconds.
+  workflow-lint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: actionlint
+        uses: docker://rhysd/actionlint:latest
+        with:
+          args: -color
+
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
@@ -212,10 +229,11 @@ jobs:
         run: |
           npm run serve >/tmp/fz-serve.log 2>&1 &
           SERVE_PID=$!
-          trap "kill $SERVE_PID 2>/dev/null || true" EXIT
+          # Single quotes: $SERVE_PID must expand when the trap fires, not now.
+          trap 'kill $SERVE_PID 2>/dev/null || true' EXIT
           # Wait for the server to bind. Up to ~10s; fail fast if it never
           # answers so the job doesn't sit until timeout.
-          for i in {1..20}; do
+          for _ in {1..20}; do
             if curl -fsS -o /dev/null http://localhost:3100/; then break; fi
             sleep 0.5
           done
