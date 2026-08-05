@@ -72,30 +72,43 @@ end to end and replaces the old `/new-release`:
 1. **Local skill** — derives the version from conventional commits, drafts +
    lints the `releases.mjs` entry, runs `build-releases.mjs`, commits and
    pushes **landing first**, then polls until `feedzero.app/releases.xml`
-   shows the new entry. Only then does it fire the feedzero CI.
-2. **CI (`release.yml`)** — bumps `package.json`, refreshes the vendored
-   fixture from the live feed, re-verifies the version lock, runs
-   `tsc` + `npm test`, commits the bump, pushes the `vX.Y.Z` tag, and calls
+   shows the new entry.
+2. **Release PR** — the skill then opens `release/vX.Y.Z` against `main`
+   carrying the `package.json` bump plus the vendored fixture refreshed from
+   the live feed, and arms auto-merge. The bump is verified by the same
+   required checks as any other change (`release-version-sync.test.ts` proves
+   `package.json` equals the feed's newest entry) and merges itself.
+3. **CI (`release-tag.yml`)** — reacts to the *merged* bump: re-checks
+   `package.json` against the live landing feed and the existing tags
+   (`scripts/release/tag-decision.mjs`), pushes the `vX.Y.Z` tag, and calls
    the reusable `docker-publish.yml` to publish the multi-arch image.
 
 The four version touchpoints stay locked: landing notes → vendored fixture
 (`release-version-sync.test.ts`) → `package.json` → git tag
-(`docker-publish.yml` drift guard).
+(`docker-publish.yml` drift guard). Because the tag is derived from what is
+on `main` rather than from an operator input, "tagged before the bump landed"
+(v0.11.0, whose image reported 0.9.0 — #211/#212) is no longer expressible.
+
+### Why the bump is a PR and not a CI push
+
+`forcingfx` is a **user** account, not an organization. GitHub only allows
+`Integration` bypass actors on org-owned rulesets, so the GitHub Actions app
+can never be exempted from `main protection` here — every CI push to `main`
+is rejected with `GH013: Changes must be made through a pull request`. The
+predecessor `release.yml` pushed the bump commit directly and therefore could
+never succeed; it sat unrun until both 0.13.0 attempts on 2026-08-02 failed
+on it (first masked as a non-fast-forward race, then the bare rule violation).
+
+Routing the bump through a PR needs no bypass, no PAT, and no relaxation of
+branch protection — and it subjects the release commit to the full check
+gauntlet, which a direct push would have skipped.
 
 ### One-time setup
 
-`release.yml` commits the version bump and pushes the tag from CI, so GitHub
-Actions needs write access:
+None beyond the defaults. `release-tag.yml` only pushes **tags**, and the
+ruleset targets the default branch (`refs/heads/main`), not `refs/tags/*`, so
+the stock `GITHUB_TOKEN` with `contents: write` suffices.
 
-- **GitHub → Settings → Actions → General → Workflow permissions → "Read and
-  write permissions"** (and allow Actions to create/approve PRs is not
-  needed). This lets `release.yml` push the bump commit + tag.
-- **Fallback** if you prefer not to grant Actions write to `main`: create a
-  fine-scoped PAT (`contents: write` on this repo), store it as the secret
-  `RELEASE_TAG_TOKEN`, and change `release.yml`'s checkout + push steps to use
-  it (`actions/checkout@v6` with `token: ${{ secrets.RELEASE_TAG_TOKEN }}`).
-  The tag it pushes then also triggers `docker-publish.yml` directly, so you
-  could drop the `publish` job — at the cost of managing a token.
-
-`workflow_call` means `docker-publish.yml` is invoked by `release.yml`; its
-original `push: tags: v*.*.*` trigger still works for hand-pushed tags.
+`workflow_call` means `docker-publish.yml` is invoked by `release-tag.yml`
+(a `GITHUB_TOKEN`-pushed tag does not itself trigger workflows); its original
+`push: tags: v*.*.*` trigger still works for hand-pushed tags.
