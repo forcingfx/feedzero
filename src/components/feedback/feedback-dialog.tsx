@@ -33,6 +33,68 @@ import { toast } from "sonner";
 const MAX_LENGTH = 2000;
 const GITHUB_ISSUES_URL = "https://github.com/forcingfx/feedzero/issues";
 
+interface FeedbackPayload {
+  message: string;
+  email?: string;
+}
+
+type SubmitOutcome = { sent: true } | { sent: false; error: string };
+
+/**
+ * Parse a response body as JSON, or `null` when it isn't JSON at all.
+ *
+ * The endpoint answers JSON on every path it controls, but the layers in front
+ * of it do not: a crashed function, a gateway timeout or a misrouted request
+ * come back as an HTML error page, and `res.json()` throws on those.
+ */
+async function readJsonBody(
+  res: Response,
+): Promise<{ ok?: boolean; error?: string } | null> {
+  try {
+    return (await res.json()) as { ok?: boolean; error?: string };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * POST the note and turn every ending — sent, rejected, unreachable — into a
+ * message the user can act on.
+ *
+ * Only a rejected `fetch` is a connection problem. This used to catch the
+ * rejected `fetch` and a failed `res.json()` in one block, so a server that
+ * answered with an HTML error page (the shape of a crashed serverless
+ * function) was reported as a broken network: the user was sent to check the
+ * one part of the system that demonstrably worked, and the status code that
+ * would have identified the real fault never reached them.
+ */
+async function submitFeedback(
+  payload: FeedbackPayload,
+): Promise<SubmitOutcome> {
+  let res: Response;
+  try {
+    res = await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    return {
+      sent: false,
+      error: "Could not send feedback. Check your connection.",
+    };
+  }
+
+  const data = await readJsonBody(res);
+  if (res.ok && data?.ok) return { sent: true };
+
+  return {
+    sent: false,
+    error:
+      data?.error ?? `Could not send feedback (server error ${res.status}).`,
+  };
+}
+
 interface FeedbackDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -49,30 +111,20 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
     if (!trimmedMessage) return;
 
     const trimmedEmail = email.trim();
-    const payload: { message: string; email?: string } = {
-      message: trimmedMessage,
-    };
+    const payload: FeedbackPayload = { message: trimmedMessage };
     if (trimmedEmail) payload.email = trimmedEmail;
 
     setIsSending(true);
     try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (data.ok) {
-        toast.success("Thanks for your feedback!");
-        setMessage("");
-        setEmail("");
-        onOpenChange(false);
-      } else {
-        toast.error(data.error || "Could not send feedback");
+      const outcome = await submitFeedback(payload);
+      if (!outcome.sent) {
+        toast.error(outcome.error);
+        return;
       }
-    } catch {
-      toast.error("Could not send feedback. Check your connection.");
+      toast.success("Thanks for your feedback!");
+      setMessage("");
+      setEmail("");
+      onOpenChange(false);
     } finally {
       setIsSending(false);
     }

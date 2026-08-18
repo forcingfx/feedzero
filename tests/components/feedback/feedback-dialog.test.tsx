@@ -209,6 +209,58 @@ describe("FeedbackDialog", () => {
     });
   });
 
+  // A crashed serverless function, a gateway timeout or a misrouted request
+  // answers with an HTML error page, not JSON. Reporting that as a connection
+  // problem sends the user to check the one thing that is working; the status
+  // code is the only clue they can pass on to support.
+  it("reports the HTTP status when the server answers with a non-JSON error page", async () => {
+    mockFetch.mockResolvedValue(
+      new Response("<!doctype html><h1>500: INTERNAL_SERVER_ERROR</h1>", {
+        status: 500,
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+
+    render(<FeedbackDialog open={true} onOpenChange={vi.fn()} />);
+
+    await userEvent.type(
+      screen.getByPlaceholderText("What's on your mind?"),
+      "hello",
+    );
+    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await vi.waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith(
+        expect.stringContaining("500"),
+      );
+    });
+    expect(mockToast.error).not.toHaveBeenCalledWith(
+      expect.stringMatching(/connection/i),
+    );
+  });
+
+  it("keeps the dialog open with the message intact when submission fails", async () => {
+    const onOpenChange = vi.fn();
+    mockFetch.mockResolvedValue(
+      new Response("<!doctype html><h1>502</h1>", {
+        status: 502,
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+
+    render(<FeedbackDialog open={true} onOpenChange={onOpenChange} />);
+
+    const textarea = screen.getByPlaceholderText("What's on your mind?");
+    await userEvent.type(textarea, "hello");
+    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await vi.waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalled();
+    });
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(textarea).toHaveValue("hello");
+  });
+
   it("falls back to a connection error toast when fetch throws", async () => {
     mockFetch.mockRejectedValue(new TypeError("network down"));
 
