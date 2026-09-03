@@ -209,6 +209,12 @@ export interface UserPreferences {
    * back-compat reason as the fields above; `undefined` reads as false.
    */
   hideReadArticles?: boolean;
+  /**
+   * Whether article rows in aggregated views carry their source feed's
+   * favicon. Optional for the same back-compat reason as the fields
+   * above; `undefined` reads as true (the historical behaviour).
+   */
+  showArticleFeedIcons?: boolean;
 }
 
 /** Baseline preferences used before hydration and for first-run defaults. */
@@ -226,6 +232,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   readerTextSize: "medium",
   readerWidth: "medium",
   hideReadArticles: false,
+  showArticleFeedIcons: true,
 };
 
 export interface CreateArticleInput {

@@ -19,6 +19,7 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       readerTextSize: "medium",
       readerWidth: "medium",
       hideReadArticles: false,
+      showArticleFeedIcons: true,
     });
   });
 

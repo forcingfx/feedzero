@@ -137,6 +137,28 @@ describe("<ReadingTab>", () => {
     });
   });
 
+  describe("feed icons in the list", () => {
+    it("is on by default", () => {
+      renderTab();
+      expect(
+        screen.getByRole("switch", { name: /show feed icons/i }),
+      ).toBeChecked();
+    });
+
+    it("flipping it off persists the preference", async () => {
+      const { usePreferencesStore } = await import(
+        "@/stores/preferences-store.ts"
+      );
+      renderTab();
+
+      fireEvent.click(screen.getByRole("switch", { name: /show feed icons/i }));
+
+      expect(
+        usePreferencesStore.getState().preferences.showArticleFeedIcons,
+      ).toBe(false);
+    });
+  });
+
   it("renders a Group floods toggle reflecting useAppStore state", () => {
     useAppStore.setState({ groupArticleFloods: true });
     renderTab();

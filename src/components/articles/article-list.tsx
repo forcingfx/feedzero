@@ -86,6 +86,9 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const hideReadArticles = usePreferencesStore(
     (s) => s.preferences.hideReadArticles ?? false,
   );
+  const showArticleFeedIcons = usePreferencesStore(
+    (s) => s.preferences.showArticleFeedIcons ?? true,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Pull-to-refresh (touch only). Refreshes the current view exactly like
@@ -328,9 +331,14 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           // disambiguator.
           const summaryFeedTitle = feedsById[feedId]?.title;
           const itemFeedTitle = isAggregatedView ? summaryFeedTitle : undefined;
-          const itemFeedSiteUrl = isAggregatedView
-            ? feedsById[feedId]?.siteUrl
-            : undefined;
+          // Withholding the site URL is how "no icon" is expressed: an
+          // ArticleItem with no source to render also drops the side
+          // column, so the row tightens instead of keeping an empty
+          // gutter.
+          const itemFeedSiteUrl =
+            isAggregatedView && showArticleFeedIcons
+              ? feedsById[feedId]?.siteUrl
+              : undefined;
           return (
             <div
               key={virtualItem.key}
