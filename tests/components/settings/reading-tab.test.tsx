@@ -113,6 +113,30 @@ describe("<ReadingTab>", () => {
     });
   });
 
+  describe("hide read articles", () => {
+    it("is off by default", () => {
+      renderTab();
+      expect(
+        screen.getByRole("switch", { name: /hide read articles/i }),
+      ).not.toBeChecked();
+    });
+
+    it("flipping it on persists the preference", async () => {
+      const { usePreferencesStore } = await import(
+        "@/stores/preferences-store.ts"
+      );
+      renderTab();
+
+      fireEvent.click(
+        screen.getByRole("switch", { name: /hide read articles/i }),
+      );
+
+      expect(
+        usePreferencesStore.getState().preferences.hideReadArticles,
+      ).toBe(true);
+    });
+  });
+
   it("renders a Group floods toggle reflecting useAppStore state", () => {
     useAppStore.setState({ groupArticleFloods: true });
     renderTab();

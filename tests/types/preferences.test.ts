@@ -18,6 +18,7 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       theme: "system",
       readerTextSize: "medium",
       readerWidth: "medium",
+      hideReadArticles: false,
     });
   });
 

@@ -203,6 +203,12 @@ export interface UserPreferences {
   readerTextSize?: ReaderTextSize;
   /** Optional for the same reason as `readerTextSize`; `undefined` reads as "medium". */
   readerWidth?: ReaderWidth;
+  /**
+   * Unread-only reading mode: read articles drop out of the list so a
+   * finished session leaves an empty view. Optional for the same
+   * back-compat reason as the fields above; `undefined` reads as false.
+   */
+  hideReadArticles?: boolean;
 }
 
 /** Baseline preferences used before hydration and for first-run defaults. */
@@ -219,6 +225,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   theme: "system",
   readerTextSize: "medium",
   readerWidth: "medium",
+  hideReadArticles: false,
 };
 
 export interface CreateArticleInput {

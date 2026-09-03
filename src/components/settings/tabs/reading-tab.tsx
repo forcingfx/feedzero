@@ -10,7 +10,7 @@
  * own surface. Reading tab is the launcher.
  */
 import { useState } from "react";
-import { Layers, MoveHorizontal, Type, Wand2, Palette } from "lucide-react";
+import { CheckCheck, Layers, MoveHorizontal, Type, Wand2, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,9 @@ export function ReadingTab() {
   );
   const readerWidth = usePreferencesStore(
     (s) => s.preferences.readerWidth ?? "medium",
+  );
+  const hideReadArticles = usePreferencesStore(
+    (s) => s.preferences.hideReadArticles ?? false,
   );
   const updatePreferences = usePreferencesStore((s) => s.update);
   const hasFeeds = useFeedStore((s) => s.feeds.length > 0);
@@ -78,6 +81,29 @@ export function ReadingTab() {
         value={readerWidth}
         onChange={(value) => void updatePreferences({ readerWidth: value })}
       />
+
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCheck className="size-4 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Hide read articles</p>
+              <p className="text-xs text-muted-foreground">
+                Show only unread items, so the list empties as you work
+                through it. The article you have open stays put until you
+                move on.
+              </p>
+            </div>
+          </div>
+          <Switch
+            aria-label="Hide read articles"
+            checked={hideReadArticles}
+            onCheckedChange={(v) =>
+              void updatePreferences({ hideReadArticles: !!v })
+            }
+          />
+        </div>
+      </div>
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
