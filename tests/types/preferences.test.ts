@@ -17,6 +17,7 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       groupArticleFloods: true,
       theme: "system",
       readerTextSize: "medium",
+      readerWidth: "medium",
     });
   });
 

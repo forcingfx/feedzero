@@ -10,7 +10,7 @@
  * organize on a brand-new account.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ReadingTab } from "@/components/settings/tabs/reading-tab";
@@ -50,10 +50,16 @@ describe("<ReadingTab>", () => {
   describe("text size", () => {
     it("renders a three-way text size control defaulting to Medium", () => {
       renderTab();
-      const medium = screen.getByRole("button", { name: /^medium$/i });
-      expect(medium).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByRole("button", { name: /^small$/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /^large$/i })).toBeInTheDocument();
+      const group = screen.getByRole("group", { name: /text size/i });
+      expect(
+        within(group).getByRole("button", { name: /^medium$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(
+        within(group).getByRole("button", { name: /^small$/i }),
+      ).toBeInTheDocument();
+      expect(
+        within(group).getByRole("button", { name: /^large$/i }),
+      ).toBeInTheDocument();
     });
 
     it("selecting Large persists the preference", async () => {
@@ -61,14 +67,48 @@ describe("<ReadingTab>", () => {
         "@/stores/preferences-store.ts"
       );
       renderTab();
+      const group = screen.getByRole("group", { name: /text size/i });
 
-      fireEvent.click(screen.getByRole("button", { name: /^large$/i }));
+      fireEvent.click(within(group).getByRole("button", { name: /^large$/i }));
 
       expect(
         usePreferencesStore.getState().preferences.readerTextSize,
       ).toBe("large");
       expect(
-        screen.getByRole("button", { name: /^large$/i }),
+        within(group).getByRole("button", { name: /^large$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+  });
+
+  describe("reading width", () => {
+    it("renders a three-way width control defaulting to Medium", () => {
+      renderTab();
+      const group = screen.getByRole("group", { name: /reading width/i });
+      expect(
+        within(group).getByRole("button", { name: /^medium$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(
+        within(group).getByRole("button", { name: /^narrow$/i }),
+      ).toBeInTheDocument();
+      expect(
+        within(group).getByRole("button", { name: /^wide$/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("selecting Wide persists the preference", async () => {
+      const { usePreferencesStore } = await import(
+        "@/stores/preferences-store.ts"
+      );
+      renderTab();
+      const group = screen.getByRole("group", { name: /reading width/i });
+
+      fireEvent.click(within(group).getByRole("button", { name: /^wide$/i }));
+
+      expect(usePreferencesStore.getState().preferences.readerWidth).toBe(
+        "wide",
+      );
+      expect(
+        within(group).getByRole("button", { name: /^wide$/i }),
       ).toHaveAttribute("aria-pressed", "true");
     });
   });

@@ -181,6 +181,14 @@ export const ARTICLE_SORT_MODES: readonly ArticleSortMode[] = [
 /** Reader body text scale. "medium" is the historical default. */
 export type ReaderTextSize = "small" | "medium" | "large";
 
+/**
+ * Reading measure (max column width) in the reader panel. "medium" is the
+ * historical ~45rem measure; "narrow" tightens it for dense screens and
+ * "wide" opens it up on large displays, mirroring the width control in
+ * browser reader modes.
+ */
+export type ReaderWidth = "narrow" | "medium" | "wide";
+
 export interface UserPreferences {
   feedSortMode: FeedSortMode;
   feedCustomOrder: string[];
@@ -193,6 +201,8 @@ export interface UserPreferences {
    * readers treat `undefined` as "medium".
    */
   readerTextSize?: ReaderTextSize;
+  /** Optional for the same reason as `readerTextSize`; `undefined` reads as "medium". */
+  readerWidth?: ReaderWidth;
 }
 
 /** Baseline preferences used before hydration and for first-run defaults. */
@@ -208,6 +218,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   // React) so this default only takes effect on a brand-new install.
   theme: "system",
   readerTextSize: "medium",
+  readerWidth: "medium",
 };
 
 export interface CreateArticleInput {
