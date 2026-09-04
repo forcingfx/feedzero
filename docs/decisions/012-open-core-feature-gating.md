@@ -1,7 +1,12 @@
 # ADR 012: Open-Core Feature Gating (Honor-System)
 
 ## Status
-Accepted (2026-05-16).
+Accepted (2026-05-16). **Tier structure superseded by
+[ADR 029](029-single-annual-plan-at-9-usd.md)** (2026-09-04): Pro is retired,
+Personal is relabelled "Supporter" and priced at $9/year, and the Free feed cap
+is 100. The gating *mechanism* this ADR describes — honor-system open-core, the
+`gateState` pure function, the `VITE_SELF_HOSTED` bypass, the two-flag launch
+model — is unchanged and still current. Prices quoted below are historical.
 
 ## Context
 
