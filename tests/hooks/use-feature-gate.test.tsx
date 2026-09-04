@@ -81,9 +81,9 @@ describe("useFeatureGate", () => {
     expect(screen.getByTestId("reason")).toHaveTextContent("self-hosted-bypass");
   });
 
-  it("coming-soon feature → not-built even when self-hosted + pro tier", () => {
+  it("coming-soon feature → not-built even when self-hosted on the paid tier", () => {
     vi.mocked(isSelfHosted).mockReturnValue(true);
-    useLicenseStore.setState({ tier: "pro" });
+    useLicenseStore.setState({ tier: "personal" });
     renderWithRouter(<GateProbe feature="search" />);
     expect(screen.getByTestId("enabled")).toHaveTextContent("false");
     expect(screen.getByTestId("reason")).toHaveTextContent("not-built");

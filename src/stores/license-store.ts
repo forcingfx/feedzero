@@ -27,7 +27,9 @@ import {
   LICENSE_TOKEN_STORAGE_KEY,
 } from "@/core/license/license-token-store";
 import { decodeLicensePayload } from "@/core/license/format";
+import type { LicenseTier } from "@/core/license/format";
 import { base64UrlDecodeToString } from "@/core/license/crypto";
+import { normalizeTier } from "@/core/features/feature-gates";
 import type { Tier } from "@/core/features/feature-gates";
 
 interface LicenseState {
@@ -54,7 +56,9 @@ function decodeTierFromToken(token: string): Tier {
   const payload = base64UrlDecodeToString(encodedPayload);
   if (!payload) return "free";
   const result = decodeLicensePayload(payload);
-  return result.ok ? result.value.tier : "free";
+  // normalizeTier, not the raw wire value: a token minted before Pro was
+  // retired still says `tier=pro`, and those stay valid for up to a year.
+  return result.ok ? normalizeTier(result.value.tier) : "free";
 }
 
 export const useLicenseStore = create<LicenseState>((set) => ({
@@ -99,8 +103,12 @@ export const useLicenseStore = create<LicenseState>((set) => ({
         return;
       }
       const serverTier = body.license?.tier;
-      if (isTier(serverTier)) {
-        set({ tier: serverTier, verifying: false, lastCheckedAt: Date.now() });
+      if (isWireTier(serverTier)) {
+        set({
+          tier: normalizeTier(serverTier),
+          verifying: false,
+          lastCheckedAt: Date.now(),
+        });
       } else {
         set({ verifying: false, lastCheckedAt: Date.now() });
       }
@@ -113,7 +121,12 @@ export const useLicenseStore = create<LicenseState>((set) => ({
   },
 }));
 
-function isTier(value: unknown): value is Tier {
+/**
+ * Guards the *wire* tier, which still includes "pro" — the server echoes
+ * back whatever the token carries, and pre-repricing tokens say "pro".
+ * Callers run the result through `normalizeTier` to get an app tier.
+ */
+function isWireTier(value: unknown): value is LicenseTier {
   return value === "free" || value === "personal" || value === "pro";
 }
 

@@ -1,9 +1,13 @@
 /**
  * Inline tier comparison for the Subscription tab.
  *
- * Renders the four tier cards — Free / Personal / Pro / Self-host — with
- * checkout deeplinks. Personal CTAs use same-tab Stripe Checkout deeplinks;
- * the customer returns to /billing/success which auto-fills the license.
+ * Renders the three tier cards — Free / Supporter / Self-host — with
+ * checkout deeplinks. The Supporter CTA uses a same-tab Stripe Checkout
+ * deeplink; the customer returns to /billing/success which auto-fills the
+ * license.
+ *
+ * Pro was retired when pricing collapsed to a single $9/year plan, so there
+ * is one paid card rather than two plus a roadmap placeholder.
  *
  * The "Already have a FeedZero account? Log in" muted link has been
  * promoted to a primary "Activate existing license" CTA on the Subscription
@@ -15,13 +19,16 @@
  */
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { pricingBullets } from "@/core/features/tier-matrix";
+import { pricingBullets, tierLabel } from "@/core/features/tier-matrix";
+import { PAID_PLAN } from "@/core/features/pricing";
+import { FREE_FEED_LIMIT } from "@/core/features/quotas";
+import type { Tier } from "@/core/features/tier-matrix";
 
 /** Feature bullets for a tier card: structural lead bullets (quota /
  *  "everything in …") followed by the matrix-derived feature bullets for
  *  that tier. Re-tiering a feature in the matrix moves its bullet here
  *  automatically — see `pricingBullets`. */
-function bulletsFor(tier: "free" | "personal" | "pro", lead: string[]): string[] {
+function bulletsFor(tier: Tier, lead: string[]): string[] {
   return [...lead, ...pricingBullets(tier).map((b) => b.blurb)];
 }
 
@@ -29,35 +36,22 @@ export function SubscriptionUpgrade() {
   return (
     <div className="space-y-3">
       <TierCard
-        name="Free"
+        name={tierLabel("free")}
         price="$0"
-        blurb="Up to 50 feeds. Optional end-to-end encrypted cloud sync. No account."
+        blurb={`Up to ${FREE_FEED_LIMIT} feeds. Optional end-to-end encrypted cloud sync. No account.`}
         features={bulletsFor("free", [])}
         cta="Current plan"
         ctaDisabled
       />
 
       <TierCard
-        name="Personal"
-        price="$5/mo"
-        priceSub="or $50/yr — save 17%"
-        blurb="Unlimited feeds and power-user organization. 30 days free, cancel anytime."
+        name={tierLabel("personal")}
+        price={PAID_PLAN.display}
+        blurb={`Unlimited feeds and power-user organization. ${PAID_PLAN.trialDays} days free, cancel anytime.`}
         featured
         features={bulletsFor("personal", ["Everything in Free", "Unlimited feeds"])}
-        cta="Start 30-day free trial — then $5/mo"
-        ctaHref="/?subscribe=personal-monthly"
-        secondaryCta="or 30 days free, then $50/yr — save 17%"
-        secondaryCtaHref="/?subscribe=personal-yearly"
-      />
-
-      <TierCard
-        name="Pro"
-        price="Coming 2026"
-        blurb="When RSS becomes your work."
-        comingSoon
-        features={bulletsFor("pro", ["Everything in Personal"])}
-        cta="Coming soon"
-        ctaDisabled
+        cta={`Start ${PAID_PLAN.trialDays}-day free trial — then ${PAID_PLAN.display}`}
+        ctaHref="/?subscribe=personal-yearly"
       />
 
       <TierCard

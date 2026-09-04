@@ -10,6 +10,10 @@ vi.mock("@/core/features/self-hosted", () => ({
 }));
 
 import { isSelfHosted } from "@/core/features/self-hosted";
+import { FREE_FEED_LIMIT } from "@/core/features/quotas";
+
+/** Matches the indicator's "N / <cap>" string for whatever the cap is. */
+const capPattern = () => new RegExp(`/\\s*${FREE_FEED_LIMIT}\\b`);
 
 function LocationProbe() {
   const { pathname, search } = useLocation();
@@ -61,24 +65,26 @@ describe("QuotaIndicator", () => {
     useLicenseStore.setState({ tier: "personal", verifying: false });
     seedFeeds(12);
     renderInRouter();
-    // The QuotaIndicator emits a "N / 50 feeds" string. Its absence is the
-    // signal that the indicator was suppressed for this user.
-    expect(screen.queryByText(/\/\s*50\b/)).toBeNull();
+    // The QuotaIndicator emits a "N / <cap> feeds" string. Its absence is
+    // the signal that the indicator was suppressed for this user.
+    expect(screen.queryByText(capPattern())).toBeNull();
   });
 
   it("renders nothing for self-hosted users (operator bypass)", () => {
     vi.mocked(isSelfHosted).mockReturnValue(true);
-    seedFeeds(70);
+    seedFeeds(FREE_FEED_LIMIT + 20);
     renderInRouter();
-    expect(screen.queryByText(/\/\s*50\b/)).toBeNull();
+    expect(screen.queryByText(capPattern())).toBeNull();
   });
 
   it("shows the current count vs limit for free hosted users", () => {
     seedFeeds(7);
     renderInRouter();
-    // Tolerant of "7 / 50", "7 of 50", "7 / 50 feeds" etc.
+    // Tolerant of "7 / N", "7 of N", "7 / N feeds" etc.
     expect(screen.getByText(/\b7\b/)).toBeInTheDocument();
-    expect(screen.getByText(/50/)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(String(FREE_FEED_LIMIT))),
+    ).toBeInTheDocument();
   });
 
   it("offers an Upgrade button when at or above the limit that navigates to Settings → Subscription", async () => {
@@ -88,7 +94,7 @@ describe("QuotaIndicator", () => {
     // subscription so the user sees the tier comparison before commitment.
     const { default: userEvent } = await import("@testing-library/user-event");
     const user = userEvent.setup();
-    seedFeeds(50);
+    seedFeeds(FREE_FEED_LIMIT);
     renderInRouter();
     const upgrade = screen.getByRole("button", { name: /upgrade/i });
     await user.click(upgrade);

@@ -12,16 +12,18 @@ import {
 } from "@/core/features/tier-matrix";
 
 describe("tier-matrix — canonical schema", () => {
-  it("declares the three tiers in ascending order", () => {
-    expect(TIER_ORDER).toEqual(["free", "personal", "pro"]);
+  it("declares the two tiers in ascending order", () => {
+    // Pro was retired when pricing collapsed to a single $9/year plan; it
+    // had no shipped exclusive features to sell. "pro" survives only as a
+    // decodable value on the license wire — see license/format.ts.
+    expect(TIER_ORDER).toEqual(["free", "personal"]);
   });
 
-  it("every entry has all three tier slots defined", () => {
+  it("every entry has both tier slots defined", () => {
     for (const id of Object.keys(TIER_MATRIX) as FeatureId[]) {
       const entry = TIER_MATRIX[id];
       expect(entry.tiers.free).toBeDefined();
       expect(entry.tiers.personal).toBeDefined();
-      expect(entry.tiers.pro).toBeDefined();
     }
   });
 
@@ -41,28 +43,25 @@ describe("tier-matrix — canonical schema", () => {
   });
 
   it("higher tiers never strip availability that a lower tier had", () => {
-    // If a feature is available on free, it must be available on personal + pro.
-    // If available on personal, it must be available on pro.
+    // If a feature is available on free, it must be available on the paid
+    // tier too. Monotonic capability — you never lose something by paying.
     for (const id of Object.keys(TIER_MATRIX) as FeatureId[]) {
       const t = TIER_MATRIX[id].tiers;
       if (t.free.available) expect(t.personal.available).toBe(true);
-      if (t.personal.available) expect(t.pro.available).toBe(true);
     }
   });
 });
 
 describe("tier-matrix — feed-subscriptions (the headline quota)", () => {
-  it("is available on every tier but capped at 50 on free", () => {
+  it("is available on every tier but capped at 100 on free", () => {
     const entry = getEntry("feed-subscriptions");
-    expect(entry.tiers.free).toEqual({ available: true, limit: 50, limitUnit: "feeds" });
+    expect(entry.tiers.free).toEqual({ available: true, limit: 100, limitUnit: "feeds" });
     expect(entry.tiers.personal).toEqual({ available: true, limit: "unlimited" });
-    expect(entry.tiers.pro).toEqual({ available: true, limit: "unlimited" });
   });
 
-  it("getLimit returns 50 on free, 'unlimited' on personal/pro", () => {
-    expect(getLimit("feed-subscriptions", "free")).toBe(50);
+  it("getLimit returns 100 on free, 'unlimited' on the paid tier", () => {
+    expect(getLimit("feed-subscriptions", "free")).toBe(100);
     expect(getLimit("feed-subscriptions", "personal")).toBe("unlimited");
-    expect(getLimit("feed-subscriptions", "pro")).toBe("unlimited");
   });
 });
 
@@ -92,7 +91,6 @@ describe("tier-matrix — currently shipped gated features", () => {
     expect(getRequiredTier("signal")).toBe("personal");
     expect(getEntry("signal").tiers.free.available).toBe(false);
     expect(getEntry("signal").tiers.personal.available).toBe(true);
-    expect(getEntry("signal").tiers.pro.available).toBe(true);
   });
 
   it("signal-briefings is Personal+, shipped, with a 10-briefing cap", () => {
@@ -101,11 +99,6 @@ describe("tier-matrix — currently shipped gated features", () => {
     expect(getRequiredTier("signal-briefings")).toBe("personal");
     expect(entry.tiers.free).toEqual({ available: false });
     expect(entry.tiers.personal).toEqual({
-      available: true,
-      limit: 10,
-      limitUnit: "briefings",
-    });
-    expect(entry.tiers.pro).toEqual({
       available: true,
       limit: 10,
       limitUnit: "briefings",
@@ -128,10 +121,12 @@ describe("tier-matrix — coming-soon features", () => {
     "authenticated-fetchers",
     "send-to-kindle",
     "themes-commercial",
-  ] as const)("%s is Pro-tier, coming-soon", (id) => {
+  ] as const)("%s is on the paid tier, still coming-soon", (id) => {
+    // These moved off Pro when it was retired. Status is unchanged, so the
+    // gate still reports `not-built` and nothing unlocked for anyone.
     const entry = getEntry(id);
     expect(entry.status).toBe("coming-soon");
-    expect(getRequiredTier(id)).toBe("pro");
+    expect(getRequiredTier(id)).toBe("personal");
   });
 });
 
@@ -150,7 +145,6 @@ describe("tier-matrix — always-free features (scope of canonical doc)", () => 
     const entry = getEntry(id);
     expect(entry.tiers.free.available).toBe(true);
     expect(entry.tiers.personal.available).toBe(true);
-    expect(entry.tiers.pro.available).toBe(true);
     expect(getRequiredTier(id)).toBe("free");
   });
 });
