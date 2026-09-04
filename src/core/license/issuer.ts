@@ -29,8 +29,35 @@ import type {
 import type { LicenseIssuer } from "../stripe/webhook-handler";
 import { ok, type Result } from "../../../packages/core/src/utils/result";
 
-/** 31 days. Matches a typical Stripe billing cycle plus grace. */
-const DEFAULT_EXPIRY_SEC = 31 * 24 * 3600;
+/**
+ * 366 days. Billing is annual, so this is one cycle plus a leap day.
+ *
+ * Only reached when the webhook cannot read `current_period_end` off the
+ * Stripe payload. It used to be 31 days — sized to a monthly cycle — which
+ * meant an annual subscriber who hit the fallback got a license that
+ * expired eleven months early. The grace window below is deliberately NOT
+ * folded in here: this is a "we don't know the real period" guess, not a
+ * period Stripe told us about.
+ */
+export const DEFAULT_EXPIRY_SEC = 366 * 24 * 3600;
+
+/**
+ * 7 days of slack added past the Stripe period end on renewal.
+ *
+ * Stripe retries a failed card over roughly three weeks. Without slack,
+ * `verify.ts` rejects the instant the old period lapses and the client's
+ * 4xx branch clears the token, so a paying customer drops to Free while
+ * their renewal is still being retried — after a full year of goodwill on
+ * an annual plan.
+ *
+ * Applied on renewal only, never on `issue`. Two reasons:
+ *  - `issue` also covers trial start, where the expiry is Stripe's
+ *    `trial_end`; grace there would quietly turn a 14-day trial into 21.
+ *  - A cancelled subscription is revoked through the deny-list, which
+ *    `verify.ts` never consults, so grace forgives a retrying invoice
+ *    without forgiving a cancellation.
+ */
+export const RENEWAL_GRACE_SEC = 7 * 24 * 3600;
 const KEY_ID_BYTE_LENGTH = 16;
 
 export interface IssuerConfig {
@@ -38,7 +65,7 @@ export interface IssuerConfig {
   storage: LicenseStorage;
   /**
    * Default expiry (seconds from now) for newly-issued licenses. Caller can
-   * override per call. Defaults to 31 days.
+   * override per call. Defaults to {@link DEFAULT_EXPIRY_SEC}.
    */
   defaultExpirySec?: number;
   /** Caller-injected for testability. Defaults to `Math.floor(Date.now()/1000)`. */
@@ -135,20 +162,24 @@ export class LicenseIssuerImpl implements LicenseIssuer {
     );
     if (!existing.ok) return existing;
 
+    // Stripe's period end plus slack for a retrying invoice. See
+    // RENEWAL_GRACE_SEC for why this lives here and not in `issue`.
+    const expirySec = args.expirySec + RENEWAL_GRACE_SEC;
+
     if (existing.value === null) {
       return this.issue({
         customerId: args.customerId,
         subscriptionId: args.subscriptionId,
-        // Renewals don't carry tier, so we default to personal for the
-        // fallback-issue path. Revisit when we surface tier on renewal events.
+        // Renewal events don't carry a tier. With a single paid tier this
+        // is correct by construction rather than a guess.
         tier: "personal",
-        expirySec: args.expirySec,
+        expirySec,
       });
     }
 
     const updated: LicenseRecord = {
       ...existing.value,
-      expirySec: args.expirySec,
+      expirySec,
       updatedAtSec: this.nowSec(),
     };
     return this.storage.put(updated);

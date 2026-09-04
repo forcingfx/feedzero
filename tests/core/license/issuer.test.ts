@@ -4,6 +4,10 @@ import { MemoryLicenseStorage } from "@/core/license/storage";
 import { verifyLicense } from "@/core/license/verify";
 import type { SigningKey } from "@/core/license/sign";
 import { isOk } from "@feedzero/core/utils/result";
+import {
+  DEFAULT_EXPIRY_SEC,
+  RENEWAL_GRACE_SEC,
+} from "@/core/license/issuer";
 
 const SECRET = "this-is-a-test-signing-secret-32-bytes!";
 const KEY: SigningKey = { secret: SECRET };
@@ -111,9 +115,14 @@ describe("LicenseIssuerImpl — issueWithToken", () => {
     ).toBe(true);
   });
 
-  it("defaults expirySec to nowSec + 31 days when not provided", async () => {
+  it("defaults expirySec to a full year when Stripe gives us no period end", async () => {
+    // Billing is annual. The old 31-day default was sized to a monthly
+    // cycle, so an annual subscriber who hit this fallback (webhook
+    // couldn't read current_period_end) got a license that died eleven
+    // months early.
     const { issuer } = makeIssuer();
-    const expected = NOW + 31 * 24 * 3600;
+    const expected = NOW + DEFAULT_EXPIRY_SEC;
+    expect(DEFAULT_EXPIRY_SEC).toBeGreaterThanOrEqual(365 * 24 * 3600);
 
     const issued = await issuer.issueWithToken({
       customerId: "cus_005",
@@ -220,7 +229,55 @@ describe("LicenseIssuerImpl — recordRenewal", () => {
     });
 
     const fetched = await storage.get(keyId);
-    expect(isOk(fetched) && fetched.value?.expirySec).toBe(newExpiry);
+    expect(isOk(fetched) && fetched.value?.expirySec).toBe(
+      newExpiry + RENEWAL_GRACE_SEC,
+    );
+  });
+
+  it("adds the grace window so a retrying invoice cannot lock out a payer", async () => {
+    // Stripe retries a failed card for weeks. Without slack past the period
+    // end, verify.ts rejects the moment the old period lapses and the
+    // client's 4xx branch clears the token — a paying customer drops to
+    // Free while their renewal is still in flight.
+    const keyId = "kid_renewal_grace_xxxxxxxxxxxxxxx";
+    const { issuer, storage } = makeIssuer({ generateKeyId: () => keyId });
+
+    await issuer.issue({
+      customerId: "cus_grace",
+      tier: "personal",
+      subscriptionId: "sub_grace",
+    });
+
+    const periodEnd = NOW + 365 * 24 * 3600;
+    await issuer.recordRenewal({
+      customerId: "cus_grace",
+      subscriptionId: "sub_grace",
+      expirySec: periodEnd,
+    });
+
+    const fetched = await storage.get(keyId);
+    expect(isOk(fetched) && fetched.value?.expirySec).toBe(
+      periodEnd + RENEWAL_GRACE_SEC,
+    );
+  });
+
+  it("does NOT extend a trial — grace is for renewals only", async () => {
+    // `issue` also covers trial start, where the expiry is pinned to
+    // Stripe's trial_end. Adding grace there would silently turn a
+    // 14-day trial into 21 days of free product.
+    const keyId = "kid_trial_no_grace_xxxxxxxxxxxxxx";
+    const { issuer, storage } = makeIssuer({ generateKeyId: () => keyId });
+
+    const trialEnd = NOW + 14 * 24 * 3600;
+    await issuer.issue({
+      customerId: "cus_trial",
+      tier: "personal",
+      subscriptionId: "sub_trial",
+      expirySec: trialEnd,
+    });
+
+    const fetched = await storage.get(keyId);
+    expect(isOk(fetched) && fetched.value?.expirySec).toBe(trialEnd);
   });
 
   it("falls back to issue when no matching record exists", async () => {
@@ -238,6 +295,8 @@ describe("LicenseIssuerImpl — recordRenewal", () => {
     expect(isOk(result)).toBe(true);
 
     const fetched = await storage.get(fallbackKeyId);
-    expect(isOk(fetched) && fetched.value?.expirySec).toBe(newExpiry);
+    expect(isOk(fetched) && fetched.value?.expirySec).toBe(
+      newExpiry + RENEWAL_GRACE_SEC,
+    );
   });
 });
