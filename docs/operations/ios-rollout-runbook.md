@@ -24,7 +24,7 @@ times and are not blockable by this repo.
 
 1. **Apple Developer Program enrollment** — $99/year. Pick the legal entity (individual vs business) carefully; you can't change it later without re-enrolling.
 2. **App Store Connect app record** — bundle ID `app.feedzero.ios`. Reserve the listing name; iOS app names must be unique per region.
-3. **RevenueCat account** — free until ~$2.5k MTR. Configure the iOS app, link the App Store Connect API key, set up `Personal+` and `Pro` entitlements that mirror `src/core/features/tier-matrix.ts`.
+3. **RevenueCat account** — free until ~$2.5k MTR. Configure the iOS app, link the App Store Connect API key, and set up the single paid entitlement that mirrors `src/core/features/tier-matrix.ts`. There is one paid tier since [ADR 029](../decisions/029-single-annual-plan-at-9-usd.md) — do not create a `Pro` entitlement. Note the App Store product must be annual to match the web price ($9/year), and Apple's 15–30% cut lands on a much smaller number than the runbook was originally sized against.
 4. **App Store Connect API key** — needed by EAS Build to ship to TestFlight without manual upload.
 5. **Universal Links AASA** — once the Apple Team ID is known, the file at `https://my.feedzero.app/.well-known/apple-app-site-association` must serve `{"applinks":{"apps":[],"details":[{"appID":"TEAMID.app.feedzero.ios","paths":["/feeds/*"]}]}}` with `Content-Type: application/json`. This is a `feedzero-landing` PR, not this repo.
 
