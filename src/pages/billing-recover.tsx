@@ -194,7 +194,7 @@ export function BillingRecover() {
 
       <p className="text-xs text-muted-foreground">
         Subscribed on a different device but never paid here?{" "}
-        <a href="/?subscribe=personal-monthly" className="underline">
+        <a href="/?subscribe=personal-yearly" className="underline">
           Start a new subscription
         </a>
         .
