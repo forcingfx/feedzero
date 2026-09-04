@@ -7,6 +7,7 @@ import { useFeedStore } from "@/stores/feed-store";
 import { useArticleStore } from "@/stores/article-store";
 import { useLicenseStore } from "@/stores/license-store";
 import { isSelfHosted } from "@/core/features/self-hosted";
+import { PAID_PLAN } from "@/core/features/pricing";
 
 vi.mock("@/core/features/self-hosted", () => ({
   isSelfHosted: vi.fn(() => false),
@@ -222,7 +223,12 @@ describe("AutoOrganizePill (wand trigger + popover)", () => {
       renderWithRouter(<AutoOrganizePill />);
       await user.click(screen.getByTestId("auto-organize-trigger"));
 
-      expect(screen.getByTestId("auto-organize-upgrade-cta")).toBeInTheDocument();
+      const cta = screen.getByTestId("auto-organize-upgrade-cta");
+      expect(cta).toBeInTheDocument();
+      // Names the price, and names it from PAID_PLAN. This CTA is the one
+      // upgrade surface that isn't matrix-derived, and it carried a stale
+      // hardcoded "$5/mo" through the whole repricing until it was caught.
+      expect(cta.textContent).toContain(PAID_PLAN.display);
       expect(screen.queryByTestId("auto-organize-open-dialog")).toBeNull();
     });
 
