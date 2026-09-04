@@ -28,6 +28,7 @@
  * `STRIPE_SECRET_KEY` and passes it in.
  */
 
+import { PAID_PLAN } from "../features/pricing";
 import { newTraceId } from "../../../packages/core/src/utils/trace-id";
 import { logError } from "../../../packages/core/src/utils/log-error";
 
@@ -37,20 +38,19 @@ const ROUTE = "/api/checkout/create-session";
 /**
  * Free-trial duration applied to every Checkout Session this handler creates.
  *
- * Why a server-controlled constant (not env var, not Dashboard config, not a
- * client-supplied flag):
- *  - Monetary terms must live in code review history, not in dashboards that
- *    silently drift between staging and live mode.
- *  - The client cannot be trusted to choose a trial length — an env var
- *    would just push the same trust problem one layer down.
- *  - Flags-and-toggles are debt (CLAUDE.md "Principles → Design").
+ * Sourced from `PAID_PLAN` so the length the server enforces and the length
+ * the pricing copy promises cannot drift apart — they were two independent
+ * literals before. The reasoning for keeping it in code at all is unchanged
+ * (ADR 015): monetary terms must live in code review history, not in
+ * dashboards that silently differ between staging and live mode, and the
+ * client cannot be trusted to choose its own trial length.
  *
- * To shorten or extend the trial: edit this constant. To sunset the trial:
+ * To shorten or extend the trial: edit `PAID_PLAN.trialDays`. To sunset it:
  * remove the `subscription_data` field from the create call entirely —
  * Stripe rejects `trial_period_days: 0`, so a zero value is not a valid
  * off-switch.
  */
-const TRIAL_PERIOD_DAYS = 30;
+const TRIAL_PERIOD_DAYS = PAID_PLAN.trialDays;
 
 /**
  * Minimal subset of `stripe.checkout.sessions.create` we depend on. Defining
