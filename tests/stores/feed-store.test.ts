@@ -86,6 +86,7 @@ import {
   getFaviconStrategyIndex,
   setFaviconCacheEntry,
 } from "../../src/core/favicon/favicon-cache.ts";
+import { FREE_FEED_LIMIT } from "@/core/features/quotas";
 
 const mockFeed = (id: string, title: string) => ({
   id,
@@ -265,7 +266,7 @@ describe("feed-store", () => {
       expect(result).toEqual({ ok: true, value: undefined });
     });
 
-    describe("Free quota gate (hard cutover at 50 feeds)", () => {
+    describe("Free quota gate (hard cutover at the free feed cap)", () => {
       function seedFeeds(n: number) {
         const feeds = Array.from({ length: n }, (_, i) =>
           mockFeed(`f${i}`, `Feed ${i}`),
@@ -273,9 +274,9 @@ describe("feed-store", () => {
         useFeedStore.setState({ feeds });
       }
 
-      it("blocks addFeed on hosted Free when already at 50 feeds", async () => {
+      it("blocks addFeed on hosted Free when already at the cap", async () => {
         useLicenseStore.setState({ tier: "free", verifying: false });
-        seedFeeds(50);
+        seedFeeds(FREE_FEED_LIMIT);
 
         const result = await useFeedStore
           .getState()
@@ -283,7 +284,9 @@ describe("feed-store", () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
-          expect(result.error).toMatch(/Free limit of 50/);
+          expect(result.error).toMatch(
+          new RegExp(`Free limit of ${FREE_FEED_LIMIT}`),
+        );
         }
         expect(addFeedFlow).not.toHaveBeenCalled();
       });
@@ -346,11 +349,13 @@ describe("feed-store", () => {
 
       it("sets store.error so a Settings indicator can render the quota warning", async () => {
         useLicenseStore.setState({ tier: "free", verifying: false });
-        seedFeeds(50);
+        seedFeeds(FREE_FEED_LIMIT);
 
         await useFeedStore.getState().addFeed("https://new.com/feed");
 
-        expect(useFeedStore.getState().error).toMatch(/Free limit of 50/);
+        expect(useFeedStore.getState().error).toMatch(
+          new RegExp(`Free limit of ${FREE_FEED_LIMIT}`),
+        );
       });
 
       it("tags the failure with reason='free-quota-exceeded' so callers can route the user to upgrade", async () => {
@@ -359,7 +364,7 @@ describe("feed-store", () => {
         // apart from a network/parse error. The reason discriminator is
         // the contract: every add-feed call site reads it.
         useLicenseStore.setState({ tier: "free", verifying: false });
-        seedFeeds(50);
+        seedFeeds(FREE_FEED_LIMIT);
 
         const result = await useFeedStore
           .getState()

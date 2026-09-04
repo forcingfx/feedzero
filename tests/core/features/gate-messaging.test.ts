@@ -12,7 +12,7 @@ import {
   featureName as fnFromGates,
 } from "@/core/features/feature-gates";
 
-const CAP: Record<string, string> = { free: "Free", personal: "Personal", pro: "Pro" };
+const CAP: Record<string, string> = { free: "Free", personal: "Supporter" };
 
 describe("gate messaging — derived entirely from the tier matrix", () => {
   it("featureName mirrors the matrix display name for every gated feature", () => {
@@ -53,11 +53,11 @@ describe("gate messaging — derived entirely from the tier matrix", () => {
     }
   });
 
-  it("signal-briefings reads 'Subscribe to Personal to unlock Signal Briefings.'", () => {
+  it("signal-briefings reads 'Subscribe to Supporter to unlock Signal Briefings.'", () => {
     expect(featureName("signal-briefings")).toBe("Signal Briefings");
-    expect(requiredTierLabel("signal-briefings")).toBe("Personal");
+    expect(requiredTierLabel("signal-briefings")).toBe("Supporter");
     expect(gateToast("signal-briefings")).toBe(
-      "Subscribe to Personal to unlock Signal Briefings.",
+      "Subscribe to Supporter to unlock Signal Briefings.",
     );
   });
 });

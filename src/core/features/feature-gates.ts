@@ -22,17 +22,18 @@
  * also derived from the same matrix.
  */
 
-import type { LicenseTier } from "../license/format";
 import {
   GATED_FEATURE_IDS,
   TIER_MATRIX,
   getRequiredTier,
+  normalizeTier,
   featureName,
   requiredTierLabel,
   gateDescription,
   gateToast,
   tierLabel,
   type FeatureId,
+  type Tier,
 } from "./tier-matrix";
 
 // Re-export the matrix-derived messaging helpers so gating consumers have
@@ -43,9 +44,10 @@ export {
   gateDescription,
   gateToast,
   tierLabel,
+  normalizeTier,
 };
 
-export type Tier = LicenseTier;
+export type { Tier };
 
 export type Feature = (typeof GATED_FEATURE_IDS)[number];
 
@@ -90,7 +92,7 @@ export interface GateState {
   requiredTier: Tier;
 }
 
-const TIER_RANK: Record<Tier, number> = { free: 0, personal: 1, pro: 2 };
+const TIER_RANK: Record<Tier, number> = { free: 0, personal: 1 };
 
 /**
  * Evaluate the gate for a feature given the current user's tier, the

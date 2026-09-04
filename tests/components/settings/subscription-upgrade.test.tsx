@@ -8,37 +8,40 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { SubscriptionUpgrade } from "@/components/settings/subscription-upgrade";
+import { PAID_PLAN } from "@/core/features/pricing";
 
 describe("<SubscriptionUpgrade>", () => {
-  it("renders all four tiers", () => {
+  it("renders the three tiers", () => {
     render(<SubscriptionUpgrade />);
     expect(screen.getByText(/^Free$/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /^Personal$/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /^Pro$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Supporter$/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Self-host/i })).toBeInTheDocument();
   });
 
-  it("Personal CTA links to the personal-monthly deeplink and surfaces the 30-day free trial", () => {
-    // Stripe-managed trial: the checkout handler injects
-    // subscription_data.trial_period_days=30. The CTA copy must match so a
-    // user reading the card understands why no charge appears immediately.
+  it("no longer offers a Pro card", () => {
+    // Pro was retired with the move to a single $9/year plan. It had no
+    // shipped exclusive features, so the card sold a roadmap.
     render(<SubscriptionUpgrade />);
-    const cta = screen.getByRole("link", { name: /30-day free trial/i });
-    expect(cta.getAttribute("href")).toMatch(/\?subscribe=personal-monthly/);
+    expect(screen.queryByRole("heading", { name: /^Pro$/i })).toBeNull();
+    expect(screen.queryByText(/coming 2026/i)).toBeNull();
   });
 
-  it("calls out '30 days free' in the Personal card blurb so the trial is visible above the fold", () => {
+  it("the paid CTA links to the annual deeplink and names the price it will charge", () => {
     render(<SubscriptionUpgrade />);
-    // Multiple matches expected (blurb + secondary yearly CTA). Both surfaces
-    // intentionally repeat the trial framing — make sure at least the blurb
-    // line is present.
-    expect(screen.getAllByText(/30 days free/i).length).toBeGreaterThan(0);
+    const cta = screen.getByRole("link", {
+      name: new RegExp(`${PAID_PLAN.trialDays}-day free trial`, "i"),
+    });
+    expect(cta.getAttribute("href")).toMatch(/\?subscribe=personal-yearly/);
+    expect(cta.textContent).toContain(PAID_PLAN.display);
   });
 
-  it("Pro tier shows Coming Soon with no subscribe link", () => {
+  it("names the trial length in the card blurb so it is visible above the fold", () => {
+    // Stripe owns the trial clock; the copy has to match what the checkout
+    // handler actually sends or the card lies about when the charge lands.
     render(<SubscriptionUpgrade />);
-    expect(screen.getByText(/coming 2026/i)).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /pro/i })).toBeNull();
+    expect(
+      screen.getAllByText(new RegExp(`${PAID_PLAN.trialDays} days free`, "i")).length,
+    ).toBeGreaterThan(0);
   });
 
   it("Self-host links to the docs page", () => {

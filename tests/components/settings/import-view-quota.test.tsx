@@ -13,6 +13,7 @@ import { ImportView } from "@/components/settings/import-view";
 import { useFeedStore } from "@/stores/feed-store";
 import { useLicenseStore } from "@/stores/license-store";
 import { useImportStore } from "@/stores/import-store";
+import { FREE_FEED_LIMIT } from "@/core/features/quotas";
 
 vi.mock("@/core/features/self-hosted", () => ({
   isSelfHosted: vi.fn(() => false),
@@ -69,23 +70,27 @@ describe("ImportView quota refusal", () => {
     // Switch to text-input mode so we can paste a URL list synchronously.
     await user.click(screen.getByLabelText(/paste text/i));
 
-    // 20 already-seeded + 35 pasted = 55, over the 50 cap.
-    const thirtyFive = Array.from(
-      { length: 35 },
+    // Seeded 20, plus enough pasted URLs to land one over the cap.
+    // Derived from FREE_FEED_LIMIT so raising the cap can't quietly turn
+    // this into a test that no longer exceeds anything.
+    const overflowing = Array.from(
+      { length: FREE_FEED_LIMIT - 20 + 1 },
       (_, i) => `https://example.com/import-${i}.xml`,
     ).join("\n");
     const textarea = screen.getByPlaceholderText(/paste opml/i);
     await user.click(textarea);
-    await user.paste(thirtyFive);
+    await user.paste(overflowing);
 
     // Quota refusal short-circuits BEFORE the preview screen is shown
     // — surfaces the error inline on the input panel, no preview click.
     await user.click(screen.getByRole("button", { name: /^import feeds$/i }));
 
-    // Tolerant of "exceed", "limit", "50"; what matters is that the user is
-    // told why and no addFeed call sneaks through.
+    // Tolerant of "exceed" / "limit" / the number; what matters is that the
+    // user is told why and no addFeed call sneaks through.
     expect(
-      await screen.findByText(/limit|exceed|50/i),
+      await screen.findByText(
+        new RegExp(`limit|exceed|${FREE_FEED_LIMIT}`, "i"),
+      ),
     ).toBeInTheDocument();
     expect(addFeedMock).not.toHaveBeenCalled();
   });
