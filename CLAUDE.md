@@ -43,91 +43,9 @@ Add feed: `feed-service.ts` (normalize, dedup) → `/api/feed` proxy → `valida
 
 Full-text extraction (user-initiated): click "Extracted" → `/api/page` → `extractor.ts` → `defuddle-extractor.ts` → `cleanup.ts` → DOMPurify → cached in extraction store.
 
-### Core Modules (Framework-Agnostic)
+### Code Map — where things live
 
-- **src/utils/result.ts** — `Result<T>` (`ok`/`err`) used everywhere instead of throwing. `andThen` chains; `fromPromise` wraps async.
-- **src/utils/constants.ts** — DB name, crypto params, `LOCAL_STORAGE` keys, default passphrase.
-- **src/core/storage/crypto.ts** — PBKDF2 + AES-GCM + HMAC-SHA256 via Web Crypto API.
-- **src/core/crypto/argon2.ts** — Argon2id wrapper around `hash-wasm`. Memory-hard KDF used to encrypt new sync vaults so a 4-word diceware passphrase (~51.7 bits) is no longer brute-forceable by GPU farms. Production params: 64 MiB / t=3 / p=1 (OWASP). The vault envelope stamps which KDF derived its key (`KdfSpec` in `src/core/sync/types.ts`) so recovery on a new device picks the matching derivation. Legacy PBKDF2 vaults auto-upgrade to Argon2id the first time the user types their passphrase on any device (recovery-step / switchToExistingCloud → `upgradeVaultKdf`).
-- **src/core/storage/db.ts** — Dexie storage. Content AES-GCM encrypted; index fields (url, feedId, guid) HMAC-SHA256 hashed so we can query without exposing plaintext. Call `open(passphrase)` or `openWithKeys(dbKeyJwk, hmacKeyJwk)` first.
-- **src/core/storage/key-material.ts** — `deriveAndStoreKeys`, `loadStoredKeys`, `clearStoredKeys`. Derives DB/HMAC/optional vault keys, persists JWK to localStorage. Raw passphrase is never persisted.
-- **src/core/storage/schema.ts** — `createFeed()` / `createArticle()` factories returning `Result`.
-- **src/core/discovery/** — `discoverFeed(url)` multi-strategy cascade; `strategies.ts` holds the pure functions.
-- **src/core/crypto/passphrase-generator.ts** — EFF large wordlist, 4 words, ~51.7 bits entropy.
-- **src/core/proxy/validate-url.ts** — SSRF-safe URL validation. Returns `Result<URL>`.
-- **src/core/proxy/proxy-handler.ts** — Shared proxy logic for serverless functions.
-- **src/core/extractor/extractor.ts** — Public `extract(html, url)` + `needsExtraction(article)`. Swap implementation by changing the import.
-- **src/core/extractor/{defuddle-extractor,cleanup,markdown}.ts** — Defuddle impl; HTML cleanup; markdown→HTML via marked + DOMPurify.
-- **src/core/extractor/adapters/** — Site-specific adapters. `SiteAdapter` interface, `AdapterRegistry` (O(1) domain lookup). `github-adapter` extracts README; `default-adapter` uses Defuddle.
-- **src/core/sync/types.ts** — `VaultData`, `EncryptedVault`, `SyncStorageAdapter`.
-- **src/core/sync/vault-crypto.ts** — Deterministic `deriveVaultId` (PBKDF2, KDF-invariant by design — vault ID is a routing identifier, not a secret) + `deriveVaultKey` (dispatches on `KdfSpec`: legacy PBKDF2 or Argon2id); `encryptVault` / `decryptVault` (`encryptVault` stamps the spec on the envelope so recovery can find the matching KDF). `DEFAULT_NEW_VAULT_KDF` is Argon2id in prod, cheap params under Vitest.
-- **src/core/sync/sync-service.ts** — Client orchestrator: `exportVault`, `importVault`, `pushVault`, `pullVault`.
-- **src/core/sync/sync-handler.ts** — Shared server `Request → Response` handler. GET (pull) / PUT (push) / DELETE.
-- **src/core/sync/adapters/** — `memory`, `filesystem`, `vercel-blob`, `resolve-adapter`.
-- **src/core/feeds/feed-service.ts** — `addFeedFlow(url)`, `refreshFeed`, `refreshAllFeeds` (guid-based dedup).
-- **src/core/signal/frequency-engine.ts** — `generateReport(articles, ctx, now)` + `pickWindow()`. Pure-TS cross-feed term frequency with greedy clustering and a bleed-over guard. No LLM, no Worker. Drives `/signal`.
-- **src/core/signal/tokenize.ts** — `tokenize()` + `lightStem()` with English stopwords and feed-noise lists.
-- **src/core/parser/parser.ts** — `parse(text, feedUrl)` via feedsmith (RSS 2.0, Atom 1.0, JSON Feed 1.1).
-- **src/core/parser/sanitizer.ts** — DOMPurify wrapper, allowlisted tags/attrs.
-- **src/core/opml/** — `opml-service.ts` (import/export via feedsmith), `url-list-parser.ts` (plain-text URL lists).
-- **src/core/feedback/feedback-handler.ts** — Creates GitHub issues via REST API. Needs `GITHUB_FEEDBACK_TOKEN` (fine-grained PAT with `issues: write`) + `GITHUB_REPO` (e.g. `forcingfx/feedzero`).
-- **src/core/sync/sync-stats-handler.ts** — Vault count stats; no PII.
-
-### Zustand Stores
-
-- **app-store** — DB init, global error, onboarding. `initialize(passphrase)`, `checkOnboardingStatus()`, `initializeReturningUser()` (detect mode, open DB, optionally pull sync).
-- **feed-store** — `feeds[]`, `selectedFeedId`, CRUD. `refreshAll()` pulls the sync vault first for sync users so feeds added on another device materialize.
-- **article-store** — `articles[]`, `selectedArticle`, `loadArticles`, `selectArticle` (auto-marks read).
-- **extraction-store** — `cache` (link → HTML), `viewMode`, `fetchExtracted(url)`.
-- **onboarding-store** — State machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery`). Modes: `local` (skips confirm) vs `sync` (requires confirm).
-- **sync-store** — Status: `local-only | syncing | synced | error`. Holds `credentials: SyncCredentials | null` (pre-derived vault ID + CryptoKey; never raw passphrase). Actions: `enableSync` (derives + pushes), `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce + 0–30s jitter), `disableSync` (deletes server vault + clears stored keys), `logout` (clears local data + resets onboarding; preserves cloud vault).
-- **import-store** — OPML/URL-list progress. `idle → importing → complete | error`.
-- **signal-store** — `/signal` page state. Status: `idle | locked | loading | ready | error`. `loadReport({ force? })` runs the local frequency engine if corpus ≥ `SIGNAL_CORPUS_GATE` (100). 24h localStorage cache (`feedzero:signal-report`) invalidated when the chosen window changes or corpus size shifts by ≥10%.
-
-### React Components
-
-- **src/components/ui/** — shadcn/ui wrappers over Radix. Use these as primitives.
-- **src/components/layout/** — header, panel.
-- **src/components/feeds/**, **articles/**, **reader/** — list/item/reader for each domain.
-- **src/components/onboarding/** — `onboarding-modal.tsx` + step components under `steps/`.
-- **src/components/explore/**, **feedback/**, **settings/** — feature UIs.
-- **src/components/sync/** — `sync-setup-dialog.tsx` (enable/disable, data mgmt, vault deletion), `sync-status-chip.tsx` (amber local / green synced / red error).
-- **src/pages/feeds-page.tsx** — Desktop: two-tier `ResizablePanelGroup`. Outer = `[sidebar | stage]`, constant on every route — the only place sidebar width lives. The `stage` panel is a slot whose *content* varies per route: `<ExploreCatalog>` on `/explore` / empty feeds, `<StatsPage>` on `/stats`, or an inner `ResizablePanelGroup` `[article-list | reader]` on the default route. New feature areas mount inside the stage; they MUST NOT add siblings to the sidebar (that's what made the sidebar visibly resize on every navigation — see ADR 013). Mobile: single panel + back nav. Syncs URL params → Zustand.
-- **src/lib/content-modes.ts** — Pure view-mode logic for reader-panel.
-- **src/lib/decode-entities.ts** — HTML entity decoding for plain-text display.
-
-### Routing
-
-```
-/feeds                                → Feed list (mobile: full screen)
-/feeds/:feedId                        → Article list (mobile: full screen; desktop: panels 1+2)
-/feeds/:feedId/articles/:articleId    → Reader (mobile: full screen; desktop: all 3 panels)
-/signal                               → Cross-feed topic frequency surface (paid tier, gated at 100-article corpus)
-```
-
-URL is the source of truth for navigation state. `FeedsPage` syncs URL params → Zustand.
-
-### Hooks
-
-- **use-keyboard-nav** — Article nav `j`/`k` (clicks DOM elements — same code path as mouse). Feed nav `u`/`i`. Actions: `o` open original, `e` toggle view (`toggleViewMode()`), `n` add feed (custom event), `[` toggle sidebar, `r` refresh. Disabled when focus is in input/textarea/contenteditable.
-- **use-media-query / use-mobile** — `useIsDesktop()` ≥1024px; `useIsMobile()` <768px (sidebar/sheet).
-- **use-auto-refresh** — Background `refreshAll()` on the `AUTO_REFRESH_INTERVAL_MS` (30 min) timer plus a focus-when-stale trigger (returning to a tab idle longer than the interval refreshes immediately). Reads the store via `getState()` inside its handlers so it subscribes once; mounted in `AppLayout`. Staleness is judged against `feed-store.lastRefreshAllAt`.
-- **use-license-refresh** — Same shape as `use-auto-refresh` but for license re-verification: a daily `LICENSE_RECHECK_INTERVAL_MS` (24h) timer + focus-when-stale trigger calling `license-store.refresh()`. Closes the gap where a tab left open for days never reboots, so a revoked subscription would keep its paid tier for the whole session. Staleness is judged against `license-store.lastCheckedAt`, which `refresh()` stamps only on a *definitive* resolution (no-token, 200, or 4xx) — transient 5xx/network failures leave it stale so focus retries promptly instead of waiting a full day. Mounted in `AppLayout` alongside `use-auto-refresh`.
-
-### Styling
-
-Single CSS entry: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero runtime cost).
-
-- `@theme` — Design tokens (`--color-*`, `--font-*`).
-- `@layer base` — Resets, base button/input styles. (The desktop layout is a two-tier `ResizablePanelGroup` in `feeds-page.tsx`, not a CSS grid — see ADR 013.)
-- `@plugin "@tailwindcss/typography"` — Required for `prose` classes used by `BriefingAbstract` to render model-generated markdown (h2, ul, li, p). Without the directive the classes are silent no-ops and Tailwind's preflight strips browser-default styling — bullets run together, headings render as plain inline text. Locked by `tests/index-css-briefing-typography.test.ts`.
-- Use Tailwind utilities in JSX with `cn()` from `src/lib/utils.ts`.
-- **Spacing** — Use Tailwind v4's default numeric scale (`p-4`, `gap-2`). Do **not** define `--spacing-xs/sm/md/lg/xl` in `@theme` — these collide with `max-w-*` utilities (`max-w-lg` resolves to `--spacing-lg` instead of `--container-lg`). [Tailwind v4 gotcha](https://github.com/tailwindlabs/tailwindcss/discussions/17777).
-
-### Types & Service Worker
-
-- **src/types/index.ts** — `Feed`, `Article`, `CreateFeedInput`, `CreateArticleInput`.
-- **src/workers/service-worker.js** — Excluded from test coverage.
+The file-level reference — every core module, Zustand store, React component, route, hook, styling token, and type, with its API and purpose — lives in **[docs/code-map.md](docs/code-map.md)**. Consult it to find where a capability lives or what a module exposes. The standing *rules* about these layers stay inline below in [Key Patterns](#key-patterns): core returns `Result` and imports no UI; URL is the source of truth for navigation; stable outer panel topology (ADR 013); etc. Conceptual views (dependency graph, encryption model, threat model) are in [docs/architecture.md](docs/architecture.md).
 
 ### Testing
 
