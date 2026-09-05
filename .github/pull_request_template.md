@@ -10,7 +10,7 @@
 
 ## Why
 
-<!-- Link a GitHub issue, GitLab issue, or describe the user-facing reason in one sentence. -->
+<!-- Link a GitHub issue, or describe the user-facing reason in one sentence. -->
 
 ## Test plan
 
