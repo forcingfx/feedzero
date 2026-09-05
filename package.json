@@ -13,6 +13,7 @@
     "build:api": "node scripts/build-api.js",
     "build:extension": "node scripts/build-extension.js",
     "build:all": "npm run build:feed && vite build && node scripts/build-api.js",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

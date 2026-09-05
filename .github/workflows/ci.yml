@@ -48,8 +48,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Two projects: the app (tsconfig.json) and the operator CLIs and build
+      # tooling under scripts/ (tsconfig.scripts.json). scripts/ was outside
+      # every automated check until 2026-09-05, which is how find-license.ts
+      # shipped importing a path that has never existed and crashed on startup
+      # for months.
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
   # `check-env` walks the source tree, extracts every env-variable reference,
   # and diffs against `expected-env.json`. New `process.env.X` references

@@ -1,0 +1,27 @@
+{
+  // Type-checks `scripts/` — the operator CLIs and build tooling that the main
+  // tsconfig deliberately leaves out.
+  //
+  // Why a second config rather than adding "scripts" to tsconfig.json's
+  // include: `src/core/sync/adapters/env.d.ts` narrows the global `process` to
+  // {env, argv, pid} and hand-rolls minimal `node:fs`/`node:path` shims, so
+  // shippable code cannot quietly assume a Node runtime. Scripts are Node-only
+  // by definition and need the real thing, so this config swaps that
+  // declaration file for @types/node.
+  //
+  // Exists because `scripts/find-license.ts` shipped in PR #106 importing a
+  // path that has never existed. It crashed on startup for every operator who
+  // followed docs/operations/license-support.md, and nothing caught it for
+  // months: tsc never looked at the file, and no test imports it (importing
+  // would execute it — each CLI calls main() at module scope).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true
+  },
+  // Only `scripts` — TypeScript pulls in whatever they import, so the rest of
+  // the tree keeps being checked by the main config with its own lib and
+  // globals.
+  "include": ["scripts"],
+  "exclude": ["node_modules", "src/core/sync/adapters/env.d.ts"]
+}
