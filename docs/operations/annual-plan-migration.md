@@ -38,7 +38,8 @@ something the app does not sell.
 
 | Object | id | Note |
 | --- | --- | --- |
-| Product — paid tier | `prod_UUUyM2HGjTzviA` | named *FeedZero Personal*; rename to *FeedZero Supporter* |
+| Product — paid tier | `prod_UUUyM2HGjTzviA` | renamed to *FeedZero Supporter* ✅ 2026-09-05 |
+| Price — $9/year | `price_1UCKSrRvqrfm74B2ZVK37lv2` | created ✅ 2026-09-05, `metadata.tier=personal` |
 | Product — Pro | `prod_UUV0RkTZnBloZC` | retired by ADR 029; archive |
 | Price — $5/month | `price_1TVVy6Rvqrfm74B2DZ2Qa9NE` | **3 live subscriptions**; keep until they renew |
 | Price — $50/year | `price_1TVW0nRvqrfm74B2BtFlcf6D` | **zero subscriptions**; archivable immediately |
@@ -52,7 +53,7 @@ surface in ADR 029 (`normalizeTier`, `extractTier` accepting `"pro"`) protects
 an empty population. Keep it — it costs nothing and the wire is a
 compatibility surface — but do not treat it as load-bearing.
 
-### 1. Create the annual price, and fix the product copy
+### 1. Create the annual price, and fix the product copy — ✅ done 2026-09-05
 
 The Stripe **product name and description print on invoices, receipts and the
 customer portal**. They are a second copy of the tier label living outside the
@@ -94,15 +95,17 @@ stripe prices create --live \
 Verify before moving on:
 
 ```bash
-stripe prices retrieve --live price_NEW
+stripe prices retrieve --live price_1UCKSrRvqrfm74B2ZVK37lv2
 ```
 
-Record the resulting `price_...` id.
+Both were run on 2026-09-05. The resulting price is
+`price_1UCKSrRvqrfm74B2ZVK37lv2` — `$9.00/year`, `metadata.tier=personal`,
+`trial_period_days: null`.
 
 ### 2. Add the new price to the allowlist, before anything points at it
 
 ```
-STRIPE_ALLOWED_PRICES=price_1TVVy6Rvqrfm74B2DZ2Qa9NE,price_NEW
+STRIPE_ALLOWED_PRICES=price_1TVVy6Rvqrfm74B2DZ2Qa9NE,price_1UCKSrRvqrfm74B2ZVK37lv2
 ```
 
 Keep the $5/month id — three subscribers still renew on it until step 6
@@ -174,6 +177,22 @@ The script is **idempotent**. A migrated subscription is skipped as
 `already-scheduled` on the next run, so re-running after a partial failure
 resumes rather than double-applying. A per-subscription failure does not abort
 the run; failures print to stderr and the exit code is non-zero.
+
+The dry run on 2026-09-05, against the whole live book:
+
+```
+9 subscription(s) examined against price_1UCKSrRvqrfm74B2ZVK37lv2
+3 to migrate, 6 skipped
+
+  skip           <6 ids>                       (inactive-status)
+  would migrate  sub_1U3hA6Rvqrfm74B26iV9dfrN  status=trialing  first $9 invoice ≈ 2026-09-11
+  would migrate  sub_1TuHCpRvqrfm74B21mBOZMsa  status=active    first $9 invoice ≈ 2026-09-16
+  would migrate  sub_1TlLkeRvqrfm74B29TPzpacJ  status=active    first $9 invoice ≈ 2026-09-23
+```
+
+**There is a clock on this.** Each subscription only moves at its *next*
+renewal, so one that bills before the schedule is attached renews at $5/month
+and waits another month. The earliest is 2026-09-11.
 
 `past_due` subscribers **are** migrated. Stripe retries a failed card for about
 three weeks and those customers are still customers — the same reasoning that
