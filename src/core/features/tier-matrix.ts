@@ -31,9 +31,32 @@
 
 import type { LicenseTier } from "../license/format";
 
-export type Tier = LicenseTier;
+/**
+ * The tiers the product actually sells. Narrower than `LicenseTier`, which
+ * is the *wire* type and still carries "pro".
+ *
+ * Pro was retired when pricing collapsed to a single $9/year plan — it had
+ * no shipped exclusive features, so it read as "pay more for the same things
+ * plus a roadmap" (the problem ADR 024 already named when it moved Signal
+ * Briefings down to Personal). Licenses minted before the change still say
+ * `tier=pro` and stay signature-valid for up to a year, so the wire cannot
+ * forget the value even though the app has. `normalizeTier` is the seam.
+ */
+export type Tier = Exclude<LicenseTier, "pro">;
 
-export const TIER_ORDER: readonly Tier[] = ["free", "personal", "pro"] as const;
+export const TIER_ORDER: readonly Tier[] = ["free", "personal"] as const;
+
+/**
+ * Collapse a tier read off the license wire (or off Stripe price metadata)
+ * onto a tier the app understands.
+ *
+ * A pre-repricing `pro` subscriber must not be downgraded by a change they
+ * did not make, so `pro` maps to the paid tier rather than to free. Call
+ * this at every boundary that reads a tier from outside the app.
+ */
+export function normalizeTier(wire: LicenseTier): Tier {
+  return wire === "pro" ? "personal" : wire;
+}
 
 export type FeatureStatus = "shipped" | "coming-soon";
 
@@ -95,6 +118,11 @@ export interface TierMatrixEntry {
    * matrix moves its bullet to the right card with zero edits to the
    * pricing components. `blurb` is the full bullet text (curated, since
    * marketing copy is punchier than the matrix `description`).
+   *
+   * Only `shipped` features carry one. While Pro existed, its card could
+   * sell a roadmap because the card itself was the roadmap; with one paid
+   * card a coming-soon bullet would sit beside shipped ones with nothing
+   * to distinguish them. `pricing-bullets.test.ts` enforces this.
    */
   marketing?: { blurb: string; rank: number };
 }
@@ -113,9 +141,8 @@ export const TIER_MATRIX = {
     category: "reading",
     status: "shipped",
     tiers: {
-      free: { available: true, limit: 50, limitUnit: "feeds" },
+      free: { available: true, limit: 100, limitUnit: "feeds" },
       personal: UNLIMITED,
-      pro: UNLIMITED,
     },
   },
   "feed-discovery": {
@@ -125,7 +152,7 @@ export const TIER_MATRIX = {
       "Paste a site URL and FeedZero finds the feed via well-known paths and HTML link tags.",
     category: "reading",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
     marketing: { blurb: "1,300+ curated feeds in Explore", rank: 10 },
   },
   "feed-refresh": {
@@ -134,7 +161,7 @@ export const TIER_MATRIX = {
     description: "Manual and automatic refresh of subscribed feeds.",
     category: "reading",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
   "full-text-extraction": {
     id: "full-text-extraction",
@@ -143,7 +170,7 @@ export const TIER_MATRIX = {
       "Fetch and clean the full article body when the feed only provides a summary.",
     category: "reading",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
     marketing: { blurb: "Full-text extraction", rank: 13 },
   },
   "content-view-toggle": {
@@ -152,7 +179,7 @@ export const TIER_MATRIX = {
     description: "Switch between feed content, extracted text, and original page.",
     category: "reading",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
   "global-feed": {
     id: "global-feed",
@@ -160,7 +187,7 @@ export const TIER_MATRIX = {
     description: "Merged view of articles from every subscribed feed.",
     category: "reading",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
   "starred-articles": {
     id: "starred-articles",
@@ -168,7 +195,7 @@ export const TIER_MATRIX = {
     description: "Star articles for quick recall; starred items are kept indefinitely.",
     category: "reading",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
   "keyboard-navigation": {
     id: "keyboard-navigation",
@@ -176,7 +203,7 @@ export const TIER_MATRIX = {
     description: "j/k article nav, u/i feed nav, plus single-key actions for power users.",
     category: "reading",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
   "mobile-navigation": {
     id: "mobile-navigation",
@@ -184,7 +211,7 @@ export const TIER_MATRIX = {
     description: "Touch-optimized single-panel layout with back navigation.",
     category: "reading",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
 
   // ── Organization ───────────────────────────────────────────────────────
@@ -194,7 +221,7 @@ export const TIER_MATRIX = {
     description: "Unsubscribe from a feed and drop its cached articles.",
     category: "organization",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
   "opml-import-export": {
     id: "opml-import-export",
@@ -203,7 +230,7 @@ export const TIER_MATRIX = {
       "Import a subscription list from another reader, or export your subscriptions.",
     category: "organization",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
     marketing: { blurb: "OPML import / export", rank: 12 },
   },
   "article-flood-grouping": {
@@ -213,7 +240,7 @@ export const TIER_MATRIX = {
       "Collapses bursts of items from chatty feeds so the article list stays scannable.",
     category: "organization",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
   "auto-organize": {
     id: "auto-organize",
@@ -222,7 +249,7 @@ export const TIER_MATRIX = {
       "One-click grouping of subscribed feeds into folders by topic.",
     category: "organization",
     status: "shipped",
-    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
     marketing: { blurb: "Auto-organize folders", rank: 22 },
   },
 
@@ -234,7 +261,7 @@ export const TIER_MATRIX = {
       "All feed content is AES-GCM encrypted at rest in IndexedDB; index fields are HMAC-hashed.",
     category: "sync-and-storage",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
     marketing: { blurb: "Offline support", rank: 14 },
   },
   "cloud-sync": {
@@ -244,7 +271,7 @@ export const TIER_MATRIX = {
       "Sync your subscriptions, folders, and read state across devices via an end-to-end encrypted vault.",
     category: "sync-and-storage",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
     marketing: { blurb: "End-to-end encrypted cloud sync across devices", rank: 11 },
   },
   "offline-prefetch": {
@@ -254,7 +281,7 @@ export const TIER_MATRIX = {
       "Background prefetch of article bodies so they're available without a network.",
     category: "sync-and-storage",
     status: "shipped",
-    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
     marketing: {
       blurb: "Offline prefetch — article bodies cached for plane mode",
       rank: 23,
@@ -269,7 +296,7 @@ export const TIER_MATRIX = {
       "Saved queries combining feeds, keywords, authors, and read state.",
     category: "filtering-and-search",
     status: "shipped",
-    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
     marketing: {
       blurb: "Smart filters — query your feeds by keyword, tag, or source",
       rank: 21,
@@ -282,7 +309,7 @@ export const TIER_MATRIX = {
       "Per-feed auto-action rules: mute, star, mark-read, or route articles by title, author, content, date, and more.",
     category: "filtering-and-search",
     status: "shipped",
-    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
   },
   search: {
     id: "search",
@@ -290,8 +317,7 @@ export const TIER_MATRIX = {
     description: "Search across every cached article body, title, and author.",
     category: "filtering-and-search",
     status: "coming-soon",
-    tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
-    marketing: { blurb: "Full-text search across articles", rank: 30 },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
   },
   signal: {
     id: "signal",
@@ -300,7 +326,7 @@ export const TIER_MATRIX = {
       "Topics emerging across your feeds, ranked by cross-feed term frequency. Fully local — no LLM, no third party.",
     category: "filtering-and-search",
     status: "shipped",
-    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
     marketing: { blurb: "Signal — topics emerging across your feeds", rank: 20 },
   },
   "signal-briefings": {
@@ -313,7 +339,6 @@ export const TIER_MATRIX = {
     tiers: {
       free: UNAVAILABLE,
       personal: { available: true, limit: 10, limitUnit: "briefings" },
-      pro: { available: true, limit: 10, limitUnit: "briefings" },
     },
     marketing: {
       blurb: "Signal Briefings — standing AI briefs from your feeds, with citations",
@@ -329,8 +354,7 @@ export const TIER_MATRIX = {
       "Fetch feeds behind HTTP basic auth, cookies, or signed URLs (Patreon, paywalled newsletters).",
     category: "delivery",
     status: "coming-soon",
-    tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
-    marketing: { blurb: "Authenticated fetchers", rank: 32 },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
   },
   "send-to-kindle": {
     id: "send-to-kindle",
@@ -338,8 +362,7 @@ export const TIER_MATRIX = {
     description: "One-click delivery of an article to your Kindle email address.",
     category: "delivery",
     status: "coming-soon",
-    tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
-    marketing: { blurb: "Send to Kindle", rank: 31 },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
   },
   bridges: {
     id: "bridges",
@@ -348,7 +371,7 @@ export const TIER_MATRIX = {
       "Turn non-RSS sources (YouTube channels, Reddit, Mastodon, GitHub repos) into feeds by mapping them to the native feed URL each already publishes.",
     category: "delivery",
     status: "shipped",
-    tiers: { free: UNAVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
   },
 
   // ── Appearance ─────────────────────────────────────────────────────────
@@ -358,7 +381,7 @@ export const TIER_MATRIX = {
     description: "Premium typography- and color-tuned themes.",
     category: "appearance",
     status: "coming-soon",
-    tiers: { free: UNAVAILABLE, personal: UNAVAILABLE, pro: AVAILABLE },
+    tiers: { free: UNAVAILABLE, personal: AVAILABLE },
   },
 
   // ── Support ────────────────────────────────────────────────────────────
@@ -368,7 +391,7 @@ export const TIER_MATRIX = {
     description: "Send a feedback message that opens a GitHub issue on the project.",
     category: "support",
     status: "shipped",
-    tiers: { free: AVAILABLE, personal: AVAILABLE, pro: AVAILABLE },
+    tiers: { free: AVAILABLE, personal: AVAILABLE },
   },
 } as const satisfies Record<string, TierMatrixEntry>;
 
@@ -396,22 +419,22 @@ export function getLimit(id: FeatureId, tier: Tier): number | "unlimited" | unde
 }
 
 /**
- * Lowest tier on which the feature is available. Falls back to the
- * highest tier ("pro") if no tier has it — that's only true for an
- * entry whose every slot is `{ available: false }`, which the schema
- * shouldn't allow but we default safely.
+ * Lowest tier on which the feature is available. Falls back to the highest
+ * tier if no tier has it — that's only true for an entry whose every slot
+ * is `{ available: false }`, which the schema shouldn't allow but we
+ * default safely (locked, rather than free).
  */
 export function getRequiredTier(id: FeatureId): Tier {
   for (const tier of TIER_ORDER) {
     if (TIER_MATRIX[id].tiers[tier].available) return tier;
   }
-  return "pro";
+  return TIER_ORDER[TIER_ORDER.length - 1]!;
 }
 
 /** A feature is "gated" if at least one tier doesn't have it. */
 export function isGated(id: FeatureId): boolean {
   const t = TIER_MATRIX[id].tiers;
-  return !t.free.available || !t.personal.available || !t.pro.available;
+  return !t.free.available || !t.personal.available;
 }
 
 // ── Matrix-derived gate messaging ──────────────────────────────────────
@@ -423,11 +446,10 @@ export function isGated(id: FeatureId): boolean {
 
 const TIER_LABEL: Record<Tier, string> = {
   free: "Free",
-  personal: "Personal",
-  pro: "Pro",
+  personal: "Supporter",
 };
 
-/** Human-readable tier label, e.g. "Personal". */
+/** Human-readable tier label, e.g. "Supporter". */
 export function tierLabel(tier: Tier): string {
   return TIER_LABEL[tier];
 }

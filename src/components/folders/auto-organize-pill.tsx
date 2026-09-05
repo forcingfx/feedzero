@@ -5,6 +5,7 @@ import { useFeatureGate } from "@/hooks/use-feature-gate";
 import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import { AutoOrganizeDialog } from "./auto-organize-dialog";
 import { Button } from "@/components/ui/button";
+import { PAID_PLAN } from "@/core/features/pricing";
 import {
   Popover,
   PopoverContent,
@@ -112,7 +113,7 @@ export function AutoOrganizePill() {
                   gate.promptUpgrade();
                 }}
               >
-                Upgrade — $5/mo
+                Upgrade — {PAID_PLAN.display}
               </Button>
             ) : (
               <Button

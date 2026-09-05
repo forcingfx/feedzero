@@ -11,6 +11,7 @@ import { isSelfHosted } from "@/core/features/self-hosted.ts";
 import { isPaidTierActive } from "@/core/features/paid-tier-active.ts";
 import { SIGNAL_CORPUS_GATE, SIGNAL_REPORT_SCHEMA_VERSION } from "@/core/signal/types.ts";
 import type { Article, Feed } from "@feedzero/core/types";
+import { tierLabel } from "@/core/features/tier-matrix";
 
 vi.mock("@/core/features/self-hosted.ts", () => ({ isSelfHosted: vi.fn(() => false) }));
 vi.mock("@/core/features/paid-tier-active.ts", () => ({ isPaidTierActive: vi.fn(() => false) }));
@@ -485,7 +486,7 @@ describe("SignalPage", () => {
 
       renderAt();
       await waitFor(() => expect(screen.getByText(/Unlock Signal/i)).toBeInTheDocument());
-      expect(screen.getByRole("button", { name: /Upgrade to Personal/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: new RegExp(`Upgrade to ${tierLabel("personal")}`, "i") })).toBeInTheDocument();
       expect(screen.queryByText("OpenAI ships a release")).not.toBeInTheDocument();
     });
 
@@ -517,10 +518,10 @@ describe("SignalPage", () => {
 
       renderAt();
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: /Upgrade to Personal/i })).toBeInTheDocument(),
+        expect(screen.getByRole("button", { name: new RegExp(`Upgrade to ${tierLabel("personal")}`, "i") })).toBeInTheDocument(),
       );
       const user = userEvent.setup();
-      await user.click(screen.getByRole("button", { name: /Upgrade to Personal/i }));
+      await user.click(screen.getByRole("button", { name: new RegExp(`Upgrade to ${tierLabel("personal")}`, "i") }));
       await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/settings"));
       expect(screen.getByTestId("location")).toHaveTextContent("tab=subscription");
     });

@@ -49,7 +49,9 @@ import { decodeLicensePayload } from "@/core/license/format";
 import { base64UrlDecodeToString } from "@/core/license/crypto";
 import type { LicensePayload } from "@/core/license/format";
 import { SubscriptionUpgrade, TierCard } from "@/components/settings/subscription-upgrade";
-import { pricingBullets } from "@/core/features/tier-matrix";
+import { tierLabel as tierLabelFor } from "@/core/features/tier-matrix";
+import { PAID_PLAN } from "@/core/features/pricing";
+import type { Tier } from "@/core/features/tier-matrix";
 import { ActivateLicenseDialog } from "@/components/settings/activate-license-dialog";
 import { openPortal } from "@/lib/open-portal";
 import { maskToken } from "@/lib/format-license";
@@ -137,7 +139,7 @@ function FreeView() {
 }
 
 interface PaidViewProps {
-  tier: "personal" | "pro";
+  tier: Exclude<Tier, "free">;
 }
 
 function PaidView({ tier }: PaidViewProps) {
@@ -183,8 +185,11 @@ function PaidView({ tier }: PaidViewProps) {
     setDeactivateOpen(false);
   }
 
-  const tierLabel = tier === "personal" ? "Personal" : "Pro";
-  const priceLabel = tier === "personal" ? "$5/month" : "$19/month";
+  // Both derived, not branched: there is one paid tier now, and the label
+  // is whatever the matrix calls it. The old ternary is how a `$19/month`
+  // Pro price outlived every other surface saying "Coming 2026".
+  const planLabel = tierLabelFor(tier);
+  const priceLabel = PAID_PLAN.display;
 
   return (
     <div className="space-y-4 py-2">
@@ -192,7 +197,7 @@ function PaidView({ tier }: PaidViewProps) {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
             <Sparkles className="size-3" />
-            {tierLabel}
+            {planLabel}
           </span>
           <span className="text-sm text-muted-foreground">
             {priceLabel}
@@ -301,71 +306,39 @@ function PaidView({ tier }: PaidViewProps) {
           onClick={() => setDeactivateOpen(true)}
         >
           <LogOut className="mr-2 size-4" />
-          Deactivate FeedZero {tierLabel} on this device
+          Deactivate FeedZero {planLabel} on this device
         </Button>
       </div>
 
-      <AlternativePlans currentTier={tier} />
+      <AlternativePlans />
 
       <DeactivateConfirm
         open={deactivateOpen}
         onOpenChange={setDeactivateOpen}
         pending={deactivatePending}
         onConfirm={onConfirmDeactivate}
-        tierLabel={tierLabel}
+        tierLabel={planLabel}
       />
     </div>
   );
 }
 
-interface AlternativePlansProps {
-  currentTier: "personal" | "pro";
-}
-
 /**
  * Compact "looking for a different plan?" strip for paid users.
  *
- * Pro users see Personal as a downgrade option (and Self-host as an
- * always-relevant escape hatch). Personal users see Pro as an upgrade
- * (still coming soon as of 2026) and Self-host. We deliberately omit the
- * Free card here — telling a paying customer "downgrade to Free" buries
- * the Deactivate action that's right above this strip.
+ * With Pro retired there is no other paid tier to move to, so this is now
+ * just the Self-host escape hatch. It stays because self-hosting is a real
+ * alternative for a paying customer, and because a subscriber who wants
+ * out should find the exit next to the Deactivate action rather than hunt
+ * for it. We deliberately omit the Free card — telling a paying customer
+ * "downgrade to Free" would bury the Deactivate action right above.
  */
-function AlternativePlans({ currentTier }: AlternativePlansProps) {
+function AlternativePlans() {
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground uppercase tracking-wider">
         Looking for a different plan?
       </p>
-      {currentTier === "pro" && (
-        <TierCard
-          name="Personal"
-          price="$5/mo"
-          priceSub="or $50/yr — save 17%"
-          blurb="Sync across every device. Unlimited feeds."
-          features={[
-            "Everything in Free",
-            "Unlimited feeds",
-            ...pricingBullets("personal").map((b) => b.blurb),
-          ]}
-          cta="Switch to Personal"
-          ctaHref="/?subscribe=personal-monthly"
-        />
-      )}
-      {currentTier === "personal" && (
-        <TierCard
-          name="Pro"
-          price="Coming 2026"
-          blurb="When RSS becomes your work."
-          comingSoon
-          features={[
-            "Everything in Personal",
-            ...pricingBullets("pro").map((b) => b.blurb),
-          ]}
-          cta="Coming soon"
-          ctaDisabled
-        />
-      )}
       <TierCard
         name="Self-host"
         price="$0 · AGPL"

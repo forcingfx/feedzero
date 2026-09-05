@@ -46,27 +46,27 @@ describe("parseSubscribeIntent", () => {
 });
 
 describe("resolvePriceId", () => {
-  it("maps personal-monthly to its env-injected Stripe price ID", () => {
-    const id = resolvePriceId("personal-monthly", {
-      personalMonthly: "price_live_monthly_abc",
-      personalYearly: "price_live_yearly_xyz",
-    });
-    expect(id).toBe("price_live_monthly_abc");
-  });
-
   it("maps personal-yearly to its env-injected Stripe price ID", () => {
     const id = resolvePriceId("personal-yearly", {
-      personalMonthly: "price_live_monthly_abc",
       personalYearly: "price_live_yearly_xyz",
     });
     expect(id).toBe("price_live_yearly_xyz");
   });
 
-  it("returns null when the matching env var is missing", () => {
+  it("resolves the retired personal-monthly key to the annual price", () => {
+    // Billing went annual-only, but `?subscribe=personal-monthly` links are
+    // already out in the world — on the landing page, in the support
+    // runbook, in old emails. Failing closed on those would send a
+    // customer at the point of highest intent to a dead end, so the key
+    // stays parseable and resolves to the only price there is.
     const id = resolvePriceId("personal-monthly", {
-      personalMonthly: "",
       personalYearly: "price_live_yearly_xyz",
     });
+    expect(id).toBe("price_live_yearly_xyz");
+  });
+
+  it("returns null when the env var is missing", () => {
+    const id = resolvePriceId("personal-yearly", { personalYearly: "" });
     expect(id).toBeNull();
   });
 
@@ -75,7 +75,6 @@ describe("resolvePriceId", () => {
     const keys: PriceKey[] = ["personal-monthly", "personal-yearly"];
     for (const key of keys) {
       const id = resolvePriceId(key, {
-        personalMonthly: "m",
         personalYearly: "y",
       });
       expect(id).not.toBeNull();

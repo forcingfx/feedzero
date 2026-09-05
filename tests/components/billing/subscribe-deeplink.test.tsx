@@ -4,7 +4,6 @@ import { MemoryRouter } from "react-router";
 import { SubscribeDeeplink } from "@/components/billing/subscribe-deeplink";
 
 const PRICE_IDS = {
-  personalMonthly: "price_test_personal_monthly",
   personalYearly: "price_test_personal_yearly",
 };
 
@@ -64,7 +63,7 @@ describe("SubscribeDeeplink", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     renderAt("/?subscribe=personal-monthly", {
-      priceIds: { personalMonthly: "", personalYearly: "" },
+      priceIds: { personalYearly: "" },
     });
     await new Promise((r) => setTimeout(r, 30));
 
@@ -105,7 +104,9 @@ describe("SubscribeDeeplink", () => {
         c[0].toString().includes("/api/checkout/create-session"),
       )!;
       const body = JSON.parse(checkout[1]?.body as string);
-      expect(body.priceId).toBe(PRICE_IDS.personalMonthly);
+      // The legacy monthly deeplink resolves to the annual price — old
+      // links out in the world must still sell the plan that exists.
+      expect(body.priceId).toBe(PRICE_IDS.personalYearly);
       expect(body.successUrl).toMatch(/billing\/success/);
       expect(body.cancelUrl).toMatch(/billing\/cancelled/);
 

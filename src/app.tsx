@@ -288,8 +288,6 @@ function AppInit({ children }: { children: React.ReactNode }) {
       <SubscribeDeeplink
         paidTierVisible={import.meta.env.VITE_PAID_TIER_VISIBLE === "1"}
         priceIds={{
-          personalMonthly:
-            import.meta.env.VITE_PRICE_PERSONAL_MONTHLY ?? "",
           personalYearly:
             import.meta.env.VITE_PRICE_PERSONAL_YEARLY ?? "",
         }}

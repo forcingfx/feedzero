@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   pricingBullets,
   getMarketing,
+  getEntry,
   GATED_FEATURE_IDS,
   TIER_MATRIX,
   getRequiredTier,
@@ -48,19 +49,25 @@ describe("pricingBullets — pricing cards derived from the matrix", () => {
     }
   });
 
-  it("Signal currently sells on the Personal card, not Pro or Free", () => {
+  it("Signal sells on the paid card, not the Free one", () => {
     expect(pricingBullets("personal").some((b) => b.id === "signal")).toBe(true);
-    expect(pricingBullets("pro").some((b) => b.id === "signal")).toBe(false);
     expect(pricingBullets("free").some((b) => b.id === "signal")).toBe(false);
   });
 
-  it("Pro card surfaces its coming-soon roadmap bullets (e.g. search)", () => {
-    expect(pricingBullets("pro").some((b) => b.id === "search")).toBe(true);
+  it("the paid card sells only shipped features, never coming-soon ones", () => {
+    // Pin: with Pro retired there is one paid card, so a coming-soon bullet
+    // would sit beside shipped ones with nothing distinguishing them. The
+    // trade-off encoded here is losing the roadmap as a selling point in
+    // exchange for a card that only promises what exists today.
+    for (const tier of TIER_ORDER) {
+      for (const bullet of pricingBullets(tier)) {
+        expect(getEntry(bullet.id).status).toBe("shipped");
+      }
+    }
   });
 
-  it("Signal Briefings lands on the Personal card (its lowest unlock tier)", () => {
+  it("Signal Briefings lands on the paid card (its lowest unlock tier)", () => {
     expect(pricingBullets("personal").some((b) => b.id === "signal-briefings")).toBe(true);
-    expect(pricingBullets("pro").some((b) => b.id === "signal-briefings")).toBe(false);
     expect(pricingBullets("free").some((b) => b.id === "signal-briefings")).toBe(false);
   });
 

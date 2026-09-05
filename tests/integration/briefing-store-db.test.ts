@@ -109,8 +109,8 @@ describe("briefing-store ↔ db.ts integration", () => {
       pendingScoreById: new Map(),
       loadingStartedAtById: new Map(),
     });
-    // Pro tier so the feature gate is open.
-    useLicenseStore.setState({ tier: "pro" });
+    // Paid tier so the feature gate is open.
+    useLicenseStore.setState({ tier: "personal" });
 
     await deleteDatabase();
     const opened = await open("correct-horse-battery-staple");

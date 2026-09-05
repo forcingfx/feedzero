@@ -15,6 +15,7 @@ import {
 } from "@/core/license/license-token-store";
 import { encodeLicensePayload, type LicenseTier } from "@/core/license/format";
 import { base64UrlEncode } from "@/core/license/crypto";
+import { tierLabel } from "@/core/features/tier-matrix";
 
 vi.mock("@/core/sync/sync-service", () => ({
   pushVault: vi.fn(),
@@ -88,7 +89,9 @@ describe("<SubscriptionTab> deactivate (PR C)", () => {
     );
     // Confirmation dialog spells out what survives + what doesn't.
     expect(
-      screen.getByRole("heading", { name: /deactivate personal/i }),
+      screen.getByRole("heading", {
+        name: new RegExp(`deactivate ${tierLabel("personal")}`, "i"),
+      }),
     ).toBeInTheDocument();
     expect(screen.getByText(/cloud vault.*intact/i)).toBeInTheDocument();
   });

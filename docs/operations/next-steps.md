@@ -64,28 +64,34 @@ If anything breaks here, that's the customer experience. We don't have a smoke t
 
 ---
 
-## 5. Decide on Pro tier roadmap (when you're ready)
+## 5. Pro tier roadmap — CLOSED (2026-09-04)
 
-**Why now-ish**: Pro is currently "Coming 2026" in the upgrade comparison and on /pricing. That works as positioning, but every month it stays Coming Soon costs latent revenue from users who'd pay for Pro features.
+Answered by [ADR 029](../decisions/029-single-annual-plan-at-9-usd.md): **Pro is
+retired, not priced.** Every Pro-only feature was coming-soon, so the tier asked
+customers to fund a promise. Its four features moved onto the single paid tier
+with `status` unchanged, so nothing unlocked for anyone. The `$19/mo`
+placeholder is gone.
 
-**Decisions to make**:
-- Which Pro features ship first? Plan currently lists: AI Signal summaries, full-text search, send-to-Kindle, authenticated fetchers, YouTube/Reddit/X bridges, commercial themes. Pick 1–2 for v1.
-- Pricing — plan says `$19/mo` (placeholder). Confirm or revise.
-- Founder lifetime offer? — captures conversion now from people who'd pay more later. Adds operational complexity.
+Shipping one of those features is now just flipping its `status` to `"shipped"`
+in `src/core/features/tier-matrix.ts` — no new Stripe price, no new env var, no
+new tier.
 
-No code action yet — this is a strategy decision. When ready, the path is:
-1. Create the Stripe price IDs (`pro_monthly`, `pro_yearly`) with `metadata.tier=pro`
-2. Add to `STRIPE_ALLOWED_PRICES` env var on Vercel
-3. Wire `VITE_PRICE_PRO_MONTHLY` / `VITE_PRICE_PRO_YEARLY` in Vercel build env
-4. Flip `FEATURE_MAP[<feature>].status` from "coming-soon" to "shipped" in `src/core/features/feature-gates.ts` as features ship
+The **founder lifetime offer** question stays open and is now sharper, not
+softer: at $9/year a $99 lifetime is eleven years of revenue pulled forward.
+`docs/strategy/002-user-pain-points.md` recommends one; it needs its own ADR.
 
 ---
 
-## 6. Decide on Annual emphasis (when you have data)
+## 6. Annual emphasis — CLOSED (2026-09-04)
 
-**Why now-ish**: The yearly Personal plan ($50/yr, 17% saving) is a small secondary link beneath the monthly Subscribe CTA. Stronger annual emphasis (top-billed, "popular" badge) trades funnel-top conversion for higher LTV. Worth A/B testing once you have ≥50 monthly subscribers to compare.
+Answered by [ADR 029](../decisions/029-single-annual-plan-at-9-usd.md): billing
+is **annual-only** at $9/year, so there is no monthly CTA to be a secondary link
+beneath. Nothing to A/B test.
 
-No code action — UI surface lives in `feedzero-landing/pricing/index.html`.
+The landing page (`feedzero-landing/pricing/index.html`) still needs updating to
+match. It ships as step 4 of
+[`docs/operations/annual-plan-migration.md`](annual-plan-migration.md), the
+runbook for the whole cutover.
 
 ---
 
