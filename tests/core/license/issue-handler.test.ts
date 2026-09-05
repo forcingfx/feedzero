@@ -8,6 +8,7 @@ import { MemoryLicenseStorage, type LicenseStorage } from "@/core/license/storag
 import type { SigningKey } from "@/core/license/sign";
 import { verifyLicense } from "@/core/license/verify";
 import { err } from "@feedzero/core/utils/result";
+import { DEFAULT_EXPIRY_SEC } from "@/core/license/issuer";
 
 const SECRET = "this-is-a-test-signing-secret-32-bytes!";
 const ADMIN_KEY = "admin_test_key_with_enough_entropy_to_be_realistic_64ch";
@@ -282,8 +283,10 @@ describe("license issue handler — success path", () => {
       { issuer, adminApiKey: ADMIN_KEY },
     );
     const stored = await storage.get("kid_deterministic_for_test");
-    // Default expiry in LicenseIssuerImpl is 31 days from issuedAt
-    expect(stored.ok && stored.value?.expirySec).toBe(NOW + 31 * 24 * 3600);
+    // Asserted against the issuer's own constant, not a literal: the number
+    // moved from 31 days to a year when billing went annual, and this test
+    // is about the handler deferring to the issuer, not about the value.
+    expect(stored.ok && stored.value?.expirySec).toBe(NOW + DEFAULT_EXPIRY_SEC);
   });
 
   it("uses caller-supplied expirySec when provided", async () => {

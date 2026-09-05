@@ -2,9 +2,8 @@
  * Subscribe-deeplink parser.
  *
  * The landing page (`www.feedzero.app/pricing`) links customers to the app
- * with `?subscribe=personal-monthly` (or `personal-yearly`). The app reads
- * this on load and — if the paid-tier flag is on — fires a Stripe Checkout
- * Session for the matching price.
+ * with `?subscribe=personal-yearly`. The app reads this on load and — if the
+ * paid-tier flag is on — fires a Stripe Checkout Session for the price.
  *
  * Why a stable string instead of the raw Stripe price ID:
  *   - Stripe price IDs differ between test mode and live mode. Wiring the
@@ -18,6 +17,14 @@
  * an arbitrary string into our checkout call.
  */
 
+/**
+ * Both keys stay parseable even though billing is annual-only.
+ *
+ * `?subscribe=personal-monthly` links are already out in the world — on the
+ * landing page, in the support runbook, in old emails — and rejecting them
+ * would fail closed at the point of highest purchase intent. They resolve
+ * to the annual price; see {@link resolvePriceId}.
+ */
 export const PRICE_KEYS = ["personal-monthly", "personal-yearly"] as const;
 export type PriceKey = (typeof PRICE_KEYS)[number];
 
@@ -43,20 +50,22 @@ function isPriceKey(value: string): value is PriceKey {
 }
 
 export interface PriceIdMap {
-  personalMonthly: string;
   personalYearly: string;
 }
 
 /**
  * Map a price key to its env-injected Stripe price ID. Returns null when
- * the corresponding env var is unset (e.g. local dev without Stripe wired)
- * so the caller can fail closed instead of hitting Stripe with an empty
- * priceId.
+ * the env var is unset (e.g. local dev without Stripe wired) so the caller
+ * can fail closed instead of hitting Stripe with an empty priceId.
+ *
+ * Every key resolves to the annual price: there is only one. The retired
+ * `personal-monthly` key is deliberately not special-cased into a rejection
+ * — an old link should still sell the plan that exists, not 404 the
+ * customer.
  */
 export function resolvePriceId(
-  key: PriceKey,
+  _key: PriceKey,
   map: PriceIdMap,
 ): string | null {
-  const id = key === "personal-monthly" ? map.personalMonthly : map.personalYearly;
-  return id ? id : null;
+  return map.personalYearly ? map.personalYearly : null;
 }

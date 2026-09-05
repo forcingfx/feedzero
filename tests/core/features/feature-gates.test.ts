@@ -2,11 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   gateState,
   FEATURE_MAP,
+  normalizeTier,
   type Feature,
   type Tier,
 } from "@/core/features/feature-gates";
 
-const TIERS: Tier[] = ["free", "personal", "pro"];
+const TIERS: Tier[] = ["free", "personal"];
 const FEATURES = Object.keys(FEATURE_MAP) as Feature[];
 
 describe("gateState — coming-soon features", () => {
@@ -53,8 +54,11 @@ describe("gateState — shipped features (paid tier active)", () => {
     });
   });
 
-  it("pro user without self-hosted → ok for auto-organize (higher tier passes)", () => {
-    expect(gateState("auto-organize", "pro", false, true)).toEqual({
+  it("a legacy pro license still passes auto-organize once normalized", () => {
+    // Pro is gone from the product but not from tokens minted before the
+    // repricing. Callers normalize at the boundary; what must hold is that
+    // the normalized tier clears a Personal-tier gate.
+    expect(gateState("auto-organize", normalizeTier("pro"), false, true)).toEqual({
       enabled: true,
       reason: "ok",
       requiredTier: "personal",

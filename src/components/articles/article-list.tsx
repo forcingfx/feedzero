@@ -5,6 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useAppStore } from "@/stores/app-store.ts";
+import { usePreferencesStore } from "@/stores/preferences-store.ts";
 import { isAggregatedFeedId } from "@feedzero/core/utils/constants";
 import { Button } from "@/components/ui/button.tsx";
 import { ArticleItem } from "./article-item.tsx";
@@ -82,6 +83,12 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const articleSortMode = useArticleStore((s) => s.articleSortMode);
   const setArticleSortMode = useArticleStore((s) => s.setArticleSortMode);
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
+  const hideReadArticles = usePreferencesStore(
+    (s) => s.preferences.hideReadArticles ?? false,
+  );
+  const showArticleFeedIcons = usePreferencesStore(
+    (s) => s.preferences.showArticleFeedIcons ?? true,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Pull-to-refresh (touch only). Refreshes the current view exactly like
@@ -124,6 +131,16 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     });
   }, []);
 
+  // Unread-only mode. The article you're reading is exempt: selecting an
+  // article auto-marks it read, so filtering purely on `read` would yank
+  // the current row out from under the reader mid-sentence. It drops out
+  // once you move on, which is the point of the mode.
+  const selectedArticleId = selectedArticle?.id;
+  const visibleArticles = useMemo(() => {
+    if (!hideReadArticles) return articles;
+    return articles.filter((a) => !a.read || a.id === selectedArticleId);
+  }, [articles, hideReadArticles, selectedArticleId]);
+
   // Walk the sorted articles through groupArticles(), then flatten each
   // group into a sequence the virtualizer can iterate as uniform rows.
   // Collapsed group → [topArticle, summaryRow]. Expanded group →
@@ -137,13 +154,13 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   // explicitly asked to see.
   const entries: FlatEntry[] = useMemo(() => {
     if (!groupArticleFloods || !isAggregatedView) {
-      return articles.map((article) => ({
+      return visibleArticles.map((article) => ({
         kind: "article" as const,
         article,
       }));
     }
     const out: FlatEntry[] = [];
-    for (const grouped of groupArticles(articles)) {
+    for (const grouped of groupArticles(visibleArticles)) {
       if (grouped.kind === "article") {
         out.push({ kind: "article", article: grouped.article });
         continue;
@@ -172,7 +189,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       }
     }
     return out;
-  }, [articles, groupArticleFloods, isAggregatedView, expandedGroups]);
+  }, [visibleArticles, groupArticleFloods, isAggregatedView, expandedGroups]);
 
   const unreadCount = useMemo(() => {
     let count = 0;
@@ -251,7 +268,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     );
   }
 
-  if (articles.length === 0) {
+  if (visibleArticles.length === 0) {
     // Show the blank placeholder only during the initial silent load. Once a
     // load settles with nothing — or while a user-initiated refresh runs — the
     // empty state with its refresh affordance stays put so the user has a
@@ -274,6 +291,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
         />
         {showBlank ? (
           <ArticleListSkeleton />
+        ) : articles.length > 0 ? (
+          <CaughtUpArticleList />
         ) : (
           <EmptyArticleList feedId={selectedFeedId} />
         )}
@@ -312,9 +331,14 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           // disambiguator.
           const summaryFeedTitle = feedsById[feedId]?.title;
           const itemFeedTitle = isAggregatedView ? summaryFeedTitle : undefined;
-          const itemFeedSiteUrl = isAggregatedView
-            ? feedsById[feedId]?.siteUrl
-            : undefined;
+          // Withholding the site URL is how "no icon" is expressed: an
+          // ArticleItem with no source to render also drops the side
+          // column, so the row tightens instead of keeping an empty
+          // gutter.
+          const itemFeedSiteUrl =
+            isAggregatedView && showArticleFeedIcons
+              ? feedsById[feedId]?.siteUrl
+              : undefined;
           return (
             <div
               key={virtualItem.key}
@@ -405,6 +429,27 @@ function EmptyArticleList({ feedId }: { feedId: string }) {
           If refresh keeps failing, use the cog above the list to delete this feed.
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Unread-only mode with everything read. Distinct from EmptyArticleList:
+ * the view has articles, they are simply all read, so offering "Refresh"
+ * as the primary action (let alone a lastError) would misdiagnose success
+ * as a fetch problem.
+ */
+function CaughtUpArticleList() {
+  return (
+    <div
+      data-testid="caught-up-empty"
+      className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center"
+    >
+      <CheckCheck className="size-6 text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">You&apos;re all caught up.</p>
+      <p className="text-xs text-muted-foreground max-w-xs">
+        Read articles are hidden. Turn that off in Settings &rarr; Reading.
+      </p>
     </div>
   );
 }

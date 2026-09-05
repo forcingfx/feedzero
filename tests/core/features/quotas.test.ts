@@ -7,6 +7,7 @@ import {
   briefingQuotaErrorMessage,
   quotaErrorMessage,
 } from "@/core/features/quotas";
+import { normalizeTier } from "@/core/features/tier-matrix";
 
 describe("checkFeedQuota", () => {
   describe("free tier (hosted)", () => {
@@ -47,9 +48,11 @@ describe("checkFeedQuota", () => {
     });
 
     it("blocks bulk imports that would exceed the limit", () => {
-      // User has 40, importing 20 more would land at 60 — over the 50 cap.
+      // Ten under the cap, importing twenty — lands ten over. Expressed
+      // against FREE_FEED_LIMIT rather than literals so raising the cap
+      // doesn't silently turn this into a test of nothing.
       const result = checkFeedQuota({
-        currentCount: 40,
+        currentCount: FREE_FEED_LIMIT - 10,
         delta: 20,
         tier: "free",
         isSelfHosted: false,
@@ -63,7 +66,7 @@ describe("checkFeedQuota", () => {
 
     it("allows bulk imports that land exactly at the limit", () => {
       const result = checkFeedQuota({
-        currentCount: 30,
+        currentCount: FREE_FEED_LIMIT - 20,
         delta: 20,
         tier: "free",
         isSelfHosted: false,
@@ -75,7 +78,7 @@ describe("checkFeedQuota", () => {
     it("blocks adds even at zero count if delta exceeds limit", () => {
       const result = checkFeedQuota({
         currentCount: 0,
-        delta: 100,
+        delta: FREE_FEED_LIMIT + 1,
         tier: "free",
         isSelfHosted: false,
         paidTierActive: true,
@@ -107,11 +110,13 @@ describe("checkFeedQuota", () => {
     });
   });
 
-  describe("pro tier", () => {
-    it("allows adds with no count limit", () => {
+  describe("legacy pro license", () => {
+    it("allows adds with no count limit once normalized", () => {
+      // Tokens minted before Pro was retired still say `tier=pro`; the
+      // boundary normalizes them onto the paid tier, which is uncapped.
       const result = checkFeedQuota({
         currentCount: 5000,
-        tier: "pro",
+        tier: normalizeTier("pro"),
         isSelfHosted: false,
         paidTierActive: true,
       });
@@ -193,7 +198,7 @@ describe("BRIEFINGS_LIMIT", () => {
 });
 
 describe("checkBriefingQuota", () => {
-  describe.each(["personal", "pro"] as const)("%s tier (hosted)", (tier) => {
+  describe.each(["personal"] as const)("%s tier (hosted)", (tier) => {
     it("allows creates when under the limit", () => {
       const result = checkBriefingQuota({
         currentCount: 3,

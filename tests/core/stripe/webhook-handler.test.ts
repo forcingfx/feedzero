@@ -136,6 +136,28 @@ describe("handleStripeWebhook", () => {
     const fixture = subscriptionCreatedEvent({
       customerId: CUSTOMER_ID,
       subscriptionId: SUBSCRIPTION_ID,
+      tier: "personal",
+    });
+    const res = await handleStripeWebhook(
+      postFixture(fixture, nowSec()),
+      makeConfig(issuer),
+    );
+    expect(res.status).toBe(200);
+    expect(issuer.issue).toHaveBeenCalledWith({
+      customerId: CUSTOMER_ID,
+      subscriptionId: SUBSCRIPTION_ID,
+      tier: "personal",
+    });
+  });
+
+  it("normalizes a legacy pro Price onto the paid tier rather than issuing nothing", async () => {
+    // A Price object created before Pro was retired still carries
+    // `metadata.tier=pro`. Rejecting it would make extractTier return null,
+    // which this handler answers with a 200 and no licence at all — a
+    // paying customer silently receiving nothing.
+    const fixture = subscriptionCreatedEvent({
+      customerId: CUSTOMER_ID,
+      subscriptionId: SUBSCRIPTION_ID,
       tier: "pro",
     });
     const res = await handleStripeWebhook(
@@ -146,15 +168,15 @@ describe("handleStripeWebhook", () => {
     expect(issuer.issue).toHaveBeenCalledWith({
       customerId: CUSTOMER_ID,
       subscriptionId: SUBSCRIPTION_ID,
-      tier: "pro",
+      tier: "personal",
     });
   });
 
   // Trialing subscriptions arrive with `current_period_end` already set to the
   // trial-end date. We MUST pass that through as expirySec — otherwise the
-  // issuer falls back to its 31-day default, which is fine for a 30-day trial
-  // (off by ~1 day) but wrong for any other trial length and brittle if the
-  // trial period changes. Pin the license to the subscription's own clock.
+  // issuer falls back to its annual default, which would hand a trialing
+  // customer a full year of paid access for free. Pin the license to the
+  // subscription's own clock.
   it("passes current_period_end (top-level) to issuer.issue for trialing subscription.created", async () => {
     const trialEndSec = nowSec() + 30 * 24 * 60 * 60;
     const fixture = subscriptionCreatedEvent({

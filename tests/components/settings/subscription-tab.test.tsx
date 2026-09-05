@@ -24,6 +24,7 @@ import {
 } from "@/core/license/license-token-store";
 import { encodeLicensePayload, type LicenseTier } from "@/core/license/format";
 import { base64UrlEncode } from "@/core/license/crypto";
+import { tierLabel } from "@/core/features/tier-matrix";
 
 function makeToken(
   tier: LicenseTier,
@@ -92,16 +93,16 @@ describe("<SubscriptionTab>", () => {
       expect(link.getAttribute("href")).toMatch(/\/billing\/recover/);
     });
 
-    it("shows the 'or subscribe' divider and all four tier cards below it", () => {
+    it("shows the 'or subscribe' divider and the tier cards below it", () => {
       renderTab();
       expect(screen.getByText(/or subscribe/i)).toBeInTheDocument();
       expect(
-        screen.getByRole("heading", { name: /^Personal$/i }),
+        screen.getByRole("heading", { name: /^Supporter$/i }),
       ).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: /^Pro$/i })).toBeInTheDocument();
       expect(
         screen.getByRole("heading", { name: /Self-host/i }),
       ).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /^Pro$/i })).toBeNull();
     });
 
     it("does not show license-token controls when free", () => {
@@ -131,9 +132,9 @@ describe("<SubscriptionTab>", () => {
       useLicenseStore.setState({ tier: "personal", verifying: false });
     });
 
-    it("shows the Personal tier label", () => {
+    it("shows the paid tier label from the matrix", () => {
       renderTab();
-      const chips = screen.getAllByText("Personal");
+      const chips = screen.getAllByText(tierLabel("personal"));
       expect(chips.length).toBeGreaterThan(0);
     });
 

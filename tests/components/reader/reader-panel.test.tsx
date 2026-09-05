@@ -112,6 +112,63 @@ describe("ReaderPanel", () => {
     });
 
     it.each([
+      ["narrow", "max-w-150"],
+      ["wide", "max-w-240"],
+    ] as const)(
+      "applies the persisted %s reading width",
+      async (width, expectedClass) => {
+        const { usePreferencesStore } = await import(
+          "@/stores/preferences-store.ts"
+        );
+        const { DEFAULT_PREFERENCES } = await import("@feedzero/core/types");
+        usePreferencesStore.setState({
+          preferences: { ...DEFAULT_PREFERENCES, readerWidth: width },
+        });
+        useArticleStore.setState({
+          selectedArticle: mockArticle(),
+          articles: [],
+          isLoading: false,
+        });
+
+        render(<ReaderPanel />);
+
+        const articleEl = screen
+          .getByRole("heading", { level: 2 })
+          .closest("article");
+        expect(articleEl!.className).toContain(expectedClass);
+        usePreferencesStore.setState({
+          preferences: { ...DEFAULT_PREFERENCES },
+        });
+      },
+    );
+
+    it("widens the rendered article body along with the column", async () => {
+      const { usePreferencesStore } = await import(
+        "@/stores/preferences-store.ts"
+      );
+      const { DEFAULT_PREFERENCES } = await import("@feedzero/core/types");
+      usePreferencesStore.setState({
+        preferences: { ...DEFAULT_PREFERENCES, readerWidth: "wide" },
+      });
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      // Nothing inside the column may carry a competing measure: a
+      // hard-coded max-w-180 on the content wrapper would clamp the
+      // prose back to the default while the headings honoured the
+      // preference, so the article would render two different widths.
+      const body = screen.getByTestId("article-content-area");
+      expect(body.querySelectorAll('[class*="max-w-180"]')).toHaveLength(0);
+
+      usePreferencesStore.setState({ preferences: { ...DEFAULT_PREFERENCES } });
+    });
+
+    it.each([
       ["small", "text-sm"],
       ["large", "text-lg"],
     ] as const)(

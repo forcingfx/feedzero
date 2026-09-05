@@ -12,7 +12,7 @@ import { decodeEntities } from "@/lib/decode-entities.ts";
 import { shareArticle } from "@/lib/share-article.ts";
 import { TAP_TARGET_EXPAND, TAP_TARGET_EXPAND_Y } from "@/lib/tap-target.ts";
 import { usePreferencesStore } from "@/stores/preferences-store.ts";
-import type { ReaderTextSize } from "@feedzero/core/types";
+import type { ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
 
 /**
  * Body scale per readerTextSize preference. Headings keep their absolute
@@ -23,6 +23,18 @@ const TEXT_SIZE_CLASS: Record<ReaderTextSize, string> = {
   small: "text-sm",
   medium: "",
   large: "text-lg",
+};
+
+/**
+ * Reading measure per readerWidth preference. "medium" is the historical
+ * 45rem column. This is the ONLY place the measure is set — ArticleContent
+ * deliberately carries no max-width of its own, so headings and prose can
+ * never end up at two different widths.
+ */
+const READER_WIDTH_CLASS: Record<ReaderWidth, string> = {
+  narrow: "max-w-150",
+  medium: "max-w-180",
+  wide: "max-w-240",
 };
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -76,6 +88,9 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   const toggleStar = useArticleStore((s) => s.toggleStar);
   const readerTextSize = usePreferencesStore(
     (s) => s.preferences.readerTextSize ?? "medium",
+  );
+  const readerWidth = usePreferencesStore(
+    (s) => s.preferences.readerWidth ?? "medium",
   );
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
@@ -274,12 +289,13 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
 
   const articleBody = (
     <div data-testid="article-content-area" className="overflow-x-hidden">
-      {/* max-w-180 matches ArticleContent's internal measure; mx-auto
-          centers the column so wide desktop panels get margins instead
-          of left-hugging text with dead space on the right. */}
+      {/* The column owns the reading measure outright; mx-auto centers it
+          so wide desktop panels get margins instead of left-hugging text
+          with dead space on the right. */}
       <article
         className={cn(
-          "p-4 px-6 max-w-180 mx-auto",
+          "p-4 px-6 mx-auto",
+          READER_WIDTH_CLASS[readerWidth],
           TEXT_SIZE_CLASS[readerTextSize],
         )}
       >

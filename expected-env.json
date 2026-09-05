@@ -5,8 +5,9 @@
       "required": "production",
       "description": "Shared secret for admin endpoints (license find / revoke / re-issue).",
       "consumers": [
+        "api/license/[action].ts",
         "server.ts",
-        "api/checkout/create-session.ts"
+        "vite.config.js"
       ]
     },
     "APP_VERSION": {
@@ -72,9 +73,11 @@
       "required": "production",
       "description": "HMAC secret for signing/verifying license tokens. Rotate triggers full re-issue.",
       "consumers": [
+        "api/license/[action].ts",
         "api/stripe/webhook.ts",
         "server.ts",
-        "src/core/license/issuer.ts"
+        "vite.config.js",
+        "src/core/proxy/resolve-rate-limiter.ts"
       ]
     },
     "OPERATOR_ALERT_URL": {
@@ -112,7 +115,10 @@
       "required": "production",
       "description": "Comma-separated list of allowed Stripe price IDs. Defence against price-id tampering at checkout creation.",
       "consumers": [
-        "api/checkout/create-session.ts"
+        "src/core/stripe/allowed-prices.ts",
+        "api/checkout/create-session.ts",
+        "server.ts",
+        "vite.config.js"
       ]
     },
     "STRIPE_SECRET_KEY": {
@@ -143,7 +149,11 @@
       "required": "production",
       "description": "Upstash REST token paired with UPSTASH_REDIS_REST_URL.",
       "consumers": [
-        "src/core/sync/adapters/upstash-adapter.ts"
+        "src/core/sync/adapters/upstash-adapter.ts",
+        "src/core/catalog/adapters/upstash-adapter.ts",
+        "src/core/license/storage-upstash.ts",
+        "src/core/stripe/resolve-seen-event-store.ts",
+        "src/core/proxy/resolve-rate-limiter.ts"
       ]
     },
     "UPSTASH_REDIS_REST_URL": {
@@ -185,16 +195,9 @@
         "src/core/features/paid-tier-active.ts"
       ]
     },
-    "VITE_PRICE_PERSONAL_MONTHLY": {
-      "required": "production",
-      "description": "Stripe price id for the Personal monthly plan, baked into the SPA bundle for the Checkout call.",
-      "consumers": [
-        "src/app.tsx"
-      ]
-    },
     "VITE_PRICE_PERSONAL_YEARLY": {
       "required": "production",
-      "description": "Stripe price id for the Personal yearly plan.",
+      "description": "Stripe price id for the annual paid plan, baked into the SPA bundle for the Checkout call. The only price: billing is annual-only, and the retired `personal-monthly` deeplink key resolves here too so old links still work. (VITE_PRICE_PERSONAL_MONTHLY was removed with the move to $9/year.)",
       "consumers": [
         "src/app.tsx"
       ]

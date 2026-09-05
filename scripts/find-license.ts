@@ -47,7 +47,7 @@ import {
 import type { CustomersClient } from "../src/core/stripe/find-customer-by-email";
 import { LicenseIssuerImpl } from "../src/core/license/issuer";
 import type { LicenseRecord } from "../src/core/license/storage";
-import { err, ok, type Result } from "../src/utils/result";
+import { err, ok, type Result } from "../packages/core/src/utils/result";
 
 // The project's `process` global is narrowed to env+argv at the type
 // level (see src/core/sync/adapters/env.d.ts) to keep shippable code

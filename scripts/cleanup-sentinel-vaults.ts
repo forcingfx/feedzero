@@ -60,7 +60,15 @@ async function main(): Promise<void> {
   });
 
   const client: SentinelScanClient = {
-    scan: (cursor, opts) => upstash.scan(cursor, opts),
+    // Upstash types `scan` as returning either [cursor, string[]] or
+    // [cursor, {key, type}[]], because passing `type` changes the payload
+    // shape. We never pass `type`, so the standard tuple is the only
+    // reachable branch — narrowed once here rather than at every use. `opts`
+    // is optional on SentinelScanClient but required by Upstash.
+    scan: async (cursor, opts) => {
+      const [next, keys] = await upstash.scan(cursor, opts ?? {});
+      return [next, keys as string[]];
+    },
     del: (key) => upstash.del(key),
   };
 

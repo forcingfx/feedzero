@@ -32,6 +32,35 @@
  */
 export const releases = [
   {
+    version: "0.14.0",
+    date: "2026-09-05T12:00:00Z",
+    title: "One paid plan at $9 a year",
+    subtitle:
+      "Pricing collapses to a single annual plan. The Pro tier is retired, the free feed limit rises to 100, and the reader gains width, unread-only, and feed-icon preferences.",
+    added: [
+      "Added a reading width preference with narrow, comfortable, and wide options, stored in the encrypted vault and synced across devices.",
+      "Added an unread-only reading mode to the article list, which hides articles once they have been read.",
+      "Added a preference for showing feed icons in the article list.",
+    ],
+    changed: [
+      "Moved to a single paid plan at $9 a year, billed annually. The monthly plan is retired. Existing subscribers move to the annual price at their next renewal, with no proration and no mid-period charge.",
+      "Renamed the paid tier to Supporter. The licence format is unchanged, so existing licences keep working without reactivation.",
+      "Raised the free feed limit to 100 subscriptions.",
+      "Shortened the free trial to 14 days, which is long enough to import a subscription list and read through two weekly cycles.",
+      "Gave licences seven days of grace past the billing period end, applied on renewal. A card that fails and retries no longer locks the reader out mid-recovery.",
+    ],
+    removed: [
+      "Removed the Pro tier. Every feature listed under it was unbuilt, so nothing became unavailable. The four planned features moved to the paid tier at the same status.",
+    ],
+    fixed: [
+      "Fixed the desktop feed list not collapsing. The control rendered and responded but the panel never moved.",
+      "Fixed the self-hosted container writing sync vaults outside the configured data directory, which lost them on restart.",
+      "Fixed eleven API endpoints serving stale bundled output, so changes to their handlers reached production again.",
+      "Fixed the release feed being served with the wrong content type from its new origin.",
+      "Fixed both operator command line tools failing to start. They imported a module path that has never existed, so the licence recovery tool documented in the support runbook could not run.",
+    ],
+  },
+  {
     version: "0.13.0",
     date: "2026-08-02T12:00:00Z",
     title: "Mobile reading rebuilt around gestures",

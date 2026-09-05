@@ -79,13 +79,28 @@ describe("useLicenseStore", () => {
     it("updates tier when server returns a different tier than the local decode", async () => {
       setLicenseToken(personalToken);
       fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true, license: { tier: "free" } }), {
+          status: 200,
+        }),
+      );
+
+      await useLicenseStore.getState().refresh();
+      expect(useLicenseStore.getState().tier).toBe("free");
+    });
+
+    it("normalizes a legacy pro tier echoed by the server onto the paid tier", async () => {
+      // The verify endpoint echoes whatever the token carries, and tokens
+      // minted before Pro was retired say "pro". Passing that straight into
+      // the store would set a tier the matrix no longer knows.
+      setLicenseToken(personalToken);
+      fetchMock.mockResolvedValue(
         new Response(JSON.stringify({ ok: true, license: { tier: "pro" } }), {
           status: 200,
         }),
       );
 
       await useLicenseStore.getState().refresh();
-      expect(useLicenseStore.getState().tier).toBe("pro");
+      expect(useLicenseStore.getState().tier).toBe("personal");
     });
 
     it("clears the token and resets tier to free when server rejects", async () => {

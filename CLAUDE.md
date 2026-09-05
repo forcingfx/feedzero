@@ -43,91 +43,9 @@ Add feed: `feed-service.ts` (normalize, dedup) → `/api/feed` proxy → `valida
 
 Full-text extraction (user-initiated): click "Extracted" → `/api/page` → `extractor.ts` → `defuddle-extractor.ts` → `cleanup.ts` → DOMPurify → cached in extraction store.
 
-### Core Modules (Framework-Agnostic)
+### Code Map — where things live
 
-- **src/utils/result.ts** — `Result<T>` (`ok`/`err`) used everywhere instead of throwing. `andThen` chains; `fromPromise` wraps async.
-- **src/utils/constants.ts** — DB name, crypto params, `LOCAL_STORAGE` keys, default passphrase.
-- **src/core/storage/crypto.ts** — PBKDF2 + AES-GCM + HMAC-SHA256 via Web Crypto API.
-- **src/core/crypto/argon2.ts** — Argon2id wrapper around `hash-wasm`. Memory-hard KDF used to encrypt new sync vaults so a 4-word diceware passphrase (~51.7 bits) is no longer brute-forceable by GPU farms. Production params: 64 MiB / t=3 / p=1 (OWASP). The vault envelope stamps which KDF derived its key (`KdfSpec` in `src/core/sync/types.ts`) so recovery on a new device picks the matching derivation. Legacy PBKDF2 vaults auto-upgrade to Argon2id the first time the user types their passphrase on any device (recovery-step / switchToExistingCloud → `upgradeVaultKdf`).
-- **src/core/storage/db.ts** — Dexie storage. Content AES-GCM encrypted; index fields (url, feedId, guid) HMAC-SHA256 hashed so we can query without exposing plaintext. Call `open(passphrase)` or `openWithKeys(dbKeyJwk, hmacKeyJwk)` first.
-- **src/core/storage/key-material.ts** — `deriveAndStoreKeys`, `loadStoredKeys`, `clearStoredKeys`. Derives DB/HMAC/optional vault keys, persists JWK to localStorage. Raw passphrase is never persisted.
-- **src/core/storage/schema.ts** — `createFeed()` / `createArticle()` factories returning `Result`.
-- **src/core/discovery/** — `discoverFeed(url)` multi-strategy cascade; `strategies.ts` holds the pure functions.
-- **src/core/crypto/passphrase-generator.ts** — EFF large wordlist, 4 words, ~51.7 bits entropy.
-- **src/core/proxy/validate-url.ts** — SSRF-safe URL validation. Returns `Result<URL>`.
-- **src/core/proxy/proxy-handler.ts** — Shared proxy logic for serverless functions.
-- **src/core/extractor/extractor.ts** — Public `extract(html, url)` + `needsExtraction(article)`. Swap implementation by changing the import.
-- **src/core/extractor/{defuddle-extractor,cleanup,markdown}.ts** — Defuddle impl; HTML cleanup; markdown→HTML via marked + DOMPurify.
-- **src/core/extractor/adapters/** — Site-specific adapters. `SiteAdapter` interface, `AdapterRegistry` (O(1) domain lookup). `github-adapter` extracts README; `default-adapter` uses Defuddle.
-- **src/core/sync/types.ts** — `VaultData`, `EncryptedVault`, `SyncStorageAdapter`.
-- **src/core/sync/vault-crypto.ts** — Deterministic `deriveVaultId` (PBKDF2, KDF-invariant by design — vault ID is a routing identifier, not a secret) + `deriveVaultKey` (dispatches on `KdfSpec`: legacy PBKDF2 or Argon2id); `encryptVault` / `decryptVault` (`encryptVault` stamps the spec on the envelope so recovery can find the matching KDF). `DEFAULT_NEW_VAULT_KDF` is Argon2id in prod, cheap params under Vitest.
-- **src/core/sync/sync-service.ts** — Client orchestrator: `exportVault`, `importVault`, `pushVault`, `pullVault`.
-- **src/core/sync/sync-handler.ts** — Shared server `Request → Response` handler. GET (pull) / PUT (push) / DELETE.
-- **src/core/sync/adapters/** — `memory`, `filesystem`, `vercel-blob`, `resolve-adapter`.
-- **src/core/feeds/feed-service.ts** — `addFeedFlow(url)`, `refreshFeed`, `refreshAllFeeds` (guid-based dedup).
-- **src/core/signal/frequency-engine.ts** — `generateReport(articles, ctx, now)` + `pickWindow()`. Pure-TS cross-feed term frequency with greedy clustering and a bleed-over guard. No LLM, no Worker. Drives `/signal`.
-- **src/core/signal/tokenize.ts** — `tokenize()` + `lightStem()` with English stopwords and feed-noise lists.
-- **src/core/parser/parser.ts** — `parse(text, feedUrl)` via feedsmith (RSS 2.0, Atom 1.0, JSON Feed 1.1).
-- **src/core/parser/sanitizer.ts** — DOMPurify wrapper, allowlisted tags/attrs.
-- **src/core/opml/** — `opml-service.ts` (import/export via feedsmith), `url-list-parser.ts` (plain-text URL lists).
-- **src/core/feedback/feedback-handler.ts** — Creates GitHub issues via REST API. Needs `GITHUB_FEEDBACK_TOKEN` (fine-grained PAT with `issues: write`) + `GITHUB_REPO` (e.g. `forcingfx/feedzero`).
-- **src/core/sync/sync-stats-handler.ts** — Vault count stats; no PII.
-
-### Zustand Stores
-
-- **app-store** — DB init, global error, onboarding. `initialize(passphrase)`, `checkOnboardingStatus()`, `initializeReturningUser()` (detect mode, open DB, optionally pull sync).
-- **feed-store** — `feeds[]`, `selectedFeedId`, CRUD. `refreshAll()` pulls the sync vault first for sync users so feeds added on another device materialize.
-- **article-store** — `articles[]`, `selectedArticle`, `loadArticles`, `selectArticle` (auto-marks read).
-- **extraction-store** — `cache` (link → HTML), `viewMode`, `fetchExtracted(url)`.
-- **onboarding-store** — State machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery`). Modes: `local` (skips confirm) vs `sync` (requires confirm).
-- **sync-store** — Status: `local-only | syncing | synced | error`. Holds `credentials: SyncCredentials | null` (pre-derived vault ID + CryptoKey; never raw passphrase). Actions: `enableSync` (derives + pushes), `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce + 0–30s jitter), `disableSync` (deletes server vault + clears stored keys), `logout` (clears local data + resets onboarding; preserves cloud vault).
-- **import-store** — OPML/URL-list progress. `idle → importing → complete | error`.
-- **signal-store** — `/signal` page state. Status: `idle | locked | loading | ready | error`. `loadReport({ force? })` runs the local frequency engine if corpus ≥ `SIGNAL_CORPUS_GATE` (100). 24h localStorage cache (`feedzero:signal-report`) invalidated when the chosen window changes or corpus size shifts by ≥10%.
-
-### React Components
-
-- **src/components/ui/** — shadcn/ui wrappers over Radix. Use these as primitives.
-- **src/components/layout/** — header, panel.
-- **src/components/feeds/**, **articles/**, **reader/** — list/item/reader for each domain.
-- **src/components/onboarding/** — `onboarding-modal.tsx` + step components under `steps/`.
-- **src/components/explore/**, **feedback/**, **settings/** — feature UIs.
-- **src/components/sync/** — `sync-setup-dialog.tsx` (enable/disable, data mgmt, vault deletion), `sync-status-chip.tsx` (amber local / green synced / red error).
-- **src/pages/feeds-page.tsx** — Desktop: two-tier `ResizablePanelGroup`. Outer = `[sidebar | stage]`, constant on every route — the only place sidebar width lives. The `stage` panel is a slot whose *content* varies per route: `<ExploreCatalog>` on `/explore` / empty feeds, `<StatsPage>` on `/stats`, or an inner `ResizablePanelGroup` `[article-list | reader]` on the default route. New feature areas mount inside the stage; they MUST NOT add siblings to the sidebar (that's what made the sidebar visibly resize on every navigation — see ADR 013). Mobile: single panel + back nav. Syncs URL params → Zustand.
-- **src/lib/content-modes.ts** — Pure view-mode logic for reader-panel.
-- **src/lib/decode-entities.ts** — HTML entity decoding for plain-text display.
-
-### Routing
-
-```
-/feeds                                → Feed list (mobile: full screen)
-/feeds/:feedId                        → Article list (mobile: full screen; desktop: panels 1+2)
-/feeds/:feedId/articles/:articleId    → Reader (mobile: full screen; desktop: all 3 panels)
-/signal                               → Cross-feed topic frequency surface (Personal+, gated at 100-article corpus)
-```
-
-URL is the source of truth for navigation state. `FeedsPage` syncs URL params → Zustand.
-
-### Hooks
-
-- **use-keyboard-nav** — Article nav `j`/`k` (clicks DOM elements — same code path as mouse). Feed nav `u`/`i`. Actions: `o` open original, `e` toggle view (`toggleViewMode()`), `n` add feed (custom event), `[` toggle sidebar, `r` refresh. Disabled when focus is in input/textarea/contenteditable.
-- **use-media-query / use-mobile** — `useIsDesktop()` ≥1024px; `useIsMobile()` <768px (sidebar/sheet).
-- **use-auto-refresh** — Background `refreshAll()` on the `AUTO_REFRESH_INTERVAL_MS` (30 min) timer plus a focus-when-stale trigger (returning to a tab idle longer than the interval refreshes immediately). Reads the store via `getState()` inside its handlers so it subscribes once; mounted in `AppLayout`. Staleness is judged against `feed-store.lastRefreshAllAt`.
-- **use-license-refresh** — Same shape as `use-auto-refresh` but for license re-verification: a daily `LICENSE_RECHECK_INTERVAL_MS` (24h) timer + focus-when-stale trigger calling `license-store.refresh()`. Closes the gap where a tab left open for days never reboots, so a revoked subscription would keep its paid tier for the whole session. Staleness is judged against `license-store.lastCheckedAt`, which `refresh()` stamps only on a *definitive* resolution (no-token, 200, or 4xx) — transient 5xx/network failures leave it stale so focus retries promptly instead of waiting a full day. Mounted in `AppLayout` alongside `use-auto-refresh`.
-
-### Styling
-
-Single CSS entry: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero runtime cost).
-
-- `@theme` — Design tokens (`--color-*`, `--font-*`).
-- `@layer base` — Resets, base button/input styles. (The desktop layout is a two-tier `ResizablePanelGroup` in `feeds-page.tsx`, not a CSS grid — see ADR 013.)
-- `@plugin "@tailwindcss/typography"` — Required for `prose` classes used by `BriefingAbstract` to render model-generated markdown (h2, ul, li, p). Without the directive the classes are silent no-ops and Tailwind's preflight strips browser-default styling — bullets run together, headings render as plain inline text. Locked by `tests/index-css-briefing-typography.test.ts`.
-- Use Tailwind utilities in JSX with `cn()` from `src/lib/utils.ts`.
-- **Spacing** — Use Tailwind v4's default numeric scale (`p-4`, `gap-2`). Do **not** define `--spacing-xs/sm/md/lg/xl` in `@theme` — these collide with `max-w-*` utilities (`max-w-lg` resolves to `--spacing-lg` instead of `--container-lg`). [Tailwind v4 gotcha](https://github.com/tailwindlabs/tailwindcss/discussions/17777).
-
-### Types & Service Worker
-
-- **src/types/index.ts** — `Feed`, `Article`, `CreateFeedInput`, `CreateArticleInput`.
-- **src/workers/service-worker.js** — Excluded from test coverage.
+The file-level reference — every core module, Zustand store, React component, route, hook, styling token, and type, with its API and purpose — lives in **[docs/code-map.md](docs/code-map.md)**. Consult it to find where a capability lives or what a module exposes. The standing *rules* about these layers stay inline below in [Key Patterns](#key-patterns): core returns `Result` and imports no UI; URL is the source of truth for navigation; stable outer panel topology (ADR 013); etc. Conceptual views (dependency graph, encryption model, threat model) are in [docs/architecture.md](docs/architecture.md).
 
 ### Testing
 
@@ -243,6 +161,58 @@ This project follows **Red-Green-Refactor-Smoke (RGR+S)**. Every change follows 
 7. **SMOKE** — For any change affecting production behavior (endpoint handlers, data layer, adapter resolution, deployment artifacts), add a smoke test under `tests/smoke/` exercising the **live deployed system** after merge. Run via `SMOKE_TESTS=1 npx vitest run tests/smoke/<name>` once Vercel reports Ready. A PR introducing a production code path without a smoke test is incomplete. ⛔ If it fails after deploy, revert or roll forward immediately.
 8. **DEVICE** — For any change to touch gestures, viewport-dependent layout, or safe-area handling: verify on **real mobile hardware** via the PR's Vercel preview URL (a QR of the branch-alias URL makes this a 5-second loop). ⛔ Emulation is not sufficient — see [Gesture work](#gesture-work).
 
+## Shipping: verify the outcome, not the action
+
+**A command exiting 0 is not evidence that the thing you wanted is true.**
+Every failure of the 2026-09-05 pricing cutover lived in that gap: `git push`
+succeeded, `gh pr merge` succeeded, `tsc` was green — and the landing site
+served stale pricing for an hour because none of those facts were the fact
+that mattered.
+
+⛔ **Never report a change as shipped until you have observed it in the
+deployed system.** Not the PR state, not the merge commit, not the CI badge.
+
+| Change | The assertion that closes it |
+| --- | --- |
+| App deploy | `curl https://my.feedzero.app/api/health` shows the expected `commit` |
+| Build-time env var (`VITE_*`) | fetch the deployed bundle, grep for the value |
+| Server-side env var | call the endpoint and assert the behaviour it gates |
+| Landing copy | `curl https://feedzero.app/<path>` and grep for the new string |
+| Stripe change | read the object back and assert its fields |
+
+### Repos and remotes
+
+- **`git remote -v` in full. Never `| head`.** Both repos carried a stale
+  `gitlab` remote for four months after the 2026-05-09 move to GitHub. A
+  landing change was pushed and merged there — a remote nothing deploys from.
+  The same applies to any command whose answer depends on seeing every line.
+- **`feedzero.app` (landing) does not auto-deploy on push** unless the commit
+  author email is one Vercel can resolve to a Git account. Use the account's
+  GitHub noreply address; a personal address Vercel cannot match makes the
+  deploy silently not happen. After pushing landing, confirm the live page.
+
+### Pull requests
+
+- **Sequential PRs off `main`. Never stacked.** This repo squash-merges, which
+  deletes the base branch, auto-closes any PR stacked on it, and GitHub then
+  refuses to reopen it once the head has been force-pushed. Land one, rebase
+  the next onto `main`, open it then.
+
+### Scripts and one-off tooling
+
+- **Never hand over an executable you have not executed.** `scripts/` is
+  type-checked by `tsconfig.scripts.json` (`npm run typecheck` covers both
+  projects) precisely because `find-license.ts` shipped in PR #106 importing a
+  path that has never existed, and crashed on startup for months. Type-clean is
+  still not "runs" — run it.
+- **Rehearse every live third-party write against that provider's test mode
+  first.** The annual-plan migration was rejected twice by Stripe — nulls, then
+  nulls nested inside `discounts` — on payloads that passed every unit test,
+  because the fixtures were the documentation's minimal shape rather than what
+  the API returns. A test-mode subscription carrying a coupon and metadata
+  found both before a customer did. See
+  `docs/operations/annual-plan-migration.md`.
+
 ## Smoke tests
 
 Smoke tests in `tests/smoke/` run only when `SMOKE_TESTS=1`. They are **not** part of `npm test`.
@@ -274,6 +244,7 @@ Touch gestures have **three arbiters**, and you only get what the other two cede
 ## Operations
 
 - **License support runbook** — `docs/operations/license-support.md`. The procedure for handling "I can't recover my license" support emails. Uses `scripts/find-license.ts` (operator CLI) backed by the pure library at `src/core/license/admin-find-license.ts`. Both reuse `findCustomerByEmail` from `src/core/stripe/find-customer-by-email.ts` so the recover-handler and the CLI agree on Stripe-customer lookup semantics.
+- **Annual-plan migration runbook** — `docs/operations/annual-plan-migration.md`. The ADR 029 cutover to a single $9/year price: Stripe price creation, allowlist-before-deploy ordering, landing-then-app, then `scripts/migrate-to-annual-plan.ts` to move the existing book onto the annual price at each subscriber's next renewal. The CLI is dry-run by default and idempotent; its decisions live in `src/core/stripe/plan-migration.ts`, mirroring the `find-license.ts` / `admin-find-license.ts` shell-and-library split.
 - **Quarterly architecture audit lap** — `docs/operations/audit-lap.md`. 90-minute recurring task; runs the test-suspicion detector + churn/size analytics + the structured eyeball pass, produces a 3-finding memo under `docs/reports/audit-YYYY-QQ.md`. Exists because four production incidents in one quarter (2026-05-12 sync, 2026-05-14 stats, 2026-05-19 destroy cascade, 2026-05-28 onboarding modal) shared a pattern that no per-PR review caught. ADR 025 names the pattern; the lap is the operational loop that catches the next instance.
 
 ## Auditing the codebase
@@ -429,8 +400,10 @@ Working code-review checklist (adapted from [Lukaszuk's clean-code summary](http
 - **Test-only adapters are branded; resolvers refuse them in production.** Every in-memory adapter (`createMemoryAdapter`, `createMemoryCatalogAdapter`, `MemoryLicenseStorage`, `MemorySeenEventStore`) is branded via `markTestOnly()` from `src/core/test-only-brand.ts`. The four resolvers call `assertNotTestOnlyInProduction()` at the point they hand the adapter back; a misconfigured production deploy throws at module-load instead of silently routing writes to a per-cold-start `Map`. New backends MUST follow the same pattern: brand the memory implementation, guard the fallthrough in the resolver. Without this, the next "credential silently missing → adapter silently swapped" incident reads exactly like the 2026-05-12 sync regression and the 2026-05-14 stats-always-zero one.
 - **Feature gating is honor-system open-core**: Client-side tier gates live in `src/core/features/feature-gates.ts` and consume tier from `useLicenseStore` (`src/stores/license-store.ts`). React components call `useFeatureGate(feature)`; store actions call `enforceFeature(feature)` / `isFeatureEnabled(feature)` from `src/stores/enforce-feature.ts` for defense-in-depth. Self-hosters bypass via `VITE_SELF_HOSTED=1` at build time. Coming-soon features stay locked regardless. See ADR 012.
 - **Gate every gated capability at BOTH layers, with matrix-derived copy.** A gated feature must be enforced in the store (so a programmatic caller can't bypass it) AND surfaced in the UI (so the user sees why). Never hardcode upgrade copy — it all derives from the matrix: `gateToast(feature)` (store toasts), `useFeatureGate(feature)` exposes `featureName` / `requiredTierLabel` / `description` (UI). Reusable UI primitives: `<UpgradeSplash feature />` (full-page lock, e.g. `/signal`), `<TierLockBadge feature />` (inline lock pill next to a control, e.g. the prefetch toggle), and route-to-upgrade handlers (`gate.enabled ? doThing() : gate.promptUpgrade()`, e.g. the rules editor entry). Renaming a feature or moving it between tiers in the matrix flows through every toast, splash, and badge with zero string edits — `tests/core/features/gate-messaging.test.ts` locks this. A silent dead control (toggle that persists but does nothing for free users) is the anti-pattern this replaced.
+- **Price copy has one home**: `src/core/features/pricing.ts` exports `PAID_PLAN` (amount, period, display string, trial days). Every price surface renders `PAID_PLAN.display` and the Stripe checkout handler reads `PAID_PLAN.trialDays` — never a literal. The amount previously lived in eight unpinned JSX literals, which is how a `$19/month` Pro price outlived every other surface saying "Coming 2026". `tests/core/features/pricing.test.ts` pins it. See ADR 029.
+- **`Tier` is narrower than `LicenseTier`**: the wire type in `src/core/license/format.ts` still carries `"pro"` because signed tokens minted before ADR 029 do; the app-facing `Tier` from the matrix does not. `normalizeTier` maps between them and MUST be applied at every boundary reading a tier from outside the app — the local token decode, the server verify echo, and Stripe price metadata. Dropping it downgrades a paying customer to Free.
 - **Canonical tier matrix**: `src/core/features/tier-matrix.ts` is the single source of truth for which features exist at which tier and with what scope/limit. `feature-gates.ts` (binary capability), `quotas.ts` (continuous limit, e.g. `FREE_FEED_LIMIT`), the gate messaging (`gateToast`/`featureName`/`requiredTierLabel`), AND the pricing cards all derive from it — never hand-edit those for tier changes; edit the matrix. The human-readable view at `docs/tier-matrix.md` regenerates via `npm run docs:tier-matrix` (`-- --check` is the staleness guard).
-- **Pricing cards derive from the matrix too**: an entry's optional `marketing: { blurb, rank }` opts the feature into the pricing grid; `pricingBullets(tier)` returns the bullets for the card matching the feature's lowest unlock tier, ordered by `rank`. Re-tiering a feature (e.g. moving Signal Personal→Pro) moves its bullet to the right card with zero edits to `subscription-upgrade.tsx` / `subscription-tab.tsx` — they render structural lead bullets ("Everything in Free", "Unlimited feeds") then `pricingBullets(tier)`. A feature with no `marketing` field never appears (e.g. `rules` is deliberately omitted). `tests/core/features/pricing-bullets.test.ts` locks placement + ordering.
+- **Pricing cards derive from the matrix too**: an entry's optional `marketing: { blurb, rank }` opts the feature into the pricing grid; `pricingBullets(tier)` returns the bullets for the card matching the feature's lowest unlock tier, ordered by `rank`. Re-tiering a feature moves its bullet to the right card with zero edits to `subscription-upgrade.tsx` / `subscription-tab.tsx` — they render structural lead bullets ("Everything in Free", "Unlimited feeds") then `pricingBullets(tier)`. A feature with no `marketing` field never appears (e.g. `rules` is deliberately omitted), and only `shipped` features carry one — with a single paid card, a coming-soon bullet would sit beside shipped ones with nothing to distinguish it. `tests/core/features/pricing-bullets.test.ts` locks placement + ordering.
 - **Honor-system gating is the right shape when server enforcement would require telemetry.** The privacy principles (process on device, encrypt at rest with keys the operator cannot read, no behavioural analytics) make per-user metering a contradiction. A determined bypass is functionally self-hosting, which the product already endorses. Document the trade-off in the gate's JSDoc — `src/core/features/quotas.ts` lines 9–13 is the model. Do not add server-side gates unless the value at stake justifies storing the metric server-side and you can name the privacy cost honestly in an ADR.
 - **Route-by-router, not route-by-flag.** When a single page component keeps growing flag branches (`isExplorePage`, `isStatsPage`, `isSettingsPage`), split into a layout route + `<Outlet />` + sibling child routes. ADR 013's stable outer panel topology is best served this way because `<Outlet />` is one stable React node — react-resizable-panels sees the same children across route changes. Template: `src/pages/app-layout.tsx` + `src/pages/feeds-route.tsx` + `src/pages/stage-view.tsx`.
 - **Avoid DOM `CustomEvent`s when props, router state, or context will do.** They are global side channels: tracing "who fires this" requires a global grep. The only justified case is a listener that cannot be reached through the React tree — e.g., a hook called above a Provider that needs to talk to a component inside it (`feedzero:toggle-sidebar` is the model). Default order of choice: `useNavigate` / URL params → props → context → `CustomEvent` (last resort).

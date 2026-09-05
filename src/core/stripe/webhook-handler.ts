@@ -16,6 +16,7 @@
 
 import type { Result } from "../../../packages/core/src/utils/result";
 import type { SeenEventStore } from "./seen-event-store";
+import type { Tier } from "../features/tier-matrix";
 import { newTraceId } from "../../../packages/core/src/utils/trace-id";
 import { logError } from "../../../packages/core/src/utils/log-error";
 
@@ -24,13 +25,13 @@ const ROUTE = "/api/stripe/webhook";
 export interface LicenseIssuer {
   issue(args: {
     customerId: string;
-    tier: "personal" | "pro";
+    tier: Exclude<Tier, "free">;
     subscriptionId: string;
     /**
      * Optional override. Trial-aware `customer.subscription.created` events
      * arrive with `current_period_end` already set to the trial-end date;
      * we pass it through here so the issued license expires when the trial
-     * does instead of falling back to the issuer's 31-day default.
+     * does instead of falling back to the issuer's annual default.
      */
     expirySec?: number;
   }): Promise<Result<void>>;
@@ -259,14 +260,27 @@ function getString(obj: Record<string, unknown>, key: string): string | null {
   return typeof val === "string" ? val : null;
 }
 
+/**
+ * Read the tier off the Stripe Price's metadata.
+ *
+ * Still accepts "pro" and normalizes it. Pro was retired from the product,
+ * but a Price object created before that may carry `metadata.tier=pro`, and
+ * rejecting it would return `null` — which this handler treats as "missing
+ * tier metadata" and answers with a 200 that issues no licence at all. A
+ * paying customer silently receiving nothing is a far worse failure than
+ * granting them the one paid tier that exists.
+ */
 function extractTier(
   subscription: Record<string, unknown>,
-): "personal" | "pro" | null {
+): Exclude<Tier, "free"> | null {
   const items = subscription.items as
     | { data?: Array<{ price?: { metadata?: { tier?: unknown } } }> }
     | undefined;
   const tier = items?.data?.[0]?.price?.metadata?.tier;
-  return tier === "personal" || tier === "pro" ? tier : null;
+  // Both accepted values normalize to the single paid tier; "free" can
+  // never come out of this, which is what the return type says.
+  if (tier === "personal" || tier === "pro") return "personal";
+  return null;
 }
 
 async function handleSubscriptionCreated(
@@ -288,7 +302,7 @@ async function handleSubscriptionCreated(
   // When the subscription is trialing (or just newly created) Stripe sets
   // current_period_end to the trial-end / first-billing date. Pin the
   // license expiry to it so the trial license expires when Stripe says it
-  // should, not at the issuer's 31-day default.
+  // should, not at the issuer's annual default.
   const expirySec = extractSubscriptionCurrentPeriodEnd(obj);
   return outcomeFromIssuerResult(
     await issuer.issue({

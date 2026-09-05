@@ -1,7 +1,13 @@
 # ADR 015: Stripe-Side 30-Day Free Trial
 
 ## Status
-Accepted (2026-05-17).
+Accepted (2026-05-17). **Trial length superseded by
+[ADR 029](029-single-annual-plan-at-9-usd.md)** (2026-09-04): 30 days becomes 14,
+and the constant now lives in `src/core/features/pricing.ts` as
+`PAID_PLAN.trialDays`. The decision this ADR actually makes — that Stripe owns
+the trial clock, that the term is a server-side code constant rather than env or
+Dashboard config, and that no new tier or local trial state is introduced — is
+unchanged. Durations and prices quoted below are historical.
 
 ## Context
 

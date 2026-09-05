@@ -53,6 +53,20 @@ function useSidebar() {
   return context;
 }
 
+/**
+ * Sidebar context when there is one, `null` when there isn't.
+ *
+ * Not a softened `useSidebar`: FeedZero mounts SidebarProvider only in the
+ * desktop shell, so "no provider" is a real app state ("there is no
+ * sidebar here"), not a missing wrapper. Controls that offer to toggle the
+ * sidebar use this so they can render nothing where there is nothing to
+ * toggle. Anything that *requires* a sidebar should still use useSidebar
+ * and get the loud error.
+ */
+function useOptionalSidebar() {
+  return React.useContext(SidebarContext);
+}
+
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -731,5 +745,7 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  SIDEBAR_COOKIE_NAME,
+  useOptionalSidebar,
   useSidebar,
 };

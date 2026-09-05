@@ -4,7 +4,7 @@
  *
  * The vanilla <Navigate to="/feeds"> drops the search string because `to`
  * is a pathname-only target. This bit the production deeplink flow:
- * `https://my.feedzero.app/?subscribe=personal-monthly` matched the
+ * `https://my.feedzero.app/?subscribe=personal-yearly` matched the
  * catchall `path="*"` route, which redirected to `/feeds` and silently
  * dropped `?subscribe=...`. SubscribeDeeplink then ran at the next route
  * with no params, so no Stripe Checkout session ever fired from the

@@ -4,6 +4,7 @@ import {
   SUPPORTED_METHODS,
   type CheckoutClient,
 } from "@/core/stripe/checkout-handler";
+import { PAID_PLAN } from "@/core/features/pricing";
 
 const ALLOWED_PRICES = [
   "price_personal_monthly_test",
@@ -161,11 +162,14 @@ describe("checkout handler — success path", () => {
     );
   });
 
-  it("injects subscription_data.trial_period_days=30 so every Personal subscription opens with a 30-day free trial", async () => {
-    // The 30-day trial is server-controlled (constant in the handler, not an
-    // env var or client field) so attackers can't extend it and operators
-    // don't risk staging vs live drift. Sunset by removing the field; setting
-    // it to 0 is invalid per Stripe.
+  it("opens every subscription with the trial length PAID_PLAN declares", async () => {
+    // The trial is server-controlled (a code constant, not an env var or a
+    // client field) so attackers can't extend it and operators don't risk
+    // staging vs live drift. Asserting against PAID_PLAN rather than a
+    // literal is deliberate: the length the server sends and the length the
+    // pricing copy promises must be the same number, and that is what this
+    // test is for. `pricing.test.ts` pins the value itself.
+    // Sunset by removing the field; setting it to 0 is invalid per Stripe.
     const create = vi.fn(async () => ({ url: "https://x", id: "y" }));
     await handleCreateCheckoutSession(
       postBody({
@@ -177,7 +181,7 @@ describe("checkout handler — success path", () => {
     );
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
-        subscription_data: { trial_period_days: 30 },
+        subscription_data: { trial_period_days: PAID_PLAN.trialDays },
       }),
       expect.anything(),
     );
