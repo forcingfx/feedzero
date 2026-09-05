@@ -1,7 +1,22 @@
-import { Layers, Star, Filter, Folder as FolderIcon } from "lucide-react";
+import {
+  Layers,
+  PanelLeft,
+  PanelLeftClose,
+  Star,
+  Filter,
+  Folder as FolderIcon,
+} from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import { useIsMobile } from "@/hooks/use-mobile.ts";
+import { useOptionalSidebar } from "@/components/ui/sidebar.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.tsx";
+import { Kbd } from "@/components/ui/kbd.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { SortPill } from "./sort-pill.tsx";
 import { SettingsPill } from "./settings-pill.tsx";
@@ -44,12 +59,54 @@ export function ArticleListControls({
       data-testid="article-list-controls"
       className="sticky top-0 z-10 flex items-center gap-2 px-3 h-12 border-b bg-background/80 backdrop-blur-sm"
     >
+      <SidebarCollapseButton />
       <FeedIndicator />
       <div className="ml-auto flex items-center gap-2 pointer-events-auto">
         <SettingsPill />
         <SortPill mode={sortMode} onChange={onSortChange} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Visible counterpart to the `[` shortcut: collapses the feed list to
+ * reclaim its width, expands it again. Sits at the left of the title bar,
+ * over the column it acts on.
+ *
+ * Renders nothing when there is no sidebar context. That is a real app
+ * state rather than a missing wrapper — SidebarProvider is mounted only in
+ * the desktop shell, and offering to collapse a sidebar that does not
+ * exist would be a dead control.
+ */
+function SidebarCollapseButton() {
+  const sidebar = useOptionalSidebar();
+  if (!sidebar) return null;
+  const { open, toggleSidebar } = sidebar;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+          aria-label={open ? "Hide feed list" : "Show feed list"}
+          aria-expanded={open}
+          onClick={toggleSidebar}
+        >
+          {open ? (
+            <PanelLeftClose className="size-4" />
+          ) : (
+            <PanelLeft className="size-4" />
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        {open ? "Hide feed list" : "Show feed list"} <Kbd>[</Kbd>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

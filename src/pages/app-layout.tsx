@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Outlet, useNavigate, useLocation, useParams } from "react-router";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
@@ -8,7 +8,8 @@ import { useSignalMidnightRefresh } from "@/hooks/use-signal-midnight-refresh.ts
 import { useBriefingAutoRefresh } from "@/hooks/use-briefing-auto-refresh.ts";
 import { useLicenseRefresh } from "@/hooks/use-license-refresh.ts";
 import { useSharedSidebarSize } from "@/hooks/use-shared-sidebar-size.ts";
-import { useSidebar } from "@/components/ui/sidebar.tsx";
+import { SIDEBAR_COOKIE_NAME, useSidebar } from "@/components/ui/sidebar.tsx";
+import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { ALL_FEEDS_ID, PANEL_LAYOUT_ID } from "@feedzero/core/utils/constants";
 import {
   ResizablePanelGroup,
@@ -124,37 +125,126 @@ export function AppLayout() {
   return <DesktopShell onFeedSelect={handleFeedSelect} />;
 }
 
+/**
+ * Whether the sidebar should start expanded.
+ *
+ * SidebarProvider already writes `sidebar_state` on every toggle, but
+ * nothing read it back, so a collapsed sidebar reappeared on every reload.
+ * Collapsing is a deliberate choice about the shape of the app; it would
+ * not be much of an option if it only lasted until the next refresh.
+ * Defaults to expanded whenever the cookie is absent or unreadable.
+ */
+function readPersistedSidebarOpen(): boolean {
+  try {
+    const match = document.cookie.match(
+      new RegExp(`(?:^|;\\s*)${SIDEBAR_COOKIE_NAME}=(true|false)`),
+    );
+    return match ? match[1] === "true" : true;
+  } catch {
+    return true;
+  }
+}
+
 function DesktopShell({ onFeedSelect }: { onFeedSelect: (id: string) => void }) {
+  return (
+    <SidebarProvider
+      defaultOpen={readPersistedSidebarOpen()}
+      className="h-svh overflow-hidden"
+    >
+      <SidebarKeyboardToggle />
+      <DesktopPanels onFeedSelect={onFeedSelect} />
+    </SidebarProvider>
+  );
+}
+
+/**
+ * The outer [sidebar | stage] group. Split out of DesktopShell purely so
+ * it can call useSidebar() — DesktopShell is the component that renders
+ * the provider, so it sits outside its own context.
+ *
+ * The sidebar panel is collapsible rather than conditionally rendered:
+ * ADR 013 requires the outer group's child set to stay constant, and
+ * unmounting the panel is exactly the layout recompute that made the
+ * sidebar jitter on every navigation.
+ */
+function DesktopPanels({ onFeedSelect }: { onFeedSelect: (id: string) => void }) {
   const layoutId = PANEL_LAYOUT_ID.MAIN;
   const sidebarSize = useSharedSidebarSize();
+  const { open, setOpen } = useSidebar();
+  const sidebarPanel = useRef<PanelImperativeHandle | null>(null);
+  const persistWidth = sidebarSize.onResize;
+  const lastExpandedPx = useRef<number | null>(null);
+
+  useEffect(() => {
+    const panel = sidebarPanel.current;
+    if (!panel) return;
+    if (!open) {
+      panel.collapse();
+      return;
+    }
+    // `expand()` restores "the most recent size", which in practice came
+    // back as minSize and silently shrank a sidebar the user had widened.
+    // The width we watched them settle on is the one to restore.
+    const width = lastExpandedPx.current;
+    if (width && width > 0) panel.resize(width);
+    else panel.expand();
+  }, [open]);
+
+  const handleSidebarResize = useCallback(
+    (size: PanelSize) => {
+      // Dragging the handle past minSize collapses the panel directly,
+      // without going through `open`. Reconciling here keeps the mouse,
+      // the button, and `[` describing the same sidebar — otherwise a
+      // drag-collapse leaves `open` true and the next `[` appears dead.
+      const collapsed = size.inPixels <= 0;
+      if (collapsed === open) setOpen(!collapsed);
+      // Never record the collapsed width — neither for this session nor
+      // for the next one. Reopening has to restore the width the user
+      // actually chose, not zero and not the minimum.
+      if (!collapsed) {
+        lastExpandedPx.current = size.inPixels;
+        persistWidth(size);
+      }
+    },
+    [open, setOpen, persistWidth],
+  );
 
   return (
-    <SidebarProvider className="h-svh overflow-hidden">
-      <SidebarKeyboardToggle />
-      <ResizablePanelGroup
-        id={layoutId}
-        direction="horizontal"
-        className="h-svh"
+    <ResizablePanelGroup
+      id={layoutId}
+      direction="horizontal"
+      className="h-svh"
+    >
+      <ResizablePanel
+        id="sidebar"
+        panelRef={sidebarPanel}
+        collapsible
+        collapsedSize={0}
+        defaultSize={sidebarSize.defaultSize ?? "256px"}
+        minSize="150px"
+        maxSize="280px"
+        className="overflow-hidden"
+        onResize={handleSidebarResize}
       >
-        <ResizablePanel
-          id="sidebar"
-          defaultSize={sidebarSize.defaultSize ?? "256px"}
-          minSize="150px"
-          maxSize="280px"
-          className="overflow-hidden"
-          onResize={sidebarSize.onResize}
+        {/* `hidden`, not just zero width: a 0px panel with overflow-hidden
+            still holds every feed link, so without this the user would tab
+            through a sidebar they cannot see. */}
+        <div
+          data-testid="sidebar-panel"
+          className="w-full h-full"
+          hidden={!open}
         >
           <AppSidebar
             collapsible="none"
             className="w-full h-full"
             onFeedSelect={onFeedSelect}
           />
-        </ResizablePanel>
-        <ResizableHandle />
-        <ResizablePanel id="stage" className="overflow-hidden">
-          <Outlet />
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </SidebarProvider>
+        </div>
+      </ResizablePanel>
+      <ResizableHandle />
+      <ResizablePanel id="stage" className="overflow-hidden">
+        <Outlet />
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }

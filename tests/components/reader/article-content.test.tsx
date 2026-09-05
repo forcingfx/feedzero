@@ -25,10 +25,22 @@ describe("ArticleContent", () => {
     expect(link!.getAttribute("target")).toBe("_blank");
   });
 
-  it("has max-w-180 class for readability", () => {
+  /**
+   * Pin: the reading measure belongs to ReaderPanel's <article> column,
+   * not here. Trade-off encoded — ArticleContent gives up the ability to
+   * be dropped anywhere unconstrained, and in exchange the readerWidth
+   * preference has exactly one place to apply. Two owners meant the body
+   * stayed at max-w-180 while the headings widened.
+   */
+  it("does not set its own reading measure (ReaderPanel owns the width)", () => {
     const { container } = render(<ArticleContent html="<p>text</p>" />);
     const wrapper = container.firstElementChild;
-    expect(wrapper?.className).toContain("max-w-180");
+    // Only bare utilities count — `[&_img]:max-w-full` scopes a child
+    // image, which is not a measure on the wrapper itself.
+    const bareMaxWidth = (wrapper?.className ?? "")
+      .split(/\s+/)
+      .filter((token) => token.startsWith("max-w-"));
+    expect(bareMaxWidth).toEqual([]);
   });
 
   it("has leading-relaxed class for readability", () => {
