@@ -28,10 +28,12 @@
  *     without its discounts loses them, permanently and silently. That is why
  *     `buildAnnualScheduleUpdate` echoes the current phase wholesale rather
  *     than naming the fields it cares about.
- *   - **A final phase with no duration runs indefinitely.** That is the shape
- *     for "this is the price from now on" — as opposed to `iterations`, which
- *     would end the annual phase after one year and hand the subscription
- *     back at whatever price the schedule defaulted to.
+ *   - **A final phase with no duration lasts one billing period, then the
+ *     schedule ends.** With `end_behavior: "release"` the subscription is
+ *     handed back *still on the annual price* and keeps renewing normally, so
+ *     the customer's steady state is $9/year with no schedule attached. This
+ *     was verified against a real subscription: phase 1 came back as one year
+ *     with an end date, not as an unbounded phase.
  */
 
 /** Minimal subset of a Stripe Subscription this migration reads. */
@@ -44,11 +46,26 @@ export interface SubscriptionSummary {
   items: { data: { price: { id: string } }[] };
 }
 
-/** A phase as Stripe returns it, plus the pass-through fields we must echo. */
+/**
+ * A phase as Stripe returns it.
+ *
+ * Deliberately open on both levels: a real phase carries far more than the
+ * three fields this module reads (`currency`, `automatic_tax`, `discounts`,
+ * `invoice_settings`, …) and each item carries more than price and quantity
+ * (`plan`, `tax_rates`, `billing_thresholds`, `metadata`). The index
+ * signatures exist so those survive the echo rather than being typed away —
+ * losing them is exactly the data loss this module is built to avoid.
+ */
 export interface SchedulePhase {
   start_date: number;
   end_date: number;
-  items: { price: string; quantity?: number }[];
+  items: SchedulePhaseItem[];
+  [passThrough: string]: unknown;
+}
+
+export interface SchedulePhaseItem {
+  price: string;
+  quantity?: number;
   [passThrough: string]: unknown;
 }
 
@@ -139,8 +156,44 @@ export interface AnnualPhase {
 }
 
 /**
- * Build the second request: re-state the current phase verbatim, then append
- * an open-ended annual phase after it.
+ * Recursively strip `null` and `undefined` from an echoed phase.
+ *
+ * Two separate Stripe behaviours make this necessary, and both were found by
+ * running the migration against a real subscription rather than a fixture:
+ *
+ *   - The SDK serializes a null field to an empty string, and Stripe reads an
+ *     empty string as "unset this parameter", then refuses it for fields that
+ *     cannot be unset — `You passed an empty string for
+ *     'phases[0][collection_method]'`.
+ *   - Stripe returns each discount as `{coupon, discount, promotion_code}`
+ *     with the two unused slots null. Echoed verbatim that reads as all three
+ *     being supplied — `You may only specify one of these parameters: coupon,
+ *     discount, promotion_code`.
+ *
+ * The second is why this recurses instead of filtering the phase's own keys:
+ * the offending nulls are inside an array of objects.
+ *
+ * Only null and undefined are dropped. `0`, `""` and `{}` are values a
+ * customer may genuinely hold, and dropping those would be the very data loss
+ * the echo exists to prevent.
+ */
+function stripNullish<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stripNullish(entry)) as unknown as T;
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, v]) => v !== null && v !== undefined)
+        .map(([k, v]) => [k, stripNullish(v)]),
+    ) as unknown as T;
+  }
+  return value;
+}
+
+/**
+ * Build the second request: re-state the current phase, minus its null fields,
+ * then append the annual phase after it.
  *
  * Throws rather than returning a `Result` because every input comes from the
  * response Stripe just gave us one line earlier. A schedule created with
@@ -163,7 +216,7 @@ export function buildAnnualScheduleUpdate(
 
   return {
     phases: [
-      { ...current },
+      stripNullish(current),
       {
         items: [{ price: annualPriceId, quantity }],
         proration_behavior: "none",
