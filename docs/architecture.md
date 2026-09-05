@@ -156,6 +156,24 @@ Endpoints:
 - `POST /api/checkout/create-session` — Stripe Checkout Session creation with priceId allowlist. Injects a server-controlled 30-day free trial via `subscription_data.trial_period_days` — see [ADR 015](decisions/015-stripe-side-trial.md).
 - `GET /api/health`, `GET /api/icon`, `POST /api/feedback`, `GET /api/favicon` — Operational endpoints.
 
+#### JSON on every path, including the ones nobody calls
+
+A handler must answer JSON for *every* outcome it can produce — validation
+failures, wrong methods, malformed payloads — and must never let an exception
+escape. The two rules are the same rule: a handler that throws does not return
+a response at all, so the platform substitutes its own HTML error page.
+
+Clients read the server's `error` field to tell the user what went wrong. Any
+response they cannot parse collapses into a generic message and takes the
+status code — the only clue identifying which layer broke — with it. This is
+not hypothetical: `/api/feedback` read `body.message.trim()` straight off the
+parsed payload, so a body of `null`, an array, or `{"message": 42}` (all valid
+JSON) threw a `TypeError` out of the handler, and the feedback dialog reported
+the resulting HTML 500 to the user as *"check your connection"* — sending them
+to inspect the one part of the system that was working. Narrow untrusted
+fields to their expected type before using them, and return `jsonResponse` from
+the method guard too.
+
 ### Production data layer: Upstash KV
 
 Per [ADR 008](decisions/008-upstash-as-production-data-layer.md), five distinct server-side concerns share one Upstash REST KV instance with non-overlapping key prefixes (`license:*`, `customer:*`, `vault:*`, `seen-event:*`, `catalog:*`, `ratelimit:*`). The credential cascade `UPSTASH_REDIS_REST_URL/TOKEN` → `KV_REST_API_URL/TOKEN` → memory fallback is shared by every adapter, so an operator configures Upstash once and all five subsystems pick it up.

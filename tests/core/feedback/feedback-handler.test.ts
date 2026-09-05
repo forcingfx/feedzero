@@ -44,6 +44,51 @@ describe("handleFeedbackRequest", () => {
     expect(res.status).toBe(405);
   });
 
+  it("answers a non-POST with a JSON body the client can parse", async () => {
+    const res = await handleFeedbackRequest(
+      new Request(ENDPOINT, { method: "GET" }),
+    );
+    expect(res.headers.get("content-type")).toBe("application/json");
+    await expect(res.json()).resolves.toMatchObject({ ok: false });
+  });
+
+  // Every entry below is accepted by JSON.parse, so the handler reaches the
+  // field reads with a value it did not expect. Each one used to throw a
+  // TypeError that escaped the handler entirely: the serverless platform
+  // turned the rejected promise into an HTML 500 page, which the dialog could
+  // not parse, so the user was told to check their connection.
+  describe.each([
+    ["a null body", null],
+    ["an array body", []],
+    ["a string body", "just text"],
+    ["a number body", 42],
+    ["a non-string message", { message: 42 }],
+    ["an object message", { message: { nested: true } }],
+  ])("malformed payload: %s", (_label, payload) => {
+    it("answers 400 JSON instead of throwing", async () => {
+      const res = await handleFeedbackRequest(postJson(payload));
+
+      expect(res.status).toBe(400);
+      expect(res.headers.get("content-type")).toBe("application/json");
+      await expect(res.json()).resolves.toMatchObject({ ok: false });
+    });
+  });
+
+  it("treats a non-string email as absent rather than throwing", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await handleFeedbackRequest(
+      postJson({ message: "Hi", email: 7 }),
+    );
+
+    expect(res.status).toBe(200);
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.body).toBe("Hi");
+  });
+
   it("returns 503 when GITHUB_FEEDBACK_TOKEN is missing", async () => {
     delete process.env.GITHUB_FEEDBACK_TOKEN;
     const res = await handleFeedbackRequest(postJson({ message: "Hi" }));
