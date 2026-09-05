@@ -11,11 +11,6 @@
  * before the user types it — see <FeedbackDialog>.
  */
 
-interface FeedbackBody {
-  message?: string;
-  email?: string;
-}
-
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_EMAIL_LENGTH = 254;
 
@@ -30,7 +25,7 @@ export async function handleFeedbackRequest(
   request: Request,
 ): Promise<Response> {
   if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return jsonResponse({ ok: false, error: "Method not allowed" }, 405);
   }
 
   const token = process.env.GITHUB_FEEDBACK_TOKEN;
@@ -43,14 +38,14 @@ export async function handleFeedbackRequest(
     );
   }
 
-  let body: FeedbackBody;
+  let payload: unknown;
   try {
-    body = await request.json();
+    payload = await request.json();
   } catch {
     return jsonResponse({ ok: false, error: "Invalid JSON" }, 400);
   }
 
-  const message = body.message?.trim();
+  const message = readTrimmedString(payload, "message");
   if (!message) {
     return jsonResponse({ ok: false, error: "Message is required" }, 400);
   }
@@ -64,7 +59,7 @@ export async function handleFeedbackRequest(
   // Email is optional. Reject obviously malformed values so a stray copy-paste
   // doesn't end up in the public issue body, but keep validation permissive —
   // the maintainer is the one who'll actually try replying.
-  const email = body.email?.trim();
+  const email = readTrimmedString(payload, "email");
   if (email) {
     if (email.length > MAX_EMAIL_LENGTH || !email.includes("@")) {
       return jsonResponse(
@@ -110,6 +105,27 @@ export async function handleFeedbackRequest(
       502,
     );
   }
+}
+
+/**
+ * Read one field of the request payload as a trimmed string, or `undefined`.
+ *
+ * Every value `JSON.parse` accepts arrives here: `null`, arrays, bare strings
+ * and numbers are all valid JSON documents, and a well-formed object can still
+ * carry a number where a string belongs. Reaching straight for `.trim()` threw
+ * a TypeError that escaped the handler, and a rejected handler promise is not
+ * a response — the serverless platform answered with its own HTML 500 page.
+ * The dialog cannot parse HTML, so it reported a *server crash* as a *network
+ * failure* and pointed the user at their connection. Narrowing to string here
+ * keeps every malformed payload on the 400-JSON path.
+ */
+function readTrimmedString(
+  payload: unknown,
+  field: string,
+): string | undefined {
+  if (typeof payload !== "object" || payload === null) return undefined;
+  const value = (payload as Record<string, unknown>)[field];
+  return typeof value === "string" ? value.trim() : undefined;
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
