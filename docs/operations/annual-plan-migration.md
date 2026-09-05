@@ -17,7 +17,7 @@ mechanism is one Stripe Subscription Schedule per subscription:
 | Phase | Price | When |
 | --- | --- | --- |
 | 0 | whatever they pay now | until the current period ends (unchanged) |
-| 1 | `$9/yr` | from then on, open-ended |
+| 1 | `$9/yr` | one year, then the schedule releases and the sub keeps renewing at $9/yr |
 
 Nobody is charged at the switchover. The first `$9` invoice is the one that
 would have been their next `$5` invoice.
@@ -229,7 +229,10 @@ In the Dashboard, on a migrated subscription:
 - A schedule is attached, with **two** phases.
 - Phase 1 ends at the subscription's existing `current_period_end` — *not*
   sooner. If it moved, the switchover will bill early.
-- Phase 2 is the `$9` annual price, with no end date.
+- Phase 2 is the `$9` annual price. It carries an end date one year out — that
+  is expected. With `end_behavior: release` the schedule then hands the
+  subscription back *still on the annual price*, and it renews normally with no
+  schedule attached.
 - **Upcoming invoice is unchanged in amount and date.** This is the check that
   matters: if it moved, proration leaked in.
 - Any coupon, tax rate or metadata the customer had is still on phase 1.

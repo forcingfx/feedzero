@@ -185,8 +185,11 @@ The shape of it:
 
 Decision item 7 is implemented as one Subscription Schedule per subscription:
 phase 0 re-states the current billing period untouched, phase 1 is the annual
-price with `proration_behavior: "none"` and no duration, so it renews
-indefinitely. Nobody is charged, credited or prorated at the switchover.
+price with `proration_behavior: "none"` and no duration. Stripe gives that
+phase one billing period and then ends the schedule; `end_behavior: "release"`
+hands the subscription back still on the annual price, so the steady state is
+$9/year with no schedule attached. Nobody is charged, credited or prorated at
+the switchover.
 
 The one Stripe behaviour that will bite a hand-edited migration: **an update
 replaces a phase rather than merging into it**, so any attribute omitted from
@@ -205,8 +208,10 @@ that reason.
   renewal, and the trial explicitly *not* receiving grace.
 - `tests/core/stripe/plan-migration.test.ts` pins the migration's eligibility
   rules and the schedule payload — including that the current phase is echoed
-  back intact, that the switchover prorates nothing, and that the annual phase
-  is open-ended.
+  back intact — including nulls nested inside `discounts` and `items`, which a
+  verbatim echo trips over — and that the switchover prorates nothing. The flow
+  was rehearsed end-to-end against a real Stripe test-mode subscription
+  carrying a coupon and metadata before being run on the live book.
 - Stripe test mode: `4242 4242 4242 4242` through `?subscribe=personal-yearly`,
   then `?subscribe=personal-monthly` to confirm the legacy key resolves rather
   than failing closed.
