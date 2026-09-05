@@ -3,12 +3,48 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-08-02T12:00:00Z</updated>
+  <updated>2026-09-05T12:00:00Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.14.0</id>
+    <title>v0.14.0: One paid plan at $9 a year</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-09-05T12:00:00Z</published>
+    <updated>2026-09-05T12:00:00Z</updated>
+    <summary>Pricing collapses to a single annual plan. The Pro tier is retired, the free feed limit rises to 100, and the reader gains width, unread-only, and feed-icon preferences.</summary>
+    <content type="html"><![CDATA[<p>Pricing collapses to a single annual plan. The Pro tier is retired, the free feed limit rises to 100, and the reader gains width, unread-only, and feed-icon preferences.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added a reading width preference with narrow, comfortable, and wide options, stored in the encrypted vault and synced across devices.</li>
+  <li>Added an unread-only reading mode to the article list, which hides articles once they have been read.</li>
+  <li>Added a preference for showing feed icons in the article list.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Moved to a single paid plan at $9 a year, billed annually. The monthly plan is retired. Existing subscribers move to the annual price at their next renewal, with no proration and no mid-period charge.</li>
+  <li>Renamed the paid tier to Supporter. The licence format is unchanged, so existing licences keep working without reactivation.</li>
+  <li>Raised the free feed limit to 100 subscriptions.</li>
+  <li>Shortened the free trial to 14 days, which is long enough to import a subscription list and read through two weekly cycles.</li>
+  <li>Gave licences seven days of grace past the billing period end, applied on renewal. A card that fails and retries no longer locks the reader out mid-recovery.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed the desktop feed list not collapsing. The control rendered and responded but the panel never moved.</li>
+  <li>Fixed the self-hosted container writing sync vaults outside the configured data directory, which lost them on restart.</li>
+  <li>Fixed eleven API endpoints serving stale bundled output, so changes to their handlers reached production again.</li>
+  <li>Fixed the release feed being served with the wrong content type from its new origin.</li>
+  <li>Fixed both operator command line tools failing to start. They imported a module path that has never existed, so the licence recovery tool documented in the support runbook could not run.</li>
+</ul>
+<h3>Removed</h3>
+<ul>
+  <li>Removed the Pro tier. Every feature listed under it was unbuilt, so nothing became unavailable. The four planned features moved to the paid tier at the same status.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.13.0</id>
     <title>v0.13.0: Mobile reading rebuilt around gestures</title>
