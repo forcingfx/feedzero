@@ -10,7 +10,7 @@ customer's next invoice. Read the whole file before running anything.
 
 ## The shape of the change
 
-Existing subscribers are on `$5/mo` or `$50/yr`. They move to `$9/yr` **at
+Existing subscribers are on `$5/mo`. They move to `$9/yr` **at
 their next renewal** — no proration, no mid-period charge, no credit. The
 mechanism is one Stripe Subscription Schedule per subscription:
 
@@ -20,10 +20,11 @@ mechanism is one Stripe Subscription Schedule per subscription:
 | 1 | `$9/yr` | from then on, open-ended |
 
 Nobody is charged at the switchover. The first `$9` invoice is the one that
-would have been their next `$5` or `$50` invoice.
+would have been their next `$5` invoice.
 
-Two prices stay live for the duration: the legacy monthly one cannot be
-archived until the last monthly subscription has renewed onto annual.
+The legacy $5/month price stays live for the duration — it cannot be archived
+until the last subscription on it has renewed onto annual. The $50/year price
+has no subscribers at all and can go as soon as nothing points at it.
 
 ---
 
@@ -33,32 +34,86 @@ The steps are ordered so that **every reversible step happens before the first
 irreversible one**, and so no customer can reach a checkout page that prices
 something the app does not sell.
 
-### 1. Create the annual price in Stripe (live mode)
+### 0. The live account, as of 2026-09-05
 
-Product: the existing paid product. Do **not** create a new product — the
-license webhook reads `metadata.tier` off the Price, and a new product would
-orphan the existing subscriptions' reporting.
+| Object | id | Note |
+| --- | --- | --- |
+| Product — paid tier | `prod_UUUyM2HGjTzviA` | named *FeedZero Personal*; rename to *FeedZero Supporter* |
+| Product — Pro | `prod_UUV0RkTZnBloZC` | retired by ADR 029; archive |
+| Price — $5/month | `price_1TVVy6Rvqrfm74B2DZ2Qa9NE` | **3 live subscriptions**; keep until they renew |
+| Price — $50/year | `price_1TVW0nRvqrfm74B2BtFlcf6D` | **zero subscriptions**; archivable immediately |
+| Price — $19/month Pro | `price_1TVW0DRvqrfm74B2L2dItBhZ` | never sold; not in the allowlist |
+| Price — $199/year Pro | `price_1TVW0DRvqrfm74B2rNLLRprR` | never sold; not in the allowlist |
 
-- Amount `$9.00`, currency `usd`, recurring, interval `year`.
-- **`metadata.tier = personal`** — this is load-bearing. `extractTier` in
-  `webhook-handler.ts` reads it; a Price without it returns `null`, which the
-  webhook answers with a 200 and no license. The customer pays and receives
-  nothing.
+The whole book is **three subscriptions** — two `active`, one `trialing`, all
+on the $5/month price. Nine exist in total; six are already `canceled`. No
+subscription was ever created on a Pro price, so the `pro` compatibility
+surface in ADR 029 (`normalizeTier`, `extractTier` accepting `"pro"`) protects
+an empty population. Keep it — it costs nothing and the wire is a
+compatibility surface — but do not treat it as load-bearing.
+
+### 1. Create the annual price, and fix the product copy
+
+The Stripe **product name and description print on invoices, receipts and the
+customer portal**. They are a second copy of the tier label living outside the
+codebase, which no test can pin — the same failure mode as the `$19/month` Pro
+price that outlived every other surface. Rename with the price change, or the
+app will say Supporter while the receipt says Personal:
+
+```bash
+stripe products update prod_UUUyM2HGjTzviA --live \
+  --name "FeedZero Supporter" \
+  --description "Auto-organize, offline prefetch, smart filters, rules, Signal, bridges"
+```
+
+The old description — *"Hosted sync, bridges, daily digest, light AI"* — also
+advertised hosted sync, which became **free** in v0.11.0.
+
+Then the price, on that same product. Do **not** create a new product: the
+webhook reads `metadata.tier` off the Price, and a new product orphans the
+existing subscriptions' reporting.
+
+```bash
+stripe prices create --live \
+  --product prod_UUUyM2HGjTzviA \
+  --unit-amount 900 \
+  --currency usd \
+  -d "recurring[interval]=year" \
+  -d "metadata[tier]=personal"
+```
+
+- **`metadata.tier = personal`** is load-bearing. `extractTier` in
+  `webhook-handler.ts` reads it; a Price without it returns `null`, and
+  `handleSubscriptionCreated` answers the webhook with a **200** and issues no
+  license. The customer is charged and receives nothing, with no Stripe retry
+  to save you.
+- **Do not put a trial on the Price.** The 14 days come from the Checkout
+  Session (`checkout-handler.ts`, `subscription_data.trial_period_days` ←
+  `PAID_PLAN.trialDays`). A trial on the Price as well would stack.
+
+Verify before moving on:
+
+```bash
+stripe prices retrieve --live price_NEW
+```
 
 Record the resulting `price_...` id.
 
 ### 2. Add the new price to the allowlist, before anything points at it
 
 ```
-STRIPE_ALLOWED_PRICES=<existing ids>,<new annual id>
+STRIPE_ALLOWED_PRICES=price_1TVVy6Rvqrfm74B2DZ2Qa9NE,price_NEW
 ```
+
+Keep the $5/month id — three subscribers still renew on it until step 6
+completes. **Drop `price_1TVW0nRvqrfm74B2BtFlcf6D`** (the $50/year): it has no
+subscribers and nothing will point at it again.
+
+Set it on **Preview as well as Production**, or preview deploys break.
 
 `resolveAllowedPrices` fails closed — a price missing from this list is
 rejected at checkout with a 400. Adding it first means step 3 cannot produce a
 window where the deploy is live and checkout is broken.
-
-Keep the legacy monthly id in the list until step 7. Old links and in-flight
-sessions still resolve through it.
 
 ### 3. Point the build at the new price
 
@@ -68,7 +123,8 @@ Vercel build env:
 VITE_PRICE_PERSONAL_YEARLY=<new annual id>
 ```
 
-`VITE_PRICE_PERSONAL_MONTHLY` is **removed** — it no longer has a consumer.
+`VITE_PRICE_PERSONAL_MONTHLY` is **removed** — nothing reads it after ADR 029;
+`app.tsx` passes only `personalYearly`.
 The retired `?subscribe=personal-monthly` deeplink key now resolves to the
 annual price, so old links keep selling rather than failing closed.
 
@@ -125,9 +181,18 @@ put a 7-day grace window on renewal in the first place.
 
 ### 7. After the last monthly subscription renews
 
-Only now:
+The $50/year price (`price_1TVW0nRvqrfm74B2BtFlcf6D`) has no subscribers and
+can be archived at step 3, as soon as `VITE_PRICE_PERSONAL_YEARLY` no longer
+points at it. Only the $5/month price has to wait for this step.
 
-- Archive the legacy monthly price in Stripe.
+Optional and independent of the schedule: archive the two Pro prices and
+`prod_UUV0RkTZnBloZC`. They are unreachable through checkout today because the
+allowlist excludes them, but they stay selectable in the Dashboard for a manual
+invoice or Payment Link, and ADR 029 retires the tier. Archiving is reversible.
+
+Only after the last monthly renewal:
+
+- Archive `price_1TVVy6Rvqrfm74B2DZ2Qa9NE` (the $5/month).
 - Remove its id from `STRIPE_ALLOWED_PRICES`.
 - Drop the `personal-monthly` key from `src/core/billing/deeplink.ts` and the
   landing page's links. ADR 029 flags this key as "a lie by name" — it is kept
