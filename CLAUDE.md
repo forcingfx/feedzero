@@ -243,6 +243,58 @@ This project follows **Red-Green-Refactor-Smoke (RGR+S)**. Every change follows 
 7. **SMOKE** — For any change affecting production behavior (endpoint handlers, data layer, adapter resolution, deployment artifacts), add a smoke test under `tests/smoke/` exercising the **live deployed system** after merge. Run via `SMOKE_TESTS=1 npx vitest run tests/smoke/<name>` once Vercel reports Ready. A PR introducing a production code path without a smoke test is incomplete. ⛔ If it fails after deploy, revert or roll forward immediately.
 8. **DEVICE** — For any change to touch gestures, viewport-dependent layout, or safe-area handling: verify on **real mobile hardware** via the PR's Vercel preview URL (a QR of the branch-alias URL makes this a 5-second loop). ⛔ Emulation is not sufficient — see [Gesture work](#gesture-work).
 
+## Shipping: verify the outcome, not the action
+
+**A command exiting 0 is not evidence that the thing you wanted is true.**
+Every failure of the 2026-09-05 pricing cutover lived in that gap: `git push`
+succeeded, `gh pr merge` succeeded, `tsc` was green — and the landing site
+served stale pricing for an hour because none of those facts were the fact
+that mattered.
+
+⛔ **Never report a change as shipped until you have observed it in the
+deployed system.** Not the PR state, not the merge commit, not the CI badge.
+
+| Change | The assertion that closes it |
+| --- | --- |
+| App deploy | `curl https://my.feedzero.app/api/health` shows the expected `commit` |
+| Build-time env var (`VITE_*`) | fetch the deployed bundle, grep for the value |
+| Server-side env var | call the endpoint and assert the behaviour it gates |
+| Landing copy | `curl https://feedzero.app/<path>` and grep for the new string |
+| Stripe change | read the object back and assert its fields |
+
+### Repos and remotes
+
+- **`git remote -v` in full. Never `| head`.** Both repos carried a stale
+  `gitlab` remote for four months after the 2026-05-09 move to GitHub. A
+  landing change was pushed and merged there — a remote nothing deploys from.
+  The same applies to any command whose answer depends on seeing every line.
+- **`feedzero.app` (landing) does not auto-deploy on push** unless the commit
+  author email is one Vercel can resolve to a Git account. Use the account's
+  GitHub noreply address; a personal address Vercel cannot match makes the
+  deploy silently not happen. After pushing landing, confirm the live page.
+
+### Pull requests
+
+- **Sequential PRs off `main`. Never stacked.** This repo squash-merges, which
+  deletes the base branch, auto-closes any PR stacked on it, and GitHub then
+  refuses to reopen it once the head has been force-pushed. Land one, rebase
+  the next onto `main`, open it then.
+
+### Scripts and one-off tooling
+
+- **Never hand over an executable you have not executed.** `scripts/` is
+  type-checked by `tsconfig.scripts.json` (`npm run typecheck` covers both
+  projects) precisely because `find-license.ts` shipped in PR #106 importing a
+  path that has never existed, and crashed on startup for months. Type-clean is
+  still not "runs" — run it.
+- **Rehearse every live third-party write against that provider's test mode
+  first.** The annual-plan migration was rejected twice by Stripe — nulls, then
+  nulls nested inside `discounts` — on payloads that passed every unit test,
+  because the fixtures were the documentation's minimal shape rather than what
+  the API returns. A test-mode subscription carrying a coupon and metadata
+  found both before a customer did. See
+  `docs/operations/annual-plan-migration.md`.
+
 ## Smoke tests
 
 Smoke tests in `tests/smoke/` run only when `SMOKE_TESTS=1`. They are **not** part of `npm test`.
