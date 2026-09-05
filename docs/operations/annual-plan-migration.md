@@ -145,10 +145,27 @@ Deploy the ADR 029 branch. At this point new customers buy the annual plan.
 Existing subscribers are untouched and still on their old price — that is
 correct, and step 6 is what changes it.
 
-### 6. Migrate the existing book
+### 6. Migrate the existing book — ✅ done 2026-09-05
+
+**Do not use `vercel env pull` for this.** Vercel redacts sensitive values, so
+`STRIPE_SECRET_KEY` comes back as `""` and the script exits with
+"missing env vars". Create a short-lived **restricted key** instead
+([dashboard](https://dashboard.stripe.com/apikeys) → Create restricted key) with:
+
+| Resource | Permission |
+| --- | --- |
+| Subscriptions | Write |
+| Subscription Schedules | Write |
+| everything else | None |
+
+Subscriptions needs *Write*, not Read: creating a schedule with
+`from_subscription` writes through to the subscription. Stripe's docs recommend
+a restricted key over a secret key generally, and explicitly when handing a key
+to an agent. Revoke it when the migration is done.
 
 ```bash
-vercel env pull .env.production --environment=production
+export STRIPE_SECRET_KEY=rk_live_...
+export VITE_PRICE_PERSONAL_YEARLY=price_1UCKSrRvqrfm74B2ZVK37lv2
 
 # Dry run — the default. Changes nothing, prints the full plan.
 npx tsx scripts/migrate-to-annual-plan.ts
@@ -158,8 +175,6 @@ npx tsx scripts/migrate-to-annual-plan.ts --subscription sub_1P... --apply
 
 # Then the rest
 npx tsx scripts/migrate-to-annual-plan.ts --apply
-
-rm .env.production   # contains live Stripe keys in cleartext
 ```
 
 Read the dry run before applying. It prints one line per subscription and a
@@ -192,7 +207,18 @@ The dry run on 2026-09-05, against the whole live book:
 
 **There is a clock on this.** Each subscription only moves at its *next*
 renewal, so one that bills before the schedule is attached renews at $5/month
-and waits another month. The earliest is 2026-09-11.
+and waits another month. The earliest was 2026-09-11.
+
+Applied 2026-09-05 — 3 migrated, 0 failed, 6 skipped. Verified per subscription:
+two phases, phase 0 still on $5/month and ending at the **unchanged** period
+end, phase 1 on $9/year with `proration_behavior: none`, `end_behavior:
+release`, subscription still active.
+
+| Subscription | Schedule | Phase 0 ends | First $9 invoice |
+| --- | --- | --- | --- |
+| `sub_1U3hA6Rvqrfm74B26iV9dfrN` (trialing) | `sub_sched_1UCLMfRvqrfm74B29mPzbcEq` | 2026-09-11 | 2026-09-11 |
+| `sub_1TuHCpRvqrfm74B21mBOZMsa` | `sub_sched_1UCLMgRvqrfm74B2roUpcp9Y` | 2026-09-16 | 2026-09-16 |
+| `sub_1TlLkeRvqrfm74B29TPzpacJ` | `sub_sched_1UCLMhRvqrfm74B2WHYEfHVz` | 2026-09-23 | 2026-09-23 |
 
 `past_due` subscribers **are** migrated. Stripe retries a failed card for about
 three weeks and those customers are still customers — the same reasoning that
