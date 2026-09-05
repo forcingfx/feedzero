@@ -164,6 +164,36 @@ both recommend one for the subscription-fatigued (BazQux's $249 is repeatedly
 cited). At $9/yr a $99 lifetime is eleven years of revenue pulled forward, which
 makes the question sharper than it was, not softer. It needs its own ADR.
 
+## Stripe migration checklist
+
+The step-by-step order of operations lives in
+[`docs/operations/annual-plan-migration.md`](../operations/annual-plan-migration.md).
+The shape of it:
+
+1. Create the `$9/yr` Price on the **existing** product, with
+   `metadata.tier = personal`. A Price without that metadata makes `extractTier`
+   return `null`, and the webhook answers a paying customer with a 200 and no
+   license.
+2. Add the new id to `STRIPE_ALLOWED_PRICES` *before* anything points at it —
+   `resolveAllowedPrices` fails closed.
+3. Set `VITE_PRICE_PERSONAL_YEARLY`; remove `VITE_PRICE_PERSONAL_MONTHLY`.
+4. Ship the landing page, then the app (the serialization rule in `CLAUDE.md`).
+5. Migrate the existing book with `scripts/migrate-to-annual-plan.ts` — dry-run
+   by default, `--apply` to execute, idempotent across re-runs.
+6. Once the last monthly subscription has renewed: archive the legacy price,
+   drop it from the allowlist, and retire the `personal-monthly` deeplink key.
+
+Decision item 7 is implemented as one Subscription Schedule per subscription:
+phase 0 re-states the current billing period untouched, phase 1 is the annual
+price with `proration_behavior: "none"` and no duration, so it renews
+indefinitely. Nobody is charged, credited or prorated at the switchover.
+
+The one Stripe behaviour that will bite a hand-edited migration: **an update
+replaces a phase rather than merging into it**, so any attribute omitted from
+the update is unset. A phase re-stated without its discounts loses them
+silently. `buildAnnualScheduleUpdate` echoes the current phase wholesale for
+that reason.
+
 ## Verification
 
 - `npm run docs:tier-matrix -- --check` — the generated matrix doc tracks the
@@ -173,6 +203,10 @@ makes the question sharper than it was, not softer. It needs its own ADR.
   `pro` token through the codec and asserts it grants paid access.
 - `tests/core/license/issuer.test.ts` covers the annual fallback, grace on
   renewal, and the trial explicitly *not* receiving grace.
+- `tests/core/stripe/plan-migration.test.ts` pins the migration's eligibility
+  rules and the schedule payload — including that the current phase is echoed
+  back intact, that the switchover prorates nothing, and that the annual phase
+  is open-ended.
 - Stripe test mode: `4242 4242 4242 4242` through `?subscribe=personal-yearly`,
   then `?subscribe=personal-monthly` to confirm the legacy key resolves rather
   than failing closed.

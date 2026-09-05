@@ -89,7 +89,9 @@ is **annual-only** at $9/year, so there is no monthly CTA to be a secondary link
 beneath. Nothing to A/B test.
 
 The landing page (`feedzero-landing/pricing/index.html`) still needs updating to
-match — see the Stripe migration checklist in ADR 029.
+match. It ships as step 4 of
+[`docs/operations/annual-plan-migration.md`](annual-plan-migration.md), the
+runbook for the whole cutover.
 
 ---
 
