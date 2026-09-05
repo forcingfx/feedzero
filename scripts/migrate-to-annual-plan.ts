@@ -53,7 +53,7 @@ import {
   type ScheduleSummary,
   type SubscriptionSummary,
 } from "../src/core/stripe/plan-migration";
-import { err, ok, type Result } from "../src/utils/result";
+import { err, ok, type Result } from "../packages/core/src/utils/result";
 
 // See the same declaration in find-license.ts: the project's `process` global
 // is narrowed at the type level to keep shippable code honest about not
