@@ -457,15 +457,18 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           !cachedExtraction &&
           article.link &&
           paywallMap[article.link] ? (
-          <PaywallPrompt
-            publisher={paywallMap[article.link].publisher}
-            articleUrl={article.link}
-            reason={
-              paywallMap[article.link].reason === "session-expired"
-                ? "session-expired"
-                : "paywall"
-            }
-          />
+          <>
+            <ArticleContent html={getContent()} />
+            <PaywallPrompt
+              publisher={paywallMap[article.link].publisher}
+              articleUrl={article.link}
+              reason={
+                paywallMap[article.link].reason === "session-expired"
+                  ? "session-expired"
+                  : "paywall"
+              }
+            />
+          </>
         ) : (
           <ArticleContent html={getContent()} />
         )}

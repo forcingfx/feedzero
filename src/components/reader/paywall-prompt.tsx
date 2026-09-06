@@ -90,14 +90,12 @@ export function PaywallPrompt({
           <h3 className="font-medium leading-tight">
             {showSessionExpired
               ? `${publisher} session needs refreshing`
-              : "Paywalled article"}
+              : "Full article not available"}
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
             {showSessionExpired
               ? `Your sign-in to ${publisher} appears to have expired. Open the publisher to sign back in, then reload this article.`
-              : publisher
-                ? `${publisher} requires a subscription to read the full article.`
-                : "This article appears to be behind a paywall."}
+              : `${publisher ?? "The publisher"} likely requires a subscription or disallows fetching.`}
           </p>
         </div>
       </header>
