@@ -25,7 +25,13 @@
 
 Paywall **gating** (by HTTP status) and the **"Open original"** fallback ship
 now: a publisher that refuses the anonymous fetch (401/402/403/451) shows a
-clean "Paywalled article → Open original" card instead of a broken extraction.
+"Full article not available → Open original" card *below the feed's own text*
+instead of a broken extraction. The card's copy is hedged ("likely requires a
+subscription or disallows fetching") because a gated status cannot distinguish
+a paywall from bot-blocking: NYT answers the proxy with a DataDome 403
+challenge page, and its feed carries only a ~170-character summary per item,
+so hiding that summary behind the card would leave the reader with less than
+Feed view shows.
 The **extension CTAs** (Install the FeedZero
 extension, Authorize `<publisher>`, session-expired sign-in) are gated behind
 `isExtensionEnabled()` (`src/core/extension/extension-enabled.ts`), which reads

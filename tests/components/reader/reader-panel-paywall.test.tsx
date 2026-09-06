@@ -99,7 +99,44 @@ describe("ReaderPanel paywall integration", () => {
     // Scoped to the prompt to avoid colliding with the article-title heading.
     expect(
       prompt.querySelector("h3"),
-    ).toHaveTextContent(/paywalled article/i);
+    ).toHaveTextContent(/full article/i);
+  });
+
+  it("keeps the feed's own text visible above the prompt in extracted view (NYT ships a one-line summary and nothing else)", () => {
+    // The verdict must not hide the only text we hold for the article:
+    // NYT's feed carries a ~170-char description per item and the anonymous
+    // fetch is refused, so replacing the pane with the prompt would leave the
+    // user with strictly less than Feed view showed them.
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+
+    act(() => {
+      useExtractionStore.setState({
+        cache: {},
+        statusMap: { "https://nytimes.com/article-x": "failed" },
+        paywallMap: {
+          "https://nytimes.com/article-x": {
+            paywalled: true,
+            publisher: "nytimes.com",
+            reason: "http-403",
+          },
+        },
+        viewMode: "extracted",
+      });
+    });
+
+    const prompt = screen.getByRole("region", { name: /paywall prompt/i });
+    const teaser = screen.getByText("Teaser.");
+    expect(teaser).toBeInTheDocument();
+    // Feed text first, prompt after: the prompt explains why there is no more.
+    expect(
+      teaser.compareDocumentPosition(prompt) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("does NOT render PaywallPrompt when in feed view (only on the extracted side)", () => {

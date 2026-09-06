@@ -40,7 +40,7 @@ describe("PaywallPrompt", () => {
       );
 
       expect(
-        screen.getByRole("heading", { name: /paywalled article/i }),
+        screen.getByRole("heading", { name: /full article/i }),
       ).toBeInTheDocument();
       const install = screen.getByRole("link", { name: /install/i });
       expect(install).toBeInTheDocument();
@@ -206,7 +206,7 @@ describe("PaywallPrompt", () => {
       ).toBeInTheDocument();
     });
 
-    it("still shows the paywall heading + message so the user understands why", () => {
+    it("still shows the heading + message so the user understands why", () => {
       useExtensionStore.setState({ status: "absent" });
 
       render(
@@ -214,7 +214,30 @@ describe("PaywallPrompt", () => {
       );
 
       expect(
-        screen.getByRole("heading", { name: /paywalled article/i }),
+        screen.getByRole("heading", { name: /full article/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("does not claim a paywall outright: a gated status can also be bot-blocking (NYT serves a DataDome 403 to datacenter IPs)", () => {
+      useExtensionStore.setState({ status: "absent" });
+
+      render(
+        <PaywallPrompt publisher="nytimes.com" articleUrl="https://nytimes.com/x" />,
+      );
+
+      expect(
+        screen.getByText(/nytimes\.com likely requires a subscription or disallows fetching/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/paywalled article/i)).not.toBeInTheDocument();
+    });
+
+    it("falls back to 'the publisher' when the host is unparseable", () => {
+      useExtensionStore.setState({ status: "absent" });
+
+      render(<PaywallPrompt publisher={null} articleUrl="not-a-url" />);
+
+      expect(
+        screen.getByText(/the publisher likely requires a subscription or disallows fetching/i),
       ).toBeInTheDocument();
     });
   });

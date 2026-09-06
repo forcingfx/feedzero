@@ -6,10 +6,15 @@ import { isExtensionEnabled } from "@/core/extension/extension-enabled.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
- * The four states the reader pane can show when /api/page returns content
- * the paywall detector flags as gated.
+ * The states the reader pane can show when the anonymous /api/page fetch
+ * was refused with a gated HTTP status (401/402/403/451).
  *
- * paywall          — anonymous fetch returned a stub; user has options
+ * The copy is deliberately hedged: a 403 can be a subscription gate or a
+ * bot challenge (NYT serves a DataDome page to datacenter IPs), and the
+ * status alone cannot tell them apart. Asserting "paywalled" would be
+ * wrong for a free article the publisher merely refused to serve us.
+ *
+ * paywall          — anonymous fetch was refused; user has options
  * session-expired  — extension fetched with cookies but still got a stub
  *                    (cookie expired since last grant)
  * authorize        — handled implicitly via extension status; not a prop value
@@ -32,7 +37,7 @@ interface PaywallPromptProps {
 const EXTENSION_INSTALL_URL = "https://feedzero.app/extension";
 
 /**
- * Reader-pane affordance for paywalled articles. Reads from the extension
+ * Reader-pane affordance for gated articles. Reads from the extension
  * store to pick the right call-to-action:
  *
  *   status=absent             → "Install the FeedZero extension" + Open original
@@ -90,14 +95,12 @@ export function PaywallPrompt({
           <h3 className="font-medium leading-tight">
             {showSessionExpired
               ? `${publisher} session needs refreshing`
-              : "Paywalled article"}
+              : "Full article not available"}
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
             {showSessionExpired
               ? `Your sign-in to ${publisher} appears to have expired. Open the publisher to sign back in, then reload this article.`
-              : publisher
-                ? `${publisher} requires a subscription to read the full article.`
-                : "This article appears to be behind a paywall."}
+              : `${publisher ?? "The publisher"} likely requires a subscription or disallows fetching.`}
           </p>
         </div>
       </header>
