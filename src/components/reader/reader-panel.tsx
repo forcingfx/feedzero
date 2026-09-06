@@ -272,7 +272,11 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
     if (viewMode === "extracted" && cachedExtraction) {
       return cachedExtraction;
     }
+    return getFeedContent();
+  }
 
+  /** The feed's own text for this article, regardless of view mode. */
+  function getFeedContent(): string {
     const content = article!.content || article!.summary || "";
     const showSubheading = hasSummarySubheading(
       article!.content,
@@ -376,7 +380,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                   onClick={() => handleModeChange("extracted")}
                   title={
                     hasPaywallVerdict
-                      ? "Article is paywalled — open to authorize the publisher"
+                      ? "Full article couldn't be fetched — open to see options"
                       : extractionStatus === "failed"
                         ? "Extraction didn't find additional content"
                         : undefined
@@ -458,7 +462,9 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           article.link &&
           paywallMap[article.link] ? (
           <>
-            <ArticleContent html={getContent()} />
+            {/* The feed's text is all we hold for a gated article; the prompt
+                explains why there is no more, it must not replace it. */}
+            <ArticleContent html={getFeedContent()} />
             <PaywallPrompt
               publisher={paywallMap[article.link].publisher}
               articleUrl={article.link}
