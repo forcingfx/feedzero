@@ -396,8 +396,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@feedzero/core": path.resolve(__dirname, "./packages/core/src"),
-      "@": path.resolve(__dirname, "./src"),
+      "@feedzero/core": path.resolve(import.meta.dirname, "./packages/core/src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   build: {
