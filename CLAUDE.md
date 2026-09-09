@@ -78,6 +78,7 @@ Three-tier strategy. See [docs/testing-strategy.md](docs/testing-strategy.md) fo
 - Use `selectFeedInSidebar(page, name)` from `fixtures.ts` — it handles opening the sidebar on mobile.
 
 **happy-dom gotchas**:
+- happy-dom is a real resource loader: a `<link rel="stylesheet">` or `<iframe src>` in a fixture opens a socket to the URL. `vitest.config.js` disables CSS/JS file loading and iframe page loading (`environmentOptions.happyDOM.settings`), and `tests/environment/no-real-network.test.ts` pins it. A disabled iframe load still prints one `NotSupportedError` line per fixture; that is happy-dom's unconditional `console.error`, not a failure. Page code that calls `fetch` on mount still needs a stub in the test (`vi.stubGlobal("fetch", ...)`), or the request goes to `localhost:3000` and dies as an `ECONNREFUSED` trace that no assertion sees.
 - DOMPurify + happy-dom executes inline scripts during sanitization. Use non-callable fixtures (`var x = 1;`, not `alert(1)`).
 - CSS-escaped colons (`content\\:encoded`) may work in happy-dom but fail in browsers — always use `getElementsByTagName` for XML namespace-prefixed elements.
 - CDATA with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead.
