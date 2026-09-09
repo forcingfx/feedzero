@@ -10,6 +10,21 @@ export default defineConfig({
   },
   test: {
     environment: "happy-dom",
+    // happy-dom is a real resource loader: a <link rel="stylesheet"> or
+    // <iframe src> in a fixture makes it open a socket to the URL. The unit
+    // suite must never touch the network, and nothing awaited those loads,
+    // so they only showed up as ECONNREFUSED stack traces in every run.
+    // tests/environment/no-real-network.test.ts pins this.
+    environmentOptions: {
+      happyDOM: {
+        settings: {
+          disableCSSFileLoading: true,
+          disableJavaScriptFileLoading: true,
+          disableIframePageLoading: true,
+          handleDisabledFileLoadingAsSuccess: true,
+        },
+      },
+    },
     include: ["tests/**/*.test.{js,ts,tsx}"],
     setupFiles: ["tests/setup.ts"],
     // Unhandled rejections FAIL the run rather than printing "Errors 1"
