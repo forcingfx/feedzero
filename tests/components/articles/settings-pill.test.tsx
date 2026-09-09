@@ -5,7 +5,7 @@
  * to configure (ALL_FEEDS, STARRED).
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsPill } from "@/components/articles/settings-pill.tsx";
@@ -67,9 +67,9 @@ function smartFilter(id: string, name: string): SmartFilter {
 }
 
 describe("SettingsPill", () => {
-  let openFeedSettings: ReturnType<typeof vi.fn>;
-  let openFolderSettings: ReturnType<typeof vi.fn>;
-  let openEditor: ReturnType<typeof vi.fn>;
+  let openFeedSettings: Mock;
+  let openFolderSettings: Mock;
+  let openEditor: Mock;
 
   beforeEach(() => {
     openFeedSettings = vi.fn();

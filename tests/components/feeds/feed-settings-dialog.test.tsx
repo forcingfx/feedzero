@@ -8,7 +8,7 @@
  * confirm.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -75,14 +75,14 @@ function renderDialog() {
 }
 
 describe("FeedSettingsDialog", () => {
-  let renameFeed: ReturnType<typeof vi.fn>;
-  let setFeedPreferFullText: ReturnType<typeof vi.fn>;
-  let setFeedPrefetchEnabled: ReturnType<typeof vi.fn>;
-  let moveFeedToFolder: ReturnType<typeof vi.fn>;
-  let refreshSingleFeed: ReturnType<typeof vi.fn>;
-  let reloadSingleFeed: ReturnType<typeof vi.fn>;
-  let removeFeed: ReturnType<typeof vi.fn>;
-  let openRulesEditor: ReturnType<typeof vi.fn>;
+  let renameFeed: Mock;
+  let setFeedPreferFullText: Mock;
+  let setFeedPrefetchEnabled: Mock;
+  let moveFeedToFolder: Mock;
+  let refreshSingleFeed: Mock;
+  let reloadSingleFeed: Mock;
+  let removeFeed: Mock;
+  let openRulesEditor: Mock;
 
   beforeEach(() => {
     renameFeed = vi.fn().mockResolvedValue(undefined);

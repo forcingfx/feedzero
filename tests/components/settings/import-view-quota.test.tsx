@@ -6,7 +6,7 @@
  * "limit exceeded" failures. ImportView pre-checks the total upfront and
  * refuses with a clear error before kicking off the loop.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ImportView } from "@/components/settings/import-view";
@@ -50,7 +50,7 @@ function seedFreeFeeds(count: number): void {
 }
 
 describe("ImportView quota refusal", () => {
-  let addFeedMock: ReturnType<typeof vi.fn>;
+  let addFeedMock: Mock;
 
   beforeEach(() => {
     useLicenseStore.setState({ tier: "free", verifying: false });

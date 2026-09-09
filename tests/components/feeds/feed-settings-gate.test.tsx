@@ -5,7 +5,7 @@
  * control locked and routed to upgrade rather than a silent dead control.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
@@ -74,8 +74,8 @@ function renderDialog() {
 }
 
 describe("FeedSettingsDialog — tier gating", () => {
-  let openRulesEditor: ReturnType<typeof vi.fn>;
-  let setFeedPrefetchEnabled: ReturnType<typeof vi.fn>;
+  let openRulesEditor: Mock;
+  let setFeedPrefetchEnabled: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();

@@ -4,14 +4,14 @@
  * same handler, new visual.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SortPill } from "@/components/articles/sort-pill.tsx";
 import type { ArticleSortMode } from "@feedzero/core/types";
 
 describe("SortPill", () => {
-  let onChange: ReturnType<typeof vi.fn>;
+  let onChange: Mock;
 
   beforeEach(() => {
     onChange = vi.fn();

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from "vitest";
 import { useLicenseStore } from "@/stores/license-store";
 import {
   setLicenseToken,
@@ -30,7 +30,7 @@ function resetStore() {
 }
 
 describe("useLicenseStore", () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
+  let fetchMock: Mock;
 
   beforeEach(() => {
     localStorage.clear();
@@ -236,6 +236,10 @@ describe("useLicenseStore", () => {
       );
 
       expect(refreshSpy).toHaveBeenCalled();
+      // Vitest 4 hands the same spy back to the next vi.spyOn on this
+      // method, call history included; restore so the sibling test starts
+      // from zero calls.
+      refreshSpy.mockRestore();
     });
 
     it("ignores storage events for unrelated keys", () => {
@@ -251,6 +255,7 @@ describe("useLicenseStore", () => {
       );
 
       expect(refreshSpy).not.toHaveBeenCalled();
+      refreshSpy.mockRestore();
     });
   });
 

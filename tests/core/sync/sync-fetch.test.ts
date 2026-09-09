@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { syncFetch } from "@/core/sync/sync-fetch";
 
 const localStorageMock = (() => {
@@ -22,7 +22,7 @@ Object.defineProperty(globalThis, "localStorage", {
 });
 
 describe("syncFetch — Bearer header attachment", () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
+  let fetchMock: Mock;
 
   beforeEach(() => {
     localStorageMock.clear();

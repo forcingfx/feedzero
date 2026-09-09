@@ -14,7 +14,7 @@
  * (`tests/core/feeds/feed-service.test.js`) covers the override-wins
  * semantics on the receiving side.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ImportView } from "@/components/settings/import-view";
@@ -39,7 +39,7 @@ const TITLE_OPML = `<?xml version="1.0" encoding="UTF-8"?>
 </opml>`;
 
 describe("ImportView — preserves OPML outline.title (issue #117)", () => {
-  let addFeedMock: ReturnType<typeof vi.fn>;
+  let addFeedMock: Mock;
 
   beforeEach(() => {
     useLicenseStore.setState({ tier: "personal", verifying: false });

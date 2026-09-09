@@ -12,7 +12,7 @@
  * - On error: shows an error alert without redirecting
  * - Email can be pre-filled via ?email= query param (deep-link from Account tab)
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach, type Mock } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { BillingRecover } from "@/pages/billing-recover";
@@ -37,7 +37,7 @@ function renderAt(url: string) {
 
 describe("<BillingRecover>", () => {
   let originalFetch: typeof fetch;
-  let assignSpy: ReturnType<typeof vi.fn>;
+  let assignSpy: Mock;
 
   beforeEach(() => {
     originalFetch = globalThis.fetch;

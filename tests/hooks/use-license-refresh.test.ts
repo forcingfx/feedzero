@@ -10,7 +10,7 @@
  *   - tears down its timer and listeners on unmount
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useLicenseRefresh } from "@/hooks/use-license-refresh.ts";
 import { useLicenseStore } from "@/stores/license-store.ts";
@@ -21,7 +21,7 @@ function setOnline(value: boolean) {
 }
 
 describe("useLicenseRefresh", () => {
-  let refresh: ReturnType<typeof vi.fn>;
+  let refresh: Mock;
 
   beforeEach(() => {
     vi.useFakeTimers();

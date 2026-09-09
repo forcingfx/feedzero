@@ -16,7 +16,7 @@
  * (replacing the 38 explicit calls with subscription-based push
  * derived from store state changes) is the follow-up; see ADR 026.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from "vitest";
 import {
   notifyChange,
   clearPending,
@@ -48,7 +48,7 @@ Object.defineProperty(globalThis, "localStorage", {
 });
 
 describe("sync-coordinator", () => {
-  let push: ReturnType<typeof vi.fn>;
+  let push: Mock;
 
   beforeEach(() => {
     vi.useFakeTimers();
