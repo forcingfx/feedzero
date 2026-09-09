@@ -3,7 +3,7 @@
  * Pocket CSV, Omnivore JSON. The HTML Pocket export + OPML + URL list
  * paths are covered by neighbouring tests (placeholder, folders).
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ImportView } from "@/components/settings/import-view";
@@ -19,7 +19,7 @@ vi.mock("@/core/features/paid-tier-active", () => ({
 }));
 
 describe("ImportView — shutdown-migration formats", () => {
-  let addFeedMock: ReturnType<typeof vi.fn>;
+  let addFeedMock: Mock;
 
   beforeEach(() => {
     useLicenseStore.setState({ tier: "personal", verifying: false });

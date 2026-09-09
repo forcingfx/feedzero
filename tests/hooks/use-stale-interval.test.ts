@@ -7,7 +7,7 @@
  * made the next "background hygiene timer we add" land as a third
  * copy.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useStaleInterval } from "@/hooks/use-stale-interval";
 
@@ -25,7 +25,7 @@ function setVisibility(state: DocumentVisibilityState) {
 }
 
 describe("useStaleInterval", () => {
-  let run: ReturnType<typeof vi.fn>;
+  let run: Mock;
   let lastAt: number | null;
 
   beforeEach(() => {

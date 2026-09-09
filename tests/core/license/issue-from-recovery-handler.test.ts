@@ -11,7 +11,7 @@
  * - Customer must have a non-revoked LicenseRecord in storage
  * - Returns the re-signed license token on success
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, type Mock } from "vitest";
 import {
   handleIssueFromRecoveryRequest,
   type IssueFromRecoveryHandlerOptions,
@@ -108,7 +108,7 @@ describe("handleIssueFromRecoveryRequest", () => {
       SIGNING_KEY,
     );
     const opts = baseOptions();
-    (opts.storage.listByCustomer as ReturnType<typeof vi.fn>).mockResolvedValue(
+    (opts.storage.listByCustomer as Mock).mockResolvedValue(
       { ok: true, value: [] },
     );
     const res = await handleIssueFromRecoveryRequest(
@@ -124,7 +124,7 @@ describe("handleIssueFromRecoveryRequest", () => {
       SIGNING_KEY,
     );
     const opts = baseOptions();
-    (opts.subscriptions.retrieve as ReturnType<typeof vi.fn>).mockResolvedValue(
+    (opts.subscriptions.retrieve as Mock).mockResolvedValue(
       { status: "canceled" },
     );
     const res = await handleIssueFromRecoveryRequest(

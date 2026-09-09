@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LicenseTokenInput } from "@/components/billing/license-token-input";
@@ -62,7 +62,7 @@ describe("LicenseTokenInput", () => {
     expect(localStorageMock.getItem("feedzero:license-token")).toBe(
       "fz_payload.signature",
     );
-    const fetchMock = (globalThis.fetch as unknown) as ReturnType<typeof vi.fn>;
+    const fetchMock = (globalThis.fetch as unknown) as Mock;
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/license/verify",
       expect.objectContaining({ method: "POST" }),
@@ -104,7 +104,7 @@ describe("LicenseTokenInput", () => {
       const { rerender } = render(
         <LicenseTokenInput paidTierVisible={true} value="" />,
       );
-      const fetchMock = (globalThis.fetch as unknown) as ReturnType<typeof vi.fn>;
+      const fetchMock = (globalThis.fetch as unknown) as Mock;
       expect(fetchMock).not.toHaveBeenCalled();
 
       function verifyCallCount(): number {
@@ -150,7 +150,7 @@ describe("LicenseTokenInput", () => {
         <LicenseTokenInput paidTierVisible={true} value="not-a-token" />,
       );
       await new Promise((r) => setTimeout(r, 20));
-      const fetchMock = (globalThis.fetch as unknown) as ReturnType<typeof vi.fn>;
+      const fetchMock = (globalThis.fetch as unknown) as Mock;
       const verifyCalls = fetchMock.mock.calls.filter((c) =>
         c[0].toString().includes("/api/license/verify"),
       );

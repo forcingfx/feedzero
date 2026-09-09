@@ -205,6 +205,9 @@ describe("RulesEditorDialog", () => {
       await user.click(screen.getByTestId("rule-save"));
 
       expect(spy).toHaveBeenCalledWith("f1", expect.any(String));
+      // Vitest 4 reuses an existing spy, call history included; restore so
+      // the toggle-off test below starts from zero calls.
+      spy.mockRestore();
     });
 
     it("does NOT call applyRuleToExistingArticles when toggle is off", async () => {
@@ -225,6 +228,7 @@ describe("RulesEditorDialog", () => {
       await user.click(screen.getByTestId("rule-save"));
 
       expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
     });
   });
 

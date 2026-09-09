@@ -8,7 +8,7 @@
  * deserves and the safety net users coming from a 200-feed
  * NetNewsWire export deserve too.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ImportView } from "@/components/settings/import-view";
@@ -120,7 +120,7 @@ describe("ImportView — preview step", () => {
     const user = userEvent.setup();
     render(<ImportView onClose={() => {}} />);
     await pasteOpml(user);
-    const addFeed = useFeedStore.getState().addFeed as ReturnType<typeof vi.fn>;
+    const addFeed = useFeedStore.getState().addFeed as Mock;
     await user.click(screen.getByRole("button", { name: /import 4 feeds/i }));
     expect(addFeed).toHaveBeenCalled();
   });

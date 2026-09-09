@@ -4,7 +4,7 @@
  * dropdown (rename + color + delete).
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -60,9 +60,9 @@ function renderDialog() {
 }
 
 describe("FolderSettingsDialog", () => {
-  let renameFolder: ReturnType<typeof vi.fn>;
-  let updateFolderColor: ReturnType<typeof vi.fn>;
-  let deleteFolder: ReturnType<typeof vi.fn>;
+  let renameFolder: Mock;
+  let updateFolderColor: Mock;
+  let deleteFolder: Mock;
 
   beforeEach(() => {
     renameFolder = vi.fn().mockResolvedValue(undefined);

@@ -10,7 +10,7 @@
  *   - tears down its timer and listeners on unmount
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -28,7 +28,7 @@ function setVisibility(state: DocumentVisibilityState) {
 }
 
 describe("useAutoRefresh", () => {
-  let refreshAll: ReturnType<typeof vi.fn>;
+  let refreshAll: Mock;
 
   beforeEach(() => {
     vi.useFakeTimers();

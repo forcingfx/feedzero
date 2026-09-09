@@ -7,7 +7,7 @@
  * can then hit `r` later to retry. Parse / discovery failures stay
  * rejected because refresh can't recover them.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ImportView } from "@/components/settings/import-view";
@@ -35,10 +35,10 @@ const MIXED_OPML = `<?xml version="1.0" encoding="UTF-8"?>
 </opml>`;
 
 describe("ImportView — placeholder feeds on recoverable fetch failure", () => {
-  let addFeedMock: ReturnType<typeof vi.fn>;
-  let addPlaceholderFeedMock: ReturnType<typeof vi.fn>;
-  let createFolderMock: ReturnType<typeof vi.fn>;
-  let moveFeedToFolderMock: ReturnType<typeof vi.fn>;
+  let addFeedMock: Mock;
+  let addPlaceholderFeedMock: Mock;
+  let createFolderMock: Mock;
+  let moveFeedToFolderMock: Mock;
 
   beforeEach(() => {
     useLicenseStore.setState({ tier: "personal", verifying: false });
