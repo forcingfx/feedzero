@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -33,6 +33,21 @@ function renderWithRoute(path: string) {
 }
 
 describe("BillingSuccess page", () => {
+  // Rendering with a session_id makes the page request the license for that
+  // session on mount. Tests that only assert copy never stubbed fetch, so
+  // happy-dom opened a real socket to localhost:3000 on every run. A default
+  // pending stub keeps the page in its initial state, which is what those
+  // tests were observing anyway; tests that need a response override it.
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders a confirmation heading", () => {
     renderWithRoute("/billing/success");
     expect(
@@ -48,6 +63,12 @@ describe("BillingSuccess page", () => {
     expect(
       screen.getByRole("button", { name: /save/i }),
     ).toBeInTheDocument();
+    // The page asks the server for this session's license rather than
+    // waiting for the user to paste — the input is the fallback.
+    const calls = (globalThis.fetch as unknown as Mock).mock.calls as Array<
+      [RequestInfo | URL, RequestInit?]
+    >;
+    expect(calls.some(([url]) => String(url).includes("/api/license/retrieve"))).toBe(true);
   });
 
   it("does NOT render the session id as page chrome on the polling-state happy path", async () => {
