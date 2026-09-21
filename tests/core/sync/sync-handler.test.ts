@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { handleSyncRequest } from "@/core/sync/sync-handler";
 import { createMemoryAdapter } from "@/core/sync/adapters/memory-adapter";
 import type { SyncStorageAdapter } from "@/core/sync/types";
-import { err } from "@feedzero/core/utils/result";
+import { err, unwrap } from "@feedzero/core/utils/result";
+import { SYNC } from "@feedzero/core/utils/constants";
+import {
+  encodePushBody,
+  PUSH_ENCODING_HEADER,
+  PUSH_ENCODING_GZIP,
+} from "@/core/sync/vault-transport";
 
 describe("sync-handler", () => {
   let adapter: SyncStorageAdapter;
@@ -22,6 +28,18 @@ describe("sync-handler", () => {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+    });
+  }
+
+  /** A PUT shaped the way the current client sends one: gzipped bytes. */
+  function makeCompressedPutRequest(body: BodyInit): Request {
+    return new Request("http://localhost/api/sync", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        [PUSH_ENCODING_HEADER]: PUSH_ENCODING_GZIP,
+      },
+      body,
     });
   }
 
@@ -117,7 +135,7 @@ describe("sync-handler", () => {
 
     it("returns 413 for oversized body", async () => {
       const vaultId = "d".repeat(64);
-      const largeCiphertext = "x".repeat(6 * 1024 * 1024); // > 5 MB
+      const largeCiphertext = "x".repeat(SYNC.MAX_VAULT_SIZE + 1024);
 
       const response = await handleSyncRequest(
         makePutRequest({
@@ -127,6 +145,59 @@ describe("sync-handler", () => {
         adapter,
       );
       expect(response.status).toBe(413);
+    });
+  });
+
+  describe("PUT (compressed transport)", () => {
+    it("stores a vault sent as a gzipped body", async () => {
+      const vaultId = "e".repeat(64);
+      const vault = { version: 4, iv: [1, 2, 3], ciphertext: "cipher" };
+      const encoded = unwrap(
+        await encodePushBody(JSON.stringify({ vaultId, vault })),
+      );
+
+      const response = await handleSyncRequest(
+        makeCompressedPutRequest(encoded as BodyInit),
+        adapter,
+      );
+      expect(response.status).toBe(200);
+
+      const stored = await adapter.get(vaultId);
+      expect(stored.ok && JSON.parse(stored.value!).vault).toEqual(vault);
+    });
+
+    it("answers 413 for a body that unpacks past the cap, not OOM", async () => {
+      // A decompression bomb: a few KB on the wire, far more than the
+      // handler will ever hold once unpacked. The cap is the only thing
+      // between a hostile client and the server's memory.
+      const bomb = unwrap(
+        await encodePushBody("x".repeat(SYNC.MAX_VAULT_SIZE + 1024)),
+      );
+      expect(bomb.byteLength).toBeLessThan(128 * 1024);
+
+      const response = await handleSyncRequest(
+        makeCompressedPutRequest(bomb as BodyInit),
+        adapter,
+      );
+      expect(response.status).toBe(413);
+    });
+
+    it("answers 400 when the body is not gzip at all", async () => {
+      const response = await handleSyncRequest(
+        makeCompressedPutRequest(JSON.stringify({ vaultId: "f".repeat(64) })),
+        adapter,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("still accepts an uncompressed body from an older client", async () => {
+      const vaultId = "0".repeat(64);
+      const vault = { version: 3, iv: [9], ciphertext: "legacy" };
+      const response = await handleSyncRequest(
+        makePutRequest({ vaultId, vault }),
+        adapter,
+      );
+      expect(response.status).toBe(200);
     });
   });
 

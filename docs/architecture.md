@@ -441,7 +441,9 @@ All claims in this document can be verified by reading the source code:
 | CSP headers | `vercel.json`, `server.ts` |
 | Favicon proxying | `src/components/feeds/feed-favicon.tsx` (render + fallback chain), `src/core/favicon/favicon-cache.ts` (per-origin resolution cache; failures retried on refresh) |
 | Sync timing jitter | `src/stores/sync-store.ts` (`scheduleSyncPush`) |
-| Payload padding | `src/core/sync/sync-service.ts` |
+| Payload padding | `src/core/sync/sync-service.ts` (`padPayload`; base64 pad, see ADR 031) |
+| Compressed push transport | `src/core/sync/vault-transport.ts` (ADR 031) |
+| Vault size headroom (device-local) | `src/core/sync/vault-headroom.ts`, `src/components/settings/vault-headroom-notice.tsx` |
 | Normalized User-Agent | `src/core/proxy/proxy-handler.ts` |
 | Sync handler | `src/core/sync/sync-handler.ts`, `api/sync.ts` |
 | IndexedDB schema | `src/core/storage/db.ts` |

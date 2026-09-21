@@ -53,6 +53,7 @@ import { toast } from "sonner";
 import { SetupWizard } from "@/components/sync/setup-wizard";
 import { ExistingCloudFlow } from "@/components/sync/existing-cloud-flow";
 import { LostPassphrasePanel } from "@/components/settings/tabs/lost-passphrase-panel";
+import { VaultHeadroomNotice } from "@/components/settings/vault-headroom-notice";
 
 type Confirmation = "none" | "delete" | "disable";
 type SubFlow = "none" | "setup" | "existing" | "choose";
@@ -220,6 +221,8 @@ export function DataSyncSection() {
               aria-label="Toggle cloud sync"
             />
           </div>
+
+          {isOn && !gated && <VaultHeadroomNotice />}
 
           {isOn && !gated && <LostPassphrasePanel />}
         </div>

@@ -6,6 +6,12 @@ import {
   authorizeLicense,
   type LicenseAuthOptions,
 } from "../license/middleware";
+import {
+  decodePushBody,
+  PUSH_ENCODING_HEADER,
+  PUSH_ENCODING_GZIP,
+  PUSH_BODY_TOO_LARGE,
+} from "./vault-transport.ts";
 
 const VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;
 const ROUTE = "/api/sync";
@@ -153,15 +159,58 @@ async function handleGet(
   });
 }
 
+/**
+ * Read the request body as JSON text, decompressing it when the client
+ * says it is gzipped.
+ *
+ * Both shapes stay supported: a client that predates the compressed
+ * transport still PUTs plain JSON, and refusing it would break every
+ * device that has not reloaded yet. The compressed path is capped on
+ * both sides of the decompression — the received bytes against the
+ * wire ceiling, the output against MAX_VAULT_SIZE — because a gzip
+ * stream that unpacks to gigabytes is only kilobytes on the wire.
+ */
+type PutBody = { text: string } | { rejection: Response };
+
+async function readPutBody(
+  request: Request,
+  ctx: RequestContext,
+): Promise<PutBody> {
+  if (request.headers.get(PUSH_ENCODING_HEADER) !== PUSH_ENCODING_GZIP) {
+    const text = await request.text();
+    if (text.length > SYNC.MAX_VAULT_SIZE) {
+      return { rejection: clientError("Payload too large", 413, ctx) };
+    }
+    return { text };
+  }
+
+  const raw = new Uint8Array(await request.arrayBuffer());
+  if (raw.byteLength > SYNC.MAX_PUSH_BODY_SIZE) {
+    return { rejection: clientError("Payload too large", 413, ctx) };
+  }
+
+  const decoded = await decodePushBody(raw, SYNC.MAX_VAULT_SIZE);
+  if (!decoded.ok) {
+    // An unreadable body is the client's problem, not an ops event: a
+    // truncated upload and a hostile one look identical from here.
+    return {
+      rejection:
+        decoded.error === PUSH_BODY_TOO_LARGE
+          ? clientError("Payload too large", 413, ctx)
+          : clientError("Invalid compressed body", 400, ctx),
+    };
+  }
+  return { text: decoded.value };
+}
+
 async function handlePut(
   request: Request,
   adapter: SyncStorageAdapter,
   ctx: RequestContext,
 ): Promise<Response> {
-  const text = await request.text();
-  if (text.length > SYNC.MAX_VAULT_SIZE) {
-    return clientError("Payload too large", 413, ctx);
-  }
+  const putBody = await readPutBody(request, ctx);
+  if ("rejection" in putBody) return putBody.rejection;
+  const text = putBody.text;
 
   let body: { vaultId?: string; vault?: unknown };
   try {

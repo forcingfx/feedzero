@@ -13,6 +13,11 @@ import { SYNC } from "@feedzero/core/utils/constants";
  * the class of belief the Tier 2.5 rule says to verify against the real
  * endpoint.
  *
+ * The bodies here are deliberately UNCOMPRESSED, even though the client
+ * now gzips its pushes. The platform limit applies to bytes received, so
+ * the uncompressed path is the worst case and the one worth pinning; a
+ * compressed push of the same vault is strictly smaller.
+ *
  * Two assertions, one on each side of the ceiling:
  *  1. A body at exactly the ceiling we ship is accepted in production.
  *     If Vercel ever tightens the limit, this fails and every paying
@@ -43,7 +48,7 @@ const SENTINEL_VAULT_ID = "b".repeat(64);
  * self-hosted target (where the handler enforces it) as well as for the
  * hosted one (where the platform does).
  */
-const OVERSIZED_BODY_BYTES = 6 * 1024 * 1024;
+const OVERSIZED_BODY_BYTES = SYNC.MAX_VAULT_SIZE + 1024 * 1024;
 
 /**
  * Build a PUT body of exactly `totalBytes`, shaped like a real push:
