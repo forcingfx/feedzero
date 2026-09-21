@@ -34,6 +34,18 @@ Feature: Data persists across browser sessions
 4. On subsequent `open(passphrase)` calls, the stored salt is read and reused
 5. Same passphrase + same salt = same key = data is decryptable
 
+### Transaction discipline
+
+Every Dexie call in `db.ts` opens its own transaction, via the
+`ctx.op((db) => …)` accessor that `requireOpen()` returns. Reaching
+through `ctx.db` directly would make the call join whichever
+transaction happens to be running when it starts, which breaks as soon
+as that transaction commits during an `await crypto.subtle…`. The one
+place allowed to talk to Dexie directly is `replaceTablesAtomically`,
+whose calls belong to the atomic clear-and-replace the sync import
+needs. See [ADR 030](../decisions/030-dexie-transaction-isolation.md)
+and [the incident](../incidents/2026-09-21-dexie-transaction-zone-bleed.md).
+
 ### What was fixed
 
 `db.js` previously called `generateSalt()` on every `open()`, meaning each session derived a different key. The fix reads the existing salt from `meta` before generating a new one.

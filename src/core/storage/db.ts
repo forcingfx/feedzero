@@ -27,6 +27,7 @@ import type {
   Briefing,
 } from "../../../packages/core/src/types";
 import { mergeDuplicateArticles } from "./dedupe-articles.ts";
+import { ownTransaction } from "./dexie-zone.ts";
 
 interface DexieRecord {
   id: string;
@@ -42,14 +43,38 @@ let db: Dexie | null = null;
 let cryptoKey: CryptoKey | null = null;
 let hmacKey: CryptoKey | null = null;
 
+/**
+ * The open database, the keys, and the one sanctioned way to reach
+ * Dexie.
+ *
+ * `op` runs a single Dexie call in a transaction of its own. Reaching
+ * through `db` directly makes the call join whichever transaction
+ * happens to be running when it starts, which is a bug everywhere
+ * except inside a deliberate transaction body — see `dexie-zone.ts`
+ * for what that costs and `replaceTablesAtomically` for the one place
+ * that legitimately does it.
+ */
+interface DbContext {
+  db: Dexie;
+  cryptoKey: CryptoKey;
+  hmacKey: CryptoKey;
+  op: <T>(work: (db: Dexie) => PromiseLike<T>) => Promise<T>;
+}
+
 /** Asserts the database is open and keys are available. */
-function requireOpen(): { db: Dexie; cryptoKey: CryptoKey; hmacKey: CryptoKey } {
+function requireOpen(): DbContext {
   if (!db || !cryptoKey || !hmacKey) {
     throw new Error(
       "Database not initialized. Call open() or openWithKeys() first.",
     );
   }
-  return { db, cryptoKey, hmacKey };
+  const openDb = db;
+  return {
+    db: openDb,
+    cryptoKey,
+    hmacKey,
+    op: (work) => ownTransaction(() => work(openDb)),
+  };
 }
 
 /**
@@ -60,7 +85,8 @@ function requireOpen(): { db: Dexie; cryptoKey: CryptoKey; hmacKey: CryptoKey } 
 export async function open(passphrase: string): Promise<Result<boolean>> {
   try {
     db = new Dexie(DB_NAME);
-    db.version(DB_VERSION).stores({
+    const instance = db;
+    instance.version(DB_VERSION).stores({
       feeds: "id, &url",
       articles: "id, feedId, [feedId+guid]",
       folders: "id",
@@ -71,10 +97,12 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
       meta: "key",
     });
 
-    await db.open();
+    await ownTransaction(() => instance.open());
 
     // Reuse existing salt or generate a new one for first-time setup
-    const existing = await db.table("meta").get(META_KEY.SALT);
+    const existing = await ownTransaction(() =>
+      instance.table("meta").get(META_KEY.SALT),
+    );
     const salt = existing ? new Uint8Array(existing.value) : generateSalt();
 
     const keyResult = await deriveKey(passphrase, salt);
@@ -86,7 +114,12 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
     hmacKey = hmacResult.value;
 
     if (!existing) {
-      await db.table("meta").put({ key: META_KEY.SALT, value: Array.from(salt) });
+      await ownTransaction(() =>
+        instance.table("meta").put({
+          key: META_KEY.SALT,
+          value: Array.from(salt),
+        }),
+      );
     }
 
     return ok(true);
@@ -106,7 +139,8 @@ export async function openWithKeys(
 ): Promise<Result<boolean>> {
   try {
     db = new Dexie(DB_NAME);
-    db.version(DB_VERSION).stores({
+    const instance = db;
+    instance.version(DB_VERSION).stores({
       feeds: "id, &url",
       articles: "id, feedId, [feedId+guid]",
       folders: "id",
@@ -117,7 +151,7 @@ export async function openWithKeys(
       meta: "key",
     });
 
-    await db.open();
+    await ownTransaction(() => instance.open());
 
     cryptoKey = await importCryptoKey(dbKeyJwk, {
       name: CRYPTO.ALGORITHM,
@@ -141,7 +175,10 @@ export async function openWithKeys(
 export async function getSalt(): Promise<Result<Uint8Array>> {
   try {
     if (!db) return err("Database not open");
-    const record = await db.table("meta").get(META_KEY.SALT);
+    const instance = db;
+    const record = await ownTransaction(() =>
+      instance.table("meta").get(META_KEY.SALT),
+    );
     if (!record) return err("No salt found");
     return ok(new Uint8Array(record.value));
   } catch (e) {
@@ -201,11 +238,9 @@ export async function feedExistsByUrl(url: string): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
     const hashedUrl = await hmacIndex(ctx.hmacKey, url);
-    const count = await ctx.db
-      .table("feeds")
-      .where("url")
-      .equals(hashedUrl)
-      .count();
+    const count = await ctx.op((db) =>
+      db.table("feeds").where("url").equals(hashedUrl).count(),
+    );
     return ok(count > 0);
   } catch (e) {
     return err(`Failed to check feed existence: ${(e as Error).message}`);
@@ -258,20 +293,16 @@ export async function removeFeedsByUrl(url: string): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
     const hashedUrl = await hmacIndex(ctx.hmacKey, url);
-    const records = await ctx.db
-      .table("feeds")
-      .where("url")
-      .equals(hashedUrl)
-      .toArray();
+    const records = await ctx.op((db) =>
+      db.table("feeds").where("url").equals(hashedUrl).toArray(),
+    );
     for (const record of records) {
       const hashedFeedId = await hmacIndex(ctx.hmacKey, record.id);
-      const articleKeys = await ctx.db
-        .table("articles")
-        .where("feedId")
-        .equals(hashedFeedId)
-        .primaryKeys();
-      await ctx.db.table("articles").bulkDelete(articleKeys);
-      await ctx.db.table("feeds").delete(record.id);
+      const articleKeys = await ctx.op((db) =>
+        db.table("articles").where("feedId").equals(hashedFeedId).primaryKeys(),
+      );
+      await ctx.op((db) => db.table("articles").bulkDelete(articleKeys));
+      await ctx.op((db) => db.table("feeds").delete(record.id));
     }
     return ok(true);
   } catch (e) {
@@ -284,12 +315,10 @@ export async function removeArticlesByFeedId(feedId: string): Promise<Result<boo
   try {
     const ctx = requireOpen();
     const hashedFeedId = await hmacIndex(ctx.hmacKey, feedId);
-    const articleKeys = await ctx.db
-      .table("articles")
-      .where("feedId")
-      .equals(hashedFeedId)
-      .primaryKeys();
-    await ctx.db.table("articles").bulkDelete(articleKeys);
+    const articleKeys = await ctx.op((db) =>
+      db.table("articles").where("feedId").equals(hashedFeedId).primaryKeys(),
+    );
+    await ctx.op((db) => db.table("articles").bulkDelete(articleKeys));
     return ok(true);
   } catch (e) {
     return err(`Failed to remove articles: ${(e as Error).message}`);
@@ -302,14 +331,12 @@ export async function removeArticlesByFeedId(feedId: string): Promise<Result<boo
 export async function removeFeed(id: string): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
-    await ctx.db.table("feeds").delete(id);
+    await ctx.op((db) => db.table("feeds").delete(id));
     const hashedFeedId = await hmacIndex(ctx.hmacKey, id);
-    const articleKeys = await ctx.db
-      .table("articles")
-      .where("feedId")
-      .equals(hashedFeedId)
-      .primaryKeys();
-    await ctx.db.table("articles").bulkDelete(articleKeys);
+    const articleKeys = await ctx.op((db) =>
+      db.table("articles").where("feedId").equals(hashedFeedId).primaryKeys(),
+    );
+    await ctx.op((db) => db.table("articles").bulkDelete(articleKeys));
     return ok(true);
   } catch (e) {
     return err(`Failed to remove feed: ${(e as Error).message}`);
@@ -326,7 +353,7 @@ export async function addArticles(
   try {
     const ctx = requireOpen();
     const records = await encryptRecords(articles);
-    await ctx.db.table("articles").bulkPut(records);
+    await ctx.op((db) => db.table("articles").bulkPut(records));
     return ok(true);
   } catch (e) {
     return err(`Failed to add articles: ${(e as Error).message}`);
@@ -362,11 +389,9 @@ export async function getArticles(
   try {
     const ctx = requireOpen();
     const hashedFeedId = await hmacIndex(ctx.hmacKey, feedId);
-    const raws: DexieRecord[] = await ctx.db
-      .table("articles")
-      .where("feedId")
-      .equals(hashedFeedId)
-      .toArray();
+    const raws: DexieRecord[] = await ctx.op((db) =>
+      db.table("articles").where("feedId").equals(hashedFeedId).toArray(),
+    );
     const articles = await decryptAndSortArticles(raws);
     return ok(limit ? articles.slice(0, limit) : articles);
   } catch (e) {
@@ -383,7 +408,9 @@ export async function getAllArticles(
 ): Promise<Result<Article[]>> {
   try {
     const ctx = requireOpen();
-    const raws: DexieRecord[] = await ctx.db.table("articles").toArray();
+    const raws: DexieRecord[] = await ctx.op((db) =>
+      db.table("articles").toArray(),
+    );
     const articles = await decryptAndSortArticles(raws);
     return ok(limit ? articles.slice(0, limit) : articles);
   } catch (e) {
@@ -410,7 +437,7 @@ export async function updateArticles(
   try {
     const ctx = requireOpen();
     const records = await encryptRecords(articles);
-    await ctx.db.table("articles").bulkPut(records);
+    await ctx.op((db) => db.table("articles").bulkPut(records));
     return ok(true);
   } catch (e) {
     return err(`Failed to update articles: ${(e as Error).message}`);
@@ -429,11 +456,13 @@ export async function getArticleByGuid(
     const ctx = requireOpen();
     const hashedFeedId = await hmacIndex(ctx.hmacKey, feedId);
     const hashedGuid = await hmacIndex(ctx.hmacKey, guid);
-    const raw: DexieRecord | undefined = await ctx.db
-      .table("articles")
-      .where("[feedId+guid]")
-      .equals([hashedFeedId, hashedGuid])
-      .first();
+    const raw: DexieRecord | undefined = await ctx.op((db) =>
+      db
+        .table("articles")
+        .where("[feedId+guid]")
+        .equals([hashedFeedId, hashedGuid])
+        .first(),
+    );
     if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
     const result = await decrypt(
       ctx.cryptoKey,
@@ -480,15 +509,15 @@ export async function dedupeArticles(
 ): Promise<Result<number>> {
   try {
     const ctx = requireOpen();
-    const table = ctx.db.table("articles");
 
+    const hashedFeedId =
+      feedId === undefined ? null : await hmacIndex(ctx.hmacKey, feedId);
     const raws: DexieRecord[] =
-      feedId === undefined
-        ? await table.toArray()
-        : await table
-            .where("feedId")
-            .equals(await hmacIndex(ctx.hmacKey, feedId))
-            .toArray();
+      hashedFeedId === null
+        ? await ctx.op((db) => db.table("articles").toArray())
+        : await ctx.op((db) =>
+            db.table("articles").where("feedId").equals(hashedFeedId).toArray(),
+          );
 
     const groups = new Map<string, DexieRecord[]>();
     for (const raw of raws) {
@@ -518,10 +547,10 @@ export async function dedupeArticles(
 
     if (keepers.length > 0) {
       const records = await encryptRecords(keepers);
-      await table.bulkPut(records);
+      await ctx.op((db) => db.table("articles").bulkPut(records));
     }
     if (idsToDelete.length > 0) {
-      await table.bulkDelete(idsToDelete);
+      await ctx.op((db) => db.table("articles").bulkDelete(idsToDelete));
     }
     return ok(idsToDelete.length);
   } catch (e) {
@@ -614,6 +643,82 @@ export interface ImportAllInput {
   anthropicKey?: string;
 }
 
+/** Pre-encrypted batches for {@link replaceTablesAtomically}. */
+interface TableReplacement {
+  feedRecords: DexieRecord[];
+  articleRecords: DexieRecord[];
+  folderRecords?: DexieRecord[];
+  filterRecords?: DexieRecord[];
+  prefRecords?: DexieRecord;
+  briefingRecords?: DexieRecord[];
+  anthropicRecord?: DexieRecord;
+  /** True when the caller has an opinion on the secret (including ""). */
+  clearAnthropicKey: boolean;
+  prefsTs: number;
+}
+
+/**
+ * The single place in this module that talks to Dexie inside a
+ * transaction, and therefore the single place whose calls must NOT go
+ * through `ctx.op` — they belong to the transaction opened here.
+ * Everything else in this file reaches Dexie via `ctx.op`, which keeps
+ * it out of this transaction's zone; `dexie-zone.ts` explains why an
+ * uninvited guest in here is a bug.
+ *
+ * Only the tables the caller has an opinion about are enrolled, so an
+ * omitted collection is left untouched (the undefined-vs-empty
+ * contract described on `importAll`).
+ *
+ * Every record is already encrypted: the transaction can only await
+ * Dexie operations, and awaiting Web Crypto in here would let the
+ * transaction commit mid-write.
+ */
+async function replaceTablesAtomically(
+  db: Dexie,
+  batch: TableReplacement,
+): Promise<void> {
+  const tables = [db.table("feeds"), db.table("articles")];
+  if (batch.folderRecords !== undefined) tables.push(db.table("folders"));
+  if (batch.filterRecords !== undefined) tables.push(db.table("smartFilters"));
+  if (batch.prefRecords !== undefined) {
+    tables.push(db.table("preferences"), db.table("meta"));
+  }
+  if (batch.briefingRecords !== undefined) tables.push(db.table("briefings"));
+  if (batch.clearAnthropicKey) tables.push(db.table("secrets"));
+
+  await db.transaction("rw", tables, async () => {
+    await db.table("feeds").clear();
+    await db.table("articles").clear();
+    await db.table("feeds").bulkPut(batch.feedRecords);
+    await db.table("articles").bulkPut(batch.articleRecords);
+    if (batch.folderRecords !== undefined) {
+      await db.table("folders").clear();
+      await db.table("folders").bulkPut(batch.folderRecords);
+    }
+    if (batch.filterRecords !== undefined) {
+      await db.table("smartFilters").clear();
+      await db.table("smartFilters").bulkPut(batch.filterRecords);
+    }
+    if (batch.prefRecords !== undefined) {
+      await db.table("preferences").clear();
+      await db.table("preferences").put(batch.prefRecords);
+      await db
+        .table("meta")
+        .put({ key: META_KEY.PREFERENCES_UPDATED_AT, value: batch.prefsTs });
+    }
+    if (batch.briefingRecords !== undefined) {
+      await db.table("briefings").clear();
+      await db.table("briefings").bulkPut(batch.briefingRecords);
+    }
+    if (batch.clearAnthropicKey) {
+      await db.table("secrets").delete("anthropic-api-key");
+      if (batch.anthropicRecord !== undefined) {
+        await db.table("secrets").put(batch.anthropicRecord);
+      }
+    }
+  });
+}
+
 /**
  * Clear and replace the provided tables atomically.
  *
@@ -676,48 +781,19 @@ export async function importAll(
         : Promise.resolve(undefined),
     ]);
 
-    const tables = [ctx.db.table("feeds"), ctx.db.table("articles")];
-    if (folderRecords !== undefined) tables.push(ctx.db.table("folders"));
-    if (filterRecords !== undefined) tables.push(ctx.db.table("smartFilters"));
-    if (prefRecords !== undefined) {
-      tables.push(ctx.db.table("preferences"), ctx.db.table("meta"));
-    }
-    if (briefingRecords !== undefined) tables.push(ctx.db.table("briefings"));
-    if (input.anthropicKey !== undefined) tables.push(ctx.db.table("secrets"));
-
-    const prefsTs = input.preferencesUpdatedAt ?? Date.now();
-
-    await ctx.db.transaction("rw", tables, async () => {
-      await ctx.db.table("feeds").clear();
-      await ctx.db.table("articles").clear();
-      await ctx.db.table("feeds").bulkPut(feedRecords);
-      await ctx.db.table("articles").bulkPut(articleRecords);
-      if (folderRecords !== undefined) {
-        await ctx.db.table("folders").clear();
-        await ctx.db.table("folders").bulkPut(folderRecords);
-      }
-      if (filterRecords !== undefined) {
-        await ctx.db.table("smartFilters").clear();
-        await ctx.db.table("smartFilters").bulkPut(filterRecords);
-      }
-      if (prefRecords !== undefined) {
-        await ctx.db.table("preferences").clear();
-        await ctx.db.table("preferences").put(prefRecords);
-        await ctx.db
-          .table("meta")
-          .put({ key: META_KEY.PREFERENCES_UPDATED_AT, value: prefsTs });
-      }
-      if (briefingRecords !== undefined) {
-        await ctx.db.table("briefings").clear();
-        await ctx.db.table("briefings").bulkPut(briefingRecords);
-      }
-      if (input.anthropicKey !== undefined) {
-        await ctx.db.table("secrets").delete("anthropic-api-key");
-        if (anthropicRecord !== undefined) {
-          await ctx.db.table("secrets").put(anthropicRecord);
-        }
-      }
-    });
+    await ctx.op((db) =>
+      replaceTablesAtomically(db, {
+        feedRecords,
+        articleRecords,
+        folderRecords,
+        filterRecords,
+        prefRecords,
+        briefingRecords,
+        anthropicRecord,
+        clearAnthropicKey: input.anthropicKey !== undefined,
+        prefsTs: input.preferencesUpdatedAt ?? Date.now(),
+      }),
+    );
 
     return ok(true);
   } catch (e) {
@@ -742,7 +818,7 @@ export async function updateFolder(folder: Folder): Promise<Result<boolean>> {
 export async function removeFolder(id: string): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
-    await ctx.db.table("folders").delete(id);
+    await ctx.op((db) => db.table("folders").delete(id));
     return ok(true);
   } catch (e) {
     return err(`Failed to remove folder: ${(e as Error).message}`);
@@ -772,7 +848,7 @@ export async function removeSmartFilter(
 ): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
-    await ctx.db.table("smartFilters").delete(id);
+    await ctx.op((db) => db.table("smartFilters").delete(id));
     return ok(true);
   } catch (e) {
     return err(`Failed to remove smart filter: ${(e as Error).message}`);
@@ -792,7 +868,9 @@ export async function removeSmartFilter(
 export async function getSecret(name: string): Promise<Result<string | null>> {
   try {
     const ctx = requireOpen();
-    const raw: DexieRecord | undefined = await ctx.db.table("secrets").get(name);
+    const raw: DexieRecord | undefined = await ctx.op((db) =>
+      db.table("secrets").get(name),
+    );
     if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
     const result = await decrypt(
       ctx.cryptoKey,
@@ -817,11 +895,13 @@ export async function putSecret(
     const encResult = await encrypt(ctx.cryptoKey, { value });
     if (!encResult.ok) return encResult;
     const { iv, ciphertext } = encResult.value;
-    await ctx.db.table("secrets").put({
-      id: name,
-      iv: Array.from(iv),
-      ciphertext: Array.from(ciphertext),
-    });
+    await ctx.op((db) =>
+      db.table("secrets").put({
+        id: name,
+        iv: Array.from(iv),
+        ciphertext: Array.from(ciphertext),
+      }),
+    );
     return ok(true);
   } catch (e) {
     return err(`Failed to store secret: ${(e as Error).message}`);
@@ -832,7 +912,7 @@ export async function putSecret(
 export async function removeSecret(name: string): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
-    await ctx.db.table("secrets").delete(name);
+    await ctx.op((db) => db.table("secrets").delete(name));
     return ok(true);
   } catch (e) {
     return err(`Failed to remove secret: ${(e as Error).message}`);
@@ -856,7 +936,7 @@ export async function updateBriefing(briefing: Briefing): Promise<Result<boolean
 export async function removeBriefing(id: string): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
-    await ctx.db.table("briefings").delete(id);
+    await ctx.op((db) => db.table("briefings").delete(id));
     return ok(true);
   } catch (e) {
     return err(`Failed to remove briefing: ${(e as Error).message}`);
@@ -873,9 +953,9 @@ export async function removeBriefing(id: string): Promise<Result<boolean>> {
 export async function getPreferences(): Promise<Result<UserPreferences | null>> {
   try {
     const ctx = requireOpen();
-    const raw: DexieRecord | undefined = await ctx.db
-      .table("preferences")
-      .get(PREFERENCES_ROW_ID);
+    const raw: DexieRecord | undefined = await ctx.op((db) =>
+      db.table("preferences").get(PREFERENCES_ROW_ID),
+    );
     if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
     const result = await decrypt(
       ctx.cryptoKey,
@@ -905,9 +985,9 @@ export async function putPreferences(
 export async function getPreferencesUpdatedAt(): Promise<Result<number | null>> {
   try {
     const ctx = requireOpen();
-    const record = await ctx.db
-      .table("meta")
-      .get(META_KEY.PREFERENCES_UPDATED_AT);
+    const record = await ctx.op((db) =>
+      db.table("meta").get(META_KEY.PREFERENCES_UPDATED_AT),
+    );
     return ok(record ? (record.value as number) : null);
   } catch (e) {
     return err(`Failed to read preferences timestamp: ${(e as Error).message}`);
@@ -920,9 +1000,9 @@ export async function setPreferencesUpdatedAt(
 ): Promise<Result<boolean>> {
   try {
     const ctx = requireOpen();
-    await ctx.db
-      .table("meta")
-      .put({ key: META_KEY.PREFERENCES_UPDATED_AT, value: ts });
+    await ctx.op((db) =>
+      db.table("meta").put({ key: META_KEY.PREFERENCES_UPDATED_AT, value: ts }),
+    );
     return ok(true);
   } catch (e) {
     return err(`Failed to write preferences timestamp: ${(e as Error).message}`);
@@ -1003,7 +1083,7 @@ async function putEncrypted(
     if (d.guid !== undefined)
       record.guid = await hmacIndex(ctx.hmacKey, d.guid as string);
 
-    await ctx.db.table(table).put(record);
+    await ctx.op((db) => db.table(table).put(record));
     return ok(true);
   } catch (e) {
     return err(`Failed to store encrypted data: ${(e as Error).message}`);
@@ -1013,7 +1093,9 @@ async function putEncrypted(
 async function getDecrypted<T>(table: string, id: string): Promise<Result<T>> {
   try {
     const ctx = requireOpen();
-    const raw: DexieRecord | undefined = await ctx.db.table(table).get(id);
+    const raw: DexieRecord | undefined = await ctx.op((db) =>
+      db.table(table).get(id),
+    );
     if (!raw) return err("Not found");
     if (!raw.iv || !raw.ciphertext) return err("Record missing encrypted data");
     const result = await decrypt(
@@ -1031,7 +1113,9 @@ async function getDecrypted<T>(table: string, id: string): Promise<Result<T>> {
 async function getAllDecrypted<T>(table: string): Promise<Result<T[]>> {
   try {
     const ctx = requireOpen();
-    const raws: DexieRecord[] = await ctx.db.table(table).toArray();
+    const raws: DexieRecord[] = await ctx.op((db) =>
+      db.table(table).toArray(),
+    );
     const results: T[] = [];
     let failedCount = 0;
 

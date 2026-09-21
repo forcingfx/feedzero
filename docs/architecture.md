@@ -445,3 +445,4 @@ All claims in this document can be verified by reading the source code:
 | Normalized User-Agent | `src/core/proxy/proxy-handler.ts` |
 | Sync handler | `src/core/sync/sync-handler.ts`, `api/sync.ts` |
 | IndexedDB schema | `src/core/storage/db.ts` |
+| Dexie transaction isolation | `src/core/storage/dexie-zone.ts` (ADR 030) |
