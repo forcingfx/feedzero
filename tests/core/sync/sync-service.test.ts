@@ -240,11 +240,12 @@ describe("sync-service", () => {
       expect(isErr(result)).toBe(true);
       if (result.ok) return;
       expect(result.error).toMatch(/too large/i);
-      // Names a remedy that actually releases bytes. Unstarring does not:
-      // toggleStar keeps extractedContent, so the old copy of this message
-      // told users to do something that changed nothing.
-      expect(result.error).toMatch(/remove a feed/i);
-      expect(result.error).not.toMatch(/unstar/i);
+      // Every remedy named here has to actually release bytes. For one
+      // release this message said "unstar" while toggleStar kept the
+      // offline copy, which sent users to do something that changed
+      // nothing; both levers below work now.
+      expect(result.error).toMatch(/unstar/i);
+      expect(result.error).toMatch(/free up space/i);
       expect(result.error).not.toMatch(/FUNCTION_PAYLOAD_TOO_LARGE/);
     });
 

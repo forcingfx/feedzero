@@ -199,23 +199,21 @@ export interface PushOutcome {
  * on. This says how big the vault is, what the limit is, and that
  * nothing was lost.
  *
- * It used to end by suggesting the user unstar articles or turn off
- * per-feed prefetch. Neither does anything: `toggleStar` strips
- * `starredAt` and keeps `extractedContent`, the prefetch toggle only
- * stops new fetches, and no code path in the app releases persisted
- * offline text. Advice that cannot work is worse than no advice, so
- * this names the one lever that does — removing a feed — and says what
- * it costs. A Settings action for dropping offline copies is the real
- * answer and is not built yet.
+ * For one release this message suggested unstarring, which did nothing:
+ * `toggleStar` kept `extractedContent` and no code path released it.
+ * Both levers it names are real now — unstarring drops the copy
+ * (`release-offline-content.ts`), and the Settings action sweeps the
+ * copies nothing is maintaining — so keep them in step: if either stops
+ * releasing space, this message goes back to being a lie.
  */
 function oversizedVaultMessage(bodyBytes: number): string {
   return (
     `Your encrypted vault is ${formatMegabytes(bodyBytes)}, which is too large ` +
     `to sync in one upload (limit ${formatMegabytes(SYNC.MAX_PUSH_BODY_SIZE)}). ` +
     `Nothing was uploaded, and your local data and cloud copy are both unchanged. ` +
-    `Saved offline full text is usually most of a vault this size, and today the ` +
-    `only way to release it is to remove a feed you no longer read, which also ` +
-    `removes its articles. Reading on this device is unaffected either way.`
+    `Saved offline full text is usually most of a vault this size: unstar ` +
+    `articles you no longer need offline, or use "Free up space" in Settings ` +
+    `to clear the copies FeedZero is no longer keeping up to date.`
   );
 }
 

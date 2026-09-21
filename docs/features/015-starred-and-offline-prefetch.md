@@ -125,6 +125,38 @@ Feature: Starred articles with background prefetch
 | `tests/integration/keyboard-ui-parity.test.tsx` | `s` key parity with the star button |
 | `tests/components/layout/sidebar-starred.test.tsx` | Entry hidden until first star; navigates via STARRED_FEED_ID |
 
+## Releasing an offline copy
+
+**The app keeps an offline copy for exactly as long as it would
+re-fetch one.** That single rule decides every release path:
+
+| Article state | Copy kept? | Why |
+| --- | --- | --- |
+| Starred | Yes | The prefetch service re-fetches starred articles, so clearing it frees space until the next refresh and no longer |
+| In a feed with `prefetchEnabled` | Yes | The user asked for this feed's bodies to be kept |
+| Neither | No | Nothing is maintaining it |
+
+Two paths act on the rule, both in
+`src/core/storage/release-offline-content.ts`:
+
+- **Unstarring** releases that article's copy, unless its feed is set to
+  prefetch. This is the lever a user reaches for when the sync size
+  error tells them their vault is too big, so it has to actually work.
+- **"Free up space"** in Settings → Sync & Data sweeps every copy
+  nothing is maintaining — the historical orphans left by articles
+  unstarred before this shipped, and by feeds whose prefetch was turned
+  off. It confirms first, then schedules a sync push so the cloud vault
+  shrinks too.
+
+Releasing is not destructive to anything the user authored: the article,
+its read state, its stars and folder overrides all stay, and full text
+can be fetched again on demand while online.
+
+**Why this was worth building:** for one release the sync size error
+told users to unstar articles when `toggleStar` kept `extractedContent`
+and no code path in the app released it. The advice was unactionable and
+the only real remedy was deleting the feed. See ADR 032.
+
 ## Design Decisions
 
 - **Star is a free primitive, prefetch is gated.** Pocket refugees expect
