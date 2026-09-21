@@ -32,11 +32,18 @@ const MIN_BUCKET = 64 * 1024;
  * Pad a JSON payload string to the nearest power-of-2 bucket size.
  * Prevents an observer from inferring subscription count from transfer size.
  * Adds a `_pad` field with random hex to reach the target length.
+ *
+ * The bucket ladder stops at `SYNC.MAX_PUSH_BODY_SIZE`, so padding can
+ * never be what makes a body undeliverable. Capping at the (larger)
+ * server accept limit used to round a 4.2 MB body up to 5 MB, straight
+ * past Vercel's 4.5 MB edge limit: a push that would have landed came
+ * back as `413 FUNCTION_PAYLOAD_TOO_LARGE` because of the padding alone.
+ * A body already at or above the ceiling is returned untouched.
  */
 export function padPayload(json: string): string {
   const targetSize = Math.min(
     nextPowerOf2(json.length, MIN_BUCKET),
-    SYNC.MAX_VAULT_SIZE,
+    SYNC.MAX_PUSH_BODY_SIZE,
   );
   const overhead = ',"_pad":""'.length;
   const padLength = targetSize - json.length - overhead;
@@ -162,6 +169,78 @@ export interface PushOutcome {
   etag: string | null;
 }
 
+function formatMegabytes(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * What the user reads when their vault no longer fits in one upload.
+ *
+ * The platform's own answer is `413 FUNCTION_PAYLOAD_TOO_LARGE` plus a
+ * region-coded request id, which tells the user nothing they can act
+ * on. This says how big the vault is, what the limit is, that nothing
+ * was lost, and which lever actually shrinks it: persisted offline full
+ * text dominates a large vault (feed and article metadata is small, and
+ * `exportVault` already drops article bodies), so unstarring or turning
+ * off per-feed prefetch is the remedy that works.
+ */
+function oversizedVaultMessage(bodyBytes: number): string {
+  return (
+    `Your encrypted vault is ${formatMegabytes(bodyBytes)}, which is too large ` +
+    `to sync in one upload (limit ${formatMegabytes(SYNC.MAX_PUSH_BODY_SIZE)}). ` +
+    `Nothing was uploaded, and your local data and cloud copy are both unchanged. ` +
+    `Saved offline full text is usually most of a vault this size, so unstar ` +
+    `articles you no longer need offline, or turn off offline prefetch for a ` +
+    `busy feed, and sync again.`
+  );
+}
+
+/**
+ * Encrypted-envelope PUT to /api/sync, shared by `pushVault` and
+ * `upgradeVaultKdf` so both get the same padding, the same size
+ * preflight, and the same translation of a 413.
+ *
+ * The preflight matters because the hosted backend answers an oversized
+ * body at the edge: our handler never runs, so its own JSON 413 (with a
+ * traceId) never reaches the client. Sending a body we already know is
+ * undeliverable costs the user an upload and buys an error code they
+ * cannot act on.
+ *
+ * `body.length` is a byte count here: the payload is JSON over base64
+ * ciphertext, hex padding and a hex vault id, so every character is one
+ * ASCII byte. The server-side check in `sync-handler.ts` measures the
+ * same way.
+ */
+async function putEncryptedVault(
+  vaultId: string,
+  vault: EncryptedVault,
+  failureLabel: string,
+): Promise<Result<PushOutcome>> {
+  const body = padPayload(JSON.stringify({ vaultId, vault }));
+
+  if (body.length > SYNC.MAX_PUSH_BODY_SIZE) {
+    return err(oversizedVaultMessage(body.length));
+  }
+
+  const response = await syncFetch("/api/sync", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+
+  if (!response.ok) {
+    if (response.status === 413) return err(oversizedVaultMessage(body.length));
+    const text = await response.text();
+    return err(`${failureLabel} (${response.status}): ${text}`);
+  }
+
+  const data = await response.json();
+  return ok({
+    updatedAt: data.updatedAt ?? Date.now(),
+    etag: response.headers?.get?.("ETag") ?? null,
+  });
+}
+
 export async function pushVault(
   auth: SyncAuth,
 ): Promise<Result<PushOutcome>> {
@@ -181,29 +260,13 @@ export async function pushVault(
     );
     if (!encryptedResult.ok) return encryptedResult;
 
-    const body = padPayload(
-      JSON.stringify({
-        vaultId,
-        vault: encryptedResult.value,
-      }),
+    // `await` inside the try, not a bare `return`: a rejected fetch must
+    // land in the catch below rather than escaping to the caller.
+    return await putEncryptedVault(
+      vaultId,
+      encryptedResult.value,
+      "Sync push failed",
     );
-
-    const response = await syncFetch("/api/sync", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      return err(`Sync push failed (${response.status}): ${text}`);
-    }
-
-    const data = await response.json();
-    return ok({
-      updatedAt: data.updatedAt ?? Date.now(),
-      etag: response.headers?.get?.("ETag") ?? null,
-    });
   } catch (e) {
     return err(`Sync push failed: ${(e as Error).message}`);
   }
@@ -443,23 +506,12 @@ export async function upgradeVaultKdf(
   );
   if (!encryptedResult.ok) return encryptedResult;
 
-  const body = padPayload(
-    JSON.stringify({
-      vaultId: current.vaultId,
-      vault: encryptedResult.value,
-    }),
+  const pushResult = await putEncryptedVault(
+    current.vaultId,
+    encryptedResult.value,
+    "KDF upgrade push failed",
   );
-
-  const response = await syncFetch("/api/sync", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body,
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    return err(`KDF upgrade push failed (${response.status}): ${text}`);
-  }
+  if (!pushResult.ok) return pushResult;
 
   return ok({
     vaultId: current.vaultId,

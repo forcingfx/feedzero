@@ -153,6 +153,49 @@ Same passphrase always produces same vault ID and same encryption key. No extern
 10. **Switch to existing cloud (replace)**: Check vault exists -> pull vault -> `importAll()` (clears local) -> set status to synced
 11. **Switch to existing cloud (merge)**: Check vault exists -> pull cloud vault -> export local vault -> merge by URL/guid -> `importAll()` -> push merged vault
 
+### Payload size ceiling
+
+A push is one PUT of the whole encrypted vault, so the vault has to fit
+in one request body. Two different limits apply to that body:
+
+| Limit | Value | Enforced by | Why |
+| --- | --- | --- | --- |
+| `SYNC.MAX_PUSH_BODY_SIZE` | 4 MiB | client (`putEncryptedVault`) | Below Vercel's 4.5 MB edge limit, with headroom for request framing |
+| `SYNC.MAX_VAULT_SIZE` | 5 MB | handler (`handlePut`) | Server-side accept limit; looser so self-hosted deployments and older clients keep working |
+
+Vercel rejects an oversized serverless request body **at the edge**, with
+`413 FUNCTION_PAYLOAD_TOO_LARGE` and a region-coded request id, before any
+handler code runs. The handler's own 413 (JSON, with a traceId) is
+therefore unreachable on the hosted backend, and the client cannot rely on
+the server to explain the failure. So the client owns this:
+
+- `padPayload` buckets up to `MAX_PUSH_BODY_SIZE` and no further. Padding
+  exists to hide subscription count from a traffic observer; it must never
+  be the reason a deliverable body becomes undeliverable. Capping at the
+  larger server limit used to round a 4.2 MB body to 5 MB and guarantee a
+  413.
+- `putEncryptedVault` preflights the body and refuses over the ceiling
+  without sending, and translates any 413 that does come back into the
+  same message. Both `pushVault` and `upgradeVaultKdf` route through it.
+- The message names the actual size, the limit, that nothing was lost, and
+  the lever that shrinks a vault: persisted offline full text
+  (`Article.extractedContent`) dominates a large vault, since `exportVault`
+  already drops article bodies and metadata is small.
+
+`tests/smoke/sync-payload-limit.test.ts` pins the ceiling against the live
+deployment from both sides — a body at exactly the ceiling is accepted, a
+body above the platform limit is rejected rather than truncated. That
+number belongs to Vercel, not to this repo, so only a live test can hold it.
+
+**Not done, and why:** chunked upload (splitting one vault across several
+PUTs) would remove the ceiling entirely, but it changes the adapter
+atomicity contract (ADR 017) — a reader must never see a half-assembled
+vault — and touches all three entry points. Shedding `extractedContent`
+automatically to squeeze under the ceiling was also rejected: that content
+is sometimes the only surviving copy of a page, and `importAll` replaces
+articles wholesale, so a shrunken push would silently delete another
+device's offline copies. Dropping it stays the user's explicit choice.
+
 ### Storage Adapter Pattern
 
 Server storage uses a pluggable adapter interface:
@@ -215,11 +258,12 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 - **Full-state sync, last-write-wins** — Entire vault uploaded/downloaded as one blob. Acceptable for Phase 1.
 - **Storage adapter pattern** — Vendor-neutral. Default is filesystem for self-hosting; Vercel Blob is opt-in.
 - **Hono standalone server** — 14kB Web standard framework. Runs on Node, Deno, Bun. Same `Request/Response` API as handlers.
+- **Two size limits, not one** — The client refuses to PUT a body over `SYNC.MAX_PUSH_BODY_SIZE` (4 MiB); the handler accepts up to `SYNC.MAX_VAULT_SIZE` (5 MB). The looser server limit is deliberate: a self-hosted deployment has no platform body cap, and older clients still send bodies this build would no longer produce, so tightening the handler would break working setups for no gain.
 - **Merge by URL for feeds, by guid for articles** — When merging local and cloud vaults, feeds are deduplicated by URL (local preferred for duplicates). Articles are deduplicated by guid. Cloud article feedIds are remapped to local feed ids when the parent feed URL matches.
 
 ## Limitations
 
 - No conflict resolution — last push wins. The `sync-pending-push` flush makes "this device has the freshest local change" win over a stale cloud copy on pull, but a genuine cross-device conflict (both sides edited the same feed since the last sync) still resolves last-push-wins.
 - No incremental sync — full vault transferred each time
-- Vault size limited to 5MB
+- A vault must fit in a single upload: 4 MiB (`SYNC.MAX_PUSH_BODY_SIZE`). A vault that outgrows it stops syncing, with an error naming the size, the limit and the remedy; local reading and the cloud copy are both left untouched. See [Payload size ceiling](#payload-size-ceiling).
 - No passphrase change/rotation flow yet
