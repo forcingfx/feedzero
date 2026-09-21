@@ -259,8 +259,32 @@ export const SYNC = {
   VAULT_ID_LENGTH: 32,
   /** Deterministic encryption salt length in bytes. */
   ENCRYPTION_SALT_LENGTH: 16,
-  /** Maximum vault payload size in bytes (5 MB). */
+  /**
+   * Largest body the sync handler will accept on a PUT (5 MB).
+   *
+   * This is the SERVER-side accept limit, deliberately looser than
+   * {@link MAX_PUSH_BODY_SIZE}: a self-hosted deployment has no
+   * platform body cap, and older clients may still send bodies that
+   * this build would no longer produce. Rejecting those retroactively
+   * would break a working self-hosted setup for no benefit.
+   */
   MAX_VAULT_SIZE: 5 * 1024 * 1024,
+  /**
+   * Largest body THIS client will PUT to /api/sync (4 MiB).
+   *
+   * Vercel rejects a serverless request body over 4.5 MB at the edge
+   * with an opaque `413 FUNCTION_PAYLOAD_TOO_LARGE`, before any of our
+   * handler code runs, so {@link MAX_VAULT_SIZE} is unreachable on the
+   * hosted backend. 4 MiB leaves headroom under that platform ceiling
+   * for request framing, and is the number `padPayload` buckets up to
+   * and `pushVault` refuses to exceed. A client that outgrows it gets
+   * an actionable error instead of a platform error code.
+   *
+   * Pinned against the live deployment by
+   * tests/smoke/sync-payload-limit.test.ts: if Vercel ever moves the
+   * ceiling, that smoke test is what catches it.
+   */
+  MAX_PUSH_BODY_SIZE: 4 * 1024 * 1024,
   /**
    * Sync data format version for forward compatibility.
    *

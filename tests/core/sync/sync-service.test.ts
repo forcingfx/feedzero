@@ -14,6 +14,46 @@ import {
   deleteVault,
   padPayload,
 } from "@/core/sync/sync-service";
+import { uint8ArrayToBase64 } from "@feedzero/core/utils/base64";
+import type { Article } from "@feedzero/core/types";
+
+/**
+ * Offline full text big enough to push an encrypted vault past the
+ * single-upload ceiling.
+ *
+ * The filler is random base64 on purpose: gzip cannot shrink it, so the
+ * ciphertext comes out roughly the size of the plaintext and the test
+ * does not silently stop exercising the oversize path the day someone
+ * improves the compression ratio.
+ */
+function buildOversizedArticles(feedId: string): Article[] {
+  const CHUNK_BYTES = 48 * 1024;
+  const CHUNKS_PER_ARTICLE = 8;
+  const ARTICLE_COUNT = 10;
+
+  const randomFiller = (): string => {
+    const chunks: string[] = [];
+    for (let i = 0; i < CHUNKS_PER_ARTICLE; i++) {
+      chunks.push(
+        uint8ArrayToBase64(crypto.getRandomValues(new Uint8Array(CHUNK_BYTES))),
+      );
+    }
+    return chunks.join("");
+  };
+
+  return Array.from({ length: ARTICLE_COUNT }, (_, i) => ({
+    ...unwrap(
+      createArticle({
+        feedId,
+        title: `Saved offline ${i}`,
+        link: `https://example.com/offline/${i}`,
+      }),
+    ),
+    starred: true,
+    extractedContent: randomFiller(),
+    extractedAt: Date.now(),
+  }));
+}
 
 describe("sync-service", () => {
   beforeEach(async () => {
@@ -176,6 +216,45 @@ describe("sync-service", () => {
       const result = await pushVault("test-passphrase");
       expect(isErr(result)).toBe(true);
     });
+
+    it("explains a 413 in terms the user can act on", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 413,
+        text: () =>
+          Promise.resolve(
+            "Request Entity Too Large FUNCTION_PAYLOAD_TOO_LARGE fra1::2k9hp-1789964995079",
+          ),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await pushVault("test-passphrase");
+      expect(isErr(result)).toBe(true);
+      if (result.ok) return;
+      expect(result.error).toMatch(/too (large|big)/i);
+      expect(result.error).toMatch(/unstar/i);
+      expect(result.error).not.toMatch(/FUNCTION_PAYLOAD_TOO_LARGE/);
+    });
+
+    it("refuses to send a vault larger than the upload ceiling", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Example" }),
+      );
+      await addFeed(feed);
+      await addArticles(buildOversizedArticles(feed.id));
+
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await pushVault("test-passphrase");
+
+      // No doomed request: the platform would reject it at the edge and
+      // the user would see an opaque error code instead of a remedy.
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(isErr(result)).toBe(true);
+      if (result.ok) return;
+      expect(result.error).toMatch(/unstar/i);
+    });
   });
 
   describe("pullVault", () => {
@@ -324,11 +403,35 @@ describe("sync-service", () => {
       expect(parsedA._pad).not.toBe(parsedB._pad);
     });
 
-    it("does not exceed MAX_VAULT_SIZE (caps at 4MB)", () => {
-      // Input just under 4MB — should pad to 4MB
+    it("pads up to the single-upload ceiling", () => {
+      // Input just under the ceiling — should pad to exactly the ceiling
       const input = "x".repeat(3 * 1024 * 1024);
       const padded = padPayload(input);
-      expect(padded.length).toBe(4 * 1024 * 1024);
+      expect(padded.length).toBe(SYNC.MAX_PUSH_BODY_SIZE);
+    });
+
+    it("leaves a payload already over the ceiling unpadded", () => {
+      // Padding an oversized body only makes it more oversized. Vercel
+      // rejects a body over 4.5 MB at the edge, so inflating a 4.2 MB
+      // body into the next bucket is what turns a deliverable push into
+      // a FUNCTION_PAYLOAD_TOO_LARGE.
+      const input = "x".repeat(SYNC.MAX_PUSH_BODY_SIZE + 1024);
+      const padded = padPayload(input);
+      expect(padded.length).toBe(input.length);
+    });
+
+    it("pads or stands aside, but never grows a body past the ceiling", () => {
+      const sizes = [
+        SYNC.MAX_PUSH_BODY_SIZE - 1024,
+        SYNC.MAX_PUSH_BODY_SIZE,
+        SYNC.MAX_PUSH_BODY_SIZE + 1,
+      ];
+      for (const size of sizes) {
+        // Under the ceiling it pads up to it; at or above it, untouched.
+        expect(padPayload("x".repeat(size)).length).toBe(
+          Math.max(size, SYNC.MAX_PUSH_BODY_SIZE),
+        );
+      }
     });
 
     it("returns input unchanged if already at a bucket boundary", () => {
