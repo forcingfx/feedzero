@@ -201,6 +201,54 @@ describe("sync-handler", () => {
     });
   });
 
+  describe("PUT (size sampling)", () => {
+    it("samples the body size without recording whose vault it was", async () => {
+      // The sample exists so an operator can see vault sizes trending
+      // toward the ceiling before anyone is blocked. It must never
+      // become a per-user size series: no vaultId, no ciphertext.
+      const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+      const vaultId = "7".repeat(64);
+
+      await handleSyncRequest(
+        makePutRequest({
+          vaultId,
+          vault: { version: 4, iv: [1], ciphertext: "x".repeat(2048) },
+        }),
+        adapter,
+      );
+
+      expect(consoleLog).toHaveBeenCalledTimes(1);
+      const line = consoleLog.mock.calls[0][0] as string;
+      const parsed = JSON.parse(line);
+      expect(parsed.event).toBe("vault.put");
+      expect(parsed.sizeBucket).toBe("<=64KB");
+      expect(parsed.encoding).toBe("identity");
+      expect(line).not.toContain(vaultId);
+      consoleLog.mockRestore();
+    });
+
+    it("records which transport the client used", async () => {
+      // Tells the operator how much of the population is on the
+      // compressed transport, which is what a rollback decision needs.
+      const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+      const vaultId = "8".repeat(64);
+      const encoded = unwrap(
+        await encodePushBody(
+          JSON.stringify({ vaultId, vault: { version: 4, iv: [1], ciphertext: "y" } }),
+        ),
+      );
+
+      await handleSyncRequest(
+        makeCompressedPutRequest(encoded as BodyInit),
+        adapter,
+      );
+
+      const parsed = JSON.parse(consoleLog.mock.calls[0][0] as string);
+      expect(parsed.encoding).toBe("gzip");
+      consoleLog.mockRestore();
+    });
+  });
+
   describe("DELETE", () => {
     function makeDeleteRequest(vaultId: string): Request {
       return new Request(`http://localhost/api/sync?vaultId=${vaultId}`, {

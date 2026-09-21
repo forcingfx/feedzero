@@ -1,6 +1,7 @@
 import { SYNC } from "../../../packages/core/src/utils/constants";
 import { newTraceId } from "../../../packages/core/src/utils/trace-id";
 import { logError } from "../../../packages/core/src/utils/log-error";
+import { logEvent, sizeBucket } from "../../../packages/core/src/utils/log-event";
 import type { SyncStorageAdapter } from "./types.ts";
 import {
   authorizeLicense,
@@ -170,7 +171,9 @@ async function handleGet(
  * wire ceiling, the output against MAX_VAULT_SIZE — because a gzip
  * stream that unpacks to gigabytes is only kilobytes on the wire.
  */
-type PutBody = { text: string } | { rejection: Response };
+type PutBody =
+  | { text: string; receivedBytes: number; encoding: string }
+  | { rejection: Response };
 
 async function readPutBody(
   request: Request,
@@ -181,7 +184,7 @@ async function readPutBody(
     if (text.length > SYNC.MAX_VAULT_SIZE) {
       return { rejection: clientError("Payload too large", 413, ctx) };
     }
-    return { text };
+    return { text, receivedBytes: text.length, encoding: "identity" };
   }
 
   const raw = new Uint8Array(await request.arrayBuffer());
@@ -200,7 +203,11 @@ async function readPutBody(
           : clientError("Invalid compressed body", 400, ctx),
     };
   }
-  return { text: decoded.value };
+  return {
+    text: decoded.value,
+    receivedBytes: raw.byteLength,
+    encoding: PUSH_ENCODING_GZIP,
+  };
 }
 
 async function handlePut(
@@ -211,6 +218,18 @@ async function handlePut(
   const putBody = await readPutBody(request, ctx);
   if ("rejection" in putBody) return putBody.rejection;
   const text = putBody.text;
+
+  // Anonymous size sample. This is the only view anyone has of whether
+  // vaults are drifting toward the ceiling across the population, and
+  // it stays a coarse bucket with nothing identifying whose vault it
+  // was — see log-event.ts for why that boundary is where it is.
+  logEvent({
+    route: ROUTE,
+    method: ctx.method,
+    event: "vault.put",
+    sizeBucket: sizeBucket(putBody.receivedBytes),
+    encoding: putBody.encoding,
+  });
 
   let body: { vaultId?: string; vault?: unknown };
   try {

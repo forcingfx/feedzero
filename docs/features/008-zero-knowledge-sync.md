@@ -215,12 +215,25 @@ of CPU for the case it is meant to warn about. Nothing is reported
 anywhere: server-side size metering would be the per-user telemetry the
 product promises not to collect.
 
-**Still not done:** there is no way to release saved offline full text
-short of removing the feed. `toggleStar` keeps `extractedContent` when
-unstarring and the prefetch toggle only stops new fetches, so a vault
-that has outgrown the ceiling has one blunt remedy. The oversize message
-and the headroom warning both say exactly that rather than suggesting
-something that does not work.
+#### Getting space back
+
+Unstarring an article now releases its saved offline copy, and Settings
+→ Sync & Data carries a "Free up space" action that sweeps every copy
+nothing is maintaining. Both are the same rule from
+[feature 015](015-starred-and-offline-prefetch.md#releasing-an-offline-copy):
+the app keeps a copy for as long as it would re-fetch one. The oversize
+error and the headroom warning name both levers, and for one release
+they named a lever that did nothing — see ADR 032.
+
+#### Watching sizes across the population
+
+Every PUT logs one anonymous line via `logEvent`
+(`packages/core/src/utils/log-event.ts`): route, method, a
+power-of-two size bucket and which transport the client used. No
+vaultId, no ciphertext, nothing that follows one vault over time. It
+answers "are vaults drifting toward the ceiling" and "how much of the
+population is on the compressed transport" without answering "how big
+is this person's vault", which is the line the privacy principles draw.
 
 **Not done, and why:** chunked upload (splitting one vault across several
 PUTs) would remove the ceiling entirely, but it changes the adapter
@@ -302,5 +315,5 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 - No conflict resolution — last push wins. The `sync-pending-push` flush makes "this device has the freshest local change" win over a stale cloud copy on pull, but a genuine cross-device conflict (both sides edited the same feed since the last sync) still resolves last-push-wins.
 - No incremental sync — full vault transferred each time
 - A vault must fit in a single upload: 4.3 MB of compressed bytes (`SYNC.MAX_PUSH_BODY_SIZE`), roughly 5.7 MB of vault JSON. Settings warns at 80%; past the limit sync stops, with local reading and the cloud copy both untouched. See [Payload size ceiling](#payload-size-ceiling).
-- No way to release saved offline full text short of removing the feed — unstarring keeps it.
+- Releasing offline copies frees space only for articles nothing is maintaining; a vault full of *starred* offline copies still needs the user to unstar them.
 - No passphrase change/rotation flow yet
