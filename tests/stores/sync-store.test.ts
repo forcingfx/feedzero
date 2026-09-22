@@ -103,7 +103,7 @@ describe("sync-store", () => {
         value: mockCredentials,
       });
       const timestamp = Date.now();
-      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: timestamp, etag: null } });
+      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: timestamp, etag: null, bytes: 2048 } });
 
       await useSyncStore.getState().enableSync("test passphrase");
 
@@ -267,9 +267,25 @@ describe("sync-store", () => {
   });
 
   describe("push", () => {
+    it("remembers the vault size so Settings can show it after a reload", async () => {
+      // The headroom readout is measured from the last push rather than
+      // by re-encrypting the vault on demand, so the number has to
+      // outlive the tab that produced it.
+      mockPushVault.mockResolvedValue({
+        ok: true,
+        value: { updatedAt: Date.now(), etag: null, bytes: 3_210_000 },
+      });
+      useSyncStore.setState({ credentials: mockCredentials });
+
+      await useSyncStore.getState().push();
+
+      expect(useSyncStore.getState().lastPushBytes).toBe(3_210_000);
+      expect(localStorage.getItem("feedzero:sync-vault-bytes")).toBe("3210000");
+    });
+
     it("pushes vault and updates status", async () => {
       const timestamp = Date.now();
-      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: timestamp, etag: null } });
+      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: timestamp, etag: null, bytes: 2048 } });
       useSyncStore.setState({ credentials: mockCredentials });
 
       await useSyncStore.getState().push();

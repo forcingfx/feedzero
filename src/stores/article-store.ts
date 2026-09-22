@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { ok } from "@feedzero/core/utils/result";
+import type { Result } from "@feedzero/core/utils/result";
 import {
   getArticles,
   getAllArticles,
@@ -16,7 +18,12 @@ import {
   fromFolderFeedId,
   fromFilterFeedId,
 } from "@feedzero/core/utils/constants";
-import type { Article, ArticleSortMode } from "@feedzero/core/types";
+import type { Article, ArticleSortMode, Feed } from "@feedzero/core/types";
+import {
+  keepsOfflineCopy,
+  withoutOfflineCopy,
+  releaseUnmaintainedOfflineContent,
+} from "../core/storage/release-offline-content.ts";
 import { ARTICLE_SORT_MODES } from "@feedzero/core/types";
 import { useSmartFilterStore } from "./smart-filter-store.ts";
 import { persistPreferences } from "./persist-preferences.ts";
@@ -57,6 +64,12 @@ interface ArticleStore {
   showMuted: boolean;
   /** Preload every article into the store; used on startup and on refresh. */
   preloadAll: () => Promise<void>;
+  /**
+   * Drop every saved offline copy the app is no longer maintaining, and
+   * report how many articles lost one. The user-facing way to shrink a
+   * vault that has outgrown the sync size limit.
+   */
+  releaseOfflineCopies: () => Promise<Result<number>>;
   loadArticles: (feedId: string) => Promise<void>;
   selectArticle: (article: Article | null) => Promise<void>;
   markAsRead: (articleId: string) => Promise<void>;
@@ -316,6 +329,28 @@ export function clearArticleCache() {
   useArticleStore.setState({ articlesByFeedId: {}, articles: [] });
 }
 
+/**
+ * The article as it looks after the star comes off.
+ *
+ * Two things go with the star. `starredAt` is stripped explicitly so an
+ * old timestamp cannot survive in the serialized vault and re-appear on
+ * the next encrypt/decrypt round. The saved offline copy goes too, when
+ * nothing else is holding it: that copy is the bulk of a large vault,
+ * and unstarring is the one lever a user has for releasing it. A feed
+ * set to prefetch IS something else holding it, so the copy stays —
+ * taking it would only mean re-downloading on the next refresh.
+ */
+function unstar(article: Article, feeds: Feed[]): Article {
+  const { starredAt: _stripped, ...rest } = article;
+  void _stripped;
+  const unstarred: Article = { ...rest, starred: false };
+
+  const feedsById = new Map(feeds.map((feed) => [feed.id, feed]));
+  return keepsOfflineCopy(unstarred, feedsById)
+    ? unstarred
+    : withoutOfflineCopy(unstarred);
+}
+
 export const useArticleStore = create<ArticleStore>((set, get) => ({
   articlesByFeedId: {},
   articles: [],
@@ -328,6 +363,25 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     const result = await getAllArticles();
     if (!result.ok) return;
     set({ articlesByFeedId: groupByFeedId(result.value) });
+  },
+
+  releaseOfflineCopies: async () => {
+    const released = await releaseUnmaintainedOfflineContent();
+    if (!released.ok) return released;
+    if (released.value.articlesCleared === 0) return ok(0);
+
+    // The in-memory articles still carry the text that is now gone from
+    // disk, and the reader reads from them.
+    await get().preloadAll();
+    const selected = get().selectedArticle;
+    if (selected?.extractedContent) {
+      set({ selectedArticle: withoutOfflineCopy(selected) });
+    }
+
+    // The cloud copy is the whole point: space released only locally
+    // leaves the vault too big to push.
+    useSyncStore.getState().scheduleSyncPush();
+    return ok(released.value.articlesCleared);
   },
 
   loadArticles: async (feedId) => {
@@ -470,14 +524,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     const nextStarred = !target.starred;
     const updated: Article = nextStarred
       ? { ...target, starred: true, starredAt: Date.now() }
-      : (() => {
-          // Strip starredAt explicitly so the field disappears from the
-          // serialized vault — otherwise an old timestamp would survive
-          // an unstar and re-appear on the next encrypt/decrypt round.
-          const { starredAt: _stripped, ...rest } = target;
-          void _stripped;
-          return { ...rest, starred: false };
-        })();
+      : unstar(target, useFeedStore.getState().feeds);
 
     set(applyArticleUpdate(get(), updated));
     // The reader subscribes to `selectedArticle` (a separate slice from

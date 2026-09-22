@@ -280,7 +280,7 @@ describe("sync-store switchToExistingCloud", () => {
       mockRecoverVault.mockResolvedValue(mockRecoveredOk(cloudVault));
       mockMergeVaults.mockReturnValue({ ok: true, value: mergedVault });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
-      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null } });
+      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null, bytes: 2048 } });
 
       await useSyncStore
         .getState()
@@ -299,7 +299,7 @@ describe("sync-store switchToExistingCloud", () => {
       mockRecoverVault.mockResolvedValue(mockRecoveredOk(cloudVault));
       mockMergeVaults.mockReturnValue({ ok: true, value: mergedVault });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
-      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null } });
+      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null, bytes: 2048 } });
 
       await useSyncStore
         .getState()
@@ -314,7 +314,7 @@ describe("sync-store switchToExistingCloud", () => {
       mockRecoverVault.mockResolvedValue(mockRecoveredOk(makeVaultData(2)));
       mockMergeVaults.mockReturnValue({ ok: true, value: makeVaultData(3) });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
-      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null } });
+      mockPushVault.mockResolvedValue({ ok: true, value: { updatedAt: Date.now(), etag: null, bytes: 2048 } });
 
       await useSyncStore
         .getState()

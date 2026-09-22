@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { SYNC } from "@feedzero/core/utils/constants";
+import { unwrap } from "@feedzero/core/utils/result";
+import {
+  encodePushBody,
+  PUSH_ENCODING_HEADER,
+  PUSH_ENCODING_GZIP,
+} from "@/core/sync/vault-transport";
 
 /**
  * Pin `SYNC.MAX_PUSH_BODY_SIZE` against the deployed platform.
@@ -12,6 +18,11 @@ import { SYNC } from "@feedzero/core/utils/constants";
  * ceiling is a *belief* about someone else's service, which is exactly
  * the class of belief the Tier 2.5 rule says to verify against the real
  * endpoint.
+ *
+ * The bodies here are deliberately UNCOMPRESSED, even though the client
+ * now gzips its pushes. The platform limit applies to bytes received, so
+ * the uncompressed path is the worst case and the one worth pinning; a
+ * compressed push of the same vault is strictly smaller.
  *
  * Two assertions, one on each side of the ceiling:
  *  1. A body at exactly the ceiling we ship is accepted in production.
@@ -43,7 +54,7 @@ const SENTINEL_VAULT_ID = "b".repeat(64);
  * self-hosted target (where the handler enforces it) as well as for the
  * hosted one (where the platform does).
  */
-const OVERSIZED_BODY_BYTES = 6 * 1024 * 1024;
+const OVERSIZED_BODY_BYTES = SYNC.MAX_VAULT_SIZE + 1024 * 1024;
 
 /**
  * Build a PUT body of exactly `totalBytes`, shaped like a real push:
@@ -74,6 +85,43 @@ describe.skipIf(SKIP)("production /api/sync (live) — payload ceiling", () => {
       });
       expect(res.status).toBe(200);
       expect((await res.json()).ok).toBe(true);
+    } finally {
+      await fetch(`${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`, {
+        method: "DELETE",
+      }).catch(() => {});
+    }
+  }, 120_000);
+
+  it("accepts the compressed transport the client actually sends", async () => {
+    // The one assertion no local test can make. `Content-Encoding: gzip`
+    // was avoided precisely because a platform or CDN might decompress
+    // such a body before the handler runs; this proves the custom header
+    // survives the real path and the deployed handler unpacks it. If
+    // this fails, every push from a current client is failing.
+    const vault = { version: SYNC.FORMAT_VERSION, iv: [1, 2, 3], ciphertext: "A".repeat(4096) };
+    const body = unwrap(
+      await encodePushBody(
+        JSON.stringify({ vaultId: SENTINEL_VAULT_ID, vault }),
+      ),
+    );
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/sync`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          [PUSH_ENCODING_HEADER]: PUSH_ENCODING_GZIP,
+        },
+        body: body as BodyInit,
+      });
+      expect(res.status).toBe(200);
+
+      // Stored unpacked, so a device on an older build can still pull it.
+      const get = await fetch(
+        `${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`,
+      );
+      expect(get.status).toBe(200);
+      expect((await get.json()).vault.ciphertext).toBe(vault.ciphertext);
     } finally {
       await fetch(`${BASE_URL}/api/sync?vaultId=${SENTINEL_VAULT_ID}`, {
         method: "DELETE",

@@ -156,36 +156,84 @@ Same passphrase always produces same vault ID and same encryption key. No extern
 ### Payload size ceiling
 
 A push is one PUT of the whole encrypted vault, so the vault has to fit
-in one request body. Two different limits apply to that body:
+in one request body. Three limits apply, each to a different quantity:
 
-| Limit | Value | Enforced by | Why |
+| Limit | Value | Applies to | Why |
 | --- | --- | --- | --- |
-| `SYNC.MAX_PUSH_BODY_SIZE` | 4 MiB | client (`putEncryptedVault`) | Below Vercel's 4.5 MB edge limit, with headroom for request framing |
-| `SYNC.MAX_VAULT_SIZE` | 5 MB | handler (`handlePut`) | Server-side accept limit; looser so self-hosted deployments and older clients keep working |
+| `SYNC.MAX_PUSH_BODY_SIZE` | 4.3 MB | compressed bytes sent | Under Vercel's 4.5 MB edge limit, with headroom for framing |
+| `SYNC.MAX_PADDED_PAYLOAD_SIZE` | 4 MiB | JSON before compression | Largest power-of-two bucket whose compressed form still fits the wire ceiling |
+| `SYNC.MAX_VAULT_SIZE` | 8 MiB | JSON after decompression | Server accept limit, and the cap that stops a decompression bomb |
 
 Vercel rejects an oversized serverless request body **at the edge**, with
 `413 FUNCTION_PAYLOAD_TOO_LARGE` and a region-coded request id, before any
-handler code runs. The handler's own 413 (JSON, with a traceId) is
-therefore unreachable on the hosted backend, and the client cannot rely on
-the server to explain the failure. So the client owns this:
+handler code runs. The handler's own 413 is therefore unreachable on the
+hosted backend, so the client owns this: `putEncryptedVault` preflights
+the encoded body and refuses over the ceiling without sending, and
+translates any 413 that does come back into the same message.
 
-- `padPayload` buckets up to `MAX_PUSH_BODY_SIZE` and no further. Padding
-  exists to hide subscription count from a traffic observer; it must never
-  be the reason a deliverable body becomes undeliverable. Capping at the
-  larger server limit used to round a 4.2 MB body to 5 MB and guarantee a
-  413.
-- `putEncryptedVault` preflights the body and refuses over the ceiling
-  without sending, and translates any 413 that does come back into the
-  same message. Both `pushVault` and `upgradeVaultKdf` route through it.
-- The message names the actual size, the limit, that nothing was lost, and
-  the lever that shrinks a vault: persisted offline full text
-  (`Article.extractedContent`) dominates a large vault, since `exportVault`
-  already drops article bodies and metadata is small.
+#### The body is gzipped in transit
 
-`tests/smoke/sync-payload-limit.test.ts` pins the ceiling against the live
-deployment from both sides — a body at exactly the ceiling is accepted, a
-body above the platform limit is rejected rather than truncated. That
-number belongs to Vercel, not to this repo, so only a live test can hold it.
+The vault is gzipped *before* encryption, so the ciphertext is
+incompressible — but it then rides in JSON, which cannot hold bytes, so
+it is base64'd. Base64 spends 8 bits to carry 6: a third of every push
+was pure encoding overhead. `encodePushBody` gzips the finished JSON and
+puts that third back, which is what moved a 4.2 MB vault (refused) to
+roughly 3.2 MB on the wire (comfortable).
+
+- **Transport only.** The handler decompresses before storing, so the
+  stored bytes, the ETag, and every GET are exactly what they were. A
+  device still running an older build pulls the vault unchanged, and the
+  handler still accepts an uncompressed PUT from one.
+- **A custom header, not `Content-Encoding: gzip`.** The standards
+  spelling is also an instruction to every proxy and CDN in the path, and
+  whether the platform decompresses such a body before our code runs is
+  not something this repo can test from a sandbox. `x-feedzero-body-encoding`
+  cannot be helpfully acted on by anything else.
+- **Decoding is capped.** A gzip stream that unpacks to gigabytes is a
+  few kilobytes on the wire, so `decodePushBody` stops reading past
+  `MAX_VAULT_SIZE` and the handler answers 413.
+
+#### Padding survives compression, but only because the alphabet matches
+
+`padPayload` buckets the JSON to a power of two so a traffic observer
+cannot infer subscription count from transfer size. What an observer
+measures is now the *compressed* length, so the pad has to compress at
+the same ratio as the ciphertext it hides. Random hex compresses to
+0.54; base64 to 0.75. The pad is therefore random **base64**, not hex —
+a detail that looks cosmetic and is load-bearing. Measured: a 1 MiB
+bucket holding anywhere from 10% to 95% real content lands within 48
+bytes of the same wire size. `tests/core/sync/sync-service.test.ts` pins
+it.
+
+#### Seeing the wall coming
+
+`VaultHeadroomNotice` in Settings shows the last push's wire size against
+the ceiling and warns at 80%. The number comes from the bytes this
+browser last sent (`PushOutcome.bytes`, persisted device-locally) rather
+than from re-encrypting the vault to measure it, which would cost seconds
+of CPU for the case it is meant to warn about. Nothing is reported
+anywhere: server-side size metering would be the per-user telemetry the
+product promises not to collect.
+
+#### Getting space back
+
+Unstarring an article now releases its saved offline copy, and Settings
+→ Sync & Data carries a "Free up space" action that sweeps every copy
+nothing is maintaining. Both are the same rule from
+[feature 015](015-starred-and-offline-prefetch.md#releasing-an-offline-copy):
+the app keeps a copy for as long as it would re-fetch one. The oversize
+error and the headroom warning name both levers, and for one release
+they named a lever that did nothing — see ADR 032.
+
+#### Watching sizes across the population
+
+Every PUT logs one anonymous line via `logEvent`
+(`packages/core/src/utils/log-event.ts`): route, method, a
+power-of-two size bucket and which transport the client used. No
+vaultId, no ciphertext, nothing that follows one vault over time. It
+answers "are vaults drifting toward the ceiling" and "how much of the
+population is on the compressed transport" without answering "how big
+is this person's vault", which is the line the privacy principles draw.
 
 **Not done, and why:** chunked upload (splitting one vault across several
 PUTs) would remove the ceiling entirely, but it changes the adapter
@@ -258,12 +306,14 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 - **Full-state sync, last-write-wins** — Entire vault uploaded/downloaded as one blob. Acceptable for Phase 1.
 - **Storage adapter pattern** — Vendor-neutral. Default is filesystem for self-hosting; Vercel Blob is opt-in.
 - **Hono standalone server** — 14kB Web standard framework. Runs on Node, Deno, Bun. Same `Request/Response` API as handlers.
-- **Two size limits, not one** — The client refuses to PUT a body over `SYNC.MAX_PUSH_BODY_SIZE` (4 MiB); the handler accepts up to `SYNC.MAX_VAULT_SIZE` (5 MB). The looser server limit is deliberate: a self-hosted deployment has no platform body cap, and older clients still send bodies this build would no longer produce, so tightening the handler would break working setups for no gain.
+- **Three size limits, each on a different quantity** — compressed bytes sent, JSON before padding, JSON after decompression. See [Payload size ceiling](#payload-size-ceiling). The looser server limit is deliberate: a self-hosted deployment has no platform body cap, and older clients still send bodies this build would no longer produce.
+- **Compression is transport-only** — the handler unpacks before storing, so the stored format is untouched and a device on an older build can still pull. This is what let the wire format change without a migration.
 - **Merge by URL for feeds, by guid for articles** — When merging local and cloud vaults, feeds are deduplicated by URL (local preferred for duplicates). Articles are deduplicated by guid. Cloud article feedIds are remapped to local feed ids when the parent feed URL matches.
 
 ## Limitations
 
 - No conflict resolution — last push wins. The `sync-pending-push` flush makes "this device has the freshest local change" win over a stale cloud copy on pull, but a genuine cross-device conflict (both sides edited the same feed since the last sync) still resolves last-push-wins.
 - No incremental sync — full vault transferred each time
-- A vault must fit in a single upload: 4 MiB (`SYNC.MAX_PUSH_BODY_SIZE`). A vault that outgrows it stops syncing, with an error naming the size, the limit and the remedy; local reading and the cloud copy are both left untouched. See [Payload size ceiling](#payload-size-ceiling).
+- A vault must fit in a single upload: 4.3 MB of compressed bytes (`SYNC.MAX_PUSH_BODY_SIZE`), roughly 5.7 MB of vault JSON. Settings warns at 80%; past the limit sync stops, with local reading and the cloud copy both untouched. See [Payload size ceiling](#payload-size-ceiling).
+- Releasing offline copies frees space only for articles nothing is maintaining; a vault full of *starred* offline copies still needs the user to unstar them.
 - No passphrase change/rotation flow yet

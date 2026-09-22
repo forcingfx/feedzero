@@ -22,6 +22,8 @@ Object.defineProperty(globalThis, "localStorage", {
   writable: true,
 });
 
+import { handleSyncRequest } from "@/core/sync/sync-handler";
+import { createMemoryAdapter } from "@/core/sync/adapters/memory-adapter";
 import {
   openWithKeys,
   addFeed,
@@ -45,7 +47,13 @@ import { unwrap, isOk } from "@feedzero/core/utils/result";
  * code paths through `fetch` without spinning up a server.
  */
 function installFakeSyncServer(): { reset: () => void } {
-  const store = new Map<string, string>();
+  // The mock stops at the network and nothing further: the request it
+  // receives is handed to the REAL sync handler over a real adapter, so
+  // this test also proves the client and server agree on the wire
+  // format. An earlier version re-implemented the handler's body parsing
+  // here, which meant the two could drift — and they did, the day push
+  // bodies started arriving gzipped.
+  const adapter = createMemoryAdapter();
   const originalFetch = globalThis.fetch;
   vi.spyOn(globalThis, "fetch").mockImplementation(
     async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -53,45 +61,15 @@ function installFakeSyncServer(): { reset: () => void } {
       if (!url.includes("/api/sync")) {
         return originalFetch(input as RequestInfo, init);
       }
-      const method = init?.method ?? "GET";
-      const parsed = new URL(url, "http://localhost");
-      const vaultId = parsed.searchParams.get("vaultId");
-
-      if (method === "PUT") {
-        const body = JSON.parse(String(init?.body ?? "")) as {
-          vaultId: string;
-          vault: unknown;
-        };
-        store.set(
-          body.vaultId,
-          JSON.stringify({ ok: true, vault: body.vault }),
-        );
-        return new Response(
-          JSON.stringify({ ok: true, updatedAt: Date.now() }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      if (method === "GET" || method === "HEAD") {
-        if (!vaultId || !store.has(vaultId)) {
-          return new Response(JSON.stringify({ error: "Not found" }), {
-            status: 404,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        return new Response(store.get(vaultId)!, {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      if (method === "DELETE") {
-        if (vaultId) store.delete(vaultId);
-        return new Response(JSON.stringify({ ok: true }), { status: 200 });
-      }
-      return new Response("Method not allowed", { status: 405 });
+      return handleSyncRequest(
+        new Request(new URL(url, "http://localhost"), init),
+        adapter,
+      );
     },
   );
-  return { reset: () => store.clear() };
+  return { reset: () => vi.restoreAllMocks() };
 }
+
 
 /**
  * Reproduces the bug pinned by tests/e2e/sync-100-feeds.spec.ts at the

@@ -1,6 +1,7 @@
 import { ok, err } from "../../../packages/core/src/utils/result";
 import type { Result } from "../../../packages/core/src/utils/result";
 import { SYNC } from "../../../packages/core/src/utils/constants";
+import { uint8ArrayToBase64 } from "../../../packages/core/src/utils/base64";
 import { exportAll, importAll } from "../storage/db.ts";
 import {
   deriveVaultId,
@@ -13,6 +14,12 @@ import {
 } from "./vault-crypto.ts";
 import type { VaultData, EncryptedVault, KdfSpec } from "./types.ts";
 import { syncFetch } from "./sync-fetch.ts";
+import { formatMegabytes } from "./vault-headroom.ts";
+import {
+  encodePushBody,
+  PUSH_ENCODING_HEADER,
+  PUSH_ENCODING_GZIP,
+} from "./vault-transport.ts";
 
 /**
  * Pre-derived sync credentials, avoiding the need to store the raw
@@ -31,37 +38,47 @@ const MIN_BUCKET = 64 * 1024;
 /**
  * Pad a JSON payload string to the nearest power-of-2 bucket size.
  * Prevents an observer from inferring subscription count from transfer size.
- * Adds a `_pad` field with random hex to reach the target length.
+ * Adds a `_pad` field of random base64 to reach the target length.
  *
- * The bucket ladder stops at `SYNC.MAX_PUSH_BODY_SIZE`, so padding can
- * never be what makes a body undeliverable. Capping at the (larger)
- * server accept limit used to round a 4.2 MB body up to 5 MB, straight
- * past Vercel's 4.5 MB edge limit: a push that would have landed came
- * back as `413 FUNCTION_PAYLOAD_TOO_LARGE` because of the padding alone.
- * A body already at or above the ceiling is returned untouched.
+ * **The pad is base64, not hex, and that is load-bearing.** The body is
+ * gzipped in transit, so what an observer measures is the compressed
+ * length. Base64 compresses to ~0.75 and random hex to ~0.54, so a hex
+ * pad hiding base64 ciphertext would make the compressed size a function
+ * of the real content again and quietly undo the padding. Matching the
+ * alphabet keeps a bucket a bucket: measured at a 48-byte spread across
+ * a 1 MiB bucket holding 10% to 95% real content.
+ *
+ * The ladder stops at `SYNC.MAX_PADDED_PAYLOAD_SIZE` — the largest
+ * bucket whose compressed form still fits the wire ceiling — so padding
+ * can never be what makes a body undeliverable. A payload already at or
+ * above that is returned untouched and rides unpadded.
  */
 export function padPayload(json: string): string {
   const targetSize = Math.min(
     nextPowerOf2(json.length, MIN_BUCKET),
-    SYNC.MAX_PUSH_BODY_SIZE,
+    SYNC.MAX_PADDED_PAYLOAD_SIZE,
   );
   const overhead = ',"_pad":""'.length;
   const padLength = targetSize - json.length - overhead;
   if (padLength <= 0) return json;
 
-  const pad = generateRandomHex(padLength);
+  const pad = generateRandomBase64(padLength);
   return json.slice(0, -1) + ',"_pad":"' + pad + '"}';
 }
 
-function generateRandomHex(length: number): string {
-  const MAX_CHUNK = 65536;
+/**
+ * `length` characters of random base64. Generated in 3-byte-aligned
+ * chunks so each chunk encodes to a whole number of base64 quads and the
+ * pieces concatenate without interior padding characters.
+ */
+function generateRandomBase64(length: number): string {
+  const BYTES_PER_CHUNK = 49152;
   const parts: string[] = [];
-  let remaining = Math.ceil(length / 2);
+  let remaining = Math.ceil((length * 3) / 4);
   while (remaining > 0) {
-    const chunk = Math.min(remaining, MAX_CHUNK);
-    const bytes = crypto.getRandomValues(new Uint8Array(chunk));
-    for (const b of bytes) parts.push(b.toString(16).padStart(2, "0"));
-    remaining -= chunk;
+    const size = Math.min(remaining, BYTES_PER_CHUNK);
+    parts.push(uint8ArrayToBase64(crypto.getRandomValues(new Uint8Array(size))));
+    remaining -= size;
   }
   return parts.join("").slice(0, length);
 }
@@ -167,10 +184,11 @@ export async function importVault(vault: VaultData): Promise<Result<boolean>> {
 export interface PushOutcome {
   updatedAt: number;
   etag: string | null;
-}
-
-function formatMegabytes(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  /**
+   * Bytes actually sent. Surfaced so the UI can show how close the vault
+   * is to the ceiling without re-encrypting it to find out.
+   */
+  bytes: number;
 }
 
 /**
@@ -178,20 +196,24 @@ function formatMegabytes(bytes: number): string {
  *
  * The platform's own answer is `413 FUNCTION_PAYLOAD_TOO_LARGE` plus a
  * region-coded request id, which tells the user nothing they can act
- * on. This says how big the vault is, what the limit is, that nothing
- * was lost, and which lever actually shrinks it: persisted offline full
- * text dominates a large vault (feed and article metadata is small, and
- * `exportVault` already drops article bodies), so unstarring or turning
- * off per-feed prefetch is the remedy that works.
+ * on. This says how big the vault is, what the limit is, and that
+ * nothing was lost.
+ *
+ * For one release this message suggested unstarring, which did nothing:
+ * `toggleStar` kept `extractedContent` and no code path released it.
+ * Both levers it names are real now — unstarring drops the copy
+ * (`release-offline-content.ts`), and the Settings action sweeps the
+ * copies nothing is maintaining — so keep them in step: if either stops
+ * releasing space, this message goes back to being a lie.
  */
 function oversizedVaultMessage(bodyBytes: number): string {
   return (
     `Your encrypted vault is ${formatMegabytes(bodyBytes)}, which is too large ` +
     `to sync in one upload (limit ${formatMegabytes(SYNC.MAX_PUSH_BODY_SIZE)}). ` +
     `Nothing was uploaded, and your local data and cloud copy are both unchanged. ` +
-    `Saved offline full text is usually most of a vault this size, so unstar ` +
-    `articles you no longer need offline, or turn off offline prefetch for a ` +
-    `busy feed, and sync again.`
+    `Saved offline full text is usually most of a vault this size: unstar ` +
+    `articles you no longer need offline, or use "Free up space" in Settings ` +
+    `to clear the copies FeedZero is no longer keeping up to date.`
   );
 }
 
@@ -206,30 +228,38 @@ function oversizedVaultMessage(bodyBytes: number): string {
  * undeliverable costs the user an upload and buys an error code they
  * cannot act on.
  *
- * `body.length` is a byte count here: the payload is JSON over base64
- * ciphertext, hex padding and a hex vault id, so every character is one
- * ASCII byte. The server-side check in `sync-handler.ts` measures the
- * same way.
+ * The size checked is the COMPRESSED byte count, because that is what
+ * the platform measures and what a 413 would be about. The handler
+ * checks the decompressed JSON against its own, looser limit.
  */
 async function putEncryptedVault(
   vaultId: string,
   vault: EncryptedVault,
   failureLabel: string,
 ): Promise<Result<PushOutcome>> {
-  const body = padPayload(JSON.stringify({ vaultId, vault }));
+  const encoded = await encodePushBody(
+    padPayload(JSON.stringify({ vaultId, vault })),
+  );
+  if (!encoded.ok) return encoded;
+  const body = encoded.value;
 
-  if (body.length > SYNC.MAX_PUSH_BODY_SIZE) {
-    return err(oversizedVaultMessage(body.length));
+  if (body.byteLength > SYNC.MAX_PUSH_BODY_SIZE) {
+    return err(oversizedVaultMessage(body.byteLength));
   }
 
   const response = await syncFetch("/api/sync", {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body,
+    headers: {
+      "Content-Type": "application/octet-stream",
+      [PUSH_ENCODING_HEADER]: PUSH_ENCODING_GZIP,
+    },
+    body: body as BodyInit,
   });
 
   if (!response.ok) {
-    if (response.status === 413) return err(oversizedVaultMessage(body.length));
+    if (response.status === 413) {
+      return err(oversizedVaultMessage(body.byteLength));
+    }
     const text = await response.text();
     return err(`${failureLabel} (${response.status}): ${text}`);
   }
@@ -238,6 +268,7 @@ async function putEncryptedVault(
   return ok({
     updatedAt: data.updatedAt ?? Date.now(),
     etag: response.headers?.get?.("ETag") ?? null,
+    bytes: body.byteLength,
   });
 }
 

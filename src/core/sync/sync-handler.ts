@@ -1,11 +1,18 @@
 import { SYNC } from "../../../packages/core/src/utils/constants";
 import { newTraceId } from "../../../packages/core/src/utils/trace-id";
 import { logError } from "../../../packages/core/src/utils/log-error";
+import { logEvent, sizeBucket } from "../../../packages/core/src/utils/log-event";
 import type { SyncStorageAdapter } from "./types.ts";
 import {
   authorizeLicense,
   type LicenseAuthOptions,
 } from "../license/middleware";
+import {
+  decodePushBody,
+  PUSH_ENCODING_HEADER,
+  PUSH_ENCODING_GZIP,
+  PUSH_BODY_TOO_LARGE,
+} from "./vault-transport.ts";
 
 const VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;
 const ROUTE = "/api/sync";
@@ -153,15 +160,76 @@ async function handleGet(
   });
 }
 
+/**
+ * Read the request body as JSON text, decompressing it when the client
+ * says it is gzipped.
+ *
+ * Both shapes stay supported: a client that predates the compressed
+ * transport still PUTs plain JSON, and refusing it would break every
+ * device that has not reloaded yet. The compressed path is capped on
+ * both sides of the decompression — the received bytes against the
+ * wire ceiling, the output against MAX_VAULT_SIZE — because a gzip
+ * stream that unpacks to gigabytes is only kilobytes on the wire.
+ */
+type PutBody =
+  | { text: string; receivedBytes: number; encoding: string }
+  | { rejection: Response };
+
+async function readPutBody(
+  request: Request,
+  ctx: RequestContext,
+): Promise<PutBody> {
+  if (request.headers.get(PUSH_ENCODING_HEADER) !== PUSH_ENCODING_GZIP) {
+    const text = await request.text();
+    if (text.length > SYNC.MAX_VAULT_SIZE) {
+      return { rejection: clientError("Payload too large", 413, ctx) };
+    }
+    return { text, receivedBytes: text.length, encoding: "identity" };
+  }
+
+  const raw = new Uint8Array(await request.arrayBuffer());
+  if (raw.byteLength > SYNC.MAX_PUSH_BODY_SIZE) {
+    return { rejection: clientError("Payload too large", 413, ctx) };
+  }
+
+  const decoded = await decodePushBody(raw, SYNC.MAX_VAULT_SIZE);
+  if (!decoded.ok) {
+    // An unreadable body is the client's problem, not an ops event: a
+    // truncated upload and a hostile one look identical from here.
+    return {
+      rejection:
+        decoded.error === PUSH_BODY_TOO_LARGE
+          ? clientError("Payload too large", 413, ctx)
+          : clientError("Invalid compressed body", 400, ctx),
+    };
+  }
+  return {
+    text: decoded.value,
+    receivedBytes: raw.byteLength,
+    encoding: PUSH_ENCODING_GZIP,
+  };
+}
+
 async function handlePut(
   request: Request,
   adapter: SyncStorageAdapter,
   ctx: RequestContext,
 ): Promise<Response> {
-  const text = await request.text();
-  if (text.length > SYNC.MAX_VAULT_SIZE) {
-    return clientError("Payload too large", 413, ctx);
-  }
+  const putBody = await readPutBody(request, ctx);
+  if ("rejection" in putBody) return putBody.rejection;
+  const text = putBody.text;
+
+  // Anonymous size sample. This is the only view anyone has of whether
+  // vaults are drifting toward the ceiling across the population, and
+  // it stays a coarse bucket with nothing identifying whose vault it
+  // was — see log-event.ts for why that boundary is where it is.
+  logEvent({
+    route: ROUTE,
+    method: ctx.method,
+    event: "vault.put",
+    sizeBucket: sizeBucket(putBody.receivedBytes),
+    encoding: putBody.encoding,
+  });
 
   let body: { vaultId?: string; vault?: unknown };
   try {

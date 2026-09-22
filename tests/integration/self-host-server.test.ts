@@ -22,6 +22,12 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
+import { unwrap } from "@feedzero/core/utils/result";
+import {
+  encodePushBody,
+  PUSH_ENCODING_HEADER,
+  PUSH_ENCODING_GZIP,
+} from "@/core/sync/vault-transport";
 import os from "node:os";
 import path from "node:path";
 import { createApp } from "../../server";
@@ -93,6 +99,38 @@ describe("self-host server integration", () => {
       // ciphertext out of `.vault` and decrypt locally.
       const getBody = await getRes.json();
       expect(getBody.vault).toBe(payload);
+    });
+
+    it("PUT accepts a compressed body through Hono and stores it unpacked", async () => {
+      // The third entry point. The client gzips its pushes, and
+      // @hono/node-server has already cost this project one incident by
+      // handling bodies differently from the other two consumers (issue
+      // #117's Content-Length leak), so "the shared handler decompresses
+      // correctly" is not the same claim as "a self-hoster's push works".
+      const app = buildSelfHostApp();
+      const vaultId = "9".repeat(64);
+      const payload = JSON.stringify({ ciphertext: "compressed", iv: "2233" });
+      const encoded = unwrap(
+        await encodePushBody(JSON.stringify({ vaultId, vault: payload })),
+      );
+
+      const putRes = await app.request("/api/sync", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          [PUSH_ENCODING_HEADER]: PUSH_ENCODING_GZIP,
+        },
+        body: encoded as BodyInit,
+      });
+      expect(putRes.status).toBe(200);
+
+      // Stored unpacked: what lands on disk is the same envelope an
+      // uncompressed PUT would have written, which is what keeps an
+      // older device able to pull it.
+      const onDisk = JSON.parse(
+        fs.readFileSync(path.join(dataDir, "vaults", `${vaultId}.json`), "utf-8"),
+      );
+      expect(onDisk.vault).toBe(payload);
     });
 
     it("DELETE removes the vault file; subsequent GET returns 404", async () => {

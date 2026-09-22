@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { readPushedBody } from "../../helpers/push-body";
 import "fake-indexeddb/auto";
 import { open, close, addFeed } from "@/core/storage/db";
 import { createFeed } from "@/core/storage/schema";
@@ -201,7 +202,7 @@ describe("upgradeVaultKdf", () => {
 
     // The push targets the same vault ID and stamps Argon2id on the envelope
     expect(fetchMock).toHaveBeenCalledOnce();
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = await readPushedBody(fetchMock.mock.calls[0][1].body);
     expect(body.vaultId).toBe(vaultId);
     expect(body.vault.kdf).toEqual(TARGET_SPEC);
   });
@@ -317,7 +318,7 @@ describe("pushVault stamps the KDF spec on the envelope", () => {
     expect(isOk(result)).toBe(true);
     expect(fetchMock).toHaveBeenCalledOnce();
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = await readPushedBody(fetchMock.mock.calls[0][1].body);
     expect(body.vault.kdf).toEqual(argonSpec);
   });
 
@@ -343,7 +344,7 @@ describe("pushVault stamps the KDF spec on the envelope", () => {
     });
     expect(isOk(result)).toBe(true);
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = await readPushedBody(fetchMock.mock.calls[0][1].body);
     expect(body.vault.kdf).toEqual(LEGACY_KDF_SPEC);
   });
 });

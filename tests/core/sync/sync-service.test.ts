@@ -15,31 +15,38 @@ import {
   padPayload,
 } from "@/core/sync/sync-service";
 import { uint8ArrayToBase64 } from "@feedzero/core/utils/base64";
+import { readPushedBody } from "../../helpers/push-body";
 import type { Article } from "@feedzero/core/types";
+
+/** Random base64, standing in for AES-GCM ciphertext on the wire. */
+function randomBase64(length: number): string {
+  const bytes = new Uint8Array(Math.ceil(length * 0.76));
+  for (let i = 0; i < bytes.length; i += 32768) {
+    crypto.getRandomValues(bytes.subarray(i, Math.min(i + 32768, bytes.length)));
+  }
+  return uint8ArrayToBase64(bytes).slice(0, length);
+}
 
 /**
  * Offline full text big enough to push an encrypted vault past the
- * single-upload ceiling.
+ * single-upload ceiling, built cheaply.
  *
- * The filler is random base64 on purpose: gzip cannot shrink it, so the
- * ciphertext comes out roughly the size of the plaintext and the test
- * does not silently stop exercising the oversize path the day someone
- * improves the compression ratio.
+ * The filler has to be incompressible, or the gzip transport shrinks it
+ * back under the ceiling and the test stops testing anything. Random
+ * base64 is incompressible, but generating megabytes of it is slow — so
+ * one 64 KiB random block is repeated instead. Deflate's window is
+ * 32 KiB, so repeats that far apart find no match and the ratio stays at
+ * 0.753 (measured, up to 6 MiB). Same test, a fraction of the cost.
  */
 function buildOversizedArticles(feedId: string): Article[] {
-  const CHUNK_BYTES = 48 * 1024;
-  const CHUNKS_PER_ARTICLE = 8;
-  const ARTICLE_COUNT = 10;
+  const BLOCK_BYTES = 48 * 1024; // 64 KiB once base64-encoded
+  const BLOCKS_PER_ARTICLE = 8; // ~512 KiB each
+  const ARTICLE_COUNT = 13; // ~6.5 MiB total, ~4.9 MB compressed
 
-  const randomFiller = (): string => {
-    const chunks: string[] = [];
-    for (let i = 0; i < CHUNKS_PER_ARTICLE; i++) {
-      chunks.push(
-        uint8ArrayToBase64(crypto.getRandomValues(new Uint8Array(CHUNK_BYTES))),
-      );
-    }
-    return chunks.join("");
-  };
+  const block = uint8ArrayToBase64(
+    crypto.getRandomValues(new Uint8Array(BLOCK_BYTES)),
+  );
+  const filler = block.repeat(BLOCKS_PER_ARTICLE);
 
   return Array.from({ length: ARTICLE_COUNT }, (_, i) => ({
     ...unwrap(
@@ -50,7 +57,7 @@ function buildOversizedArticles(feedId: string): Article[] {
       }),
     ),
     starred: true,
-    extractedContent: randomFiller(),
+    extractedContent: filler,
     extractedAt: Date.now(),
   }));
 }
@@ -181,13 +188,14 @@ describe("sync-service", () => {
       expect(url).toMatch(/\/api\/sync$/);
       expect(options.method).toBe("PUT");
       // syncFetch wraps init.headers as a Headers instance — accept either shape.
-      const contentType =
+      const header = (name: string) =>
         options.headers instanceof Headers
-          ? options.headers.get("Content-Type")
-          : options.headers["Content-Type"];
-      expect(contentType).toBe("application/json");
+          ? options.headers.get(name)
+          : options.headers[name];
+      expect(header("Content-Type")).toBe("application/octet-stream");
+      expect(header("x-feedzero-body-encoding")).toBe("gzip");
 
-      const body = JSON.parse(options.body);
+      const body = await readPushedBody(options.body);
       expect(body.vaultId).toMatch(/^[0-9a-f]{64}$/);
       expect(body.vault.version).toBe(SYNC.FORMAT_VERSION);
       expect(typeof body.vault.ciphertext).toBe("string");
@@ -231,8 +239,13 @@ describe("sync-service", () => {
       const result = await pushVault("test-passphrase");
       expect(isErr(result)).toBe(true);
       if (result.ok) return;
-      expect(result.error).toMatch(/too (large|big)/i);
+      expect(result.error).toMatch(/too large/i);
+      // Every remedy named here has to actually release bytes. For one
+      // release this message said "unstar" while toggleStar kept the
+      // offline copy, which sent users to do something that changed
+      // nothing; both levers below work now.
       expect(result.error).toMatch(/unstar/i);
+      expect(result.error).toMatch(/free up space/i);
       expect(result.error).not.toMatch(/FUNCTION_PAYLOAD_TOO_LARGE/);
     });
 
@@ -253,7 +266,7 @@ describe("sync-service", () => {
       expect(fetchMock).not.toHaveBeenCalled();
       expect(isErr(result)).toBe(true);
       if (result.ok) return;
-      expect(result.error).toMatch(/unstar/i);
+      expect(result.error).toMatch(/too large/i);
     });
   });
 
@@ -403,35 +416,60 @@ describe("sync-service", () => {
       expect(parsedA._pad).not.toBe(parsedB._pad);
     });
 
-    it("pads up to the single-upload ceiling", () => {
-      // Input just under the ceiling — should pad to exactly the ceiling
+    it("pads up to the top bucket", () => {
       const input = "x".repeat(3 * 1024 * 1024);
       const padded = padPayload(input);
-      expect(padded.length).toBe(SYNC.MAX_PUSH_BODY_SIZE);
+      expect(padded.length).toBe(SYNC.MAX_PADDED_PAYLOAD_SIZE);
     });
 
-    it("leaves a payload already over the ceiling unpadded", () => {
-      // Padding an oversized body only makes it more oversized. Vercel
-      // rejects a body over 4.5 MB at the edge, so inflating a 4.2 MB
-      // body into the next bucket is what turns a deliverable push into
-      // a FUNCTION_PAYLOAD_TOO_LARGE.
-      const input = "x".repeat(SYNC.MAX_PUSH_BODY_SIZE + 1024);
+    it("leaves a payload already over the top bucket unpadded", () => {
+      // Padding an oversized body only makes it more oversized. The next
+      // bucket up would not survive compression inside the wire ceiling,
+      // so an outsized payload rides unpadded rather than being inflated
+      // into a 413.
+      const input = "x".repeat(SYNC.MAX_PADDED_PAYLOAD_SIZE + 1024);
       const padded = padPayload(input);
       expect(padded.length).toBe(input.length);
     });
 
-    it("pads or stands aside, but never grows a body past the ceiling", () => {
+    it("pads or stands aside, but never grows a body past the top bucket", () => {
       const sizes = [
-        SYNC.MAX_PUSH_BODY_SIZE - 1024,
-        SYNC.MAX_PUSH_BODY_SIZE,
-        SYNC.MAX_PUSH_BODY_SIZE + 1,
+        SYNC.MAX_PADDED_PAYLOAD_SIZE - 1024,
+        SYNC.MAX_PADDED_PAYLOAD_SIZE,
+        SYNC.MAX_PADDED_PAYLOAD_SIZE + 1,
       ];
       for (const size of sizes) {
-        // Under the ceiling it pads up to it; at or above it, untouched.
         expect(padPayload("x".repeat(size)).length).toBe(
-          Math.max(size, SYNC.MAX_PUSH_BODY_SIZE),
+          Math.max(size, SYNC.MAX_PADDED_PAYLOAD_SIZE),
         );
       }
+    });
+
+    it("still hides content size once the body is compressed", async () => {
+      // The whole point of padding is that a traffic observer cannot
+      // infer subscription count from transfer size. The body is gzipped
+      // in transit, so the pad must compress at the SAME ratio as the
+      // base64 ciphertext it is hiding — random hex compresses to 0.54,
+      // base64 to 0.75, and mixing the two makes the compressed length a
+      // function of the real content size again. Two payloads in the same
+      // bucket must look the same on the wire.
+      const { encodePushBody } = await import("@/core/sync/vault-transport");
+      const bucket = 1024 * 1024;
+
+      const wireLengths: number[] = [];
+      for (const fraction of [0.55, 0.95]) {
+        const ciphertext = randomBase64(Math.round(bucket * fraction));
+        const json = JSON.stringify({
+          vaultId: "a".repeat(64),
+          vault: { version: 4, iv: [1], ciphertext },
+        });
+        const padded = padPayload(json);
+        expect(padded.length).toBe(bucket);
+        wireLengths.push(unwrap(await encodePushBody(padded)).byteLength);
+      }
+
+      const [lean, full] = wireLengths;
+      expect(Math.abs(lean - full)).toBeLessThan(1024);
     });
 
     it("returns input unchanged if already at a bucket boundary", () => {

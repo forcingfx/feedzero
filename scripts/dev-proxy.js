@@ -20,7 +20,14 @@
 export async function toWebRequest(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
-  const bodyStr = Buffer.concat(chunks).toString();
+  // Keep the body as bytes. Decoding it to a string here would replace
+  // every invalid UTF-8 sequence with U+FFFD, which is lossy for any
+  // body that is not text — sync pushes are gzipped, and a text
+  // round-trip corrupts them into a body the handler cannot read. The
+  // other two entry points (Hono, Vercel) hand the handler a real
+  // Request and never had this problem, so a mistake here shows up only
+  // in `npm run dev` and in E2E.
+  const body = Buffer.concat(chunks);
 
   const url = new URL(req.url, "http://localhost");
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
@@ -35,7 +42,7 @@ export async function toWebRequest(req) {
   return new Request(url, {
     method: req.method,
     headers,
-    ...(hasBody ? { body: bodyStr } : {}),
+    ...(hasBody ? { body } : {}),
   });
 }
 

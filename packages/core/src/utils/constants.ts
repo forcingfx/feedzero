@@ -173,6 +173,11 @@ export const LOCAL_STORAGE = {
    *  in-memory debounce timer) so the next pull() can flush the change to
    *  the cloud before importVault would otherwise overwrite it. */
   SYNC_PENDING_PUSH: "feedzero:sync-pending-push",
+  /** Wire size of the last successful vault push, in bytes. Device-local
+   *  and purely informational: it drives the headroom readout in Settings
+   *  so a user can see the size ceiling coming without the app having to
+   *  re-encrypt the whole vault to measure it. */
+  SYNC_VAULT_BYTES: "feedzero:sync-vault-bytes",
 } as const;
 
 /**
@@ -260,31 +265,45 @@ export const SYNC = {
   /** Deterministic encryption salt length in bytes. */
   ENCRYPTION_SALT_LENGTH: 16,
   /**
-   * Largest body the sync handler will accept on a PUT (5 MB).
+   * Largest DECOMPRESSED push body the sync handler will accept (8 MiB),
+   * and the cap `decodePushBody` stops a decompression bomb at.
    *
-   * This is the SERVER-side accept limit, deliberately looser than
-   * {@link MAX_PUSH_BODY_SIZE}: a self-hosted deployment has no
-   * platform body cap, and older clients may still send bodies that
-   * this build would no longer produce. Rejecting those retroactively
-   * would break a working self-hosted setup for no benefit.
+   * Looser than the wire ceiling on purpose. A push body is gzipped in
+   * transit, so a request that fits {@link MAX_PUSH_BODY_SIZE} unpacks
+   * to roughly a third more than it measured; this is the number that
+   * unpacked size is checked against. It is also the accept limit for a
+   * self-hosted deployment, which has no platform body cap at all.
    */
-  MAX_VAULT_SIZE: 5 * 1024 * 1024,
+  MAX_VAULT_SIZE: 8 * 1024 * 1024,
   /**
-   * Largest body THIS client will PUT to /api/sync (4 MiB).
+   * Largest body THIS client will PUT to /api/sync, measured on the
+   * compressed bytes actually sent (4.3 MB).
    *
    * Vercel rejects a serverless request body over 4.5 MB at the edge
-   * with an opaque `413 FUNCTION_PAYLOAD_TOO_LARGE`, before any of our
-   * handler code runs, so {@link MAX_VAULT_SIZE} is unreachable on the
-   * hosted backend. 4 MiB leaves headroom under that platform ceiling
-   * for request framing, and is the number `padPayload` buckets up to
-   * and `pushVault` refuses to exceed. A client that outgrows it gets
-   * an actionable error instead of a platform error code.
+   * with an opaque `413 FUNCTION_PAYLOAD_TOO_LARGE`, before any handler
+   * code runs, so a client-side ceiling is the only place that failure
+   * can be turned into something a user can act on. The ~200 KB of
+   * headroom covers request framing and the fact that Vercel documents
+   * "4.5 MB" without saying whether it means 4.5e6 or 4.5 MiB.
    *
-   * Pinned against the live deployment by
-   * tests/smoke/sync-payload-limit.test.ts: if Vercel ever moves the
-   * ceiling, that smoke test is what catches it.
+   * This number is a belief about someone else's platform, not a fact
+   * this repo can check: the sandbox has no route to production.
+   * tests/smoke/sync-payload-limit.test.ts is what turns it into a
+   * measurement, and it has to be run against the deployment.
    */
-  MAX_PUSH_BODY_SIZE: 4 * 1024 * 1024,
+  MAX_PUSH_BODY_SIZE: 4_300_000,
+  /**
+   * Largest bucket `padPayload` will round a body up to, measured on the
+   * JSON before compression (4 MiB).
+   *
+   * Distinct from the wire ceiling because padding happens before gzip:
+   * a 4 MiB padded payload leaves the browser at roughly 3.2 MB, well
+   * inside {@link MAX_PUSH_BODY_SIZE}. The next bucket up (8 MiB) would
+   * not fit, so this is where the ladder stops. A payload above it is
+   * sent unpadded, which is why a vault can still exceed 4 MiB of JSON
+   * and sync.
+   */
+  MAX_PADDED_PAYLOAD_SIZE: 4 * 1024 * 1024,
   /**
    * Sync data format version for forward compatibility.
    *

@@ -10,7 +10,8 @@ import {
   exportVault,
   mergeVaults,
 } from "../core/sync/sync-service";
-import type { SyncCredentials } from "../core/sync/sync-service";
+import type { SyncCredentials, PushOutcome } from "../core/sync/sync-service";
+import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import type { VaultData } from "../core/sync/types.ts";
 import {
   addVaultKeys,
@@ -45,6 +46,55 @@ export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 const clearPendingPush = syncCoordinator.clearPending;
 const hasPendingPush = syncCoordinator.hasPending;
 
+/**
+ * Remember the wire size of the last successful push so the Settings
+ * headroom readout survives a reload. Device-local and informational;
+ * a missing or corrupt value simply means "not measured yet".
+ */
+function rememberVaultBytes(bytes: number): void {
+  try {
+    const normalized = Math.trunc(bytes);
+    if (!Number.isFinite(normalized) || normalized < 0) return;
+    localStorage.setItem(
+      LOCAL_STORAGE.SYNC_VAULT_BYTES,
+      normalized.toString(10),
+    );
+  } catch {
+    // Private mode, disabled storage: the readout is a nicety, not a
+    // reason to fail a push that already succeeded.
+  }
+}
+
+function loadStoredVaultBytes(): number | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE.SYNC_VAULT_BYTES);
+    if (raw === null) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The state every successful push produces. Extracted because the same
+ * four-field update was repeated at three call sites; with it in one
+ * place, the fourth — the flush inside `pull()`, which records the ETag
+ * and the size but deliberately NOT `status: "synced"`, because the
+ * pull that follows decides the status — is a visible outlier instead
+ * of hiding inside copy-paste variation.
+ */
+function syncedState(outcome: PushOutcome): Partial<SyncStore> {
+  rememberVaultBytes(outcome.bytes);
+  return {
+    status: "synced",
+    lastSyncedAt: outcome.updatedAt,
+    lastVaultEtag: outcome.etag,
+    lastPushBytes: outcome.bytes,
+    error: null,
+  };
+}
+
 type SwitchMode = "replace" | "merge";
 
 interface SyncStore {
@@ -60,6 +110,12 @@ interface SyncStore {
    * users between active windows.
    */
   lastVaultEtag: string | null;
+  /**
+   * Wire size of the most recent successful push, or null when this
+   * device has not pushed since the value was last cleared. Drives the
+   * Settings headroom readout; never leaves the device.
+   */
+  lastPushBytes: number | null;
 
   enableSync: (passphrase: string) => Promise<void>;
   restoreSync: (credentials: SyncCredentials) => void;
@@ -120,6 +176,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   error: null,
   credentials: null,
   lastVaultEtag: null,
+  lastPushBytes: loadStoredVaultBytes(),
 
   enableSync: async (passphrase) => {
     // Derive vault keys and persist alongside existing DB keys
@@ -137,7 +194,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     const result = await pushVault(credentials);
     if (result.ok) {
       clearPendingPush();
-      set({ status: "synced", lastSyncedAt: result.value.updatedAt, lastVaultEtag: result.value.etag, error: null });
+      set(syncedState(result.value));
     } else {
       set({ status: "error", error: result.error });
     }
@@ -207,7 +264,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     const result = await pushVault(credentials);
     if (result.ok) {
       clearPendingPush();
-      set({ status: "synced", lastSyncedAt: result.value.updatedAt, lastVaultEtag: result.value.etag, error: null });
+      set(syncedState(result.value));
     } else {
       set({ status: "error", error: result.error });
     }
@@ -238,7 +295,11 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         // The flush wrote a fresh ETag — record it so the conditional
         // pull below short-circuits with 304 (the vault we'd download
         // is exactly the one we just uploaded).
-        set({ lastVaultEtag: flushResult.value.etag });
+        set({
+          lastVaultEtag: flushResult.value.etag,
+          lastPushBytes: flushResult.value.bytes,
+        });
+        rememberVaultBytes(flushResult.value.bytes);
       }
 
       // Send If-None-Match when we have a cached ETag from the
@@ -428,13 +489,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       mergeResult.value,
     );
 
-    set({
-      credentials: finalCreds,
-      status: "synced",
-      lastSyncedAt: pushResult.value.updatedAt,
-      lastVaultEtag: pushResult.value.etag,
-      error: null,
-    });
+    set({ credentials: finalCreds, ...syncedState(pushResult.value) });
     return ok(true);
   },
 }));
