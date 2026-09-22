@@ -53,7 +53,12 @@ const hasPendingPush = syncCoordinator.hasPending;
  */
 function rememberVaultBytes(bytes: number): void {
   try {
-    localStorage.setItem(LOCAL_STORAGE.SYNC_VAULT_BYTES, String(bytes));
+    const normalized = Math.trunc(bytes);
+    if (!Number.isFinite(normalized) || normalized < 0) return;
+    localStorage.setItem(
+      LOCAL_STORAGE.SYNC_VAULT_BYTES,
+      normalized.toString(10),
+    );
   } catch {
     // Private mode, disabled storage: the readout is a nicety, not a
     // reason to fail a push that already succeeded.
