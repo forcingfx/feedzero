@@ -18,6 +18,12 @@ Feature: Feed refresh
     Then all feeds are refreshed in the background
     And new articles appear in the feed list
 
+  Scenario: A refresh never interrupts reading
+    Given the user is reading an article
+    When any refresh finishes (app load, timer, focus, pull-to-refresh, manual)
+    Then the article stays open in the reader
+    And new articles appear in the list around it
+
   Scenario: Periodic background refresh
     Given the app has been open with existing feeds
     When AUTO_REFRESH_INTERVAL_MS elapses
@@ -133,6 +139,7 @@ Feature: Feed refresh
 - **Sequential refresh** — Feeds are refreshed one at a time to avoid overwhelming the proxy. Could be parallelized later.
 - **Debounce via flag** — `main.js` uses boolean guards (`refreshingAll`, `refreshingFeed`) to prevent concurrent refresh operations from double-clicks.
 - **Non-blocking auto-refresh** — On app load, refresh runs in the background without blocking the UI.
+- **Refresh in place, never re-enter the view** — After a refresh the feed store reloads the open list with `articleStore.refreshArticles(feedId)`, which re-fetches and re-derives the list but leaves `selectedArticle` alone. `loadArticles` is for navigation only: it clears the selection because a new view starts unselected. Routing a refresh through `loadArticles` closed the article being read every time a background refresh finished (the route's URL sync had already applied that article id, so nothing re-selected it). Locked by `tests/integration/feed-store-db.test.ts` and `tests/pages/feeds-page-behavior.test.tsx`.
 - **DB schema v2** — Bumped from v1 to v2 to add the compound index. Dexie handles migration automatically.
 
 ## Limitations

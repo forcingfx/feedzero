@@ -154,6 +154,32 @@ function resetStores() {
   });
   clearArticleCache();
   vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [] });
+  vi.mocked(db.getFeeds).mockResolvedValue({ ok: true, value: [] });
+}
+
+/**
+ * The article being read must survive a background refresh landing new
+ * rows. Before the fix, the post-refresh reload re-entered the view,
+ * cleared the selection, and dropped the reader to an empty pane.
+ */
+async function expectReaderSurvivesRefresh() {
+  useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+  vi.mocked(db.getFeeds).mockResolvedValue({ ok: true, value: [makeFeed("feed-1")] });
+  vi.mocked(db.getArticles).mockResolvedValue({
+    ok: true,
+    value: [makeArticle("art-1"), makeArticle("art-2")],
+  });
+  renderPage("/feeds/feed-1/articles/art-2");
+  expect(await screen.findByText("Content for art-2")).toBeInTheDocument();
+
+  vi.mocked(db.getArticles).mockResolvedValue({
+    ok: true,
+    value: [makeArticle("art-3"), makeArticle("art-1"), makeArticle("art-2")],
+  });
+  await act(() => useFeedStore.getState().refreshAll());
+
+  expect(screen.getByText("Content for art-2")).toBeInTheDocument();
+  expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
 }
 
 describe("FeedsPage behavior — desktop", () => {
@@ -161,6 +187,10 @@ describe("FeedsPage behavior — desktop", () => {
     mockIsDesktop = true;
     currentUrl = "";
     resetStores();
+  });
+
+  it("keeps the open article on screen when a refresh finishes", async () => {
+    await expectReaderSurvivesRefresh();
   });
 
   it("shows explore catalog at /feeds when there are no feeds (redirects to /explore)", async () => {
@@ -374,6 +404,10 @@ describe("FeedsPage behavior — mobile", () => {
     mockIsDesktop = false;
     currentUrl = "";
     resetStores();
+  });
+
+  it("mobile: keeps the open article on screen when a refresh finishes", async () => {
+    await expectReaderSurvivesRefresh();
   });
 
   it("redirects /feeds → /explore when feed count is minimal (mobile)", async () => {

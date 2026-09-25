@@ -70,7 +70,17 @@ interface ArticleStore {
    * vault that has outgrown the sync size limit.
    */
   releaseOfflineCopies: () => Promise<Result<number>>;
+  /**
+   * Enter a view: show its cached articles, clear the selection, then
+   * fetch fresh rows. For navigation only; a new view starts unselected.
+   */
   loadArticles: (feedId: string) => Promise<void>;
+  /**
+   * Re-fetch the current view in place after a refresh or sync landed
+   * new rows. Leaves the selection alone: an app update must never close
+   * the article the user is reading.
+   */
+  refreshArticles: (feedId: string) => Promise<void>;
   selectArticle: (article: Article | null) => Promise<void>;
   markAsRead: (articleId: string) => Promise<void>;
   /**
@@ -330,6 +340,42 @@ export function clearArticleCache() {
 }
 
 /**
+ * Fetch the rows backing one view from the DB. Five paths mirror the
+ * five kinds of feed id:
+ * - ALL_FEEDS_ID: one bulk query; results replace every feed bucket.
+ * - STARRED_FEED_ID: one bulk query; filter retains only `starred`
+ *   articles but every fetched article still updates its feed bucket
+ *   so other views stay consistent.
+ * - filter:<id>: one bulk query; evaluator runs over every loaded
+ *   article in deriveVisibleArticles.
+ * - folder:<id>: one bulk query, filtered on read to the folder's members.
+ * - concrete feed id: targeted per-feed query.
+ */
+async function fetchArticlesForView(feedId: string): Promise<Article[]> {
+  if (
+    feedId === ALL_FEEDS_ID ||
+    isStarredFeedId(feedId) ||
+    isFilterFeedId(feedId)
+  ) {
+    const result = await getAllArticles();
+    return result.ok ? result.value : [];
+  }
+  if (isFolderFeedId(feedId)) {
+    const folderId = fromFolderFeedId(feedId)!;
+    const memberIds = new Set(
+      useFeedStore
+        .getState()
+        .feeds.filter((f) => f.folderId === folderId)
+        .map((f) => f.id),
+    );
+    const result = await getAllArticles();
+    return result.ok ? result.value.filter((a) => memberIds.has(a.feedId)) : [];
+  }
+  const result = await getArticles(feedId);
+  return result.ok ? result.value : [];
+}
+
+/**
  * The article as it looks after the star comes off.
  *
  * Two things go with the star. `starredAt` is stripped explicitly so an
@@ -400,41 +446,11 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       isLoading: cachedVisible.length === 0,
     });
 
-    // Fetch fresh data in the background and merge it back into the source
-    // of truth. Five paths mirror the five kinds of feed id:
-    // - ALL_FEEDS_ID: one bulk query; results replace every feed bucket.
-    // - STARRED_FEED_ID: one bulk query; filter retains only `starred`
-    //   articles but every fetched article still updates its feed bucket
-    //   so other views stay consistent.
-    // - filter:<id>: one bulk query; evaluator runs over every loaded
-    //   article in deriveVisibleArticles.
-    // - folder:<id>: one bulk query, filtered on read to the folder's members.
-    // - concrete feed id: targeted per-feed query.
-    let fetched: Article[] = [];
-    if (
-      feedId === ALL_FEEDS_ID ||
-      isStarredFeedId(feedId) ||
-      isFilterFeedId(feedId)
-    ) {
-      const result = await getAllArticles();
-      fetched = result.ok ? result.value : [];
-    } else if (isFolderFeedId(feedId)) {
-      const folderId = fromFolderFeedId(feedId)!;
-      const memberIds = new Set(
-        useFeedStore
-          .getState()
-          .feeds.filter((f) => f.folderId === folderId)
-          .map((f) => f.id),
-      );
-      const result = await getAllArticles();
-      fetched = result.ok
-        ? result.value.filter((a) => memberIds.has(a.feedId))
-        : [];
-    } else {
-      const result = await getArticles(feedId);
-      fetched = result.ok ? result.value : [];
-    }
+    await get().refreshArticles(feedId);
+  },
 
+  refreshArticles: async (feedId) => {
+    const fetched = await fetchArticlesForView(feedId);
     const nextByFeed = mergeFetchedArticles(get(), feedId, fetched);
     set({
       articlesByFeedId: nextByFeed,
