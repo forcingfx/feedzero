@@ -31,15 +31,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useFeedStore } from "../../src/stores/feed-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 import { useLicenseStore } from "../../src/stores/license-store.ts";
+import { useArticleStore } from "../../src/stores/article-store.ts";
 import {
   open,
   close,
   deleteDatabase,
   getFeeds as dbGetFeeds,
   addFeed as dbAddFeed,
+  addArticles as dbAddArticles,
   getFolders as dbGetFolders,
 } from "../../src/core/storage/db.ts";
-import type { Feed } from "@feedzero/core/types";
+import type { Article, Feed } from "@feedzero/core/types";
 
 // Mock the network boundary inside feed-service. Everything else
 // (parse, sanitize, db.addFeed, db.addArticles) runs for real.
@@ -72,6 +74,22 @@ function makeFeed(id: string, title: string): Feed {
     siteUrl: `https://${id}.example.com`,
     createdAt: Date.now(),
     updatedAt: Date.now(),
+  };
+}
+
+function makeArticle(id: string, feedId: string, title: string): Article {
+  return {
+    id,
+    feedId,
+    guid: id,
+    title,
+    link: `https://example.com/${id}`,
+    content: `<p>${title}</p>`,
+    summary: "",
+    author: "",
+    publishedAt: Date.now(),
+    read: false,
+    createdAt: Date.now(),
   };
 }
 
@@ -280,6 +298,47 @@ describe("feed-store ↔ db.ts integration", () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error).toMatch(/already exists/i);
+    });
+  });
+
+  // A refresh (boot, timer, focus, pull-to-refresh) lands new rows while
+  // the user may already be reading. Reading must never be interrupted by
+  // an app update: the open article stays open, new rows still appear.
+  describe("a refresh does not close the article being read", () => {
+    async function openArticleInFeed(): Promise<Article> {
+      await dbAddFeed(makeFeed("a", "Feed A"));
+      const reading = makeArticle("reading", "a", "Being read");
+      await dbAddArticles([reading]);
+      await useFeedStore.getState().loadFeeds();
+      useFeedStore.getState().selectFeed("a");
+      await useArticleStore.getState().loadArticles("a");
+      const loaded = useArticleStore.getState().articles[0];
+      await useArticleStore.getState().selectArticle(loaded);
+      await dbAddArticles([makeArticle("fresh", "a", "Just arrived")]);
+      return loaded;
+    }
+
+    const refreshPaths: Array<[string, () => Promise<void>]> = [
+      ["refreshAll", () => useFeedStore.getState().refreshAll()],
+      ["refreshView", () => useFeedStore.getState().refreshView("a")],
+      ["reloadSingleFeed", () => useFeedStore.getState().reloadSingleFeed("a")],
+    ];
+
+    it.each(refreshPaths)("%s keeps the open article selected", async (_, refresh) => {
+      const reading = await openArticleInFeed();
+
+      await refresh();
+
+      expect(useArticleStore.getState().selectedArticle?.id).toBe(reading.id);
+    });
+
+    it.each(refreshPaths)("%s still shows the newly arrived article", async (_, refresh) => {
+      await openArticleInFeed();
+
+      await refresh();
+
+      const ids = useArticleStore.getState().articles.map((a) => a.id);
+      expect(ids).toContain("fresh");
     });
   });
 

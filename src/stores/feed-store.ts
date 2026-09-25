@@ -315,13 +315,17 @@ async function reloadFeeds(
  * for new articles to appear. Extracted so an action that intentionally
  * skips the reload (e.g. a metadata-only mutator) is a visible
  * one-line omission instead of a forgotten copy of the dance.
+ *
+ * Refreshes in place rather than re-entering the view: re-entering
+ * clears the selection, which closed the article the user was reading
+ * every time a background refresh finished.
  */
 async function reloadArticleStoreForView(
   selectedFeedId: string | null,
 ): Promise<void> {
   const articleStore = useArticleStore.getState();
   await articleStore.preloadAll();
-  if (selectedFeedId) await articleStore.loadArticles(selectedFeedId);
+  if (selectedFeedId) await articleStore.refreshArticles(selectedFeedId);
 }
 
 /**
