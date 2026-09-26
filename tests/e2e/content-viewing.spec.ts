@@ -108,8 +108,15 @@ test.describe("Content viewing", () => {
     feedPage: page,
   }) => {
     await setupFeed(page);
+    await expect(
+      page.getByRole("heading", { name: "First Article" }),
+    ).toBeVisible({ timeout: 10000 });
 
-    // Select the article with HTML entities in the title
+    // On mobile the open reader covers the list, as it does for a real
+    // user; go back first. (The second tap used to pass only when it
+    // beat the reader's slide-in.) Desktop shows both panes.
+    const backPill = page.getByTestId("back-pill");
+    if (await backPill.isVisible()) await backPill.click();
     await articleOption(page, "Entity & Decode Test").click();
 
     // The heading should show decoded entities

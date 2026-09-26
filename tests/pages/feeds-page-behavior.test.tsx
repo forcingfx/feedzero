@@ -11,6 +11,11 @@ import { useArticleStore, clearArticleCache } from "@/stores/article-store.ts";
 import * as db from "@/core/storage/db.ts";
 import { ALL_FEEDS_ID, toFolderFeedId } from "@feedzero/core/utils/constants";
 import type { Article, Feed } from "@feedzero/core/types";
+import { MotionGlobalConfig } from "motion/react";
+
+// happy-dom has no real frame clock, so Motion's enter/exit animations
+// never finish there. Make them instant; the gesture logic still runs.
+MotionGlobalConfig.skipAnimations = true;
 
 const ExploreCatalog = lazy(() =>
   import("@/components/explore/explore-catalog.tsx").then((m) => ({
@@ -685,10 +690,14 @@ describe("FeedsPage behavior — mobile", () => {
     });
   });
 
-  it("mobile: edge-swipe right dismisses the reader back to the list", async () => {
+  // The reader's swipe-back is Motion's drag, which listens to pointer
+  // events. These tests drive Motion's own recognizer (not a mock), but
+  // synthetic events bypass the browser's gesture arbitration, so they
+  // prove our wiring only; feel is verified on a real phone.
+  async function openReaderOnMobile() {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     // Keep the article present through loadArticles, otherwise the
-    // vanished-article guard navigates back on its own and this test
+    // vanished-article guard navigates back on its own and these tests
     // would pass without the gesture doing anything.
     vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [makeArticle("art-1")] });
     useArticleStore.setState({
@@ -696,67 +705,53 @@ describe("FeedsPage behavior — mobile", () => {
       selectedArticle: makeArticle("art-1"),
     });
     const { container } = renderPage("/feeds/feed-1/articles/art-1");
-    const layer = container.querySelector(
-      "[data-testid='reader-layer']",
-    ) as HTMLElement;
+    // Let the (instant, under skipAnimations) slide-in settle.
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    return container.querySelector("[data-testid='reader-layer']") as HTMLElement;
+  }
 
-    const touch = (type: string, x: number) =>
-      act(() => {
-        layer.dispatchEvent(
-          new TouchEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            touches:
-              type === "touchend"
-                ? []
-                : [new Touch({ identifier: 1, target: layer, clientX: x, clientY: 300 })],
-          }),
-        );
+  async function drag(
+    target: Element,
+    path: Array<[number, number]>,
+    pointerType = "touch",
+  ) {
+    // Motion reads pageX/pageY, which happy-dom leaves at 0 whatever the
+    // init says, so they are defined on each event by hand.
+    const send = (type: string, to: EventTarget, [x, y]: [number, number]) => {
+      const event = new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType,
+        isPrimary: true,
+        button: 0,
+        clientX: x,
+        clientY: y,
       });
-
-    touch("touchstart", 8); // within the left edge zone
-    touch("touchmove", 80);
-    touch("touchmove", 180);
-    touch("touchend", 180);
-
-    await waitFor(() => {
-      expect(currentUrl).toBe("/feeds/feed-1");
+      Object.defineProperties(event, { pageX: { value: x }, pageY: { value: y } });
+      to.dispatchEvent(event);
+    };
+    const [start, ...rest] = path;
+    act(() => send("pointerdown", target, start));
+    for (const point of rest) {
+      await act(async () => {
+        send("pointermove", window, point);
+        await new Promise((r) => setTimeout(r, 20));
+      });
+    }
+    await act(async () => {
+      send("pointerup", window, path[path.length - 1]);
+      await new Promise((r) => setTimeout(r, 20));
     });
-  });
+  }
 
   it("mobile: a rightward drag anywhere on the reader dismisses it (browsers own the edge)", async () => {
     // Real mobile browsers run their OWN back gesture in the left edge
     // zone, so an edge-only dismiss is unreachable on device. Any
-    // rightward-dominant drag on the reader goes back (Reeder model).
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [makeArticle("art-1")] });
-    useArticleStore.setState({
-      articles: [makeArticle("art-1")],
-      selectedArticle: makeArticle("art-1"),
-    });
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
-    const layer = container.querySelector(
-      "[data-testid='reader-layer']",
-    ) as HTMLElement;
+    // rightward drag on the reader goes back (Reeder model).
+    const layer = await openReaderOnMobile();
 
-    const touch = (type: string, x: number, y = 300) =>
-      act(() => {
-        layer.dispatchEvent(
-          new TouchEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            touches:
-              type === "touchend"
-                ? []
-                : [new Touch({ identifier: 1, target: layer, clientX: x, clientY: y })],
-          }),
-        );
-      });
-
-    touch("touchstart", 180); // mid-screen
-    touch("touchmove", 260);
-    touch("touchmove", 340);
-    touch("touchend", 340);
+    await drag(layer, [[150, 300], [200, 302], [260, 304], [330, 305]]);
 
     await waitFor(() => {
       expect(currentUrl).toBe("/feeds/feed-1");
@@ -764,45 +759,46 @@ describe("FeedsPage behavior — mobile", () => {
   });
 
   it("mobile: a vertical-dominant drag does not dismiss the reader", async () => {
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [makeArticle("art-1")] });
-    useArticleStore.setState({
-      articles: [makeArticle("art-1")],
-      selectedArticle: makeArticle("art-1"),
-    });
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
-    const layer = container.querySelector(
-      "[data-testid='reader-layer']",
-    ) as HTMLElement;
+    const layer = await openReaderOnMobile();
 
-    const touch = (type: string, x: number) =>
-      act(() => {
-        layer.dispatchEvent(
-          new TouchEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            touches:
-              type === "touchend"
-                ? []
-                : [new Touch({ identifier: 1, target: layer, clientX: x, clientY: 300 })],
-          }),
-        );
-      });
+    await drag(layer, [[150, 300], [160, 360], [170, 420], [190, 460]]);
 
-    touch("touchstart", 150);
-    act(() => {
-      layer.dispatchEvent(
-        new TouchEvent("touchmove", {
-          bubbles: true,
-          cancelable: true,
-          touches: [new Touch({ identifier: 1, target: layer, clientX: 190, clientY: 460 })],
-        }),
-      );
-    });
-    touch("touchend", 190);
-
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((r) => setTimeout(r, 50));
     expect(currentUrl).toBe("/feeds/feed-1/articles/art-1");
+  });
+
+  it("mobile: a drag that starts in a code block leaves the reader open", async () => {
+    // Wide <pre> blocks pan horizontally; that pan is not a back-swipe.
+    const layer = await openReaderOnMobile();
+    const pre = document.createElement("pre");
+    layer.appendChild(pre);
+
+    await drag(pre, [[150, 300], [200, 300], [260, 300], [330, 300]]);
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(currentUrl).toBe("/feeds/feed-1/articles/art-1");
+  });
+
+  it("mobile: a mouse drag selects text instead of dismissing the reader", async () => {
+    // The mobile layout also serves narrow desktop windows; there a
+    // click-drag is text selection, not a back gesture.
+    const layer = await openReaderOnMobile();
+
+    await drag(layer, [[150, 300], [200, 300], [260, 300], [330, 300]], "mouse");
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(currentUrl).toBe("/feeds/feed-1/articles/art-1");
+  });
+
+  it("mobile: the reader keeps text selectable and hands vertical pans to the browser", async () => {
+    // Motion's default drag listener sets user-select:none on the whole
+    // layer, which would make article text uncopyable. The layer declares
+    // pan-y itself so the browser keeps vertical scrolling (and pinch
+    // zoom) while horizontal drags reach the gesture.
+    const layer = await openReaderOnMobile();
+
+    expect(layer.style.userSelect).not.toBe("none");
+    expect(layer.hasAttribute("data-reader-layer")).toBe(true);
   });
 
   it("mobile header: dot-only status indicator, view options pinned to the right corner", () => {
