@@ -183,6 +183,20 @@
         touch-action: manipulation;
     }
 
+    /* The mobile reader's swipe-back (MobileReaderLayer) needs horizontal
+       drags; the browser keeps vertical scroll and pinch zoom. Declared
+       on the reader's scrollers too, because a scroll container starts a
+       new touch-action scope and would otherwise let the browser claim a
+       horizontal drag. Wide code blocks get their native pan back. */
+    [data-reader-layer],
+    [data-reader-layer] [data-reader-scroll] {
+        touch-action: pan-y pinch-zoom;
+    }
+
+    [data-reader-layer] pre {
+        touch-action: auto;
+    }
+
 }
 
 /* iOS Safari auto-zooms a focused form control when its computed font-size

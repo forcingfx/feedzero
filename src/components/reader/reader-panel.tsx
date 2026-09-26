@@ -212,7 +212,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
         <div className="h-full flex flex-col">
           <div
             ref={scrollContainerRef}
-            data-testid="reader-scroll-container"
+            data-testid="reader-scroll-container" data-reader-scroll
             className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none"
           >
             {content}
@@ -485,7 +485,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   if (onNavigate) {
     return (
       <div className="h-full flex flex-col">
-        <div ref={scrollContainerRef} data-testid="reader-scroll-container" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none">
+        <div ref={scrollContainerRef} data-testid="reader-scroll-container" data-reader-scroll className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none">
           {articleBody}
         </div>
         {navPills}

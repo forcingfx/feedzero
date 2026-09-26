@@ -5,7 +5,7 @@ Implemented (reader-as-overlay model, 2026-08)
 
 ## Summary
 
-On mobile (< 1024px viewport) the article list fills the viewport and the reader is an **overlay layer** on top of it. Navigation is asymmetric by design: **tap goes in, swipe goes out**. Tapping an article mounts the reader layer (slides in from the right); an edge-swipe right (starting within ~28px of the left edge) follows the finger and dismisses it, as does the back pill. The list never horizontal-swipes into the reader and never unmounts while reading, so its scroll position survives the round trip. The URL stays the source of truth: the reader layer exists iff the route carries an `articleId`.
+On mobile (< 1024px viewport) the article list fills the viewport and the reader is an **overlay layer** on top of it. Navigation is asymmetric by design: **tap goes in, swipe goes out**. Tapping an article mounts the reader layer (slides in from the right); a rightward drag anywhere on it follows the finger and dismisses it on a flick or past about a third of the width, as does the back pill. The list never horizontal-swipes into the reader and never unmounts while reading, so its scroll position survives the round trip. The URL stays the source of truth: the reader layer exists iff the route carries an `articleId`.
 
 This replaced two earlier models: the original drill-down-with-back-buttons, and a horizontal snap-x pager (list and reader as side-by-side panels). The pager made the two surfaces feel physically connected — a leftward swipe on the list dragged the reader in — which fought the swipe-right-to-mark-read row gesture and lost list scroll position (PR #237 feedback).
 
@@ -22,16 +22,23 @@ Feature: Mobile navigation
     Then the reader layer slides in over the list
     And the URL gains the articleId segment
 
-  Scenario: Edge-swipe dismisses the reader
+  Scenario: Swiping right dismisses the reader
     Given the reader layer is open
-    When the user drags rightward starting at the left screen edge
+    When the user drags rightward anywhere on the reader
     Then the layer follows the finger
-    And releasing past a third of the screen width returns to the list
+    And a quick flick, or a slow drag past about a third of the width,
+      slides the layer off screen and then returns to the list
     And the article list is unchanged (scroll position intact)
 
-  Scenario: Mid-screen swipes belong to the content
+  Scenario: An early release stays in the article
+    Given the user is dragging the reader rightward
+    When they release slowly before a third of the width, or flick back left
+    Then the layer springs back and the article stays open
+
+  Scenario: Vertical scrolls, code blocks and mouse drags are not back-swipes
     Given the reader layer is open
-    When the user drags starting away from the left edge
+    When the user scrolls vertically, pans a wide code block,
+      or click-drags with a mouse to select text
     Then the reader does not dismiss
 
   Scenario: The list cannot swipe into the reader
@@ -115,7 +122,7 @@ Feature: Mobile navigation
 
 ### Flow (closing the reader)
 
-1. User edge-swipes right on the reader layer (or taps the back pill)
+1. User swipes right on the reader layer and the layer slides off screen (or taps the back pill)
 2. `closeReader()` sets `skipAutoSelectRef.current = true` and navigates
    to the parent route (`/feeds/:feedId`)
 3. The reader layer unmounts (its existence is derived from `articleId`)
@@ -124,7 +131,7 @@ Feature: Mobile navigation
 
 Gesture ownership map (mobile):
 - **List rows**: rightward drag → toggle read; vertical → scroll; leftward → nothing.
-- **Reader layer**: edge-zone rightward drag → dismiss; elsewhere → content scroll.
+- **Reader layer**: rightward touch drag anywhere → dismiss; vertical → content scroll (and pinch zoom); inside `<pre>` → native horizontal pan. The screen edges belong to the OS/browser back gesture.
 - **Article list top**: downward overscroll → pull-to-refresh.
 
 ### Files
@@ -132,7 +139,9 @@ Gesture ownership map (mobile):
 | File | Role |
 |------|------|
 | `src/pages/feeds-route.tsx` | Mobile branch renders `<main>` (list) + conditional `<MobileReaderLayer>`; auto-select suppression; empty-stage→list fallback (present→absent transition guard) |
-| `src/hooks/use-swipe-back.ts` | Edge-zone arming, finger-following `dragX`, commit past ⅓ width; non-passive touchmove for `preventDefault` |
+| `src/pages/feeds-route.tsx` (`MobileReaderLayer`) | Motion drag (`motion/react`): touch-only start via `useDragControls`, direction lock, slide off then `onBack`, spring back on an early release |
+| `src/lib/swipe-back.ts` | `shouldCommitSwipeBack()`: speed OR distance decides the release (flick ≥ 400px/s, or ≥ 35% of the width) |
+| `src/index.css` | `touch-action: pan-y pinch-zoom` on `[data-reader-layer]` and its `[data-reader-scroll]` scrollers; `auto` on `<pre>` |
 | `src/hooks/use-media-query.ts` | `useIsDesktop()` hook for responsive breakpoint detection |
 | `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = quick-switch favicon dock + Explore/Settings shortcuts; open state = full feed list + Refresh/Settings footer |
 | `src/lib/recent-feeds.ts` | Pure `stableDockFeeds()` / `recordRecentFeed()` helpers + `MOBILE_DOCK_FEED_CAP` |
@@ -169,6 +178,10 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
 
 - **Ref-based skip flag** — Using a ref (`skipAutoSelectRef`) instead of state avoids re-renders while still persisting across the async article load cycle. The ref is reset only when `articleId` appears in the URL, ensuring the skip persists through multiple effect runs.
 
+- **Swipe-back is Motion's drag, not a hand-rolled touch handler** — The first version tracked `touchmove` by hand and committed on distance alone, so a natural short flick did nothing, and on commit it snapped the layer back to 0 before the route change removed it, which read as a flicker. Motion's drag supplies direction locking, release velocity and GPU transforms without React re-renders; our code only decides the release (`shouldCommitSwipeBack`) and waits for the slide-off to finish before navigating. Drags start through `useDragControls` rather than Motion's own listener, because that listener sets `user-select: none` (article text would become uncopyable) and would also start on mouse drags and inside code blocks. The layer's `x` stays in pixels: Motion cannot resolve a `"100%"` offset without a layout measurement, so a drag caught mid slide-in would jump.
+
+- **Native back gestures stay native** — Opening an article pushes a history entry, so Safari's edge swipe (in a browser tab) and Android's system back gesture already work. Installed iOS web apps (`display: standalone`) get no back swipe from the OS, which is why the in-app gesture exists.
+
 - **Reader as a layer, not a peer** — The snap-pager model made the list and reader feel like two connected panels; users read that as "swiping the list drags the reader in," which collided with row swipe-actions. A layer matches the iOS mental model (detail slides over master), frees every list gesture, and keeps the list mounted so scroll position is preserved for free. Entry is tap-only; exit is edge-swipe or back pill — asymmetric on purpose.
 
 - **Auto-select only on feed switch** — Auto-selecting the first article when switching feeds improves UX by showing content immediately. But auto-select is suppressed after Back navigation because the user explicitly wanted to see the article list (to pick a different article).
@@ -180,4 +193,4 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
 ## Limitations
 
 - Browser back/forward buttons may not trigger `handleBack()` — they navigate directly via the router. The `skipAutoSelectRef` logic only applies to the in-app Back button.
-- Swipe gestures for navigation are not implemented.
+- Gesture feel can only be verified on real hardware: the unit tests drive Motion's recognizer with synthetic pointer events, which bypass the browser's own gesture arbitration.

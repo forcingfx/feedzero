@@ -117,4 +117,57 @@ test.describe("Mobile navigation", () => {
       readerScroll.evaluate((el) => el.scrollTop),
     ).toBe(0);
   });
+  test("a quick rightward swipe on the reader slides it away and returns to the list", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    // CDP touch input runs through Chromium's touch-action handling, so
+    // this catches a layer that lets the browser claim horizontal drags.
+    // It is still not a finger: feel is verified on a real phone.
+    test.skip(browserName !== "chromium", "CDP touch input is Chromium-only");
+    await skipOnboarding(page);
+    await mockFeedEndpoint(page, SAMPLE_RSS);
+    await addFeedViaUI(page, "https://example.com/feed");
+
+    const items = page.locator('[role="option"]');
+    await items.first().waitFor({ state: "visible", timeout: 10000 });
+    await items.first().click();
+    const layer = page.locator('[data-testid="reader-layer"]');
+    await expect(layer).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(400); // let the slide-in finish
+
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (
+      type: "touchStart" | "touchMove" | "touchEnd",
+      x: number,
+    ) =>
+      cdp.send("Input.dispatchTouchEvent", {
+        type,
+        touchPoints: type === "touchEnd" ? [] : [{ x, y: 400 }],
+      });
+    // A flick that ends short of the one-third distance rule (131px on
+    // this 393px viewport), so only its speed can commit it. Moves are
+    // paced (each CDP step takes ~50ms here, far slower than a real
+    // 60Hz touchscreen), so the steps are wide enough to read as a flick
+    // at ~600px/s.
+    const moveTo = async (x: number) => {
+      await touch("touchMove", x);
+      await page.waitForTimeout(16);
+    };
+    await touch("touchStart", 120);
+    await moveTo(135);
+    await moveTo(150);
+    await testInfo.attach("mid-swipe", {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+    // The screenshot paused the "finger". Motion measures release speed
+    // over the last 100ms, so the flick runs longer than that.
+    for (const x of [180, 210, 240]) await moveTo(x);
+    await touch("touchEnd", 240);
+
+    await expect(layer).toHaveCount(0, { timeout: 3000 });
+    await expect(page).toHaveURL(/\/feeds\/[^/]+$/);
+    await expect(page.locator('[role="listbox"]')).toBeVisible();
+  });
 });
