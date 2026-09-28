@@ -202,10 +202,16 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
               and "Settings" (app preferences). 2026-05-19 bug report
               proved the inline-at-bottom-of-scroll placement broke under
               long lists. `shrink-0` so the footer can't be squeezed.
+
+              Pads for the home indicator only, like the closed dock
+              strip. Safari already lays this fixed drawer out above its
+              toolbar; a (100vh - 100dvh) term here added a toolbar's
+              height of dead space that the fixed-height drawer took from
+              the feed list (~200px on iPhone, 2026-09-28 report).
             */}
             <div
               data-testid="drawer-section"
-              className="shrink-0 border-t bg-background px-3 py-1 pb-[calc(env(safe-area-inset-bottom)_+_(100vh_-_100dvh)_+_0.25rem)]"
+              className="shrink-0 border-t bg-background px-3 py-1 pb-[calc(env(safe-area-inset-bottom)_+_0.25rem)]"
             >
               <SidebarMenu>
                 <NewFolderInput trailing={<AutoOrganizePill />} />

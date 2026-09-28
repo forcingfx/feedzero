@@ -522,6 +522,29 @@ describe("MobileNavDrawer", () => {
     expect(scroll.className).toContain("overflow-x-hidden");
   });
 
+  it("pinned footer pads for the home indicator only, so it never squeezes the feed list", async () => {
+    // Trade-off: the footer sits between the feed list and Safari's
+    // toolbar, and Safari already lays the fixed drawer out above that
+    // toolbar. Padding the footer by (100vh - 100dvh) as well added a
+    // toolbar's height of dead space (~200px on an iPhone, user report
+    // 2026-09-28) that the fixed-height drawer took from the feed list,
+    // pushing every feed below the fold. The footer pads like the closed
+    // dock strip: env(safe-area-inset-bottom) alone. If a real device
+    // ever shows the footer under the toolbar, fix the drawer's anchoring,
+    // not this padding.
+    const user = userEvent.setup();
+    const { container } = renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    const settingsBtn = await screen.findByRole("button", { name: "Settings" });
+    const drawer = container.ownerDocument.querySelector("[data-testid='drawer-content']")!;
+    const footer = [...drawer.querySelectorAll("[data-testid='drawer-section']")].find(
+      (section) => section.contains(settingsBtn),
+    )!;
+
+    expect(footer.className).toContain("safe-area-inset-bottom");
+    expect(footer.className).not.toMatch(/100vh[\s_]*-[\s_]*100dvh/);
+  });
+
   describe("browser-chrome occlusion fix (permanent regression guard)", () => {
     // Context (2026-05-13 second mobile bug report): on iOS Safari with the
     // bottom toolbar visible, the drawer's bottom content was hidden behind
