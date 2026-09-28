@@ -198,6 +198,15 @@ deployed system.** Not the PR state, not the merge commit, not the CI badge.
   deletes the base branch, auto-closes any PR stacked on it, and GitHub then
   refuses to reopen it once the head has been force-pushed. Land one, rebase
   the next onto `main`, open it then.
+- **Open the PR yourself once the change is stable. Do not ask first.** This
+  is the owner's standing request, so it counts as the explicit ask that
+  agent harnesses otherwise wait for. Stable means: the RGR cycle is done,
+  `npm test` and `npx tsc --noEmit` are green, the E2E specs the change
+  touches pass (or fail identically on `main`), and the branch is pushed.
+  Fill in `.github/pull_request_template.md` and leave unchecked, in plain
+  words, anything only a human can do (the real-device check of step 8).
+  This covers opening only: merging stays with the owner, and a change
+  still mid-cycle gets no PR.
 
 ### Scripts and one-off tooling
 
