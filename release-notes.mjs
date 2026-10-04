@@ -32,6 +32,31 @@
  */
 export const releases = [
   {
+    version: "0.15.0",
+    date: "2026-10-04T11:00:00Z",
+    title: "Larger sync vaults and a smoother mobile reader",
+    subtitle:
+      "Sync accepts larger vaults and shows how close a vault is to the size limit. The mobile reader's swipe-back was rebuilt, and several sync, reading, and navigation bugs are fixed.",
+    added: [
+      "Added a vault size readout in Settings that shows the size of the last sync upload against the limit and warns at 80 percent.",
+      "Added a Free up space action in Settings that removes saved offline copies which nothing keeps up to date.",
+    ],
+    changed: [
+      "Raised the effective sync vault size limit by about 40 percent by compressing uploads in transit. Stored vaults are unchanged, and devices on an older version keep syncing.",
+      "Rebuilt the swipe-back gesture in the mobile reader. A short quick flick now goes back, a slow drag past about a third of the width does too, and the flicker on release is gone.",
+      "Released an article's saved offline copy when it is unstarred, unless its feed has offline prefetch turned on.",
+      "Kept the feed's own text visible when an article cannot be fetched in full. The prompt below it now says the publisher likely requires a subscription or disallows fetching, since a blocked fetch is not proof of a paywall.",
+    ],
+    fixed: [
+      "Fixed sync failing with a 413 error for large vaults. Size padding had inflated uploads past the hosting platform's request limit, and the failed upload also blocked downloads.",
+      "Fixed the open article being replaced by an empty reader when a refresh finished.",
+      "Fixed the mobile navigation drawer on iPhone Safari, where the pinned footer left no room for the feed list.",
+      "Fixed feed icons failing to load on the hosted app. The icon endpoint had rejected every lookup by domain since August.",
+      "Fixed the feedback form reporting a connection problem when the server had rejected the request. It now shows the server's own error.",
+      "Updated the XML parser and HTTP client dependencies to clear high-severity security advisories.",
+    ],
+  },
+  {
     version: "0.14.0",
     date: "2026-09-05T12:00:00Z",
     title: "One paid plan at $9 a year",
