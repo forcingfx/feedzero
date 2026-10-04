@@ -53,6 +53,25 @@ in the same commit, so there is nothing to sequence and nothing to poll.
      `feedzero-landing` (author email must be the GitHub noreply address, or
      Vercel silently skips the deploy). Say in the report which it was:
      "landing copy checked, no change needed" or the landing PR link.
+   - **Promoted features**: landing's `features.items` and `features.minis`
+     are what the product is sold on. Compare them with what shipped (the
+     `shipped` entries of `src/core/features/tier-matrix.ts` and this
+     release's `added` bullets) and report to the user, as a short list:
+     anything promoted that is not shipped or no longer true, and anything
+     shipped in this release that deserves a slot. Which features to promote
+     is the user's decision; the release does not wait for it, but the list
+     must be in the report.
+   - **Screenshots**: refresh them every release, in a PR of their own that
+     merges before step 10 so the landing rebuild picks them up.
+     - Per-feature shots live in this repo and landing mirrors them from
+       `main` at build time: `node scripts/capture-marketing.mjs`, then
+       commit `docs/marketing/screenshots/`. Needs `pngquant` and a free
+       port 3001.
+     - The homepage hero lives in landing: in a `feedzero-landing` worktree,
+       `node take-screenshot.mjs --scene landing`, commit `screenshot.png`
+       (see that repo's `release-screenshot` skill).
+     - Look at every image before committing it. A scene that no longer
+       matches the UI produces a wrong picture, not an error.
 6. **--dry-run?** print the version and entry, then STOP.
 7. **Open the release PR** — one worktree, one commit, both changes together:
 
@@ -110,7 +129,8 @@ docker run --rm --entrypoint sh ghcr.io/forcingfx/feedzero:v<version> \
 cd /tmp   # any directory that is not a linked Vercel project
 vercel redeploy "$(vercel ls feedzero-landing --prod 2>/dev/null | grep -oE 'https://[^ ]+' | head -1)" \
   --target production
-curl -sSL "https://feedzero.app/?cb=$(date +%s)" | grep -c "alpha (v<version>)"   # must print 1 or more
+cd ~/builder/feedzero
+SMOKE_TESTS=1 npx vitest run tests/smoke/landing-version.test.ts
 ```
 
 11. **Tear down** the worktree and the branch. Auto-merge can leave the remote
@@ -155,5 +175,4 @@ git ls-remote --exit-code --heads origin release/v<version> \
   on the final entry, not only on the draft.
 - **Resume after partial failure**: if `release-notes.mjs` already has an entry
   for `<version>`, skip steps 4–5 and resume at step 7.
-- Screenshots, bento cards and social posts are out of scope; run those
-  separately.
+- Bento cards and social posts are out of scope; run those separately.
