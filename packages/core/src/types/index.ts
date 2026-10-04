@@ -1,5 +1,11 @@
 export interface Feed {
   id: string;
+  /**
+   * Guids of undated articles retention purged while they were still in
+   * the feed. Refresh skips them, and forgets each one once it leaves the
+   * feed, so the list never outgrows the feed itself.
+   */
+  retiredGuids?: string[];
   url: string;
   title: string;
   description: string;
@@ -133,6 +139,12 @@ export interface Article {
   extractedContent?: string;
   /** Unix epoch ms when extractedContent was captured. */
   extractedAt?: number;
+  /**
+   * The feed gave no publish date, so `publishedAt` is when the app first
+   * saw the item. Retention remembers such an article's guid when it
+   * purges it: re-seen, it would look brand new and come straight back.
+   */
+  datePresumed?: true;
 }
 
 export interface CreateFeedInput {

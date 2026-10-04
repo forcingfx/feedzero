@@ -82,6 +82,7 @@ export function createArticle({
     publishedAt: publishedAt ?? Date.now(),
     read: false,
     createdAt: Date.now(),
+    ...(publishedAt === null && { datePresumed: true as const }),
   });
 }
 
