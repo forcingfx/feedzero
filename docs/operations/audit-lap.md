@@ -146,3 +146,25 @@ issue.
 - When the fix-ratio is already healthy (< 15%) and no detector spiked.
   Skipping a lap is fine if the system is steady; the cadence exists
   to catch decay, not to manufacture work.
+
+## Open-ended audit requests
+
+Moved from `CLAUDE.md`.
+
+When asked to "level up the codebase," "review and find what to fix," or similar open-ended improvement requests:
+
+1. **Map first. Do not edit.** Read the territory before proposing anything. Useful one-shot signals:
+   - `git log --since='6 months ago' --pretty=format: --name-only | grep -v '^$' | sort | uniq -c | sort -rn | head -25` — churn hotspots; the file changed most often is usually where bugs concentrate.
+   - `find src -name '*.ts' -o -name '*.tsx' | xargs wc -l | sort -rn | head -30` — file size outliers; a low-churn big file is fine, a high-churn big file is the next refactor.
+   - `grep -rl 'vi.mock("@/core/storage/db.ts"' tests/stores/` — store tests that mock the boundary they should verify (see the contract-tests rule above).
+   - `grep -rln 'from "@/components"' src/core src/stores` — boundary violations (core/stores importing UI). Must be empty.
+   - `find docs/incidents -type f` — known fragile zones; the next bug is usually adjacent to the last one.
+   - Commit-fix ratio over the last quarter: `git log --since='3 months ago' --pretty=format:'%s' | grep -ciE '^(fix|hotfix|revert)'` divided by total commits. >25% is a smell.
+
+2. **Write a short ranked memo before any code.** Three to seven findings. Each one: what costs, what buys, why now. Not an essay — one paragraph per finding. The memo is the spec the user approves before any commit. Refuse a finding if you cannot answer at least two of: "removes a class of bug? removes a class of confusion? unblocks future speed?"
+
+3. **Ship one commit per finding.** Smallest-risk first, so a surprise on a harder finding does not block the easier ones. Every commit is type-clean, test-green, and self-contained. The branch is the audit; the commits are the findings; the PR description maps commits ↔ findings.
+
+4. **Refuse to rewrite working modules because their style offends you.** A 889-line file with zero recent bugs and zero recent churn is not a target. The same file when you are about to invest in three new additions is. (See "Split a big file when the next investment is committed.")
+
+5. **For larger users of the audit pattern** — when the user accepts the full memo and asks you to "ship all findings" — be explicit about the trade-off vs. one-PR-per-finding. State up front that you will land one branch with one commit per finding so each is reviewable independently, and recommend the user split for serious follow-ups.

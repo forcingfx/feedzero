@@ -281,3 +281,71 @@ Smoke tests are **NOT** part of `npm test`. They require network access, consume
 ### When SMOKE runs in the RGR cycle
 
 Step 7 of the RGR+S cycle, after the PR has merged and Vercel has deployed. If the smoke test fails, **revert or roll forward with a fix immediately** — the PR isn't done until SMOKE passes against prod. "It passed CI" is not "it works in production".
+
+## Working rules and gotchas
+
+Moved from `CLAUDE.md`, which keeps the one-line rules. This section holds the rationale, examples and environment gotchas.
+
+**Test behavior, not implementation**: Verify user-observable outcomes, not internal mechanisms.
+
+**Pin-tests must state their rationale.** A test that freezes a *product decision* (rather than a correctness property) has to say which trade-off it encodes, in a comment or the test name — because the next person to touch it is trying to decide whether reversing it is legitimate. `"badge hidden on mobile (max-md:hidden) to keep the row compact"` tells you exactly what you're giving up; `"orders dock favicons most-recently-viewed first"` tells you nothing and reads as load-bearing when it was a guess. The 2026-08 UX rounds reversed six such decisions; the annotated ones took seconds, the bare ones needed archaeology. Cost at write time: one line.
+- Bad: "toggleView sets viewMode to extracted" — only checks state change.
+- Good: "pressing E triggers content extraction" — verifies the user action.
+- If a user action has multiple code paths (click + keyboard), test both.
+
+**Store tests vs component tests**:
+- Store unit tests *may* assert on `getState()` — state is the store's observable output.
+- Component/page tests must NOT replace store methods with mocks and assert on mock calls. Use real store methods; assert on rendered UI, URL, or resulting store state.
+- Bad: `useFeedStore.setState({ selectFeed: mockSelectFeed }); expect(mockSelectFeed).toHaveBeenCalledWith("feed-1");`
+- Good: `renderPage("/feeds/feed-1"); expect(useFeedStore.getState().selectedFeedId).toBe("feed-1");`
+
+**Playwright gotchas**:
+- `transition-all` on interactive elements makes them "not stable". Use `transition-colors` or scoped properties; otherwise `{ force: true }` after confirming visibility.
+- Sidebar transitions `duration-200 ease-in-out`. Wait for `data-state` to change, not `waitForTimeout`.
+- Use `selectFeedInSidebar(page, name)` from `fixtures.ts` — it handles opening the sidebar on mobile.
+
+**happy-dom gotchas**:
+- happy-dom is a real resource loader: a `<link rel="stylesheet">` or `<iframe src>` in a fixture opens a socket to the URL. `vitest.config.js` disables CSS/JS file loading and iframe page loading (`environmentOptions.happyDOM.settings`), and `tests/environment/no-real-network.test.ts` pins it. A disabled iframe load still prints one `NotSupportedError` line per fixture; that is happy-dom's unconditional `console.error`, not a failure. Page code that calls `fetch` on mount still needs a stub in the test (`vi.stubGlobal("fetch", ...)`), or the request goes to `localhost:3000` and dies as an `ECONNREFUSED` trace that no assertion sees.
+- DOMPurify + happy-dom executes inline scripts during sanitization. Use non-callable fixtures (`var x = 1;`, not `alert(1)`).
+- CSS-escaped colons (`content\\:encoded`) may work in happy-dom but fail in browsers — always use `getElementsByTagName` for XML namespace-prefixed elements.
+- CDATA with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead.
+- `isContentEditable` may differ from browsers. Dispatch keyboard events from the target element, not `document`.
+- Radix `AlertDialog` renders curly quotes (`“`/`”`). Use flexible regex matchers.
+- happy-dom puts a stub `nodeName` getter on `Node.prototype` (returns `""`) and shadows the real one per subclass; browsers define it once on `Node.prototype` per WebIDL. DOMPurify ≥3.4.8 caches the Node-level getter (anti-clobbering hardening), so under unpatched happy-dom every tag name reads `""` and `<script>` can pass through **while `isSupported` stays `true`** — browsers are unaffected. `tests/setup.ts` shims `Node.prototype.nodeName` to delegate to the shadow getter. If sanitization tests ever fail en masse after a DOMPurify bump, suspect this class of environment-detection drift first and verify in a real browser before touching the library version.
+
+**Tier 2.5 — Smoke against real external services**: When a feature depends on external data (favicons, feeds, extraction), mocked tests alone are insufficient. Mocks encode your *belief* about what the service returns; if that belief is wrong, all mocked tests pass while the feature is broken (e.g. TechCrunch's `favicon.ico` is a 198-byte placeholder).
+- **Rule**: Before deploying a feature that fetches externally, `curl` the real endpoint and verify the response matches your fixtures.
+- For fallback chains (A → B → C), test that the *first* strategy works for the sites users care about, not just that the chain eventually produces *something*.
+
+**Tier 2.5 — Multi-layer caching**: Features with multiple cache layers (browser HTTP, localStorage, in-memory Map) need end-to-end invalidation tests. A unit test that clears one layer while another serves stale data is a false green.
+- **Rule**: New endpoints start with `Cache-Control: no-cache`. Add caching after the endpoint is verified in production.
+- **Rule**: A "clear cache" action must clear ALL layers — in-memory, localStorage, and browser HTTP (via hard-reload guidance or cache-busting query params).
+
+**Tier 1.5 — Contract tests (boundary verification)**:
+- Every client-server boundary needs a contract test that the client's request shape is accepted by the server's handler.
+- Routing contract tests in `server.test.ts` verify every Vercel wrapper (`api/*.ts`) exports a handler for every method the shared handler supports.
+- Integration contract tests verify `proxyFetch()` builds requests `handleProxyRequest()` can parse. Mock only the outbound external fetch, never the client/server boundary.
+- **Rule**: When a mock replaces a real function at a system boundary, a separate contract test must verify both sides agree on the interface.
+- **Mock at the boundary, not at the collaborator.** The boundary is the network, the filesystem, the system clock. `db.ts`, `key-manager.ts`, and the `sync-service` helpers are *internal collaborators* — mocking them lets the contract drift silently. Three SEV incidents (`2026-05-12`, `2026-05-14`, `2026-05-19`) shared a pattern: store logic green, store↔db contract broken. The 2026-05-19 incident report names it: "*The destroy cascade had a test that asserted `destroy` was called — verifying the bug as a feature.*" When you need to test a store mutator end-to-end, run it against the real `db.ts` via `fake-indexeddb` and mock only the network. Templates: `tests/integration/feed-store-db.test.ts`, `tests/integration/sync-store-db.test.ts`.
+
+**Vitest gotchas**:
+- **Vitest 4 mock lifecycle** (since #286): `vi.restoreAllMocks()` only restores spies created with `vi.spyOn`; it no longer touches `vi.fn()` mocks, so the module-factory `vi.fn().mockResolvedValue(...)` returns survive it (under vitest 3 they did not, which cost twenty-minute "unhandled rejection" hunts). The new trap is the inverse: `vi.spyOn(obj, "m")` on an already-spied method **returns the existing spy, call history included**, so a second test asserting `not.toHaveBeenCalled()` sees the first test's call. Restore each spy at the end of the test that created it (`spy.mockRestore()`), as `tests/stores/license-store.test.ts` does. Type a reusable mock variable as `Mock` (`import { type Mock } from "vitest"`), not `ReturnType<typeof vi.fn>`: a bare `vi.fn()` is now `Mock<Procedure | Constructable>` and no longer assigns to a concrete function type.
+- When asserting "this hook called `navigate()`", mock `useNavigate` directly rather than rendering a `<LocationProbe>` and reading `useLocation()` from a module-level variable. `renderHook` doesn't flush the route-driven re-render synchronously, so the probe captures stale state. react-router 8 is ESM-only, so `vi.spyOn(ReactRouter, "useNavigate")` throws (`Module namespace is not configurable`); partial-mock instead: `const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }));` then `vi.mock("react-router", async (importOriginal) => ({ ...(await importOriginal<typeof import("react-router")>()), useNavigate: () => navigateSpy }))`, and `expect(navigateSpy).toHaveBeenCalledWith("/feeds/b")` in the assertion. Templates: `tests/hooks/use-keyboard-nav.test.tsx`, `tests/components/command-palette/command-palette.test.tsx`.
+
+### Smoke test scope (from `CLAUDE.md`)
+
+Smoke tests in `tests/smoke/` run only when `SMOKE_TESTS=1`. They are **not** part of `npm test`.
+
+They:
+- Hit real production URLs (`https://my.feedzero.app/api/*`) via `fetch`.
+- Assert system-level invariants the unit suite can't check: "adapter X resolves to Upstash in prod", "rate limit 429s appear after N requests", "vault PUT then GET returns the same bytes against the real backend".
+- Are tolerant of side effects: a test that exhausts a rate-limit bucket must wait for the window to reset before asserting "normal traffic works".
+- Honor `SMOKE_BASE_URL` for staging / preview environments.
+
+What NOT to assert:
+- Unit-level behavior (function returns X for Y) — RED's job.
+- UI rendering — Playwright's job.
+- Per-user state — smoke tests are stateless and parallelizable.
+- Anything that would log raw IPs, user emails, license tokens, or vault ciphertext. Same anonymity floor as production logs.
+
+Reference: `tests/smoke/release-feed.test.ts`, `tests/smoke/rate-limiter.test.ts`.
