@@ -9,7 +9,7 @@ URLs from `main`, so any changes here ship live on the next deploy.
 | Filename                       | Depicts                                                                                  |
 | ------------------------------ | ---------------------------------------------------------------------------------------- |
 | `feature-any-feed.png`         | Explore URL input with the discovery chip — RSS / **Atom** / JSON Feed pills + "Example Blog · Press Enter to add" |
-| `feature-sync.png`             | SetupWizard with the four-word passphrase + the persistent "Synced · 1 min ago" pill in the top-right corner |
+| `feature-sync.png`             | The "Your secret key" dialog showing the four-word passphrase, over a blurred Settings page |
 | `feature-keyboard.png`         | Settings → Help, keyboard-shortcuts card with `j` `k` `u` `o` …                          |
 | `feature-switch-readers.png`   | Pre-import preview tree — folders with feed counts, OPML provenance ("Imported from you 'My subscriptions'") and the "Import 11 feeds" confirmation |
 | `feature-starring.png`         | Sidebar "Starred" selected, list of starred articles, filled-star reader                 |
@@ -33,8 +33,8 @@ The script:
 1. Boots `vite --port 3001 --strictPort` as a child process.
 2. Opens Playwright (Chromium) at 1280×800 CSS × 1.5 DPR — enough to
    trigger the desktop two-pane layout, output exactly 1920×1200.
-3. Drives the silent local-only onboarding (no welcome screen — the
-   app auto-initialises a fresh DB).
+3. Clicks through the welcome modal on the local-only path (Get
+   Started → Local only → Continue), the same steps a new user takes.
 4. Seeds 20 neutral demo feeds + 36 articles into the live IndexedDB
    by dynamic-importing `src/core/storage/db.ts` from the dev server.
    No real publications, no real authors — generic archetypes only

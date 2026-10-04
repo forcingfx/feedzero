@@ -8,7 +8,7 @@
  *
  * Run: `node scripts/capture-marketing.mjs`
  *  - boots `vite --port 3001 --strictPort` as a child process,
- *  - drives onboarding once (local-only mode),
+ *  - clicks through the welcome modal once (local-only mode),
  *  - seeds neutral demo feeds/articles by dynamic-importing the core
  *    storage modules via Vite's dev server (so each scene paints over a
  *    realistic, but synthetic, reading session),
@@ -262,14 +262,19 @@ async function newContext(browser) {
 }
 
 async function completeOnboarding(page) {
-  // Fresh installs are silently onboarded by `startNewUserOnboarding`:
-  // it generates a passphrase, opens the DB in local-only mode, and
-  // marks onboarding-complete — no welcome screen to click through.
-  // We just wait for the app shell to appear.
-  await page.waitForSelector(
-    '[data-sidebar="menu-button"], aside, [role="banner"]',
-    { timeout: 30000 },
-  );
+  // A fresh install shows the welcome modal and opens no database until
+  // the user picks a storage mode (the 2026-05-28 onboarding fix; before
+  // it the app initialised silently and this function only waited).
+  // Take the local-only path, the same clicks a new user makes.
+  await page.getByRole("button", { name: /Get Started/i }).click({ timeout: 30000 });
+  // The radio itself is visually hidden behind its card, so set it
+  // directly rather than clicking through the overlay.
+  await page.getByLabel("Local only").check({ force: true });
+  await page.getByRole("button", { name: /^Continue/ }).click();
+  await page.getByRole("dialog").waitFor({ state: "hidden", timeout: 30000 });
+  await page.waitForSelector('[data-sidebar="menu-button"], aside, [role="banner"]', {
+    timeout: 30000,
+  });
   await page.waitForTimeout(800);
 }
 
