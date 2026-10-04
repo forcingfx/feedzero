@@ -1,5 +1,16 @@
 import type { Page } from "@playwright/test";
 
+/**
+ * Fixture dates are relative to now, not fixed. Article retention (30
+ * days by default) skips items published before the retention period,
+ * so a fixed date would age out of every feed a month after it was
+ * written. Order is preserved: 1 day ago is the newest item.
+ */
+const DAY_MS = 24 * 60 * 60 * 1000;
+const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS);
+const rfcDaysAgo = (days: number) => daysAgo(days).toUTCString();
+const isoDaysAgo = (days: number) => daysAgo(days).toISOString();
+
 /** RSS 2.0 feed with 5 articles of varying content lengths. */
 export const SAMPLE_RSS = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
@@ -11,35 +22,35 @@ export const SAMPLE_RSS = `<?xml version="1.0" encoding="UTF-8"?>
       <title>First Article</title>
       <link>https://example.com/first</link>
       <description>Short description only.</description>
-      <pubDate>Fri, 03 Jan 2025 12:00:00 GMT</pubDate>
+      <pubDate>${rfcDaysAgo(2)}</pubDate>
       <guid>https://example.com/first</guid>
     </item>
     <item>
       <title>Second Article</title>
       <link>https://example.com/second</link>
       <description>Brief summary of the second article.</description>
-      <pubDate>Thu, 02 Jan 2025 12:00:00 GMT</pubDate>
+      <pubDate>${rfcDaysAgo(3)}</pubDate>
       <guid>https://example.com/second</guid>
     </item>
     <item>
       <title>Third Article</title>
       <link>https://example.com/third</link>
       <description>${"This is a long article with plenty of content to read. ".repeat(20)}</description>
-      <pubDate>Wed, 01 Jan 2025 12:00:00 GMT</pubDate>
+      <pubDate>${rfcDaysAgo(4)}</pubDate>
       <guid>https://example.com/third</guid>
     </item>
     <item>
       <title>Fourth Article</title>
       <link>https://example.com/fourth</link>
       <description>${"Another long article with extensive content for scroll testing. ".repeat(40)}</description>
-      <pubDate>Tue, 31 Dec 2024 12:00:00 GMT</pubDate>
+      <pubDate>${rfcDaysAgo(5)}</pubDate>
       <guid>https://example.com/fourth</guid>
     </item>
     <item>
       <title>Entity &amp; Decode Test</title>
       <link>https://example.com/fifth</link>
       <description>Article with HTML entities: &lt;strong&gt;bold&lt;/strong&gt; &amp; more.</description>
-      <pubDate>Mon, 30 Dec 2024 12:00:00 GMT</pubDate>
+      <pubDate>${rfcDaysAgo(6)}</pubDate>
       <guid>https://example.com/fifth</guid>
     </item>
   </channel>
@@ -51,19 +62,19 @@ export const SAMPLE_ATOM = `<?xml version="1.0" encoding="UTF-8"?>
   <title>Atom Test Feed</title>
   <link href="https://atom-example.com" rel="alternate"/>
   <id>urn:uuid:atom-test-feed</id>
-  <updated>2025-01-03T12:00:00Z</updated>
+  <updated>${isoDaysAgo(2)}</updated>
   <entry>
     <title>Atom Entry One</title>
     <link href="https://atom-example.com/one" rel="alternate"/>
     <id>urn:uuid:atom-entry-one</id>
-    <updated>2025-01-03T12:00:00Z</updated>
+    <updated>${isoDaysAgo(2)}</updated>
     <summary>Summary of the first Atom entry.</summary>
   </entry>
   <entry>
     <title>Atom Entry Two</title>
     <link href="https://atom-example.com/two" rel="alternate"/>
     <id>urn:uuid:atom-entry-two</id>
-    <updated>2025-01-02T12:00:00Z</updated>
+    <updated>${isoDaysAgo(3)}</updated>
     <summary>Summary of the second Atom entry.</summary>
   </entry>
 </feed>`;
@@ -80,14 +91,14 @@ export const SAMPLE_JSON_FEED = JSON.stringify({
       title: "JSON Entry One",
       url: "https://json-example.com/one",
       content_text: "Content of the first JSON Feed entry.",
-      date_published: "2025-01-03T12:00:00Z",
+      date_published: isoDaysAgo(2),
     },
     {
       id: "json-2",
       title: "JSON Entry Two",
       url: "https://json-example.com/two",
       content_text: "Content of the second JSON Feed entry.",
-      date_published: "2025-01-02T12:00:00Z",
+      date_published: isoDaysAgo(3),
     },
   ],
 });
@@ -117,21 +128,21 @@ export const SAMPLE_RSS_UPDATED = `<?xml version="1.0" encoding="UTF-8"?>
       <title>Brand New Article</title>
       <link>https://example.com/new</link>
       <description>This article was added after refresh.</description>
-      <pubDate>Sat, 04 Jan 2025 12:00:00 GMT</pubDate>
+      <pubDate>${rfcDaysAgo(1)}</pubDate>
       <guid>https://example.com/new</guid>
     </item>
     <item>
       <title>First Article</title>
       <link>https://example.com/first</link>
       <description>Short description only.</description>
-      <pubDate>Fri, 03 Jan 2025 12:00:00 GMT</pubDate>
+      <pubDate>${rfcDaysAgo(2)}</pubDate>
       <guid>https://example.com/first</guid>
     </item>
     <item>
       <title>Second Article</title>
       <link>https://example.com/second</link>
       <description>Brief summary of the second article.</description>
-      <pubDate>Thu, 02 Jan 2025 12:00:00 GMT</pubDate>
+      <pubDate>${rfcDaysAgo(3)}</pubDate>
       <guid>https://example.com/second</guid>
     </item>
   </channel>

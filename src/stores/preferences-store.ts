@@ -2,8 +2,14 @@ import { create } from "zustand";
 import { getPreferences, putPreferences } from "../core/storage/db.ts";
 import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
-import type { UserPreferences, FeedSortMode, ArticleSortMode } from "@feedzero/core/types";
-import { useFeedStore } from "./feed-store.ts";
+import type {
+  ArticleRetention,
+  UserPreferences,
+  FeedSortMode,
+  ArticleSortMode,
+} from "@feedzero/core/types";
+import { countExpiredArticles } from "../core/storage/article-retention.ts";
+import { useFeedStore, reloadArticleStoreForView } from "./feed-store.ts";
 import { useArticleStore } from "./article-store.ts";
 import { useAppStore } from "./app-store.ts";
 import { useSyncStore } from "./sync-store.ts";
@@ -38,6 +44,16 @@ interface PreferencesStore {
   reload: () => Promise<void>;
   /** Merge a patch, persist the encrypted row, and schedule a sync push. */
   update: (patch: Partial<UserPreferences>) => Promise<void>;
+  /**
+   * How many articles a retention period would remove right now, so the
+   * UI can say so before the user commits to it. 0 when unreadable.
+   */
+  countArticlesExpiredBy: (retention: ArticleRetention) => Promise<number>;
+  /**
+   * Save a retention period, then purge and reload the open list through
+   * the same path every refresh takes, so the change shows at once.
+   */
+  setArticleRetention: (retention: ArticleRetention) => Promise<void>;
 }
 
 /**
@@ -177,5 +193,15 @@ export const usePreferencesStore = create<PreferencesStore>((set, get) => ({
     set({ preferences: next });
     await putPreferences(next);
     useSyncStore.getState().scheduleSyncPush();
+  },
+
+  countArticlesExpiredBy: async (retention) => {
+    const count = await countExpiredArticles(retention);
+    return count.ok ? count.value : 0;
+  },
+
+  setArticleRetention: async (articleRetention) => {
+    await get().update({ articleRetention });
+    await reloadArticleStoreForView(useFeedStore.getState().selectedFeedId);
   },
 }));

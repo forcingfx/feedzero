@@ -325,7 +325,7 @@ async function reloadFeeds(
  * clears the selection, which closed the article the user was reading
  * every time a background refresh finished.
  */
-async function reloadArticleStoreForView(
+export async function reloadArticleStoreForView(
   selectedFeedId: string | null,
 ): Promise<void> {
   const articleStore = useArticleStore.getState();
