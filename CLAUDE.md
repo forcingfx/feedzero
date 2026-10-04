@@ -68,7 +68,7 @@ Three-tier strategy. See [docs/testing-strategy.md](docs/testing-strategy.md) fo
 
 **Tier 2 — Structural assertions (Vitest + RTL)**: Verify critical CSS classes (`overflow-hidden`, `min-h-0`, `h-svh`), ARIA, DOM composition. Catches regressions happy-dom can't see in computed styles.
 
-**Tier 3 — E2E (Playwright + Chromium)**: Two viewports (`desktop` 1280×720, `mobile` Pixel 5). `tests/e2e/`, dev server on port 3001. Feeds mocked via `page.route()` with `feed-fixtures.ts`. Onboarding bypassed via localStorage (`tests/e2e/fixtures.ts`). First-launch auto-subscribe to `https://feedzero.app/releases.xml` is best-effort (try/catch) so a network miss is silent.
+**Tier 3 — E2E (Playwright + Chromium)**: Two viewports (`desktop` 1280×720, `mobile` Pixel 5). `tests/e2e/`, dev server on port 3001. A third project, `offline`, runs `offline.spec.ts` against a production build on port 3002, because the dev server ships no service worker. Feeds mocked via `page.route()` with `feed-fixtures.ts`. Onboarding bypassed via localStorage (`tests/e2e/fixtures.ts`). First-launch auto-subscribe to `https://feedzero.app/releases.xml` is best-effort (try/catch) so a network miss is silent.
 
 **Coverage thresholds** (`npm run test:coverage`): Statements/Lines/Functions 90%; Branches 83%. Excluded: `src/workers/**`, `src/main.tsx`, `*.d.ts`, `src/types/**`, `src/core/extractor/adapters/types.ts`, `src/core/sync/types.ts`, `src/components/ui/**`.
 
@@ -279,6 +279,7 @@ One-line rules. The rationale, incident history and code templates for each are 
 - **Operational logging takes no identities**: only `logError` and `logEvent`, sizes as power-of-two buckets, nothing tying a line to a vault. See ADR 032.
 - **Sync push bodies are gzipped in transit**: signal it with `x-feedzero-body-encoding`, never `Content-Encoding: gzip`; pad with base64, not hex; cap decoding at `MAX_VAULT_SIZE`; pass request bodies through as bytes, never `Buffer.toString()`. See ADR 031.
 - **Every `db.ts` operation goes through `ctx.op((db) => …)`**; the only exception is `replaceTablesAtomically`. See ADR 030.
+- **The service worker handles three things and nothing else**: the app page (network-first, stored copy only when offline), hashed `/assets/` (cache-first), and the icons and manifest. It must never handle `/api/*`, other origins, or non-GET requests, and `/sw.js` is served `no-cache`. See ADR 033.
 - **Prefer static imports of in-tree modules at file top.** A dynamic `import()` followed by a named-export destructure is a build error (`INEFFECTIVE_DYNAMIC_IMPORT`).
 - **Design defaults**: route by router, not by flag; orchestrate boot in store actions, not component effects; reach for a DOM `CustomEvent` last (`useNavigate` / URL params → props → context first); extract a helper when the same multi-step dance repeats; split a big file when the next investment is committed, not before; put the highest-quality source first in a fallback chain; trace the full request path with real data before deploying.
 

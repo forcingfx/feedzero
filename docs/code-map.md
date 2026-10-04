@@ -90,4 +90,6 @@ Single CSS entry: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero
 ## Types & Service Worker
 
 - **src/types/index.ts** — `Feed`, `Article`, `CreateFeedInput`, `CreateArticleInput`.
-- **src/workers/service-worker.js** — Excluded from coverage.
+- **src/workers/service-worker.js** — Template for the service worker that keeps the app openable offline. The build injects the asset manifest and emits it at `/sw.js`; it is never served as-is. Excluded from coverage; exercised by `tests/workers/service-worker.test.ts`. See ADR 033.
+- **src/lib/register-service-worker.ts** — `registerServiceWorker()`: registers `/sw.js` in production builds, called from `src/main.tsx`. Never throws.
+- **scripts/service-worker/** — `render-service-worker.mjs` (`renderServiceWorker(template, { buildId, assets })`) and `vite-plugin.mjs` (`serviceWorkerPlugin()`, `buildIdFor(assets)`): emit `/sw.js` on production builds.

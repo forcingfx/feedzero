@@ -277,6 +277,8 @@ Smoke tests are **NOT** part of `npm test`. They require network access, consume
 | `tests/smoke/health.test.ts` | 200 + `{ok:true}` |
 | `tests/smoke/rate-limiter.test.ts` | 320-request burst → mix of 200s + 429s + Retry-After |
 | `tests/smoke/release-feed.test.ts` | Live release feed parses against our parser |
+| `tests/smoke/service-worker.test.ts` | `/sw.js` is JavaScript, `no-cache`, and lists assets that exist |
+| `tests/smoke/landing-version.test.ts` | Landing homepage names the release production is serving |
 
 ### When SMOKE runs in the RGR cycle
 
