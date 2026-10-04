@@ -2,6 +2,19 @@
 
 Guidance for Claude Code (claude.ai/code) working in this repository.
 
+## Overview
+
+FeedZero is a privacy-first RSS reader for people who need their reading kept private — journalists, activists, and people living under surveillance. Feeds are fetched through a proxy, sanitized, and stored encrypted in the browser; optional sync stores only an encrypted vault server-side.
+
+## Terminology
+
+- **RGR+S** — Red-Green-Refactor-Smoke, the mandatory change sequence in [Development Workflow](#development-workflow).
+- **Vault** — a user's encrypted sync blob, read and written through `/api/sync`.
+- **Three entry points** — the consumers of every API handler: `server.ts` (Hono), `vite.config.js` (dev), `api/*.ts` (Vercel).
+- **Tier matrix** — `src/core/features/tier-matrix.ts`, the single source of truth for which feature exists at which tier.
+- **Pin-test** — a test that freezes a product decision rather than a correctness property.
+- **Smoke test** — a `tests/smoke/` test that hits the live deployed system, run with `SMOKE_TESTS=1`.
+
 ## ⚠ Mandatory: Red-Green-Refactor
 
 **Every code change MUST follow the RGR cycle. No exceptions.**
@@ -28,7 +41,7 @@ Run a single test file: `npx vitest run <path/to/file>`.
 
 ## Architecture
 
-FeedZero is a privacy-first RSS reader. React + TypeScript UI, Zustand state, React Router, Tailwind CSS v4. Core modules (`src/core/`, `src/utils/`) are framework-agnostic TypeScript with zero React/UI imports — they are the shared backend.
+React + TypeScript UI, Zustand state, React Router, Tailwind CSS v4. Core modules (`src/core/`, `src/utils/`) are framework-agnostic TypeScript with zero React/UI imports — they are the shared backend.
 
 ### Runtime Dependencies
 
@@ -132,9 +145,11 @@ All API handlers use the Web standard `Request → Response` pattern via shared 
 
 **Endpoints**: `POST /api/feed` `{url}` (feed proxy), `POST /api/page` `{url}` (page proxy), `/api/sync` (GET/PUT/DELETE/HEAD encrypted vault), `GET /api/icon` (favicon proxy), `POST /api/feedback` (→ GitHub issue, requires `GITHUB_FEEDBACK_TOKEN` + `GITHUB_REPO`), `GET /api/stats-sync`.
 
-**SSRF protections** — Proxy blocks internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http`/`https`. Do not weaken these.
-
 **Sync storage** — Pluggable `SyncStorageAdapter`. Default: filesystem (`SYNC_STORAGE=filesystem`). Vercel: `SYNC_STORAGE=vercel-blob` + `BLOB_READ_WRITE_TOKEN`. Dev: memory.
+
+### Security boundaries
+
+SSRF protections — Proxy blocks internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http`/`https`. Do not weaken these.
 
 ### Deployment
 

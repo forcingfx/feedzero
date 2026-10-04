@@ -119,5 +119,5 @@ Do not accept these shortcuts:
 - **"The function is simple"** - Simple functions with complex input domains (strings, floats, nested structures) benefit most from PBT
 - **"We don't have time"** - PBT tests are often shorter than comprehensive example suites
 - **"It's too hard to write generators"** - Most PBT libraries have excellent built-in strategies; custom generators are rarely needed
-- **"The test failed, so it's a bug"** - Failures require validation; see [interpreting-failures.md]({baseDir}/references/interpreting-failures.md)
+- **"The test failed, so it's a bug"** - Failures require validation; see [interpreting-failures.md](references/interpreting-failures.md)
 - **"No crash means it works"** - "No exception" is the weakest property; always push for stronger guarantees
