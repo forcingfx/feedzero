@@ -13,6 +13,7 @@
 | siteUrl     | string | Website URL, default ''             |
 | createdAt   | number | Unix ms timestamp                   |
 | updatedAt   | number | Unix ms timestamp                   |
+| retiredGuids | string[]? | Guids of undated articles retention purged while still in the feed; refresh skips them and forgets each once it leaves the feed ([feature 025](features/025-article-retention.md)) |
 
 Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 
@@ -31,6 +32,7 @@ Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 | publishedAt | number  | Unix ms timestamp, nullable           |
 | read        | boolean | Read status, default false          |
 | createdAt   | number  | Unix ms timestamp                   |
+| datePresumed | true?  | The feed gave no date, so `publishedAt` is first-seen time; retention tombstones the guid when it purges such an article |
 
 ### Preferences (synced user settings)
 
@@ -47,6 +49,7 @@ the vault with timestamp last-write-wins — see [ADR 022](decisions/022-prefere
 | groupArticleFloods| boolean                               | Collapse same-feed bursts         |
 | theme             | `"light" \| "dark" \| "system"`       | Color scheme (synced; bridged into next-themes by `<ThemeBridge>`) |
 | readerTextSize    | `"small" \| "medium" \| "large"` (optional) | Reader body text scale; absent on rows from older clients → treated as "medium" |
+| articleRetention  | `7 \| 14 \| 30 \| 90 \| 365 \| "never"` (optional) | Days an unstarred article is kept after publication; absent → 30, so existing vaults are purged at the default on upgrade |
 
 ### Meta (internal)
 

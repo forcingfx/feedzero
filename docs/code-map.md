@@ -12,6 +12,7 @@ File-level index of FeedZero's modules, stores, components, routes, hooks, styli
 - **src/core/crypto/argon2.ts** — Argon2id via `hash-wasm`; memory-hard KDF for new sync vaults so a 4-word passphrase (~51.7 bits) resists GPU brute-force. Prod params 64 MiB / t=3 / p=1 (OWASP). Vault envelope stamps the deriving KDF (`KdfSpec` in `sync/types.ts`) so recovery picks the match. Legacy PBKDF2 vaults auto-upgrade on first passphrase entry (→ `upgradeVaultKdf`).
 - **src/core/storage/db.ts** — Dexie. Content AES-GCM encrypted; index fields (url, feedId, guid) HMAC-SHA256 hashed so we query without exposing plaintext. Call `open(passphrase)` or `openWithKeys(dbKeyJwk, hmacKeyJwk)` first.
 - **src/core/storage/key-material.ts** — `deriveAndStoreKeys` / `loadStoredKeys` / `clearStoredKeys`: derives DB/HMAC/optional vault keys, persists JWK to localStorage. Raw passphrase never persisted.
+- **src/core/storage/article-retention.ts** — Article retention: `purgeExpiredArticles({ now, keep })` deletes unstarred articles older than the vault's period and tombstones undated ones on their feed (`retiredGuids`); `admitsOnIngest` is the matching rule refresh applies to new feed items; `countExpiredArticles` backs the "Remove N articles?" confirm.
 - **src/core/storage/schema.ts** — `createFeed()` / `createArticle()` factories returning `Result`.
 - **src/core/discovery/** — `discoverFeed(url)` multi-strategy cascade; pure functions in `strategies.ts`.
 - **src/core/crypto/passphrase-generator.ts** — EFF large wordlist, 4 words, ~51.7 bits.
