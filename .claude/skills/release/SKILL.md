@@ -6,7 +6,7 @@ argument-hint: "[X.Y.Z to force a version] [--dry-run]"
 
 # /release
 
-One PR, one repository, unattended. The notes entry and the version bump land
+One PR, one repository, unattended, plus a rebuild of the landing page at the end. The notes entry and the version bump land
 in the same commit, so there is nothing to sequence and nothing to poll.
 
 ## Inputs
@@ -84,7 +84,19 @@ docker run --rm --entrypoint sh ghcr.io/forcingfx/feedzero:v<version> \
    the tags by the publish job. If one architecture's build fails,
    `gh run rerun <run-id> --failed` redoes only that one; nothing is tagged
    until both exist.
-10. **Tear down** the worktree and the branch. Auto-merge can leave the remote
+10. **Redeploy the landing page.** `feedzero.app` is a static build that reads
+    `https://my.feedzero.app/releases.json` at build time, so its version
+    string and release-notes accordion stay on the previous release until it
+    is rebuilt. Do this after step 9 has shown the app serving the new version:
+
+```bash
+cd /tmp   # any directory that is not a linked Vercel project
+vercel redeploy "$(vercel ls feedzero-landing --prod 2>/dev/null | grep -oE 'https://[^ ]+' | head -1)" \
+  --target production
+curl -sSL "https://feedzero.app/?cb=$(date +%s)" | grep -c "alpha (v<version>)"   # must print 1 or more
+```
+
+11. **Tear down** the worktree and the branch. Auto-merge can leave the remote
     branch behind even with `--delete-branch`:
 
 ```bash
@@ -105,10 +117,12 @@ git ls-remote --exit-code --heads origin release/v<version> \
 - **The feed is served from this repo.** `scripts/release/build-feed.mjs`
   emits `public/releases.xml` during the build; landing rewrites
   `feedzero.app/releases.xml` to it, so the public URL and every entry id are
-  unchanged. A release has no landing step.
-- **Landing's homepage accordion** renders from its own `releases.mjs` mirror.
-  It is not on the release path; a stale accordion corrects itself on the next
-  landing deploy and never affects the feed subscribers read.
+  unchanged. The feed needs no landing step; only the homepage does (step 10).
+- **Landing's homepage** (version string and release-notes accordion) is built
+  from `https://my.feedzero.app/releases.json` when landing deploys. It is
+  not on the path subscribers read, so a stale page never affects the feed,
+  but nothing rebuilds it after a release: v0.15.0 was live for an hour while
+  the homepage still said v0.14.0. Step 10 is that rebuild.
 - **Why the bump is a PR and not a CI push:** `forcingfx` is a *user* account,
   so the `main protection` ruleset cannot grant the GitHub Actions app a
   bypass — GitHub only allows Integration bypass actors on org-owned repos.
