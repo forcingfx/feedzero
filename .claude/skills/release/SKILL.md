@@ -36,6 +36,23 @@ in the same commit, so there is nothing to sequence and nothing to poll.
    `fixable` violations (append period, em-dash→comma, strip `!`); anything
    else → ABORT and show it. Hand-edit for tone — the lint only enforces
    mechanics.
+   **Landing impact** — decide both before the PR, because the entry carries
+   one of them:
+   - **`affects`**: the landing homepage stamps a NEW badge on every feature
+     whose id is listed in the newest entry's `affects` array. List the ids
+     and set the ones this release materially adds or changes; omit the field
+     only if none apply. `draftNotes` never sets it.
+
+     ```bash
+     git -C ~/builder/feedzero-landing fetch -q origin
+     git -C ~/builder/feedzero-landing show origin/main:content/home.md | grep -E '^\s*- id:'
+     ```
+   - **Copy**: read the release's `added` / `changed` / `removed` bullets
+     against `content/home.md` and `content/pricing.md` in landing. If a
+     claim there is now false or a headline feature is missing, open a PR in
+     `feedzero-landing` (author email must be the GitHub noreply address, or
+     Vercel silently skips the deploy). Say in the report which it was:
+     "landing copy checked, no change needed" or the landing PR link.
 6. **--dry-run?** print the version and entry, then STOP.
 7. **Open the release PR** — one worktree, one commit, both changes together:
 
