@@ -189,6 +189,16 @@ export type ReaderTextSize = "small" | "medium" | "large";
  */
 export type ReaderWidth = "narrow" | "medium" | "wide";
 
+/**
+ * How long an unstarred article is kept, in days since it was published,
+ * or "never" to keep everything. Bounds vault size: a feed nobody reads
+ * would otherwise grow the vault forever.
+ */
+export type ArticleRetention = 7 | 14 | 30 | 90 | 365 | "never";
+
+/** Retention for a vault that never chose a period. */
+export const DEFAULT_ARTICLE_RETENTION: ArticleRetention = 30;
+
 export interface UserPreferences {
   feedSortMode: FeedSortMode;
   feedCustomOrder: string[];
@@ -215,6 +225,12 @@ export interface UserPreferences {
    * above; `undefined` reads as true (the historical behaviour).
    */
   showArticleFeedIcons?: boolean;
+  /**
+   * Article retention period. Optional so rows synced from older clients
+   * still parse; `undefined` reads as the 30-day default, which is how an
+   * existing vault starts being purged on upgrade.
+   */
+  articleRetention?: ArticleRetention;
 }
 
 /** Baseline preferences used before hydration and for first-run defaults. */
@@ -233,6 +249,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   readerWidth: "medium",
   hideReadArticles: false,
   showArticleFeedIcons: true,
+  articleRetention: DEFAULT_ARTICLE_RETENTION,
 };
 
 export interface CreateArticleInput {
