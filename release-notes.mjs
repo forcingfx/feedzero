@@ -37,6 +37,7 @@ export const releases = [
     title: "Larger sync vaults and a smoother mobile reader",
     subtitle:
       "Sync accepts larger vaults and shows how close a vault is to the size limit. The mobile reader's swipe-back was rebuilt, and several sync, reading, and navigation bugs are fixed.",
+    affects: ["sync", "mobile"],
     added: [
       "Added a vault size readout in Settings that shows the size of the last sync upload against the limit and warns at 80 percent.",
       "Added a Free up space action in Settings that removes saved offline copies which nothing keeps up to date.",
