@@ -15,9 +15,9 @@ name: Publish self-host image
 #   * push tag v*.*.*  — full release, tagged with version + `latest`
 #   * workflow_dispatch — manual rebuild, tagged with the commit SHA
 #
-# To cut a release:
-#   git tag v0.9.1
-#   git push origin v0.9.1
+# Releases are cut by the /release skill: its PR bumps package.json,
+# release-tag.yml creates the tag and calls this workflow. Do not tag by
+# hand (the v0.11.0 image reported 0.9.0 that way, #211/#212).
 #
 # The workflow tags the image as `v0.9.1`, `0.9`, and `latest`. Pin
 # in self-host .env via `FEEDZERO_VERSION=v0.9.1` for stability.
@@ -125,7 +125,11 @@ jobs:
             type=raw,value=latest,enable=${{ steps.ver.outputs.release == 'true' }}
             type=sha,enable=${{ steps.ver.outputs.release != 'true' }}
 
+      # First attempt may fail without failing the job: see the retry
+      # step below for why.
       - name: Build + push
+        id: build
+        continue-on-error: true
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -142,6 +146,28 @@ jobs:
           cache-to: type=gha,mode=max
           # Version reported by /api/health comes from package.json
           # via scripts/build-api.js (it inlines pkgVersion into the
-          # bundles at build time). The /new-release skill bumps
-          # package.json before tagging, so the git tag and the
-          # baked version stay aligned.
+          # bundles at build time). The /release skill bumps
+          # package.json in the release PR and release-tag.yml tags
+          # the merged commit, so the git tag and the baked version
+          # stay aligned.
+
+      # `npm ci` for linux/arm64 runs under QEMU emulation, where node
+      # crashes at random: exit 139 (SIGSEGV) on v0.14.0, exit 132
+      # (SIGILL) on v0.12.0 and v0.15.0. Every time, re-running the job
+      # unchanged succeeded. This step is that re-run, so a release no
+      # longer waits for a human to press the button. It is a mitigation,
+      # not a cure: the cure is building arm64 on a native arm64 runner.
+      # A second failure fails the job, so a real build break still
+      # surfaces. Keep the inputs identical to the first attempt.
+      - name: Build + push (retry after an emulation crash)
+        if: ${{ steps.build.outcome == 'failure' }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
