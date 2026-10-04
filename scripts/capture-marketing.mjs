@@ -24,6 +24,7 @@ import { mkdir, stat } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -748,6 +749,13 @@ async function main() {
       const s = await stat(f);
       console.log(`  ${(s.size / 1024).toFixed(1).padStart(7)} KB  ${f.replace(REPO_ROOT + "/", "")}`);
     }
+  } catch (err) {
+    // A scene that no longer matches the UI fails on a selector timeout,
+    // which says nothing about what the page looked like. Keep the picture.
+    const failureShot = resolve(tmpdir(), "capture-marketing-failure.png");
+    await page.screenshot({ path: failureShot }).catch(() => {});
+    console.error(`Scene failed at ${page.url()} — page saved to ${failureShot}`);
+    throw err;
   } finally {
     await browser.close();
     try {
