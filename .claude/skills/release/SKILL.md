@@ -80,10 +80,10 @@ docker run --rm --entrypoint sh ghcr.io/forcingfx/feedzero:v<version> \
   -c 'node -p "require(\"/app/package.json\").version"'
 ```
 
-   If the image job fails, read the exit code before investigating. `npm ci`
-   for arm64 runs under QEMU and crashes at random (exit 132 or 139);
-   `docker-publish.yml` retries the build once by itself. If both attempts
-   crashed, `gh run rerun <run-id> --failed` and watch again.
+   The image is built per architecture on native runners, then joined under
+   the tags by the publish job. If one architecture's build fails,
+   `gh run rerun <run-id> --failed` redoes only that one; nothing is tagged
+   until both exist.
 10. **Tear down** the worktree and the branch. Auto-merge can leave the remote
     branch behind even with `--delete-branch`:
 
