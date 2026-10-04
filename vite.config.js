@@ -5,6 +5,7 @@ import path from "path";
 import { readFileSync } from "fs";
 import { toWebRequest, sendWebResponse } from "./scripts/dev-proxy.js";
 import { visualizer } from "rollup-plugin-visualizer";
+import { serviceWorkerPlugin } from "./scripts/service-worker/vite-plugin.mjs";
 
 // Inject the current package.json version as a build-time constant so
 // the SPA and dev server can identify which build is running. The
@@ -500,7 +501,11 @@ export default defineConfig({
     // first-paint concern (cached aggressively, lazy-parsed by V8).
     chunkSizeWarningLimit: 800,
   },
-  plugins: [react(), tailwindcss(), apiProxyPlugin(), analyzePlugin].filter(
-    Boolean,
-  ),
+  plugins: [
+    react(),
+    tailwindcss(),
+    apiProxyPlugin(),
+    serviceWorkerPlugin(),
+    analyzePlugin,
+  ].filter(Boolean),
 });
