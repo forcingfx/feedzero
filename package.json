@@ -98,5 +98,8 @@
   },
   "optionalDependencies": {
     "@vercel/blob": "^2.8.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
   }
 }
