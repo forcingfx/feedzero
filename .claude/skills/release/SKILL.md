@@ -47,9 +47,19 @@ ln -s ~/builder/feedzero/node_modules node_modules
 
 # Prepend the entry to the `releases` array in release-notes.mjs, then:
 npm version <version> --no-git-tag-version
+
+# Regenerate the feed and refresh the fixture the byte-compatibility tests
+# compare against. Skip this and two tests in
+# tests/scripts/release/build-feed.test.ts fail.
+npm run build:feed
+cp public/releases.xml tests/fixtures/release-feed.xml
+git diff -- tests/fixtures/release-feed.xml | grep '^-[^-]'
+# ^ must print ONLY the feed's <updated> line. Any other removed line means
+#   an existing entry changed: STOP (see "Never change existing <id> values").
+
 npm test                    # the version-lock test proves notes == package.json
 
-git add release-notes.mjs package.json package-lock.json
+git add release-notes.mjs package.json package-lock.json tests/fixtures/release-feed.xml
 git commit -m "release: v<version>"
 git push -u origin release/v<version>
 gh pr create --head release/v<version> --base main \
@@ -70,7 +80,19 @@ docker run --rm --entrypoint sh ghcr.io/forcingfx/feedzero:v<version> \
   -c 'node -p "require(\"/app/package.json\").version"'
 ```
 
-10. **Tear down** the worktree.
+   If the image job fails, read the exit code before investigating. `npm ci`
+   for arm64 runs under QEMU and crashes at random (exit 132 or 139);
+   `docker-publish.yml` retries the build once by itself. If both attempts
+   crashed, `gh run rerun <run-id> --failed` and watch again.
+10. **Tear down** the worktree and the branch. Auto-merge can leave the remote
+    branch behind even with `--delete-branch`:
+
+```bash
+git -C ~/builder/feedzero worktree remove ~/builder/feedzero-wt-release-<version>
+git -C ~/builder/feedzero branch -D release/v<version>
+git ls-remote --exit-code --heads origin release/v<version> \
+  && git push origin --delete release/v<version>
+```
 
 ## Notes
 
@@ -92,6 +114,14 @@ docker run --rm --entrypoint sh ghcr.io/forcingfx/feedzero:v<version> \
   bypass — GitHub only allows Integration bypass actors on org-owned repos.
   Every CI push to `main` is rejected with `GH013`. The predecessor
   `release.yml` pushed directly and could never have succeeded.
+- **`computeVersion` turns a breaking change on 0.x into 1.0.0.** That is a
+  product statement, not a mechanical one. While the product is pre-1.0, pass
+  an explicit `X.Y.Z` instead (v0.14.0 was cut this way).
+- **`draftNotes` output is a starting point.** It emits one sentence per
+  commit subject, PR numbers included. Rewrite it to the house style at the
+  top of `release-notes.mjs`: user-facing changes only, verb-led past tense,
+  no em-dashes, sorted into added / changed / fixed / removed. Run `lintNotes`
+  on the final entry, not only on the draft.
 - **Resume after partial failure**: if `release-notes.mjs` already has an entry
   for `<version>`, skip steps 4–5 and resume at step 7.
 - Screenshots, bento cards and social posts are out of scope; run those
