@@ -7,6 +7,7 @@ import { createFeed, createArticle } from "../storage/schema.ts";
 import {
   addFeed,
   feedExistsByUrl,
+  getFeed,
   getFeeds,
   removeFeedsByUrl,
   addArticles,
@@ -28,6 +29,11 @@ import {
 import { applyRules } from "../rules/engine.ts";
 import { buildContext } from "../filters/evaluator.ts";
 import { isFeedDueForRefresh } from "./refresh-backoff.ts";
+import {
+  admitsOnIngest,
+  loadArticleRetention,
+  retentionCutoff,
+} from "../storage/article-retention.ts";
 
 interface AddFeedResult {
   feed: Feed;
@@ -283,7 +289,11 @@ export async function addFeedFlow(
     const storeResult = await addFeed(feed);
     if (!storeResult.ok) return storeResult;
 
-    const articles = createArticlesForFeed(feed.id, parsedArticles);
+    const cutoff = await loadIngestCutoff(now);
+    const admitted = parsedArticles.filter((item) =>
+      admitsOnIngest(asIncoming(item), cutoff, new Set()),
+    );
+    const articles = createArticlesForFeed(feed.id, admitted);
     await addArticles(articles);
 
     return ok({ feed, articles });
@@ -554,17 +564,21 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
     const parsedArticles = parseResult.value.articles;
     const newArticles = [];
     const updatedArticles: Article[] = [];
+    const cutoff = await loadIngestCutoff(now);
+    const retiredGuids = await storedRetiredGuids(feed);
 
     for (const parsed of parsedArticles) {
-      const guid = parsed.guid || parsed.link;
+      const guid = itemGuid(parsed);
       if (!guid) continue;
 
       const existing = await getArticleByGuid(feed.id, guid);
       if (!existing.ok) continue;
 
       if (existing.value === null) {
-        // New article
-        newArticles.push(parsed);
+        // New article, unless retention already removed it or would.
+        if (admitsOnIngest(asIncoming(parsed), cutoff, retiredGuids)) {
+          newArticles.push(parsed);
+        }
       } else {
         // Existing — check if content changed
         const oldContent = existing.value.content || "";
@@ -639,6 +653,8 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
     // counter so the feed returns to the default refresh cadence.
     delete feed.consecutive304Count;
 
+    keepRetiredGuidsStillInFeed(feed, retiredGuids, parsedArticles);
+
     await persistFreshness(feed, {
       fetchedAt: now,
       successfulAt: now,
@@ -660,6 +676,51 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
     });
     return err(errorMessage);
   }
+}
+
+function itemGuid(item: ParsedArticle): string {
+  return item.guid || item.link;
+}
+
+function asIncoming(item: ParsedArticle) {
+  return { guid: itemGuid(item), publishedAt: item.publishedAt };
+}
+
+/**
+ * The retention cutoff for this ingest. A failure to read it admits
+ * everything: losing new articles to an unreadable preferences row would
+ * be worse than briefly keeping old ones, which the next purge removes.
+ */
+async function loadIngestCutoff(now: number): Promise<number | null> {
+  const retention = await loadArticleRetention();
+  return retention.ok ? retentionCutoff(retention.value, now) : null;
+}
+
+/**
+ * The feed's retired guids as stored. Read from the db rather than the
+ * passed-in feed, which the caller may hold from before a purge retired
+ * more of them.
+ */
+async function storedRetiredGuids(feed: Feed): Promise<Set<string>> {
+  const stored = await getFeed(feed.id);
+  const guids = stored.ok ? stored.value.retiredGuids : feed.retiredGuids;
+  return new Set(guids ?? []);
+}
+
+/**
+ * Forget retired guids the feed no longer carries: an item that has left
+ * the feed cannot come back through it, so the list stays no longer than
+ * the feed itself.
+ */
+function keepRetiredGuidsStillInFeed(
+  feed: Feed,
+  retiredGuids: ReadonlySet<string>,
+  items: ParsedArticle[],
+): void {
+  const inFeed = new Set(items.map(itemGuid));
+  const kept = [...retiredGuids].filter((guid) => inFeed.has(guid));
+  if (kept.length > 0) feed.retiredGuids = kept;
+  else delete feed.retiredGuids;
 }
 
 /**
@@ -794,12 +855,17 @@ export async function reloadFeed(
     const parseResult = parse(text, feed.url);
     if (!parseResult.ok) return err(parseResult.error);
 
-    // Store all articles fresh
+    // Store all articles fresh, minus what retention removed or would.
+    const cutoff = await loadIngestCutoff(Date.now());
+    const retiredGuids = await storedRetiredGuids(feed);
     const articles: Article[] = [];
     for (const parsed of parseResult.value.articles) {
-      const guid = parsed.guid || parsed.link;
+      const guid = itemGuid(parsed);
       if (!guid) continue;
+      if (!admitsOnIngest(asIncoming(parsed), cutoff, retiredGuids)) continue;
 
+      // publishedAt passes through as parsed (null when undated), so
+      // createArticle marks an undated item `datePresumed`.
       const articleResult = createArticle({
         feedId: feed.id,
         guid,
@@ -808,7 +874,7 @@ export async function reloadFeed(
         content: parsed.content,
         summary: parsed.summary,
         author: parsed.author,
-        publishedAt: parsed.publishedAt ?? Date.now(),
+        publishedAt: parsed.publishedAt,
       });
       if (articleResult.ok) articles.push(articleResult.value);
     }

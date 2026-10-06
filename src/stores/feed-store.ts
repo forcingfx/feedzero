@@ -316,14 +316,20 @@ async function reloadFeeds(
  * skips the reload (e.g. a metadata-only mutator) is a visible
  * one-line omission instead of a forgotten copy of the dance.
  *
+ * Purges what article retention has expired first, so a refresh never
+ * shows rows it is about to delete. Every refresh runs through here,
+ * including the one at boot, which is how an existing vault is purged on
+ * upgrade.
+ *
  * Refreshes in place rather than re-entering the view: re-entering
  * clears the selection, which closed the article the user was reading
  * every time a background refresh finished.
  */
-async function reloadArticleStoreForView(
+export async function reloadArticleStoreForView(
   selectedFeedId: string | null,
 ): Promise<void> {
   const articleStore = useArticleStore.getState();
+  await articleStore.purgeExpired();
   await articleStore.preloadAll();
   if (selectedFeedId) await articleStore.refreshArticles(selectedFeedId);
 }

@@ -24,6 +24,7 @@ import {
   withoutOfflineCopy,
   releaseUnmaintainedOfflineContent,
 } from "../core/storage/release-offline-content.ts";
+import { purgeExpiredArticles } from "../core/storage/article-retention.ts";
 import { ARTICLE_SORT_MODES } from "@feedzero/core/types";
 import { useSmartFilterStore } from "./smart-filter-store.ts";
 import { persistPreferences } from "./persist-preferences.ts";
@@ -70,6 +71,12 @@ interface ArticleStore {
    * vault that has outgrown the sync size limit.
    */
   releaseOfflineCopies: () => Promise<Result<number>>;
+  /**
+   * Delete the articles the vault's retention period has expired, sparing
+   * the one open in the reader. Does not reload the view: callers run it
+   * just before the reload they already do. Returns how many went.
+   */
+  purgeExpired: () => Promise<number>;
   /**
    * Enter a view: show its cached articles, clear the selection, then
    * fetch fresh rows. For navigation only; a new view starts unselected.
@@ -428,6 +435,22 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     // leaves the vault too big to push.
     useSyncStore.getState().scheduleSyncPush();
     return ok(released.value.articlesCleared);
+  },
+
+  purgeExpired: async () => {
+    const open = get().selectedArticle;
+    // Housekeeping on a core flow: a failed purge must never fail the
+    // refresh it rides on. The next refresh tries again.
+    try {
+      const purged = await purgeExpiredArticles({
+        keep: new Set(open ? [open.id] : []),
+      });
+      if (!purged.ok || purged.value.articlesRemoved === 0) return 0;
+      useSyncStore.getState().scheduleSyncPush();
+      return purged.value.articlesRemoved;
+    } catch {
+      return 0;
+    }
   },
 
   loadArticles: async (feedId) => {

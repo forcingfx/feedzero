@@ -326,6 +326,20 @@ export async function removeArticlesByFeedId(feedId: string): Promise<Result<boo
 }
 
 /**
+ * Delete articles by id in one bulk operation.
+ */
+export async function removeArticles(ids: string[]): Promise<Result<boolean>> {
+  if (ids.length === 0) return ok(true);
+  try {
+    const ctx = requireOpen();
+    await ctx.op((db) => db.table("articles").bulkDelete(ids));
+    return ok(true);
+  } catch (e) {
+    return err(`Failed to remove articles: ${(e as Error).message}`);
+  }
+}
+
+/**
  * Remove a feed and its articles.
  */
 export async function removeFeed(id: string): Promise<Result<boolean>> {

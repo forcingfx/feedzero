@@ -33,6 +33,15 @@ const SPONSORED_FEED_XML = `<?xml version="1.0" encoding="UTF-8"?>
 vi.mock("../../../src/core/storage/db.ts", () => {
   const articles = new Map<string, Article>();
   return {
+    // Retention reads. Fixtures carry fixed past dates, so retention is
+    // "never" here; these tests are about ingest, not age. Retention has
+    // its own suite (tests/core/feeds/refresh-retention.test.ts). No
+    // stored feed means no retired guids. The real db returns Results.
+    getPreferences: vi.fn(async () => ({
+      ok: true,
+      value: { articleRetention: "never" },
+    })),
+    getFeed: vi.fn(async () => ({ ok: false, error: "not found" })),
     getArticleByGuid: vi.fn(async () => ({ ok: true, value: null })),
     addArticles: vi.fn(async (arts: Article[]) => {
       for (const a of arts) articles.set(a.id, a);

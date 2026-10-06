@@ -276,6 +276,7 @@ One-line rules. The rationale, incident history and code templates for each are 
 - **Price copy has one home**: `PAID_PLAN` in `src/core/features/pricing.ts` — never a literal. See ADR 029.
 - **Apply `normalizeTier` at every boundary** that reads a tier from outside the app. Dropping it downgrades a paying customer to Free.
 - **Do NOT clear a starred article's offline copy.** `src/core/storage/release-offline-content.ts` owns the keep/release rule; user-facing copy about a full vault must name one of its two levers. See ADR 032.
+- **Retention deletes at purge AND refuses at ingest**: every ingest path filters new items through `admitsOnIngest` (`src/core/storage/article-retention.ts`), or purged articles come back as new. See [docs/key-patterns.md](docs/key-patterns.md) and feature 025.
 - **Operational logging takes no identities**: only `logError` and `logEvent`, sizes as power-of-two buckets, nothing tying a line to a vault. See ADR 032.
 - **Sync push bodies are gzipped in transit**: signal it with `x-feedzero-body-encoding`, never `Content-Encoding: gzip`; pad with base64, not hex; cap decoding at `MAX_VAULT_SIZE`; pass request bodies through as bytes, never `Buffer.toString()`. See ADR 031.
 - **Every `db.ts` operation goes through `ctx.op((db) => …)`**; the only exception is `replaceTablesAtomically`. See ADR 030.

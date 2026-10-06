@@ -20,6 +20,9 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       readerWidth: "medium",
       hideReadArticles: false,
       showArticleFeedIcons: true,
+      // 30 days, not "never": bounds vault size by default (owner's call,
+      // 2026-10-04). Existing vaults are purged at this default on upgrade.
+      articleRetention: 30,
     });
   });
 

@@ -42,6 +42,7 @@ import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
 import { ThemeToggle } from "../theme-toggle";
 import { RulesAuditPanel } from "./rules-audit-panel";
 import { SignalSection } from "../signal-section";
+import { ArticleRetentionSetting } from "../article-retention-setting";
 
 export function ReadingTab() {
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
@@ -115,6 +116,8 @@ export function ReadingTab() {
           />
         </div>
       </div>
+
+      <ArticleRetentionSetting />
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">

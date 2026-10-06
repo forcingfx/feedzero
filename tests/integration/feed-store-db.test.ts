@@ -39,6 +39,7 @@ import {
   getFeeds as dbGetFeeds,
   addFeed as dbAddFeed,
   addArticles as dbAddArticles,
+  getAllArticles as dbGetAllArticles,
   getFolders as dbGetFolders,
 } from "../../src/core/storage/db.ts";
 import type { Article, Feed } from "@feedzero/core/types";
@@ -339,6 +340,45 @@ describe("feed-store ↔ db.ts integration", () => {
 
       const ids = useArticleStore.getState().articles.map((a) => a.id);
       expect(ids).toContain("fresh");
+    });
+  });
+
+  // Retention runs at the tail of every refresh, including the one at
+  // boot, which is how an existing vault is purged on upgrade.
+  describe("a refresh applies article retention", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    function agedArticle(id: string, days: number): Article {
+      return { ...makeArticle(id, "a", id), publishedAt: Date.now() - days * DAY };
+    }
+
+    async function seedFeed(articles: Article[]) {
+      await dbAddFeed(makeFeed("a", "Feed A"));
+      await dbAddArticles(articles);
+      await useFeedStore.getState().loadFeeds();
+      useFeedStore.getState().selectFeed("a");
+      await useArticleStore.getState().loadArticles("a");
+    }
+
+    it("removes expired articles from the db and from the open list", async () => {
+      await seedFeed([agedArticle("old", 45), agedArticle("recent", 3)]);
+
+      await useFeedStore.getState().refreshAll();
+
+      const stored = await dbGetAllArticles();
+      expect(stored.ok && stored.value.map((a) => a.id)).toEqual(["recent"]);
+      expect(useArticleStore.getState().articles.map((a) => a.id)).toEqual(["recent"]);
+    });
+
+    it("spares an expired article the user has open in the reader", async () => {
+      await seedFeed([agedArticle("open-old", 45)]);
+      const open = useArticleStore.getState().articles[0];
+      await useArticleStore.getState().selectArticle(open);
+
+      await useFeedStore.getState().refreshAll();
+
+      expect(useArticleStore.getState().selectedArticle?.id).toBe("open-old");
+      expect(useArticleStore.getState().articles.map((a) => a.id)).toEqual(["open-old"]);
     });
   });
 

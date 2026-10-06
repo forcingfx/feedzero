@@ -47,6 +47,11 @@ describe("<ReadingTab>", () => {
     useSignalModeStore.setState({ mode: "ml", hidden: false, nightly: false });
   });
 
+  it("offers the article retention period", () => {
+    renderTab();
+    expect(screen.getByRole("combobox", { name: /keep articles/i })).toBeInTheDocument();
+  });
+
   describe("text size", () => {
     it("renders a three-way text size control defaulting to Medium", () => {
       renderTab();

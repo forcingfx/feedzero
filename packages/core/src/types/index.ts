@@ -1,5 +1,11 @@
 export interface Feed {
   id: string;
+  /**
+   * Guids of undated articles retention purged while they were still in
+   * the feed. Refresh skips them, and forgets each one once it leaves the
+   * feed, so the list never outgrows the feed itself.
+   */
+  retiredGuids?: string[];
   url: string;
   title: string;
   description: string;
@@ -133,6 +139,12 @@ export interface Article {
   extractedContent?: string;
   /** Unix epoch ms when extractedContent was captured. */
   extractedAt?: number;
+  /**
+   * The feed gave no publish date, so `publishedAt` is when the app first
+   * saw the item. Retention remembers such an article's guid when it
+   * purges it: re-seen, it would look brand new and come straight back.
+   */
+  datePresumed?: true;
 }
 
 export interface CreateFeedInput {
@@ -189,6 +201,16 @@ export type ReaderTextSize = "small" | "medium" | "large";
  */
 export type ReaderWidth = "narrow" | "medium" | "wide";
 
+/**
+ * How long an unstarred article is kept, in days since it was published,
+ * or "never" to keep everything. Bounds vault size: a feed nobody reads
+ * would otherwise grow the vault forever.
+ */
+export type ArticleRetention = 7 | 14 | 30 | 90 | 365 | "never";
+
+/** Retention for a vault that never chose a period. */
+export const DEFAULT_ARTICLE_RETENTION: ArticleRetention = 30;
+
 export interface UserPreferences {
   feedSortMode: FeedSortMode;
   feedCustomOrder: string[];
@@ -215,6 +237,12 @@ export interface UserPreferences {
    * above; `undefined` reads as true (the historical behaviour).
    */
   showArticleFeedIcons?: boolean;
+  /**
+   * Article retention period. Optional so rows synced from older clients
+   * still parse; `undefined` reads as the 30-day default, which is how an
+   * existing vault starts being purged on upgrade.
+   */
+  articleRetention?: ArticleRetention;
 }
 
 /** Baseline preferences used before hydration and for first-run defaults. */
@@ -233,6 +261,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   readerWidth: "medium",
   hideReadArticles: false,
   showArticleFeedIcons: true,
+  articleRetention: DEFAULT_ARTICLE_RETENTION,
 };
 
 export interface CreateArticleInput {
