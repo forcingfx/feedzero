@@ -39,6 +39,27 @@ describe("scanEnvReferences", () => {
     expect(scanEnvReferences(source)).toEqual(new Set(["REAL_CONFIG"]));
   });
 
+  it("excludes Vite's built-in constants, which no operator can set", () => {
+    // `import.meta.env.PROD` and friends are compiled in by Vite from the
+    // build mode. They are not deployment config, so asking for a spec
+    // entry would document a knob that does not exist.
+    const source = `
+      if (import.meta.env.PROD) {}
+      if (import.meta.env.DEV) {}
+      const mode = import.meta.env.MODE;
+      const base = import.meta.env.BASE_URL;
+      const ssr = import.meta.env.SSR;
+      const real = import.meta.env.VITE_REAL_CONFIG;
+    `;
+    expect(scanEnvReferences(source)).toEqual(new Set(["VITE_REAL_CONFIG"]));
+  });
+
+  it("still reports a server variable that shares a name with a Vite built-in", () => {
+    // Only the `import.meta.env` form is Vite's. `process.env.MODE` would
+    // be a real variable someone has to set.
+    expect(scanEnvReferences("const m = process.env.MODE;")).toEqual(new Set(["MODE"]));
+  });
+
   it("returns an empty set for source with no env references", () => {
     expect(scanEnvReferences("const x = 1;")).toEqual(new Set());
   });

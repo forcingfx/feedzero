@@ -20,6 +20,14 @@ const TOOLING_NAMES = new Set<string>([
 ]);
 
 /**
+ * Constants Vite compiles into `import.meta.env` from the build mode. No
+ * operator sets them, so they are not deployment config. Only the
+ * `import.meta.env` form is exempt: `process.env.MODE` would be a real
+ * variable.
+ */
+const VITE_BUILTIN_NAMES = new Set<string>(["MODE", "DEV", "PROD", "SSR", "BASE_URL"]);
+
+/**
  * Extract every env-variable name referenced from a source-code string.
  *
  * Recognises three reference forms used in the codebase:
@@ -36,7 +44,7 @@ export function scanEnvReferences(source: string): Set<string> {
   // doesn't fall through to the generic `env.NAME` rule.
   const importMetaPattern = /import\.meta\.env\.([A-Z][A-Z0-9_]*)/g;
   for (const match of source.matchAll(importMetaPattern)) {
-    found.add(match[1]);
+    if (!VITE_BUILTIN_NAMES.has(match[1])) found.add(match[1]);
   }
   // `process.env.NAME`
   const processPattern = /process\.env\.([A-Z][A-Z0-9_]*)/g;

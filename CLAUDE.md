@@ -2,6 +2,19 @@
 
 Guidance for Claude Code (claude.ai/code) working in this repository.
 
+## Overview
+
+FeedZero is a privacy-first RSS reader for people who need their reading kept private — journalists, activists, and people living under surveillance. Feeds are fetched through a proxy, sanitized, and stored encrypted in the browser; optional sync stores only an encrypted vault server-side.
+
+## Terminology
+
+- **RGR+S** — Red-Green-Refactor-Smoke, the mandatory change sequence in [Development Workflow](#development-workflow).
+- **Vault** — a user's encrypted sync blob, read and written through `/api/sync`.
+- **Three entry points** — the consumers of every API handler: `server.ts` (Hono), `vite.config.js` (dev), `api/*.ts` (Vercel).
+- **Tier matrix** — `src/core/features/tier-matrix.ts`, the single source of truth for which feature exists at which tier.
+- **Pin-test** — a test that freezes a product decision rather than a correctness property.
+- **Smoke test** — a `tests/smoke/` test that hits the live deployed system, run with `SMOKE_TESTS=1`.
+
 ## ⚠ Mandatory: Red-Green-Refactor
 
 **Every code change MUST follow the RGR cycle. No exceptions.**
@@ -28,7 +41,7 @@ Run a single test file: `npx vitest run <path/to/file>`.
 
 ## Architecture
 
-FeedZero is a privacy-first RSS reader. React + TypeScript UI, Zustand state, React Router, Tailwind CSS v4. Core modules (`src/core/`, `src/utils/`) are framework-agnostic TypeScript with zero React/UI imports — they are the shared backend.
+React + TypeScript UI, Zustand state, React Router, Tailwind CSS v4. Core modules (`src/core/`, `src/utils/`) are framework-agnostic TypeScript with zero React/UI imports — they are the shared backend.
 
 ### Runtime Dependencies
 
@@ -55,70 +68,24 @@ Three-tier strategy. See [docs/testing-strategy.md](docs/testing-strategy.md) fo
 
 **Tier 2 — Structural assertions (Vitest + RTL)**: Verify critical CSS classes (`overflow-hidden`, `min-h-0`, `h-svh`), ARIA, DOM composition. Catches regressions happy-dom can't see in computed styles.
 
-**Tier 3 — E2E (Playwright + Chromium)**: Two viewports (`desktop` 1280×720, `mobile` Pixel 5). `tests/e2e/`, dev server on port 3001. Feeds mocked via `page.route()` with `feed-fixtures.ts`. Onboarding bypassed via localStorage (`tests/e2e/fixtures.ts`). First-launch auto-subscribe to `https://feedzero.app/releases.xml` is best-effort (try/catch) so a network miss is silent.
+**Tier 3 — E2E (Playwright + Chromium)**: Two viewports (`desktop` 1280×720, `mobile` Pixel 5). `tests/e2e/`, dev server on port 3001. A third project, `offline`, runs `offline.spec.ts` against a production build on port 3002, because the dev server ships no service worker. Feeds mocked via `page.route()` with `feed-fixtures.ts`. Onboarding bypassed via localStorage (`tests/e2e/fixtures.ts`). First-launch auto-subscribe to `https://feedzero.app/releases.xml` is best-effort (try/catch) so a network miss is silent.
 
 **Coverage thresholds** (`npm run test:coverage`): Statements/Lines/Functions 90%; Branches 83%. Excluded: `src/workers/**`, `src/main.tsx`, `*.d.ts`, `src/types/**`, `src/core/extractor/adapters/types.ts`, `src/core/sync/types.ts`, `src/components/ui/**`.
 
-**Test behavior, not implementation**: Verify user-observable outcomes, not internal mechanisms.
+**Rules** — the rationale, good/bad examples, and the Playwright, happy-dom and Vitest gotchas are in [docs/testing-strategy.md](docs/testing-strategy.md#working-rules-and-gotchas). Read that section before writing or debugging tests.
 
-**Pin-tests must state their rationale.** A test that freezes a *product decision* (rather than a correctness property) has to say which trade-off it encodes, in a comment or the test name — because the next person to touch it is trying to decide whether reversing it is legitimate. `"badge hidden on mobile (max-md:hidden) to keep the row compact"` tells you exactly what you're giving up; `"orders dock favicons most-recently-viewed first"` tells you nothing and reads as load-bearing when it was a guess. The 2026-08 UX rounds reversed six such decisions; the annotated ones took seconds, the bare ones needed archaeology. Cost at write time: one line.
-- Bad: "toggleView sets viewMode to extracted" — only checks state change.
-- Good: "pressing E triggers content extraction" — verifies the user action.
-- If a user action has multiple code paths (click + keyboard), test both.
-
-**Store tests vs component tests**:
-- Store unit tests *may* assert on `getState()` — state is the store's observable output.
-- Component/page tests must NOT replace store methods with mocks and assert on mock calls. Use real store methods; assert on rendered UI, URL, or resulting store state.
-- Bad: `useFeedStore.setState({ selectFeed: mockSelectFeed }); expect(mockSelectFeed).toHaveBeenCalledWith("feed-1");`
-- Good: `renderPage("/feeds/feed-1"); expect(useFeedStore.getState().selectedFeedId).toBe("feed-1");`
-
-**Playwright gotchas**:
-- `transition-all` on interactive elements makes them "not stable". Use `transition-colors` or scoped properties; otherwise `{ force: true }` after confirming visibility.
-- Sidebar transitions `duration-200 ease-in-out`. Wait for `data-state` to change, not `waitForTimeout`.
-- Use `selectFeedInSidebar(page, name)` from `fixtures.ts` — it handles opening the sidebar on mobile.
-
-**happy-dom gotchas**:
-- happy-dom is a real resource loader: a `<link rel="stylesheet">` or `<iframe src>` in a fixture opens a socket to the URL. `vitest.config.js` disables CSS/JS file loading and iframe page loading (`environmentOptions.happyDOM.settings`), and `tests/environment/no-real-network.test.ts` pins it. A disabled iframe load still prints one `NotSupportedError` line per fixture; that is happy-dom's unconditional `console.error`, not a failure. Page code that calls `fetch` on mount still needs a stub in the test (`vi.stubGlobal("fetch", ...)`), or the request goes to `localhost:3000` and dies as an `ECONNREFUSED` trace that no assertion sees.
-- DOMPurify + happy-dom executes inline scripts during sanitization. Use non-callable fixtures (`var x = 1;`, not `alert(1)`).
-- CSS-escaped colons (`content\\:encoded`) may work in happy-dom but fail in browsers — always use `getElementsByTagName` for XML namespace-prefixed elements.
-- CDATA with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead.
-- `isContentEditable` may differ from browsers. Dispatch keyboard events from the target element, not `document`.
-- Radix `AlertDialog` renders curly quotes (`“`/`”`). Use flexible regex matchers.
-- happy-dom puts a stub `nodeName` getter on `Node.prototype` (returns `""`) and shadows the real one per subclass; browsers define it once on `Node.prototype` per WebIDL. DOMPurify ≥3.4.8 caches the Node-level getter (anti-clobbering hardening), so under unpatched happy-dom every tag name reads `""` and `<script>` can pass through **while `isSupported` stays `true`** — browsers are unaffected. `tests/setup.ts` shims `Node.prototype.nodeName` to delegate to the shadow getter. If sanitization tests ever fail en masse after a DOMPurify bump, suspect this class of environment-detection drift first and verify in a real browser before touching the library version.
-
-**Tier 2.5 — Smoke against real external services**: When a feature depends on external data (favicons, feeds, extraction), mocked tests alone are insufficient. Mocks encode your *belief* about what the service returns; if that belief is wrong, all mocked tests pass while the feature is broken (e.g. TechCrunch's `favicon.ico` is a 198-byte placeholder).
-- **Rule**: Before deploying a feature that fetches externally, `curl` the real endpoint and verify the response matches your fixtures.
-- For fallback chains (A → B → C), test that the *first* strategy works for the sites users care about, not just that the chain eventually produces *something*.
-
-**Tier 2.5 — Multi-layer caching**: Features with multiple cache layers (browser HTTP, localStorage, in-memory Map) need end-to-end invalidation tests. A unit test that clears one layer while another serves stale data is a false green.
-- **Rule**: New endpoints start with `Cache-Control: no-cache`. Add caching after the endpoint is verified in production.
-- **Rule**: A "clear cache" action must clear ALL layers — in-memory, localStorage, and browser HTTP (via hard-reload guidance or cache-busting query params).
-
-**Tier 1.5 — Contract tests (boundary verification)**:
-- Every client-server boundary needs a contract test that the client's request shape is accepted by the server's handler.
-- Routing contract tests in `server.test.ts` verify every Vercel wrapper (`api/*.ts`) exports a handler for every method the shared handler supports.
-- Integration contract tests verify `proxyFetch()` builds requests `handleProxyRequest()` can parse. Mock only the outbound external fetch, never the client/server boundary.
-- **Rule**: When a mock replaces a real function at a system boundary, a separate contract test must verify both sides agree on the interface.
-- **Mock at the boundary, not at the collaborator.** The boundary is the network, the filesystem, the system clock. `db.ts`, `key-manager.ts`, and the `sync-service` helpers are *internal collaborators* — mocking them lets the contract drift silently. Three SEV incidents (`2026-05-12`, `2026-05-14`, `2026-05-19`) shared a pattern: store logic green, store↔db contract broken. The 2026-05-19 incident report names it: "*The destroy cascade had a test that asserted `destroy` was called — verifying the bug as a feature.*" When you need to test a store mutator end-to-end, run it against the real `db.ts` via `fake-indexeddb` and mock only the network. Templates: `tests/integration/feed-store-db.test.ts`, `tests/integration/sync-store-db.test.ts`.
-
-**Vitest gotchas**:
-- **Vitest 4 mock lifecycle** (since #286): `vi.restoreAllMocks()` only restores spies created with `vi.spyOn`; it no longer touches `vi.fn()` mocks, so the module-factory `vi.fn().mockResolvedValue(...)` returns survive it (under vitest 3 they did not, which cost twenty-minute "unhandled rejection" hunts). The new trap is the inverse: `vi.spyOn(obj, "m")` on an already-spied method **returns the existing spy, call history included**, so a second test asserting `not.toHaveBeenCalled()` sees the first test's call. Restore each spy at the end of the test that created it (`spy.mockRestore()`), as `tests/stores/license-store.test.ts` does. Type a reusable mock variable as `Mock` (`import { type Mock } from "vitest"`), not `ReturnType<typeof vi.fn>`: a bare `vi.fn()` is now `Mock<Procedure | Constructable>` and no longer assigns to a concrete function type.
-- When asserting "this hook called `navigate()`", mock `useNavigate` directly rather than rendering a `<LocationProbe>` and reading `useLocation()` from a module-level variable. `renderHook` doesn't flush the route-driven re-render synchronously, so the probe captures stale state. react-router 8 is ESM-only, so `vi.spyOn(ReactRouter, "useNavigate")` throws (`Module namespace is not configurable`); partial-mock instead: `const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }));` then `vi.mock("react-router", async (importOriginal) => ({ ...(await importOriginal<typeof import("react-router")>()), useNavigate: () => navigateSpy }))`, and `expect(navigateSpy).toHaveBeenCalledWith("/feeds/b")` in the assertion. Templates: `tests/hooks/use-keyboard-nav.test.tsx`, `tests/components/command-palette/command-palette.test.tsx`.
+- **Test behavior, not implementation**: assert user-observable outcomes, not internal mechanisms. If a user action has multiple code paths (click + keyboard), test both.
+- **Pin-tests must state their rationale**: a test that freezes a *product decision* names the trade-off it encodes, in a comment or the test name.
+- **Component/page tests must NOT replace store methods with mocks** and assert on mock calls. Use real store methods; assert on rendered UI, URL, or resulting store state.
+- **Mock at the boundary, not at the collaborator.** The boundary is the network, the filesystem, the system clock. Never mock `db.ts`, `key-manager.ts`, or the `sync-service` helpers; run store mutators against the real `db.ts` via `fake-indexeddb`. Templates: `tests/integration/feed-store-db.test.ts`, `tests/integration/sync-store-db.test.ts`.
+- **Every client-server boundary needs a contract test.** When a mock replaces a real function at a system boundary, a separate contract test must verify both sides agree on the interface.
+- **Smoke external services**: before deploying a feature that fetches externally, `curl` the real endpoint and verify the response matches your fixtures.
+- **Caching**: new endpoints start with `Cache-Control: no-cache`; a "clear cache" action must clear ALL layers — in-memory, localStorage, and browser HTTP.
+- **Unit tests stay off the network**: page code that calls `fetch` on mount needs `vi.stubGlobal("fetch", ...)` in its test.
 
 ### App Initialization Flow
 
-`src/app.tsx` orchestrates startup via `AppInit`:
-
-1. `checkOnboardingStatus()` reads `feedzero:onboarding-complete` from localStorage.
-2. **New users**: `<OnboardingModal>` renders (outside `<BrowserRouter>`, always mounted). The onboarding store drives steps.
-3. **Returning users**: `initializeReturningUser()` in `app-store.ts`:
-   - Tries `loadStoredKeys()` first — if derived keys exist, uses `openWithKeys()` (no passphrase needed).
-   - Falls back to passphrase from localStorage for legacy users (auto-migrates: derives keys, stores them, removes raw passphrase).
-   - Local-only users without stored keys: error (requires re-onboarding).
-   - Sync users: reconstructs `SyncCredentials` from stored vault ID + JWK, pulls vault.
-4. Once `isDbReady`, routes render.
-
-`<OnboardingModal>` and `<SyncSetupDialog>` mount at the top level alongside `<BrowserRouter>`, not inside routes.
+`src/app.tsx` orchestrates startup via `AppInit`: new users get `<OnboardingModal>`; returning users go through `initializeReturningUser()` in `app-store.ts` (stored derived keys first, legacy passphrase fallback, vault pull for sync users); routes render once `isDbReady`. `<OnboardingModal>` and `<SyncSetupDialog>` mount at the top level alongside `<BrowserRouter>`, not inside routes. Step-by-step: [docs/architecture.md](docs/architecture.md#app-initialization-flow).
 
 ### CORS Proxy, Sync API & Server
 
@@ -132,9 +99,11 @@ All API handlers use the Web standard `Request → Response` pattern via shared 
 
 **Endpoints**: `POST /api/feed` `{url}` (feed proxy), `POST /api/page` `{url}` (page proxy), `/api/sync` (GET/PUT/DELETE/HEAD encrypted vault), `GET /api/icon` (favicon proxy), `POST /api/feedback` (→ GitHub issue, requires `GITHUB_FEEDBACK_TOKEN` + `GITHUB_REPO`), `GET /api/stats-sync`.
 
-**SSRF protections** — Proxy blocks internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http`/`https`. Do not weaken these.
-
 **Sync storage** — Pluggable `SyncStorageAdapter`. Default: filesystem (`SYNC_STORAGE=filesystem`). Vercel: `SYNC_STORAGE=vercel-blob` + `BLOB_READ_WRITE_TOKEN`. Dev: memory.
+
+### Security boundaries
+
+SSRF protections — Proxy blocks internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http`/`https`. Do not weaken these.
 
 ### Deployment
 
@@ -164,14 +133,9 @@ This project follows **Red-Green-Refactor-Smoke (RGR+S)**. Every change follows 
 
 ## Shipping: verify the outcome, not the action
 
-**A command exiting 0 is not evidence that the thing you wanted is true.**
-Every failure of the 2026-09-05 pricing cutover lived in that gap: `git push`
-succeeded, `gh pr merge` succeeded, `tsc` was green — and the landing site
-served stale pricing for an hour because none of those facts were the fact
-that mattered.
+**A command exiting 0 is not evidence that the thing you wanted is true.** Every failure of the 2026-09-05 pricing cutover lived in that gap: `git push` succeeded, `gh pr merge` succeeded, `tsc` was green — and the landing site served stale pricing for an hour because none of those facts were the fact that mattered.
 
-⛔ **Never report a change as shipped until you have observed it in the
-deployed system.** Not the PR state, not the merge commit, not the CI badge.
+⛔ **Never report a change as shipped until you have observed it in the deployed system.** Not the PR state, not the merge commit, not the CI badge.
 
 | Change | The assertion that closes it |
 | --- | --- |
@@ -183,63 +147,24 @@ deployed system.** Not the PR state, not the merge commit, not the CI badge.
 
 ### Repos and remotes
 
-- **`git remote -v` in full. Never `| head`.** Both repos carried a stale
-  `gitlab` remote for four months after the 2026-05-09 move to GitHub. A
-  landing change was pushed and merged there — a remote nothing deploys from.
-  The same applies to any command whose answer depends on seeing every line.
-- **`feedzero.app` (landing) does not auto-deploy on push** unless the commit
-  author email is one Vercel can resolve to a Git account. Use the account's
-  GitHub noreply address; a personal address Vercel cannot match makes the
-  deploy silently not happen. After pushing landing, confirm the live page.
+- **`git remote -v` in full. Never `| head`.** Both repos carried a stale `gitlab` remote for four months after the 2026-05-09 move to GitHub. A landing change was pushed and merged there — a remote nothing deploys from. The same applies to any command whose answer depends on seeing every line.
+- **`feedzero.app` (landing) does not auto-deploy on push** unless the commit author email is one Vercel can resolve to a Git account. Use the account's GitHub noreply address; a personal address Vercel cannot match makes the deploy silently not happen. After pushing landing, confirm the live page.
 
 ### Pull requests
 
-- **Sequential PRs off `main`. Never stacked.** This repo squash-merges, which
-  deletes the base branch, auto-closes any PR stacked on it, and GitHub then
-  refuses to reopen it once the head has been force-pushed. Land one, rebase
-  the next onto `main`, open it then.
-- **Open the PR yourself once the change is stable. Do not ask first.** This
-  is the owner's standing request, so it counts as the explicit ask that
-  agent harnesses otherwise wait for. Stable means: the RGR cycle is done,
-  `npm test` and `npx tsc --noEmit` are green, the E2E specs the change
-  touches pass (or fail identically on `main`), and the branch is pushed.
-  Fill in `.github/pull_request_template.md` and leave unchecked, in plain
-  words, anything only a human can do (the real-device check of step 8).
-  This covers opening only: merging stays with the owner, and a change
-  still mid-cycle gets no PR.
+- **Sequential PRs off `main`. Never stacked.** This repo squash-merges, which deletes the base branch, auto-closes any PR stacked on it, and GitHub then refuses to reopen it once the head has been force-pushed. Land one, rebase the next onto `main`, open it then.
+- **Open the PR yourself once the change is stable. Do not ask first.** This is the owner's standing request, so it counts as the explicit ask that agent harnesses otherwise wait for. Stable means: the RGR cycle is done, `npm test` and `npx tsc --noEmit` are green, the E2E specs the change touches pass (or fail identically on `main`), and the branch is pushed. Fill in `.github/pull_request_template.md` and leave unchecked, in plain words, anything only a human can do (the real-device check of step 8). This covers opening only: merging stays with the owner, and a change still mid-cycle gets no PR.
 
 ### Scripts and one-off tooling
 
-- **Never hand over an executable you have not executed.** `scripts/` is
-  type-checked by `tsconfig.scripts.json` (`npm run typecheck` covers both
-  projects) precisely because `find-license.ts` shipped in PR #106 importing a
-  path that has never existed, and crashed on startup for months. Type-clean is
-  still not "runs" — run it.
-- **Rehearse every live third-party write against that provider's test mode
-  first.** The annual-plan migration was rejected twice by Stripe — nulls, then
-  nulls nested inside `discounts` — on payloads that passed every unit test,
-  because the fixtures were the documentation's minimal shape rather than what
-  the API returns. A test-mode subscription carrying a coupon and metadata
-  found both before a customer did. See
-  `docs/operations/annual-plan-migration.md`.
+- **Never hand over an executable you have not executed.** `scripts/` is type-checked by `tsconfig.scripts.json` (`npm run typecheck` covers both projects) precisely because `find-license.ts` shipped in PR #106 importing a path that has never existed, and crashed on startup for months. Type-clean is still not "runs" — run it.
+- **Rehearse every live third-party write against that provider's test mode first.** The annual-plan migration was rejected twice by Stripe — nulls, then nulls nested inside `discounts` — on payloads that passed every unit test, because the fixtures were the documentation's minimal shape rather than what the API returns. A test-mode subscription carrying a coupon and metadata found both before a customer did. See `docs/operations/annual-plan-migration.md`.
 
 ## Smoke tests
 
-Smoke tests in `tests/smoke/` run only when `SMOKE_TESTS=1`. They are **not** part of `npm test`.
+Smoke tests in `tests/smoke/` run only when `SMOKE_TESTS=1`; they are **not** part of `npm test`. They hit real production URLs (`https://my.feedzero.app/api/*`) via `fetch`, honor `SMOKE_BASE_URL` for staging / preview environments, and assert system-level invariants the unit suite can't check. They must tolerate their own side effects (wait out a rate-limit window before asserting normal traffic works).
 
-They:
-- Hit real production URLs (`https://my.feedzero.app/api/*`) via `fetch`.
-- Assert system-level invariants the unit suite can't check: "adapter X resolves to Upstash in prod", "rate limit 429s appear after N requests", "vault PUT then GET returns the same bytes against the real backend".
-- Are tolerant of side effects: a test that exhausts a rate-limit bucket must wait for the window to reset before asserting "normal traffic works".
-- Honor `SMOKE_BASE_URL` for staging / preview environments.
-
-What NOT to assert:
-- Unit-level behavior (function returns X for Y) — RED's job.
-- UI rendering — Playwright's job.
-- Per-user state — smoke tests are stateless and parallelizable.
-- Anything that would log raw IPs, user emails, license tokens, or vault ciphertext. Same anonymity floor as production logs.
-
-Reference: `tests/smoke/release-feed.test.ts`, `tests/smoke/rate-limiter.test.ts`.
+Do NOT assert unit-level behavior, UI rendering, or per-user state in a smoke test, and never log raw IPs, user emails, license tokens, or vault ciphertext — same anonymity floor as production logs. Details and examples: [docs/testing-strategy.md](docs/testing-strategy.md#tier-4--smoke-tests). Reference: `tests/smoke/release-feed.test.ts`, `tests/smoke/rate-limiter.test.ts`.
 
 ## Gesture work
 
@@ -259,23 +184,7 @@ Touch gestures have **three arbiters**, and you only get what the other two cede
 
 ## Auditing the codebase
 
-When asked to "level up the codebase," "review and find what to fix," or similar open-ended improvement requests:
-
-1. **Map first. Do not edit.** Read the territory before proposing anything. Useful one-shot signals:
-   - `git log --since='6 months ago' --pretty=format: --name-only | grep -v '^$' | sort | uniq -c | sort -rn | head -25` — churn hotspots; the file changed most often is usually where bugs concentrate.
-   - `find src -name '*.ts' -o -name '*.tsx' | xargs wc -l | sort -rn | head -30` — file size outliers; a low-churn big file is fine, a high-churn big file is the next refactor.
-   - `grep -rl 'vi.mock("@/core/storage/db.ts"' tests/stores/` — store tests that mock the boundary they should verify (see the contract-tests rule above).
-   - `grep -rln 'from "@/components"' src/core src/stores` — boundary violations (core/stores importing UI). Must be empty.
-   - `find docs/incidents -type f` — known fragile zones; the next bug is usually adjacent to the last one.
-   - Commit-fix ratio over the last quarter: `git log --since='3 months ago' --pretty=format:'%s' | grep -ciE '^(fix|hotfix|revert)'` divided by total commits. >25% is a smell.
-
-2. **Write a short ranked memo before any code.** Three to seven findings. Each one: what costs, what buys, why now. Not an essay — one paragraph per finding. The memo is the spec the user approves before any commit. Refuse a finding if you cannot answer at least two of: "removes a class of bug? removes a class of confusion? unblocks future speed?"
-
-3. **Ship one commit per finding.** Smallest-risk first, so a surprise on a harder finding does not block the easier ones. Every commit is type-clean, test-green, and self-contained. The branch is the audit; the commits are the findings; the PR description maps commits ↔ findings.
-
-4. **Refuse to rewrite working modules because their style offends you.** A 889-line file with zero recent bugs and zero recent churn is not a target. The same file when you are about to invest in three new additions is. (See "Split a big file when the next investment is committed.")
-
-5. **For larger users of the audit pattern** — when the user accepts the full memo and asks you to "ship all findings" — be explicit about the trade-off vs. one-PR-per-finding. State up front that you will land one branch with one commit per finding so each is reviewable independently, and recommend the user split for serious follow-ups.
+For open-ended improvement requests ("level up the codebase", "review and find what to fix"), follow [docs/operations/audit-lap.md](docs/operations/audit-lap.md#open-ended-audit-requests). In short: map first and do not edit; write a ranked memo of three to seven findings before any code, and get it approved; ship one commit per finding, smallest-risk first; refuse to rewrite working modules because their style offends you.
 
 ## Commit Messages
 
@@ -312,39 +221,14 @@ The 2026-05-16 deeplink-hotfix incident proved that "I'll just stash and switch 
 - `git checkout <ref>` of any kind when you have uncommitted work — same failure mode as above.
 - Run a hotfix and a feature in the same working tree by switching between branches.
 
-**Worktree command recipe:**
-
-```bash
-# Create — always from origin/main unless explicitly told otherwise
-git -C ~/builder/feedzero worktree add ~/builder/feedzero-wt-<slug> -b <branch-name> origin/main
-
-# Work
-cd ~/builder/feedzero-wt-<slug>
-# … RGR cycles, commits, push, PR …
-
-# Tear down after merge (or after explicit user say-so)
-git -C ~/builder/feedzero worktree remove ~/builder/feedzero-wt-<slug>
-git -C ~/builder/feedzero branch -D <branch-name>   # if not auto-deleted by gh
-```
-
-Naming: `<slug>` is a 2–3 word kebab-case description of the work — `deeplink-fix`, `paid-tier-gating`, `release-cut`. No timestamps; the branch name carries the lifecycle.
-
-**`node_modules` cost:** Each worktree needs `node_modules` for dev/test. For short-lived hotfixes that only need `npx tsc --noEmit` and targeted `npx vitest run <path>`, skip `npm install` — vitest and tsc resolve from the symlinked `node_modules`:
-
-```bash
-ln -s ~/builder/feedzero/node_modules ~/builder/feedzero-wt-<slug>/node_modules
-```
-
-For worktrees that need a dev server (`npm run dev`), run `npm install` in the worktree (symlink can fail on some toolchains that resolve `realpath`).
-
-**Announce the worktree decision:** Before running `worktree add`, state the trigger and the slug ("Triggering rule 1 — uncommitted changes in main tree. Creating `feedzero-wt-deeplink-fix`."). The user can redirect if they prefer a different layout.
+**Create** — always from `origin/main` unless explicitly told otherwise: `git -C ~/builder/feedzero worktree add ~/builder/feedzero-wt-<slug> -b <branch-name> origin/main`, where `<slug>` is a 2–3 word kebab-case description of the work. **Announce the decision first**: state the trigger and the slug before running `worktree add`. Teardown, the `node_modules` symlink shortcut, and when to run `npm install` instead are in [docs/operations/worktrees.md](docs/operations/worktrees.md).
 
 ### Other multi-agent rules
 
 - **Commit after every successful GREEN.** Small conventional commits; never batch unrelated RGR cycles. The reflog survives `reset --hard` for ~90 days; uncommitted work survives nothing.
 - **Before any destructive git op** (`reset --hard`, `clean -fd`, `checkout .`, `stash drop`, force-push, branch delete): run `git status` and describe what you see. If there are modifications you did not author, stop and ask. Default to preserve, not clear.
 - **Delegated subagents always isolate.** Pass `isolation: "worktree"` to the Agent tool for any task that touches the codebase. The runtime auto-creates and cleans up.
-- **Releases are one PR in this repo.** `release-notes.mjs` here is the source of truth; `scripts/release/build-feed.mjs` emits `public/releases.xml` during the build, and landing *rewrites* `feedzero.app/releases.xml` to `my.feedzero.app/releases.xml` so the public URL and every entry id are unchanged for subscribers. The notes entry and the version bump land in the same commit, so there is no ordering to get right and nothing to poll — the landing-first rule this replaced cost the 0.13.0 release a polling loop, a preflight guard, and a window where the two repos disagreed. Landing's homepage accordion renders from its own `releases.mjs` mirror; it is not on the release path, and a stale accordion corrects itself on landing's next deploy without ever affecting the feed. **Never** re-add a static `releases.xml` to landing: Vercel matches the filesystem before rewrites, so the file would shadow the real feed.
+- **Releases are one PR in this repo.** `release-notes.mjs` here is the source of truth; `scripts/release/build-feed.mjs` emits `public/releases.xml` during the build, and landing *rewrites* `feedzero.app/releases.xml` to `my.feedzero.app/releases.xml` so the public URL and every entry id are unchanged for subscribers. The notes entry and the version bump land in the same commit, so there is no ordering to get right and nothing to poll — the landing-first rule this replaced cost the 0.13.0 release a polling loop, a preflight guard, and a window where the two repos disagreed. Landing's homepage (version string and accordion) is built from `my.feedzero.app/releases.json` at landing's deploy time; it never affects the feed, but it stays on the previous release until landing is redeployed, which is the last step of `/release`. **Never** re-add a static `releases.xml` to landing: Vercel matches the filesystem before rewrites, so the file would shadow the real feed.
 - **Don't touch code you didn't author.** If `git status` shows files modified by another agent or pre-existing user WIP: don't stage, don't revert, don't include in your commits.
 - **When splitting one uncommitted tree across multiple commits**, prefer `git add -p`. Create a safety stash (`git stash push -u && git stash apply`) first — but if the rules above triggered, use a worktree instead, not a stash split.
 - **Stacked PRs + squash merges: retarget before merging the upper PR.** When PR B stacks on PR A's branch and A squash-merges into main, A's branch is dead — its history never reaches main. Merging B into that branch strands B's entire diff silently (the 2026-08-02 batch-2 incident: 1.7k lines marked "merged" that never landed; rescued by #245). Rule: after the lower PR merges, retarget the upper PR's base to main and let its checks re-run BEFORE merging it. Never merge a PR whose base is not main unless you are deliberately extending a still-open stack. The merge queue only accepts main-based PRs, which enforces this structurally.
@@ -367,65 +251,38 @@ FeedZero exists to protect its users — journalists, activists, and people livi
 
 ### Clean Code rules
 
-Working code-review checklist (adapted from [Lukaszuk's clean-code summary](https://gist.github.com/wojteklu/73c6914cc446146b8b533c0988cf8d29) of Martin's *Clean Code*).
-
-**General** — Follow surrounding-code conventions. Keep it simple. Boy Scout Rule (leave files cleaner). Always find the root cause; a symptom-fix that doesn't explain the symptom is a bug waiting to recur.
-
-**Design** — Push configurable data to high levels. Prefer polymorphism / dispatch tables to long `if/else` or `switch`; state machines live in dedicated modules. Use dependency injection over globals/singletons. Law of Demeter — no `a.b().c().d()` chains. Don't over-configure; flags and toggles are debt. When N call sites repeat the same M-step dance, extract a helper — the win is not LOC, it's making intentional omissions visible (see the Key Patterns rule). When a single component branches on `pathname` for more than two routes, you are writing a router by hand — use the router instead.
-
-**Names** — Descriptive, unambiguous, pronounceable, searchable. `i`/`j`/`tmp` only in tight obvious loops. Replace magic numbers with named constants. Meaningful distinctions (`userInfo` vs `userData` is a smell). No type-encoding prefixes (`strName`, `IUser`).
-
-**Functions** — Small (one screen max — extract). Do one thing — the name describes it fully. Fewer arguments (three is plenty; five is a refactor). No side effects beyond what the name says. No flag arguments — split into two functions.
-
-**Comments** — Explain in code first (rename, extract, restructure). Don't repeat what code says. Delete commented-out code — git remembers. Use comments for *why*: hidden constraints, surprising trade-offs, bug references.
-
-**Structure** — Vertical blank lines separate concepts; related code stays vertically dense. Declare variables close to use. Callees below callers (top-down readability). Short lines. Don't horizontally align `=` or types.
-
-**Objects and data structures** — Hide internal structure; don't return mutable references that callers mutate. Prefer plain TypeScript types for transport between modules; reserve classes for behavior with invariants. Small, few fields, single responsibility. Composition over inheritance.
-
-**Tests** — One logical assertion per test (multiple `expect()` for one assertion is fine). Readable (a worked example of how to use the unit). Independent. Repeatable (no clocks, unseeded random, or external network in unit tests). Fast — the full suite is ~9s; keep it that way.
-
-**Code smells vocabulary** — Rigidity (small change cascades), Fragility (change here breaks unrelated there), Immobility (can't reuse, tangled in context), Needless complexity (anticipated requirements that never came), Needless repetition (copy-paste instead of extraction), Opacity (intent unclear at a glance).
+The working code-review checklist — general, design, names, functions, comments, structure, objects and data structures, tests, and the code-smell vocabulary — is in [docs/clean-code.md](docs/clean-code.md). Apply it whenever you review or refactor.
 
 ### Key Patterns
+
+One-line rules. The rationale, incident history and code templates for each are in [docs/key-patterns.md](docs/key-patterns.md) — read the matching entry before touching that area.
 
 - All core functions return `Result<T>` — never throw for expected errors.
 - UI components are functional React with hooks — no classes.
 - State lives in Zustand stores — components subscribe to slices.
 - URL is the source of truth for navigation state.
-- Core modules have zero React/UI imports — they are the shared backend.
+- Core (`src/core/`) and stores (`src/stores/`) have zero React/UI imports and never import from `src/components/`.
 - Sanitization delegated to DOMPurify — `dangerouslySetInnerHTML` only for pre-sanitized content.
 - TypeScript strict — no `any` except in type declarations for untyped libs.
 - IndexedDB stores encrypted content + HMAC-hashed index fields (no plaintext metadata exposed).
-- Feed detection tries JSON parse first (JSON Feed), then XML (RSS/Atom).
-- XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector`.
-- **Key-data coupling invariant**: Stored derived keys (`feedzero:derived-keys` in localStorage) must always decrypt local IndexedDB data. Only two operations may break this coupling: `open(passphrase)` (derives fresh keys + re-opens DB) and `importAll()` (clears + re-encrypts all data). Any operation that modifies stored keys without re-encrypting data, or re-encrypts data without updating stored keys, is a bug. When transitioning between sync modes, use `exportCurrentKeys()` to persist the in-memory keys rather than deriving new ones.
-- **Quality-first fallback chains**: When a feature has multiple strategies (e.g., favicon: smart resolver → well-known paths → third-party), put the highest-quality source first, not the fastest. A fast bad result that gets cached is worse than a slow good result. Client and server must agree on quality thresholds — or only one layer should validate. A dumb proxy that passes through garbage defeats a smart resolver running after it.
-- **Trace the full request path before deploying**: For any feature spanning client → server → external → response → cache → render, trace every step with real data. Mocked tests prove logic; only end-to-end traces prove the system works. Ask: (1) what does the external service actually return? (2) which cache stores it first? (3) does the cached result survive the user's "clear/retry"?
-- **Core modules must not import from UI components.** Stores (`src/stores/`) and core (`src/core/`) are the shared backend; they must never import from `src/components/`. If a store needs a UI side effect, use an event, a shared utility in `src/utils/`/`src/core/`, or let the UI react to store state changes.
-- **Pull-before-mutate invariant**: Any flow that reads remote state and then modifies local state must fetch the remote data **before** any destructive local op (`deleteDatabase`, `tryDeleteServerVault`). The recovery flow calls `pullVault()` first, then `initFresh(skipServerCleanup: true)`. Otherwise you destroy the vault you're trying to recover. Workflows with destructive + read operations on shared remote state need integration tests; mocked unit tests can't catch temporal coupling across module boundaries.
-- **No-auto-destroy invariant**: No automated code path may delete server-side vault data. `destroy()` (`src/core/storage/key-manager.ts`) has exactly one sanctioned caller — `useAppStore.getState().resetApp`, which must be invoked from an explicit user-confirmation UI (the "Wipe and start over" `<AlertDialog>` on `InvalidKeysScreen` or the equivalent Settings reset). Boot-time canary failures route to `recoveryMode: "invalid-keys"` instead of `destroy()`. Issue #117 root-caused a chain of silent vault deletion to a boot-time auto-destroy cascade; ADR 018 is the durable rule. The runtime check `assertKeyDataCoupling()` is called at the end of every key-touching flow (`initFresh`, `applyCloudVault`, `restore`) to enforce the key-data coupling invariant mechanically rather than by convention.
-- **API handlers answer JSON on every path; clients never treat an unparseable body as a network error.** A handler that throws returns no response, so the platform substitutes an HTML error page — and a client calling `res.json()` in the same `try` as its `fetch` reports that server crash as a *connection* failure, hiding the status code that identifies the real layer. Narrow untrusted payload fields to their expected type (`readTrimmedString` in `src/core/feedback/feedback-handler.ts`) instead of reaching for `.trim()` on whatever `JSON.parse` returned — `null`, arrays, and `{"message": 42}` are all valid JSON. On the client, only a rejected `fetch` may say "check your connection"; every answered request reports the server's own `error`, falling back to the status code (`submitFeedback` in `src/components/feedback/feedback-dialog.tsx`).
-- **Shared mutable headers leak Content-Length**: `@hono/node-server` mutates the `headers` record passed to `new Response(body, { headers })` by appending the computed `Content-Length`. A `const HEADERS = {...}` shared across responses lets a small response's `Content-Length` leak into a large response's headers, truncating the body at the receiver. The shared-state pattern is now a code-review smell — see `apiHeaders()` in `src/core/sync/sync-handler.ts` for the correct pattern (function returning a fresh object per call). This was the proximate cause of issue #117's `JSON.parse: unterminated string` reports.
-- **An offline copy lives exactly as long as something would re-fetch it.** `Article.extractedContent` is what makes a vault large, and for one release nothing in the app released it: `toggleStar` kept it, the prefetch toggle only stopped new fetches, and the sync size error told users to do both. `src/core/storage/release-offline-content.ts` owns the rule now — a copy is kept while the article is starred or its feed has `prefetchEnabled`, and released otherwise. Unstarring releases; "Free up space" in Settings sweeps the orphans. Do NOT clear a starred article's copy: the prefetch service re-downloads it on the next refresh, so the space comes back and all you bought was churn. Any user-facing copy naming a remedy for a full vault must name one of these two levers, and the tests assert the wording, because advice that frees zero bytes is worse than no advice. See ADR 032.
-- **Retention deletes at purge AND refuses at ingest.** `purgeExpiredArticles` (`src/core/storage/article-retention.ts`) removes unstarred articles older than the vault's period, but refresh dedupes against stored rows only, so a purged article still in the publisher's feed would come straight back as new and unread. Every ingest path (`refreshFeed`, `addFeedFlow`, `reloadFeed`) therefore filters new items through `admitsOnIngest`: dated items by age, undated ones (whose date is "first seen", so they always look new) by the feed's `retiredGuids` tombstones. A new ingest path that skips this check reintroduces the zombie. The purge runs at the tail of every refresh and spares the article open in the reader. See `docs/features/025-article-retention.md`.
-- **Operational logging has two doors, and neither takes identities.** `logError` (console.error) is for ops-actionable failures; `logEvent` (console.log) is for routine samples like vault size, so a line per push does not inflate the error log on-call reads. Both enforce the same privacy floor the same way: the TypeScript interface IS the allow-list, plus a defensive runtime field-pick that survives a caller reaching for `any`. Sizes are logged as power-of-two buckets, never exact bytes, and nothing ties a line to a vault — "are vaults trending toward the ceiling" is answerable, "how big is this person's vault" is not, and that is the line. See ADR 032.
-- **Sync push bodies are gzipped in transit, and the padding alphabet is load-bearing.** The vault is compressed before encryption, so the ciphertext is incompressible — but base64'ing it into JSON spends 8 bits to carry 6, and that third of every push is what `encodePushBody` (`src/core/sync/vault-transport.ts`) puts back. Compression is transport-only: the handler decompresses before storing, so the stored bytes, the ETag and every GET are unchanged and an older client still pulls. Two things are easy to break here. (1) The signal is a custom header (`x-feedzero-body-encoding`), never `Content-Encoding: gzip`, because the latter instructs every proxy in the path and no sandbox can test whether the platform decompresses first. (2) `padPayload` buckets to powers of two to hide vault size from a traffic observer, and an observer now measures the *compressed* length — so the pad must compress at the ciphertext's ratio. Random hex compresses to 0.54, base64 to 0.75; a hex pad would keep passing its tests while protecting nobody. Pad with base64. Decoding is capped at `MAX_VAULT_SIZE` or accepting compressed bodies hands any client a memory-exhaustion primitive. And any code converting a Node request into a Web `Request` must pass the body through as bytes, never `Buffer.toString()` — the dev proxy decoded bodies as UTF-8, which is invisible for JSON and shreds a gzip stream, so only `npm run dev` and E2E broke. See ADR 031.
-- **Dexie's transaction zone is ambient, so every db operation states where it is.** Dexie resolves `Table._trans` as `this._tx || PSD.trans`, and that zone follows promise continuations into code that never asked for it: a read that happens to resume while `importAll`'s transaction is running joins it, the transaction commits during the read's `await crypto.subtle…`, and the read dies on a finished transaction (`UnknownError: Attempt to get records from database without an in-progress transaction` in Firefox, `TransactionInactiveError` under fake-indexeddb). The casualty is never the transaction's owner, which is why it reads as a random sync failure. Every call in `db.ts` therefore goes through `ctx.op((db) => …)` (`ownTransaction` in `src/core/storage/dexie-zone.ts`); the only exception is `replaceTablesAtomically`, whose calls belong to the transaction it opens. `tests/core/storage/db-zone-discipline.test.ts` fails the build if a new db function reaches for `ctx.db` instead. See ADR 030.
-- **Test-only adapters are branded; resolvers refuse them in production.** Every in-memory adapter (`createMemoryAdapter`, `createMemoryCatalogAdapter`, `MemoryLicenseStorage`, `MemorySeenEventStore`) is branded via `markTestOnly()` from `src/core/test-only-brand.ts`. The four resolvers call `assertNotTestOnlyInProduction()` at the point they hand the adapter back; a misconfigured production deploy throws at module-load instead of silently routing writes to a per-cold-start `Map`. New backends MUST follow the same pattern: brand the memory implementation, guard the fallthrough in the resolver. Without this, the next "credential silently missing → adapter silently swapped" incident reads exactly like the 2026-05-12 sync regression and the 2026-05-14 stats-always-zero one.
-- **Feature gating is honor-system open-core**: Client-side tier gates live in `src/core/features/feature-gates.ts` and consume tier from `useLicenseStore` (`src/stores/license-store.ts`). React components call `useFeatureGate(feature)`; store actions call `enforceFeature(feature)` / `isFeatureEnabled(feature)` from `src/stores/enforce-feature.ts` for defense-in-depth. Self-hosters bypass via `VITE_SELF_HOSTED=1` at build time. Coming-soon features stay locked regardless. See ADR 012.
-- **Gate every gated capability at BOTH layers, with matrix-derived copy.** A gated feature must be enforced in the store (so a programmatic caller can't bypass it) AND surfaced in the UI (so the user sees why). Never hardcode upgrade copy — it all derives from the matrix: `gateToast(feature)` (store toasts), `useFeatureGate(feature)` exposes `featureName` / `requiredTierLabel` / `description` (UI). Reusable UI primitives: `<UpgradeSplash feature />` (full-page lock, e.g. `/signal`), `<TierLockBadge feature />` (inline lock pill next to a control, e.g. the prefetch toggle), and route-to-upgrade handlers (`gate.enabled ? doThing() : gate.promptUpgrade()`, e.g. the rules editor entry). Renaming a feature or moving it between tiers in the matrix flows through every toast, splash, and badge with zero string edits — `tests/core/features/gate-messaging.test.ts` locks this. A silent dead control (toggle that persists but does nothing for free users) is the anti-pattern this replaced.
-- **Price copy has one home**: `src/core/features/pricing.ts` exports `PAID_PLAN` (amount, period, display string, trial days). Every price surface renders `PAID_PLAN.display` and the Stripe checkout handler reads `PAID_PLAN.trialDays` — never a literal. The amount previously lived in eight unpinned JSX literals, which is how a `$19/month` Pro price outlived every other surface saying "Coming 2026". `tests/core/features/pricing.test.ts` pins it. See ADR 029.
-- **`Tier` is narrower than `LicenseTier`**: the wire type in `src/core/license/format.ts` still carries `"pro"` because signed tokens minted before ADR 029 do; the app-facing `Tier` from the matrix does not. `normalizeTier` maps between them and MUST be applied at every boundary reading a tier from outside the app — the local token decode, the server verify echo, and Stripe price metadata. Dropping it downgrades a paying customer to Free.
-- **Canonical tier matrix**: `src/core/features/tier-matrix.ts` is the single source of truth for which features exist at which tier and with what scope/limit. `feature-gates.ts` (binary capability), `quotas.ts` (continuous limit, e.g. `FREE_FEED_LIMIT`), the gate messaging (`gateToast`/`featureName`/`requiredTierLabel`), AND the pricing cards all derive from it — never hand-edit those for tier changes; edit the matrix. The human-readable view at `docs/tier-matrix.md` regenerates via `npm run docs:tier-matrix` (`-- --check` is the staleness guard).
-- **Pricing cards derive from the matrix too**: an entry's optional `marketing: { blurb, rank }` opts the feature into the pricing grid; `pricingBullets(tier)` returns the bullets for the card matching the feature's lowest unlock tier, ordered by `rank`. Re-tiering a feature moves its bullet to the right card with zero edits to `subscription-upgrade.tsx` / `subscription-tab.tsx` — they render structural lead bullets ("Everything in Free", "Unlimited feeds") then `pricingBullets(tier)`. A feature with no `marketing` field never appears (e.g. `rules` is deliberately omitted), and only `shipped` features carry one — with a single paid card, a coming-soon bullet would sit beside shipped ones with nothing to distinguish it. `tests/core/features/pricing-bullets.test.ts` locks placement + ordering.
-- **Honor-system gating is the right shape when server enforcement would require telemetry.** The privacy principles (process on device, encrypt at rest with keys the operator cannot read, no behavioural analytics) make per-user metering a contradiction. A determined bypass is functionally self-hosting, which the product already endorses. Document the trade-off in the gate's JSDoc — `src/core/features/quotas.ts` lines 9–13 is the model. Do not add server-side gates unless the value at stake justifies storing the metric server-side and you can name the privacy cost honestly in an ADR.
-- **Route-by-router, not route-by-flag.** When a single page component keeps growing flag branches (`isExplorePage`, `isStatsPage`, `isSettingsPage`), split into a layout route + `<Outlet />` + sibling child routes. ADR 013's stable outer panel topology is best served this way because `<Outlet />` is one stable React node — react-resizable-panels sees the same children across route changes. Template: `src/pages/app-layout.tsx` + `src/pages/feeds-route.tsx` + `src/pages/stage-view.tsx`.
-- **Avoid DOM `CustomEvent`s when props, router state, or context will do.** They are global side channels: tracing "who fires this" requires a global grep. The only justified case is a listener that cannot be reached through the React tree — e.g., a hook called above a Provider that needs to talk to a component inside it (`feedzero:toggle-sidebar` is the model). Default order of choice: `useNavigate` / URL params → props → context → `CustomEvent` (last resort).
-- **Boot orchestration belongs in store actions, not in component effects.** A component running three cascading `useEffect`s that coordinate via `useStore.getState()` reads is too much logic for a component. Hoist the sequence into a store action; the component reacts to state. Template: `app-store.startNewUserOnboarding` runs secure-context check + passphrase generation + `initialize` + `completeOnboarding`; `AppInit` just fires the action and renders the resulting `securityProblem`/`error`/`isDbReady`.
-- **Extract a helper when the same multi-step dance repeats N times.** The point is not LOC. The point is that an *intentional* omission becomes visibly different from the default path, instead of hiding inside copy-paste variation. Template: `reloadFeeds + schedulePush` in `src/stores/feed-store.ts` — once every mutator routes through them, the action that intentionally skips `schedulePush()` (e.g., `setFolderOpen`, `reorderFeeds`) is a one-line outlier the reviewer can see.
-- **Split a big file when the next investment is committed, not before.** A low-churn 800-line file is fine if no one is editing it. The same file when you know the next three additions are queued deserves a pluggable split first — otherwise each new addition compounds the size and the next reviewer pays the cost. Template: `src/components/explore/` is now a shell + per-tab files + `TAB_DESCRIPTORS` registry because the curated catalog (use-case packs, editorial collections, bridges) is the next investment area.
-- **Prefer static imports of in-tree modules at file top.** Dynamic `import('./foo.ts')` followed by named-export destructure is brittle: Rollup's chunk-graph decisions can move the target into a parent chunk that does not expose source-name properties (only minified aliases for static importers), and the destructure silently returns `undefined`. This was the proximate cause of the 2026-05-23 SEV1 prod-bundle boot crash (`useAppStore` came back undefined from a dynamic `import("./app-store.ts")` once Rollup placed app-store in the entry chunk). Cycles where two modules only access each other's exports *inside function bodies* (runtime) are safe in JavaScript — the partial-module-during-evaluation problem only bites if you read an export during module evaluation. `vite.config.js` promotes `INEFFECTIVE_DYNAMIC_IMPORT` to a build error so any regression of this pattern fails CI before deploy. See `docs/incidents/2026-05-23-prod-bundle-boot-crash.md`.
+- Feed detection tries JSON parse first (JSON Feed), then XML (RSS/Atom). XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector`.
+- **Key-data coupling invariant**: stored derived keys (`feedzero:derived-keys`) must always decrypt local IndexedDB data. Only `open(passphrase)` and `importAll()` may break the coupling; when changing sync mode, persist the in-memory keys with `exportCurrentKeys()`. `assertKeyDataCoupling()` closes every key-touching flow.
+- **Pull-before-mutate invariant**: fetch remote state (`pullVault()`) **before** any destructive local op (`deleteDatabase`, `tryDeleteServerVault`).
+- **No-auto-destroy invariant**: no automated code path may delete server-side vault data. `destroy()` has exactly one sanctioned caller — `useAppStore.getState().resetApp`, behind an explicit user-confirmation UI. Boot-time canary failures route to `recoveryMode: "invalid-keys"`. See ADR 018.
+- **API handlers answer JSON on every path; clients never treat an unparseable body as a network error.** Narrow untrusted payload fields to their expected type (`readTrimmedString`); only a rejected `fetch` may say "check your connection".
+- **Never share a mutable headers object across responses** — `@hono/node-server` appends `Content-Length` to it. Use a function returning a fresh object, as `apiHeaders()` does.
+- **Test-only adapters are branded** with `markTestOnly()`; every resolver calls `assertNotTestOnlyInProduction()`. New backends MUST follow the same pattern.
+- **Gate every gated capability at BOTH layers** (store and UI), with copy derived from the matrix. `src/core/features/tier-matrix.ts` is the single source of truth for gates, quotas, gate messaging and pricing bullets — never hand-edit those for tier changes. Feature gating is honor-system open-core (ADR 012); do not add server-side gates without an ADR naming the privacy cost.
+- **Price copy has one home**: `PAID_PLAN` in `src/core/features/pricing.ts` — never a literal. See ADR 029.
+- **Apply `normalizeTier` at every boundary** that reads a tier from outside the app. Dropping it downgrades a paying customer to Free.
+- **Do NOT clear a starred article's offline copy.** `src/core/storage/release-offline-content.ts` owns the keep/release rule; user-facing copy about a full vault must name one of its two levers. See ADR 032.
+- **Retention deletes at purge AND refuses at ingest**: every ingest path filters new items through `admitsOnIngest` (`src/core/storage/article-retention.ts`), or purged articles come back as new. See [docs/key-patterns.md](docs/key-patterns.md) and feature 025.
+- **Operational logging takes no identities**: only `logError` and `logEvent`, sizes as power-of-two buckets, nothing tying a line to a vault. See ADR 032.
+- **Sync push bodies are gzipped in transit**: signal it with `x-feedzero-body-encoding`, never `Content-Encoding: gzip`; pad with base64, not hex; cap decoding at `MAX_VAULT_SIZE`; pass request bodies through as bytes, never `Buffer.toString()`. See ADR 031.
+- **Every `db.ts` operation goes through `ctx.op((db) => …)`**; the only exception is `replaceTablesAtomically`. See ADR 030.
+- **The service worker handles three things and nothing else**: the app page (network-first, stored copy only when offline), hashed `/assets/` (cache-first), and the icons and manifest. It must never handle `/api/*`, other origins, or non-GET requests, and `/sw.js` is served `no-cache`. See ADR 033.
+- **Prefer static imports of in-tree modules at file top.** A dynamic `import()` followed by a named-export destructure is a build error (`INEFFECTIVE_DYNAMIC_IMPORT`).
+- **Design defaults**: route by router, not by flag; orchestrate boot in store actions, not component effects; reach for a DOM `CustomEvent` last (`useNavigate` / URL params → props → context first); extract a helper when the same multi-step dance repeats; split a big file when the next investment is committed, not before; put the highest-quality source first in a fallback chain; trace the full request path with real data before deploying.
 
 ---
 

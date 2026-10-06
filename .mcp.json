@@ -6,6 +6,10 @@
         "shadcn@latest",
         "mcp"
       ]
+    },
+    "reporails": {
+      "command": "/home/DeadEye3164/.local/share/uv/tools/reporails-cli/bin/reporails-mcp",
+      "args": []
     }
   }
 }

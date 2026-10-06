@@ -10,7 +10,7 @@ useDefault = true
 # parameters (Apple Maps share `view_token=...`, ad tracker IDs, signed S3 URLs)
 # that gitleaks' default JWT / generic-secret rules flag despite not being
 # secrets — they are content the parser must handle byte-for-byte. Adding new
-# fixtures is part of the regression workflow (see CLAUDE.md "Tier 2.5"), so
+# fixtures is part of the regression workflow (see docs/testing-strategy.md "Tier 2.5"), so
 # the allowlist is path-scoped, not per-fingerprint.
 #
 # Use the singular `[allowlist]` form — gitleaks v8.18.4 (the version pinned in

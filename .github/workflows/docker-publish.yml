@@ -9,15 +9,16 @@ name: Publish self-host image
 #
 # Self-hosters use this image via docker-compose.yml; the published
 # multi-arch (amd64 + arm64) build means Raspberry Pi users don't
-# rebuild from source on every update.
+# rebuild from source on every update. Each architecture is built on a
+# runner of that architecture, then joined under one set of tags.
 #
 # Triggers:
 #   * push tag v*.*.*  — full release, tagged with version + `latest`
 #   * workflow_dispatch — manual rebuild, tagged with the commit SHA
 #
-# To cut a release:
-#   git tag v0.9.1
-#   git push origin v0.9.1
+# Releases are cut by the /release skill: its PR bumps package.json,
+# release-tag.yml creates the tag and calls this workflow. Do not tag by
+# hand (the v0.11.0 image reported 0.9.0 that way, #211/#212).
 #
 # The workflow tags the image as `v0.9.1`, `0.9`, and `latest`. Pin
 # in self-host .env via `FEEDZERO_VERSION=v0.9.1` for stability.
@@ -48,17 +49,21 @@ permissions:
   packages: write
 
 jobs:
-  build-and-push:
-    name: Build + push multi-arch image
+  # Three stages: resolve what to publish, build each architecture on a
+  # runner of that architecture, then join the two images under the tags.
+  #
+  # Each architecture builds natively. The previous single job built arm64
+  # under QEMU emulation, where `npm ci` crashed node at random (exit 139 on
+  # v0.14.0, exit 132 on v0.12.0 and v0.15.0) and every release needed a
+  # manual re-run. Native runners remove the emulator, so there is nothing
+  # left to retry.
+  prepare:
+    name: Resolve version + tags
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # The `secrets` context is not available in step-level `if:`
-    # conditions (only `env`, `github`, `vars`, etc. are). Compute the
-    # Docker Hub presence flag once here — job-level `env` *can* read
-    # `secrets` — and gate the optional login step on this string.
-    env:
-      DOCKERHUB_ENABLED: ${{ secrets.DOCKERHUB_TOKEN != '' }}
-
+    timeout-minutes: 5
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
     steps:
       - name: Check out
         uses: actions/checkout@v7
@@ -66,6 +71,7 @@ jobs:
       # Resolve the release version from the trigger and (except for the
       # SHA-only manual dispatch) refuse to publish if it disagrees with
       # package.json. Closes the drift class behind issues #211/#212.
+      # Runs before any build, so a mismatch publishes nothing.
       - name: Resolve + verify release version
         id: ver
         # Resolution order (input -> v-tag -> package.json) and the
@@ -76,38 +82,11 @@ jobs:
           node scripts/resolve-image-version.mjs \
             "${{ inputs.version }}" "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU (arm64 emulation for cross-arch builds)
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Docker Hub mirror is optional. When DOCKERHUB_TOKEN is set, we
-      # log in and the metadata + build-push steps stamp tags for both
-      # registries. When the secret is missing the step is skipped and
-      # the workflow publishes to GHCR alone — first-time setup is
-      # therefore zero-config.
-      - name: Log in to Docker Hub
-        if: ${{ env.DOCKERHUB_ENABLED == 'true' }}
-        uses: docker/login-action@v4
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       # Compute the image list conditionally so the Docker Hub mirror is
       # only included when the secret is present. metadata-action stamps
-      # every tag against every image in this list — Buildx then pushes
-      # each tag to its named registry in a single build. Conditional
-      # expression: when DOCKERHUB_TOKEN is set we add docker.io as a
-      # second line; otherwise we get GHCR alone.
+      # every tag against every image in this list; the publish job then
+      # points each of those tags at the multi-arch manifest. The output
+      # holds image names only, never a secret value, so it can cross jobs.
       - name: Derive image metadata
         id: meta
         uses: docker/metadata-action@v6
@@ -125,23 +104,157 @@ jobs:
             type=raw,value=latest,enable=${{ steps.ver.outputs.release == 'true' }}
             type=sha,enable=${{ steps.ver.outputs.release != 'true' }}
 
-      - name: Build + push
+  build:
+    name: Build ${{ matrix.arch }} image
+    needs: prepare
+    strategy:
+      # Let the other architecture finish: its layers land in the cache and
+      # a re-run of the failed one is then the only work left.
+      fail-fast: false
+      matrix:
+        include:
+          # amd64 covers most servers and desktops.
+          - arch: amd64
+            runner: ubuntu-latest
+          # arm64 covers Pi 4/5 + Apple-silicon hosts running docker locally.
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Pushed to GHCR by digest only, with no tag: a half-finished run
+      # leaves nothing a self-hoster could pull by name. The publish job
+      # attaches the tags once both architectures exist.
+      - name: Build + push by digest
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
-          # arm64 covers Pi 4/5 + Apple-silicon hosts running docker
-          # locally; amd64 covers everything else.
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Builds are slow without a remote cache — share state
-          # across runs via GitHub's actions cache.
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ needs.prepare.outputs.labels }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/feedzero,push-by-digest=true,name-canonical=true,push=true
+          # Builds are slow without a remote cache — share state across
+          # runs via GitHub's actions cache, one scope per architecture so
+          # the two builds do not evict each other.
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=image-${{ matrix.arch }}
           # Version reported by /api/health comes from package.json
           # via scripts/build-api.js (it inlines pkgVersion into the
-          # bundles at build time). The /new-release skill bumps
-          # package.json before tagging, so the git tag and the
-          # baked version stay aligned.
+          # bundles at build time). The /release skill bumps
+          # package.json in the release PR and release-tag.yml tags
+          # the merged commit, so the git tag and the baked version
+          # stay aligned.
+
+      - name: Record the image digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/digests"
+          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+
+      - name: Hand the digest to the publish job
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish multi-arch manifest
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The `secrets` context is not available in step-level `if:`
+    # conditions (only `env`, `github`, `vars`, etc. are). Compute the
+    # Docker Hub presence flag once here — job-level `env` *can* read
+    # `secrets` — and gate the optional login step on this string.
+    env:
+      DOCKERHUB_ENABLED: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+    steps:
+      - name: Collect the image digests
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: image-digest-*
+          merge-multiple: true
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker Hub mirror is optional. When DOCKERHUB_TOKEN is set, we
+      # log in and the manifest step below also writes the docker.io tags
+      # that `prepare` stamped, copying the layers across from GHCR. When
+      # the secret is missing the step is skipped and the workflow
+      # publishes to GHCR alone — first-time setup is therefore zero-config.
+      - name: Log in to Docker Hub
+        if: ${{ env.DOCKERHUB_ENABLED == 'true' }}
+        uses: docker/login-action@v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tag the multi-arch manifest
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          TAGS: ${{ needs.prepare.outputs.tags }}
+          SOURCE_IMAGE: ghcr.io/${{ github.repository_owner }}/feedzero
+        run: |
+          set -euo pipefail
+
+          tag_args=()
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then tag_args+=(--tag "$tag"); fi
+          done <<< "$TAGS"
+
+          sources=()
+          for digest in *; do
+            sources+=("${SOURCE_IMAGE}@sha256:${digest}")
+          done
+
+          # One digest per architecture. Publishing with fewer would move
+          # `latest` to an image some self-hosters cannot run.
+          if [ "${#sources[@]}" -ne 2 ] || [ "${#tag_args[@]}" -eq 0 ]; then
+            echo "::error::expected 2 digests and at least 1 tag, got ${#sources[@]} digest(s) and $(( ${#tag_args[@]} / 2 )) tag(s)"
+            exit 1
+          fi
+
+          docker buildx imagetools create "${tag_args[@]}" "${sources[@]}"
+
+      - name: Verify both architectures are published
+        env:
+          TAGS: ${{ needs.prepare.outputs.tags }}
+        run: |
+          set -euo pipefail
+          first_tag="$(printf '%s\n' "$TAGS" | sed -n '1p')"
+          platforms="$(docker buildx imagetools inspect "$first_tag" --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+          echo "$first_tag -> $platforms"
+          for want in linux/amd64 linux/arm64; do
+            case " $platforms " in
+              *" $want "*) ;;
+              *) echo "::error::$first_tag is missing $want"; exit 1 ;;
+            esac
+          done

@@ -1,6 +1,6 @@
 {
   "name": "feedzero",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Privacy-first RSS reader",
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -98,5 +98,8 @@
   },
   "optionalDependencies": {
     "@vercel/blob": "^2.8.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
   }
 }

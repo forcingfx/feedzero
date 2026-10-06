@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
 import { App } from "./app.tsx";
 import { ThemeBridge } from "./components/theme-bridge.tsx";
+import { registerServiceWorker } from "./lib/register-service-worker.ts";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
@@ -18,3 +19,5 @@ createRoot(document.getElementById("root")!).render(
     </ThemeProvider>
   </StrictMode>,
 );
+
+void registerServiceWorker();

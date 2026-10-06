@@ -6,7 +6,7 @@ argument-hint: "[X.Y.Z to force a version] [--dry-run]"
 
 # /release
 
-One PR, one repository, unattended. The notes entry and the version bump land
+One PR, one repository, unattended, plus a rebuild of the landing page at the end. The notes entry and the version bump land
 in the same commit, so there is nothing to sequence and nothing to poll.
 
 ## Inputs
@@ -36,6 +36,42 @@ in the same commit, so there is nothing to sequence and nothing to poll.
    `fixable` violations (append period, em-dash→comma, strip `!`); anything
    else → ABORT and show it. Hand-edit for tone — the lint only enforces
    mechanics.
+   **Landing impact** — decide both before the PR, because the entry carries
+   one of them:
+   - **`affects`**: the landing homepage stamps a NEW badge on every feature
+     whose id is listed in the newest entry's `affects` array. List the ids
+     and set the ones this release materially adds or changes; omit the field
+     only if none apply. `draftNotes` never sets it.
+
+     ```bash
+     git -C ~/builder/feedzero-landing fetch -q origin
+     git -C ~/builder/feedzero-landing show origin/main:content/home.md | grep -E '^\s*- id:'
+     ```
+   - **Copy**: read the release's `added` / `changed` / `removed` bullets
+     against `content/home.md` and `content/pricing.md` in landing. If a
+     claim there is now false or a headline feature is missing, open a PR in
+     `feedzero-landing` (author email must be the GitHub noreply address, or
+     Vercel silently skips the deploy). Say in the report which it was:
+     "landing copy checked, no change needed" or the landing PR link.
+   - **Promoted features**: landing's `features.items` and `features.minis`
+     are what the product is sold on. Compare them with what shipped (the
+     `shipped` entries of `src/core/features/tier-matrix.ts` and this
+     release's `added` bullets) and report to the user, as a short list:
+     anything promoted that is not shipped or no longer true, and anything
+     shipped in this release that deserves a slot. Which features to promote
+     is the user's decision; the release does not wait for it, but the list
+     must be in the report.
+   - **Screenshots**: refresh them every release, in a PR of their own that
+     merges before step 10 so the landing rebuild picks them up.
+     - Per-feature shots live in this repo and landing mirrors them from
+       `main` at build time: `node scripts/capture-marketing.mjs`, then
+       commit `docs/marketing/screenshots/`. Needs `pngquant` and a free
+       port 3001.
+     - The homepage hero lives in landing: in a `feedzero-landing` worktree,
+       `node take-screenshot.mjs --scene landing`, commit `screenshot.png`
+       (see that repo's `release-screenshot` skill).
+     - Look at every image before committing it. A scene that no longer
+       matches the UI produces a wrong picture, not an error.
 6. **--dry-run?** print the version and entry, then STOP.
 7. **Open the release PR** — one worktree, one commit, both changes together:
 
@@ -47,9 +83,19 @@ ln -s ~/builder/feedzero/node_modules node_modules
 
 # Prepend the entry to the `releases` array in release-notes.mjs, then:
 npm version <version> --no-git-tag-version
+
+# Regenerate the feed and refresh the fixture the byte-compatibility tests
+# compare against. Skip this and two tests in
+# tests/scripts/release/build-feed.test.ts fail.
+npm run build:feed
+cp public/releases.xml tests/fixtures/release-feed.xml
+git diff -- tests/fixtures/release-feed.xml | grep '^-[^-]'
+# ^ must print ONLY the feed's <updated> line. Any other removed line means
+#   an existing entry changed: STOP (see "Never change existing <id> values").
+
 npm test                    # the version-lock test proves notes == package.json
 
-git add release-notes.mjs package.json package-lock.json
+git add release-notes.mjs package.json package-lock.json tests/fixtures/release-feed.xml
 git commit -m "release: v<version>"
 git push -u origin release/v<version>
 gh pr create --head release/v<version> --base main \
@@ -70,7 +116,32 @@ docker run --rm --entrypoint sh ghcr.io/forcingfx/feedzero:v<version> \
   -c 'node -p "require(\"/app/package.json\").version"'
 ```
 
-10. **Tear down** the worktree.
+   The image is built per architecture on native runners, then joined under
+   the tags by the publish job. If one architecture's build fails,
+   `gh run rerun <run-id> --failed` redoes only that one; nothing is tagged
+   until both exist.
+10. **Redeploy the landing page.** `feedzero.app` is a static build that reads
+    `https://my.feedzero.app/releases.json` at build time, so its version
+    string and release-notes accordion stay on the previous release until it
+    is rebuilt. Do this after step 9 has shown the app serving the new version:
+
+```bash
+cd /tmp   # any directory that is not a linked Vercel project
+vercel redeploy "$(vercel ls feedzero-landing --prod 2>/dev/null | grep -oE 'https://[^ ]+' | head -1)" \
+  --target production
+cd ~/builder/feedzero
+SMOKE_TESTS=1 npx vitest run tests/smoke/landing-version.test.ts
+```
+
+11. **Tear down** the worktree and the branch. Auto-merge can leave the remote
+    branch behind even with `--delete-branch`:
+
+```bash
+git -C ~/builder/feedzero worktree remove ~/builder/feedzero-wt-release-<version>
+git -C ~/builder/feedzero branch -D release/v<version>
+git ls-remote --exit-code --heads origin release/v<version> \
+  && git push origin --delete release/v<version>
+```
 
 ## Notes
 
@@ -83,16 +154,25 @@ docker run --rm --entrypoint sh ghcr.io/forcingfx/feedzero:v<version> \
 - **The feed is served from this repo.** `scripts/release/build-feed.mjs`
   emits `public/releases.xml` during the build; landing rewrites
   `feedzero.app/releases.xml` to it, so the public URL and every entry id are
-  unchanged. A release has no landing step.
-- **Landing's homepage accordion** renders from its own `releases.mjs` mirror.
-  It is not on the release path; a stale accordion corrects itself on the next
-  landing deploy and never affects the feed subscribers read.
+  unchanged. The feed needs no landing step; only the homepage does (step 10).
+- **Landing's homepage** (version string and release-notes accordion) is built
+  from `https://my.feedzero.app/releases.json` when landing deploys. It is
+  not on the path subscribers read, so a stale page never affects the feed,
+  but nothing rebuilds it after a release: v0.15.0 was live for an hour while
+  the homepage still said v0.14.0. Step 10 is that rebuild.
 - **Why the bump is a PR and not a CI push:** `forcingfx` is a *user* account,
   so the `main protection` ruleset cannot grant the GitHub Actions app a
   bypass — GitHub only allows Integration bypass actors on org-owned repos.
   Every CI push to `main` is rejected with `GH013`. The predecessor
   `release.yml` pushed directly and could never have succeeded.
+- **`computeVersion` turns a breaking change on 0.x into 1.0.0.** That is a
+  product statement, not a mechanical one. While the product is pre-1.0, pass
+  an explicit `X.Y.Z` instead (v0.14.0 was cut this way).
+- **`draftNotes` output is a starting point.** It emits one sentence per
+  commit subject, PR numbers included. Rewrite it to the house style at the
+  top of `release-notes.mjs`: user-facing changes only, verb-led past tense,
+  no em-dashes, sorted into added / changed / fixed / removed. Run `lintNotes`
+  on the final entry, not only on the draft.
 - **Resume after partial failure**: if `release-notes.mjs` already has an entry
   for `<version>`, skip steps 4–5 and resume at step 7.
-- Screenshots, bento cards and social posts are out of scope; run those
-  separately.
+- Bento cards and social posts are out of scope; run those separately.

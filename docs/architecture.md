@@ -122,6 +122,21 @@ IndexedDB (encrypted via Dexie + Web Crypto)
 - **preferences-store** — Single source of truth for synced user settings (feed/folder order, feed+article sort, group floods, theme, and the reading-appearance fields `readerTextSize` / `readerWidth` / `hideReadArticles` / `showArticleFeedIcons` — see feature 024). Every field added after the record shipped is optional with a `?? default` read, so a preference row written by an older client still parses. `hydrate()` (run before `isDbReady`) loads the encrypted `preferences` row or migrates legacy localStorage keys on first boot; `update(patch)` writes through to the row and schedules a sync push; `reload()` re-applies after a cloud restore. Consumer stores (feed/article/app) keep an in-memory field for synchronous reads but persist via the `persistPreferences` helper. See ADR 022.
 - **signal-store** — Drives `/signal`. Status state machine (`locked | loading | ready | error`), 24h localStorage cache (`feedzero:signal-report`). `loadReport({ force? })` collects every article from `article-store`, checks the 100-article gate, runs `generateReport()` from `core/signal/frequency-engine` (pure-TS frequency analysis), and writes the result to cache. No network, no LLM.
 
+## App Initialization Flow
+
+`src/app.tsx` orchestrates startup via `AppInit`:
+
+1. `checkOnboardingStatus()` reads `feedzero:onboarding-complete` from localStorage.
+2. **New users**: `<OnboardingModal>` renders (outside `<BrowserRouter>`, always mounted). The onboarding store drives steps.
+3. **Returning users**: `initializeReturningUser()` in `app-store.ts`:
+   - Tries `loadStoredKeys()` first — if derived keys exist, uses `openWithKeys()` (no passphrase needed).
+   - Falls back to passphrase from localStorage for legacy users (auto-migrates: derives keys, stores them, removes raw passphrase).
+   - Local-only users without stored keys: error (requires re-onboarding).
+   - Sync users: reconstructs `SyncCredentials` from stored vault ID + JWK, pulls vault.
+4. Once `isDbReady`, routes render.
+
+`<OnboardingModal>` and `<SyncSetupDialog>` mount at the top level alongside `<BrowserRouter>`, not inside routes.
+
 ## Routing
 
 ```

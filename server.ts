@@ -423,6 +423,14 @@ async function startServer(): Promise<void> {
     await next();
     c.header("Cache-Control", "public, max-age=31536000, immutable");
   });
+  // The service worker script must be revalidated on every check. A worker
+  // runs from the user's browser, so the only fix for a bad one is shipping
+  // a good /sw.js, and a cached copy would keep the bad one alive. Matches
+  // the /sw.js rule in vercel.json.
+  app.use("/sw.js", async (c, next) => {
+    await next();
+    c.header("Cache-Control", "no-cache");
+  });
   app.use("/*", serveStatic({ root: "./dist" }));
   app.get("/*", serveStatic({ path: "./dist/index.html" }));
 

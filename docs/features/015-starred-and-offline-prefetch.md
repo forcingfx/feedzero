@@ -125,6 +125,17 @@ Feature: Starred articles with background prefetch
 | `tests/integration/keyboard-ui-parity.test.tsx` | `s` key parity with the star button |
 | `tests/components/layout/sidebar-starred.test.tsx` | Entry hidden until first star; navigates via STARRED_FEED_ID |
 
+## Opening the app offline
+
+Prefetch puts article text on the device. Reading it with no connection
+also needs the app itself on the device, which is the service worker's
+job (ADR 033): after one online visit, `my.feedzero.app` opens offline
+on any route and shows whatever is in the local database. This applies
+to every tier; prefetch decides how much full text is there to read.
+
+Before 2026-10-04 no service worker was registered, so "offline" only
+held for a tab that was already open.
+
 ## Releasing an offline copy
 
 **The app keeps an offline copy for exactly as long as it would
