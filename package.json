@@ -77,7 +77,7 @@
     "cmdk": "^1.1.1",
     "defuddle": "^0.19.3",
     "dexie": "^4.4.5",
-    "dompurify": "^3.4.15",
+    "dompurify": "^3.4.17",
     "feedsmith": "^2.9.6",
     "hash-wasm": "^4.12.0",
     "hono": "^4.13.7",
@@ -101,5 +101,10 @@
   },
   "allowScripts": {
     "esbuild@0.28.1": true
+  },
+  "overrides": {
+    "@vercel/cli-config": {
+      "zod": "^4.6.6"
+    }
   }
 }
