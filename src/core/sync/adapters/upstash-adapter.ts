@@ -71,6 +71,14 @@ const SCAN_PAGE_SIZE = 100;
 // applies to a 64-hex vaultId, this key is a fixed namespaced literal.
 const LAST_UPDATED_KEY = "vault-meta:lastUpdatedAt";
 
+// count() runs on the public, unauthenticated /api/stats-sync, and its SCAN
+// walks the whole shared keyspace (catalog and rate-limit keys included),
+// so each uncached call costs about keys/100 billed commands. The cached
+// count bounds that to one SCAN per window however often the endpoint is
+// hit. Not under VAULT_KEY_PREFIX, so the SCAN never counts it.
+const COUNT_CACHE_KEY = "vault-meta:count";
+const COUNT_CACHE_TTL_SECONDS = 600;
+
 function vaultKey(vaultId: string): string {
   return VAULT_KEY_PREFIX + vaultId;
 }
@@ -135,6 +143,18 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
 
   async count(): Promise<Result<number>> {
     return tryUpstash(async () => {
+      const cached = await this.client.get<string>(COUNT_CACHE_KEY);
+      if (cached !== null && cached !== undefined) return Number(cached);
+      const total = await this.scanVaultCount();
+      await this.client.set(COUNT_CACHE_KEY, String(total), {
+        ex: COUNT_CACHE_TTL_SECONDS,
+      });
+      return total;
+    });
+  }
+
+  private async scanVaultCount(): Promise<number> {
+    {
       let cursor: number | string = 0;
       let total = 0;
       do {
@@ -148,7 +168,7 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
         // defensive and treat both 0 and "0" as completion.
       } while (cursor !== 0 && cursor !== "0");
       return total;
-    });
+    }
   }
 
   async lastUpdatedAt(): Promise<Result<number | null>> {
