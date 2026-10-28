@@ -152,6 +152,7 @@ Per [ADR 008](decisions/008-upstash-as-production-data-layer.md), five server-si
 | Key | Type | Description |
 |---|---|---|
 | `vault:<vaultId>` | JSON-string of `{ok, vault}` | The encrypted vault payload from the client. **The Upstash client for this adapter is constructed with `automaticDeserialization: false`** because the handler stores a string and reads a string — auto-parsing turns the string back into an object, which `new Response(obj)` then renders as `"[object Object]"`. Bug live for 24h in PR #45 before the smoke test caught it. See [2026-05-12 incident postmortem](incidents/2026-05-12-sync-regression.md). |
+| `vault-etag:<vaultId>` | weak ETag string (`W/"<16 hex>"`) | Written in the same `MSET` as the vault, so the two cannot disagree, and deleted before it. A conditional pull reads only this key and answers 304 without reading the vault: Upstash bills the bytes a read returns, and unchanged pulls (boot plus every 30-minute refresh, per device) used most of the 10 GB monthly free-plan bandwidth when each one read the full vault. Vaults pushed before this key existed fall back to the full read until their next push. |
 
 ### Stripe event-id dedup (`src/core/stripe/seen-event-store.ts`)
 

@@ -74,4 +74,37 @@ describe.skipIf(SKIP)("production /api/sync (live)", () => {
     expect(afterBody.ok).toBe(false);
     expect(afterBody.traceId).toMatch(/^req_[0-9a-f]+$/);
   }, 20_000);
+
+  // An unchanged pull is answered from the stored `vault-etag:` key
+  // without reading the vault (the Upstash bandwidth fix). That key must
+  // never outlive its vault: a 304 for a deleted vault would tell a
+  // device it is current when its data is gone.
+  it("answers an unchanged pull with 304, and 404 once the vault is deleted", async () => {
+    const vaultId = sentinelVaultId();
+    const url = `${BASE_URL}/api/sync?vaultId=${vaultId}`;
+    let etag = "";
+
+    try {
+      const putRes = await fetch(`${BASE_URL}/api/sync`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vaultId,
+          vault: { version: 1, iv: [1, 2, 3], ciphertext: `etag-${Date.now()}` },
+        }),
+      });
+      expect(putRes.status).toBe(200);
+      etag = putRes.headers.get("ETag") ?? "";
+      expect(etag).toMatch(/^W\/"[0-9a-f]{16}"$/);
+
+      const unchanged = await fetch(url, { headers: { "If-None-Match": etag } });
+      expect(unchanged.status).toBe(304);
+      expect(unchanged.headers.get("ETag")).toBe(etag);
+    } finally {
+      await fetch(url, { method: "DELETE" });
+    }
+
+    const afterDelete = await fetch(url, { headers: { "If-None-Match": etag } });
+    expect(afterDelete.status).toBe(404);
+  }, 20_000);
 });

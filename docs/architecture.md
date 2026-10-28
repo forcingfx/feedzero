@@ -163,7 +163,7 @@ Endpoints:
 
 - `POST /api/feed` (body: `{ "url": "..." }`) — Proxies RSS/Atom/JSON feed requests (CORS bypass). Rate-limited per hashed client (300/min default).
 - `POST /api/page` (body: `{ "url": "..." }`) — Proxies web page requests for full-text extraction. Rate-limited.
-- `/api/sync` — GET / HEAD / PUT / DELETE encrypted vault. Storage: Upstash KV (`vault:<vaultId>`).
+- `/api/sync` — GET / HEAD / PUT / DELETE encrypted vault. Storage: Upstash KV (`vault:<vaultId>`, plus `vault-etag:<vaultId>` so an unchanged conditional GET or a HEAD answers without reading the vault; see `docs/data-schema.md`).
 - `/api/catalog` — `action=count`, `action=popular`, `?url=<...>` lookup. Storage: Upstash KV (`catalog:feed:*` + `catalog:ranking` sorted set).
 - `/api/stats-sync` — Vault count for the public stats page. Reads the same backend as `/api/sync`.
 - `POST /api/license/verify`, `POST /api/license/issue` — License Bearer-token verification and (admin-only) issuance. Storage: Upstash KV (`license:record:*`, `license:revoked:*`, `customer:*:keys`).
