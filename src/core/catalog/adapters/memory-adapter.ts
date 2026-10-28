@@ -13,12 +13,10 @@ export function createMemoryCatalogAdapter(): CatalogStorageAdapter {
 
   return markTestOnly({
     async upsert(url) {
-      const now = new Date().toISOString();
       const existing = store.get(url);
 
       if (existing) {
         existing.requestCount += 1;
-        existing.lastRequestedAt = now;
       } else {
         store.set(url, {
           url,
@@ -27,11 +25,10 @@ export function createMemoryCatalogAdapter(): CatalogStorageAdapter {
           siteUrl: null,
           status: "active",
           requestCount: 1,
-          lastRequestedAt: now,
           lastCrawledAt: null,
           errorCount: 0,
           lastError: null,
-          createdAt: now,
+          createdAt: new Date().toISOString(),
         });
       }
 

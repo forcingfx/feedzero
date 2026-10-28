@@ -164,7 +164,7 @@ Endpoints:
 - `POST /api/feed` (body: `{ "url": "..." }`) — Proxies RSS/Atom/JSON feed requests (CORS bypass). Rate-limited per hashed client (300/min default).
 - `POST /api/page` (body: `{ "url": "..." }`) — Proxies web page requests for full-text extraction. Rate-limited.
 - `/api/sync` — GET / HEAD / PUT / DELETE encrypted vault. Storage: Upstash KV (`vault:<vaultId>`).
-- `/api/catalog` — `action=count`, `action=popular`, `?url=<...>` lookup. Storage: Upstash KV (`catalog:feed:*` + `catalog:ranking` sorted set).
+- `/api/catalog` — `action=count`, `action=popular`, `?url=<...>` lookup. Storage: Upstash KV (`catalog:feed:*` + `catalog:ranking` sorted set). Writes come from `/api/feed`: each 2xx upstream answer (not 304 or other 3xx) records a fire-and-forget hit as `SET NX` on the feed record + `ZINCRBY` on the ranking, 2 commands. `requestCount` is read from the ranking score; there is no `lastRequestedAt`.
 - `/api/stats-sync` — Vault count for the public stats page. Reads the same backend as `/api/sync`.
 - `POST /api/license/verify`, `POST /api/license/issue` — License Bearer-token verification and (admin-only) issuance. Storage: Upstash KV (`license:record:*`, `license:revoked:*`, `customer:*:keys`).
 - `POST /api/stripe/webhook` — Stripe webhook receiver with signature verification + event-id dedup. Dedup store: Upstash KV (`seen-event:<eventId>`). `customer.subscription.created` reads `current_period_end` (trial-end date for trialing subscriptions) and pins the issued license to it; `invoice.paid` extends the license on first charge.

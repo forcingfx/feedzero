@@ -29,6 +29,17 @@ describe("CatalogStorageAdapter (memory)", () => {
     expect(feed.value!.requestCount).toBe(3);
   });
 
+  it("does not expose lastRequestedAt (no adapter keeps it current; see ADR 008)", async () => {
+    // The Upstash adapter stopped rewriting the record on every fetch to
+    // stay within 2 billed commands per upsert, so a per-request timestamp
+    // can no longer be honest. Both adapters drop it so the contract agrees.
+    const adapter = createMemoryCatalogAdapter();
+    await adapter.upsert("https://example.com/feed.xml");
+    const feed = await adapter.get("https://example.com/feed.xml");
+    if (!feed.ok) throw new Error(feed.error);
+    expect(feed.value).not.toHaveProperty("lastRequestedAt");
+  });
+
   it("get returns null for unknown feed", async () => {
     const adapter = createMemoryCatalogAdapter();
     const result = await adapter.get("https://unknown.com/feed");

@@ -33,8 +33,8 @@ Consolidate all five storage needs onto a single Upstash REST KV instance. Each 
 | `customer:<customerId>:keys` | same | same | Redis SET of keyIds. Enables O(records-per-customer) `listByCustomer`. |
 | `vault:<vaultId>` | `src/core/sync/adapters/upstash-adapter.ts` | `UpstashSyncAdapter` | Already-JSON-stringified `{ok, vault}` payload. Auto-deserialization OFF on the client. |
 | `seen-event:<eventId>` | `src/core/stripe/seen-event-store.ts` | `UpstashSeenEventStore` | TTL = Stripe's 3-day retry window. |
-| `catalog:feed:<url>` | `src/core/catalog/adapters/upstash-adapter.ts` | `UpstashCatalogAdapter` | JSON `CatalogFeed`. |
-| `catalog:ranking` | same | same | Redis sorted set. Score = `requestCount`. Enables O(log N) inserts + O(top-K) reads for `popular()`. |
+| `catalog:feed:<url>` | `src/core/catalog/adapters/upstash-adapter.ts` | `UpstashCatalogAdapter` | JSON metadata record, created once with `SET NX`. **No TTL**: one key per unique feed URL ever fetched. |
+| `catalog:ranking` | same | same | Redis sorted set. Score = request count, bumped with `ZINCRBY`; the only source of `requestCount`. Enables O(log N) inserts + O(top-K) reads for `popular()`. |
 | `ratelimit:cli_<hash>` | `src/core/proxy/rate-limiter.ts` | `UpstashRateLimiter` | Counter. TTL = window length (default 60s). Auto-expires. |
 
 The prefixes are structurally non-overlapping. `vaultId` is 64-hex, no colons; `customerId` and `keyId` always begin with a recognizable substring; rate-limit keys carry the `cli_` prefix. No two writers can ever conflict.
@@ -55,13 +55,13 @@ The sync adapter constructs the Redis client with `automaticDeserialization: fal
 
 ### Rate-limit auto-cleanup
 
-The rate-limit keyspace is the only one that grows unbounded under organic traffic (one key per unique IP+UA hash per window). Each key carries a TTL = the window length, so the keyspace size is bounded by `unique_clients_in_last_window`. No GC job required.
+Two keyspaces grow under organic traffic. The rate-limit keyspace gets one key per unique IP+UA hash per window, but each key carries a TTL = the window length, so it is bounded by `unique_clients_in_last_window` and needs no GC. The catalog keyspace has **no TTL**: every unique feed URL that ever returns a 2xx through `/api/feed` leaves a `catalog:feed:<url>` key and a `catalog:ranking` member forever. It grows with the number of distinct feeds, not with traffic, and nothing collects it today.
 
 ## Why a single backend
 
 - **One integration to keep healthy.** The 2026-05-12 incident's root cause was Vercel Blob's "Needs Attention" flag silently disabling the integration. With one backend there's one set of integration status flags to watch.
 - **Smaller operator surface.** Five storage modules sharing one client constructor pattern (`UpstashClient` interface + dynamic import of `@upstash/redis`) is easier to operate than five different SDKs.
-- **Free tier headroom.** Combined load — license writes per signup (rare), event dedup per Stripe event (rare), vault PUT per sync (low frequency, batched), catalog upsert per proxy fetch (frequent but cheap), rate-limit INCR per proxy request (frequent) — well within Upstash free-tier 10K commands/day for current usage. Will need monitoring once traffic grows.
+- **Command budget.** Upstash bills per command, and the per-fetch paths dominate: every `/api/feed` request runs the rate limiter, and every 2xx upstream answer records a catalog hit. The original estimate here ("well within 10K commands/day") assumed the catalog upsert was cheap; it was 3 commands (GET + SET + ZADD) per fetch, and with every client refreshing every subscribed feed every 30 minutes that exhausted the paid plan in 2026-10. The catalog upsert is now 2 commands (`SET NX` + `ZINCRBY`), and 304 Not Modified / other 3xx answers record nothing. Budget as roughly `2 × 2xx_fetches + rate_limit_commands × proxy_requests` per day, and watch the Upstash usage graph rather than trusting this estimate.
 - **Same anonymity floor.** All five concerns already needed to be PII-free; co-locating them doesn't change that. Vault payloads are client-encrypted blobs; license records contain only `keyId` (random) + `customerId` (Stripe-scoped opaque) + tier; rate-limit hashes are salted SHA-256 of IP+UA.
 
 ## Alternatives rejected

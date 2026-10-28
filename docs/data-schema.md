@@ -163,8 +163,8 @@ Per [ADR 008](decisions/008-upstash-as-production-data-layer.md), five server-si
 
 | Key | Type | Description |
 |---|---|---|
-| `catalog:feed:<url>` | JSON `CatalogFeed` | One per known feed URL. Fields: `url`, `title`, `description`, `siteUrl`, `status`, `requestCount`, `lastRequestedAt`, `lastCrawledAt`, `errorCount`, `lastError`, `createdAt`. |
-| `catalog:ranking` | Redis sorted set | Members = feed URLs, scores = `requestCount`. Enables O(log N) inserts and O(top-K + MGET) reads for `popular()`. `count()` is O(1) via `ZCARD`. |
+| `catalog:feed:<url>` | JSON record | One per known feed URL, created once with `SET NX` and changed only by `updateMetadata`; no TTL. Fields: `url`, `title`, `description`, `siteUrl`, `status`, `lastCrawledAt`, `errorCount`, `lastError`, `createdAt`. Records written before 2026-10 also carry `requestCount` and `lastRequestedAt`; both are stale and ignored on read. |
+| `catalog:ranking` | Redis sorted set | Members = feed URLs, scores = request count (`ZINCRBY` per 2xx proxy fetch). The API's `requestCount` comes from this score. Enables O(log N) inserts and O(top-K + MGET) reads for `popular()`. `count()` is O(1) via `ZCARD`. |
 
 ### Proxy rate-limit counters (`src/core/proxy/rate-limiter.ts`)
 
