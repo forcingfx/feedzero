@@ -151,6 +151,23 @@ function makeFeed(id: string, title: string): Feed {
   };
 }
 
+function makeArticle(overrides: Partial<Article>): Article {
+  return {
+    id: "article",
+    feedId: "df",
+    guid: "tag:daringfireball.net,2026:/linked/example",
+    title: "Example",
+    link: "https://example.com/post",
+    content: "",
+    summary: "",
+    author: "",
+    publishedAt: 1_700_000_000_000,
+    read: false,
+    createdAt: 1_700_000_000_000,
+    ...overrides,
+  };
+}
+
 function emptyVault(): VaultData {
   return { version: 1, exportedAt: Date.now(), feeds: [], articles: [] };
 }
@@ -342,19 +359,11 @@ describe("sync-store ↔ db.ts integration", () => {
     it("keeps the local article blurb when the cloud copy arrives stripped", async () => {
       await injectCredentials();
       const feed = makeFeed("df", "Daring Fireball");
-      const local: Article = {
+      const local = makeArticle({
         id: "article-1",
-        feedId: "df",
-        guid: "tag:daringfireball.net,2026:/linked/example",
-        title: "Example",
-        link: "https://example.com/post",
         content: "<p>A linked-list blurb.</p>",
         summary: "A linked-list blurb.",
-        author: "John Gruber",
-        publishedAt: 1_700_000_000_000,
-        read: false,
-        createdAt: 1_700_000_000_000,
-      };
+      });
       expect((await dbAddFeed(feed)).ok).toBe(true);
       expect((await dbAddArticles([local])).ok).toBe(true);
 
@@ -385,19 +394,10 @@ describe("sync-store ↔ db.ts integration", () => {
     it("matches the local blurb by guid when the ids differ", async () => {
       await injectCredentials();
       const feed = makeFeed("df", "Daring Fireball");
-      const local: Article = {
+      const local = makeArticle({
         id: "local-id",
-        feedId: "df",
-        guid: "tag:daringfireball.net,2026:/linked/other",
-        title: "Other",
-        link: "https://example.com/other",
         content: "<p>Blurb kept by guid.</p>",
-        summary: "",
-        author: "",
-        publishedAt: 1_700_000_000_000,
-        read: false,
-        createdAt: 1_700_000_000_000,
-      };
+      });
       expect((await dbAddFeed(feed)).ok).toBe(true);
       expect((await dbAddArticles([local])).ok).toBe(true);
 

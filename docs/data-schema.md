@@ -105,6 +105,12 @@ Conflict resolution differs by field: id-keyed collections
 winning on collision; `preferences` is a scalar record resolved by
 `preferencesUpdatedAt` (newer wins, ties favor local).
 
+Article bodies never travel: `exportVault` blanks `content` and `summary`,
+and `importVault` refills them from this device's copy of the same article
+(matched by id, then guid) before replacing local data. Without the refill
+a pull wipes every local blurb, and the reader opens those articles in
+Full text because it sees nothing to show in Feed view.
+
 #### EncryptedVault (stored on server)
 
 | Field      | Type     | Description                          |
