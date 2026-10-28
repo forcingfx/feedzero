@@ -49,13 +49,14 @@ export interface StorageCensus {
 
 const VAULT_PREFIX = "vault:";
 const SORTED_SET_KEYS = new Set(["catalog:ranking"]);
-const KNOWN_PREFIXES = [
-  "vault-meta:",
-  "catalog:feed:",
-  "license:",
-  "customer:",
-  "seen-event:",
-  "ratelimit:",
+/** Prefix → kind. `customer:` is the license module's email index. */
+const KNOWN_PREFIXES: ReadonlyArray<[string, string]> = [
+  ["vault-meta:", "vault-meta"],
+  ["catalog:feed:", "catalog:feed"],
+  ["license:", "license"],
+  ["customer:", "license"],
+  ["seen-event:", "seen-event"],
+  ["ratelimit:", "ratelimit"],
 ];
 
 /** Name the kind of key without ever returning the key itself. */
@@ -66,11 +67,8 @@ export function classifyKey(key: string): string {
       : "vault";
   }
   if (SORTED_SET_KEYS.has(key)) return key;
-  const known = KNOWN_PREFIXES.find((prefix) => key.startsWith(prefix));
-  if (known === "customer:") return "license";
-  if (known === "license:") return "license";
-  if (known) return known.slice(0, -1);
-  return `other (${key.split(":")[0]})`;
+  const known = KNOWN_PREFIXES.find(([prefix]) => key.startsWith(prefix));
+  return known ? known[1] : `other (${key.split(":")[0]})`;
 }
 
 /** Smallest power of two at or above `bytes`. */
