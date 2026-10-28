@@ -71,6 +71,14 @@ const SCAN_PAGE_SIZE = 100;
 // applies to a 64-hex vaultId, this key is a fixed namespaced literal.
 const LAST_UPDATED_KEY = "vault-meta:lastUpdatedAt";
 
+// count() runs on the public, unauthenticated /api/stats-sync, and its SCAN
+// walks the whole shared keyspace (catalog and rate-limit keys included),
+// so each uncached call costs about keys/100 billed commands. The cached
+// count bounds that to one SCAN per window however often the endpoint is
+// hit. Not under VAULT_KEY_PREFIX, so the SCAN never counts it.
+const COUNT_CACHE_KEY = "vault-meta:count";
+const COUNT_CACHE_TTL_SECONDS = 600;
+
 function vaultKey(vaultId: string): string {
   return VAULT_KEY_PREFIX + vaultId;
 }
@@ -135,20 +143,38 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
 
   async count(): Promise<Result<number>> {
     return tryUpstash(async () => {
-      let cursor: number | string = 0;
-      let total = 0;
-      do {
-        const [nextCursor, keys] = await this.client.scan(cursor, {
-          match: `${VAULT_KEY_PREFIX}*`,
-          count: SCAN_PAGE_SIZE,
-        });
-        total += keys.length;
-        cursor = nextCursor;
-        // Upstash REST returns cursor as a string "0" to mean "done". Be
-        // defensive and treat both 0 and "0" as completion.
-      } while (cursor !== 0 && cursor !== "0");
+      const cached = await this.readCachedCount();
+      if (cached !== null) return cached;
+      const total = await this.scanVaultCount();
+      await this.client.set(COUNT_CACHE_KEY, String(total), {
+        ex: COUNT_CACHE_TTL_SECONDS,
+      });
       return total;
     });
+  }
+
+  /** The cached count, or null on a miss or a value that isn't a count. */
+  private async readCachedCount(): Promise<number | null> {
+    const raw = await this.client.get<string>(COUNT_CACHE_KEY);
+    if (raw === null || raw === undefined) return null;
+    const count = Number(raw);
+    return Number.isInteger(count) && count >= 0 ? count : null;
+  }
+
+  private async scanVaultCount(): Promise<number> {
+    let cursor: number | string = 0;
+    let total = 0;
+    do {
+      const [nextCursor, keys] = await this.client.scan(cursor, {
+        match: `${VAULT_KEY_PREFIX}*`,
+        count: SCAN_PAGE_SIZE,
+      });
+      total += keys.length;
+      cursor = nextCursor;
+      // Upstash REST returns cursor as a string "0" to mean "done". Be
+      // defensive and treat both 0 and "0" as completion.
+    } while (cursor !== 0 && cursor !== "0");
+    return total;
   }
 
   async lastUpdatedAt(): Promise<Result<number | null>> {

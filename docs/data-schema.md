@@ -152,6 +152,8 @@ Per [ADR 008](decisions/008-upstash-as-production-data-layer.md), five server-si
 | Key | Type | Description |
 |---|---|---|
 | `vault:<vaultId>` | JSON-string of `{ok, vault}` | The encrypted vault payload from the client. **The Upstash client for this adapter is constructed with `automaticDeserialization: false`** because the handler stores a string and reads a string — auto-parsing turns the string back into an object, which `new Response(obj)` then renders as `"[object Object]"`. Bug live for 24h in PR #45 before the smoke test caught it. See [2026-05-12 incident postmortem](incidents/2026-05-12-sync-regression.md). |
+| `vault-meta:lastUpdatedAt` | epoch ms string | Written on every successful vault PUT. Read by `/api/stats-sync`. |
+| `vault-meta:count` | integer string | TTL 600s. Cached result of `count()`, whose SCAN walks the whole shared keyspace (~keys/100 billed commands). `/api/stats-sync` is public and unauthenticated, so the cache bounds it to one SCAN per ten minutes however often it is called. |
 
 ### Stripe event-id dedup (`src/core/stripe/seen-event-store.ts`)
 

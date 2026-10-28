@@ -233,6 +233,57 @@ describe("UpstashSyncAdapter", () => {
       }
     });
 
+    // /api/stats-sync is public and unauthenticated, and SCAN walks the
+    // whole shared keyspace (catalog and rate-limit keys too), costing
+    // roughly keys/100 billed commands per call. Caching the count trades
+    // up to ten minutes of staleness on a vanity number for a fixed,
+    // small per-call cost that a caller looping on the endpoint cannot
+    // inflate.
+    it("serves a repeat count from the cache without scanning again", async () => {
+      client.store.set(`vault:${"a".repeat(64)}`, "v1");
+      let scans = 0;
+      const counting: UpstashSyncClient = {
+        ...client,
+        async scan(cursor, opts) {
+          scans++;
+          return client.scan(cursor, opts);
+        },
+      };
+      const cached = new UpstashSyncAdapter(counting);
+
+      const first = await cached.count();
+      const second = await cached.count();
+
+      expect(first).toEqual({ ok: true, value: 1 });
+      expect(second).toEqual({ ok: true, value: 1 });
+      expect(scans).toBe(1);
+    });
+
+    it("stores the cached count with a ten-minute expiry", async () => {
+      const writes: Array<[string, unknown, { ex?: number } | undefined]> = [];
+      const recording: UpstashSyncClient = {
+        ...client,
+        async set(key, value, opts) {
+          writes.push([key, value, opts]);
+          return client.set(key, value, opts);
+        },
+      };
+
+      await new UpstashSyncAdapter(recording).count();
+
+      expect(writes).toEqual([["vault-meta:count", "0", { ex: 600 }]]);
+    });
+
+    it("rescans when the cached count is not a count", async () => {
+      client.store.set(`vault:${"a".repeat(64)}`, "v1");
+      client.store.set("vault-meta:count", "garbage");
+
+      const result = await adapter.count();
+
+      expect(result).toEqual({ ok: true, value: 1 });
+      expect(client.store.get("vault-meta:count")).toBe("1");
+    });
+
     it("returns Result.err when SCAN throws on any page", async () => {
       const broken: UpstashSyncClient = {
         async get() {
