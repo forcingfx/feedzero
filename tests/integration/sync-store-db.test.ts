@@ -53,6 +53,8 @@ import {
   deleteDatabase,
   addFeed as dbAddFeed,
   getFeeds as dbGetFeeds,
+  addArticles as dbAddArticles,
+  getAllArticles as dbGetAllArticles,
   putPreferences as dbPutPreferences,
   getPreferences as dbGetPreferences,
   setPreferencesUpdatedAt as dbSetPreferencesUpdatedAt,
@@ -65,7 +67,7 @@ import {
 import { clearLicenseToken } from "../../src/core/license/license-token-store.ts";
 import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import type { VaultData } from "../../src/core/sync/types.ts";
-import type { Feed } from "@feedzero/core/types";
+import type { Article, Feed } from "@feedzero/core/types";
 
 // Network boundary. pushVault / pullVault / deleteVault hit /api/sync;
 // the rest (exportVault, importVault, mergeVaults) is pure or db-bound
@@ -332,6 +334,92 @@ describe("sync-store ↔ db.ts integration", () => {
       if (!credsResult.ok) throw new Error(credsResult.error);
       useSyncStore.setState({ credentials: credsResult.value, status: "synced" });
     }
+
+    // exportVault strips content/summary to keep the vault small, so a
+    // pulled vault always carries blank bodies. Importing it verbatim
+    // wiped every local blurb, and the reader then auto-switched to
+    // Full text on feeds that do ship one (reported on Daring Fireball).
+    it("keeps the local article blurb when the cloud copy arrives stripped", async () => {
+      await injectCredentials();
+      const feed = makeFeed("df", "Daring Fireball");
+      const local: Article = {
+        id: "article-1",
+        feedId: "df",
+        guid: "tag:daringfireball.net,2026:/linked/example",
+        title: "Example",
+        link: "https://example.com/post",
+        content: "<p>A linked-list blurb.</p>",
+        summary: "A linked-list blurb.",
+        author: "John Gruber",
+        publishedAt: 1_700_000_000_000,
+        read: false,
+        createdAt: 1_700_000_000_000,
+      };
+      expect((await dbAddFeed(feed)).ok).toBe(true);
+      expect((await dbAddArticles([local])).ok).toBe(true);
+
+      pullVaultMock.mockResolvedValue({
+        ok: true,
+        value: {
+          ...vaultWith([feed]),
+          articles: [{ ...local, content: "", summary: "", read: true }],
+        },
+      });
+
+      await useSyncStore.getState().pull();
+
+      const stored = await dbGetAllArticles();
+      if (!stored.ok) throw new Error(stored.error);
+      expect(stored.value).toEqual([
+        expect.objectContaining({
+          id: "article-1",
+          content: "<p>A linked-list blurb.</p>",
+          summary: "A linked-list blurb.",
+          read: true,
+        }),
+      ]);
+    });
+
+    // Two devices that fetched the same feed before first syncing hold
+    // the item under different ids; the guid is what they share.
+    it("matches the local blurb by guid when the ids differ", async () => {
+      await injectCredentials();
+      const feed = makeFeed("df", "Daring Fireball");
+      const local: Article = {
+        id: "local-id",
+        feedId: "df",
+        guid: "tag:daringfireball.net,2026:/linked/other",
+        title: "Other",
+        link: "https://example.com/other",
+        content: "<p>Blurb kept by guid.</p>",
+        summary: "",
+        author: "",
+        publishedAt: 1_700_000_000_000,
+        read: false,
+        createdAt: 1_700_000_000_000,
+      };
+      expect((await dbAddFeed(feed)).ok).toBe(true);
+      expect((await dbAddArticles([local])).ok).toBe(true);
+
+      pullVaultMock.mockResolvedValue({
+        ok: true,
+        value: {
+          ...vaultWith([feed]),
+          articles: [{ ...local, id: "cloud-id", content: "" }],
+        },
+      });
+
+      await useSyncStore.getState().pull();
+
+      const stored = await dbGetAllArticles();
+      if (!stored.ok) throw new Error(stored.error);
+      expect(stored.value).toEqual([
+        expect.objectContaining({
+          id: "cloud-id",
+          content: "<p>Blurb kept by guid.</p>",
+        }),
+      ]);
+    });
 
     it("keeps newer local preferences when the cloud copy is older (LWW)", async () => {
       await injectCredentials();
