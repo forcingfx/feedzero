@@ -2,6 +2,7 @@ import { SYNC } from "../../../packages/core/src/utils/constants";
 import { newTraceId } from "../../../packages/core/src/utils/trace-id";
 import { logError } from "../../../packages/core/src/utils/log-error";
 import { logEvent, sizeBucket } from "../../../packages/core/src/utils/log-event";
+import { etagOf } from "./vault-etag.ts";
 import type { SyncStorageAdapter } from "./types.ts";
 import {
   authorizeLicense,
@@ -57,24 +58,6 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: apiHeaders() });
 }
 
-/**
- * Compute a weak ETag for a stored payload. SHA-256 truncated to the
- * first 16 hex characters (64 bits) — collision risk is negligible at
- * one ETag per vault per change, and the short form keeps headers
- * compact. Weak validator (W/"…") because the server may re-serialize
- * structurally-equivalent JSON; the bytes match only the byte-shape
- * stored, not the semantic content.
- */
-async function etagOf(data: string): Promise<string> {
-  const bytes = new TextEncoder().encode(data);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const hex = Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 16);
-  return `W/"${hex}"`;
-}
-
 function apiHeadersWithEtag(etag: string): Record<string, string> {
   return { ...apiHeaders(), ETag: etag };
 }
@@ -126,6 +109,34 @@ function validateVaultId(vaultId: string | null): string | null {
   return vaultId;
 }
 
+/**
+ * Answer without reading the vault when the adapter keeps its ETag
+ * separately: a 304 for a matching If-None-Match, and the bodiless
+ * reply HEAD needs. Upstash bills the bytes a read returns, and an
+ * unchanged pull is most pulls, so reading an 8 MiB vault only to hash
+ * it spent the monthly bandwidth quota on nothing.
+ *
+ * Returns null whenever the full read must decide: no stored ETag (a
+ * vault pushed before ETags were stored), a mismatch, or a failed read.
+ */
+async function answerFromStoredEtag(
+  request: Request,
+  adapter: SyncStorageAdapter,
+  vaultId: string,
+): Promise<Response | null> {
+  if (!adapter.getEtag) return null;
+  const stored = await adapter.getEtag(vaultId);
+  if (!stored.ok || stored.value === null) return null;
+  const headers = apiHeadersWithEtag(stored.value);
+  if (request.headers.get("if-none-match") === stored.value) {
+    return new Response(null, { status: 304, headers });
+  }
+  if (request.method === "HEAD") {
+    return new Response(null, { status: 200, headers });
+  }
+  return null;
+}
+
 async function handleGet(
   request: Request,
   adapter: SyncStorageAdapter,
@@ -135,6 +146,9 @@ async function handleGet(
   const rawId = url.searchParams.get("vaultId");
   const vaultId = validateVaultId(rawId);
   if (!vaultId) return clientError("Invalid or missing vaultId", 400, ctx);
+
+  const unchanged = await answerFromStoredEtag(request, adapter, vaultId);
+  if (unchanged) return unchanged;
 
   const result = await adapter.get(vaultId);
   if (!result.ok) {

@@ -142,4 +142,11 @@ export interface SyncStorageAdapter {
    * timestamps. Don't rely on sub-second precision.
    */
   lastUpdatedAt(): Promise<Result<number | null>>;
+  /**
+   * The stored vault's ETag without reading the vault, or `null` when
+   * none is stored. Optional: adapters that implement it let a
+   * conditional pull answer 304 without reading the vault (the Upstash
+   * bandwidth fix); the rest fall back to reading and hashing it.
+   */
+  getEtag?(vaultId: string): Promise<Result<string | null>>;
 }

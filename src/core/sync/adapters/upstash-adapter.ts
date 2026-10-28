@@ -28,6 +28,7 @@
 
 import { type Result, ok, err } from "../../../../packages/core/src/utils/result";
 import type { SyncStorageAdapter } from "../types";
+import { etagOf } from "../vault-etag.ts";
 
 /**
  * Minimal subset of the Upstash Redis client we depend on. Defined inline
@@ -49,6 +50,8 @@ export interface UpstashSyncClient {
     value: unknown,
     opts?: { nx?: boolean; ex?: number },
   ): Promise<unknown>;
+  /** Sets every key in one atomic command. */
+  mset(entries: Record<string, unknown>): Promise<unknown>;
   /** Returns the number of keys deleted (0 or 1 for a single-key call). */
   del(key: string): Promise<number>;
   /**
@@ -70,6 +73,16 @@ const SCAN_PAGE_SIZE = 100;
 // keyspace as vault payloads but cannot collide with a vault: VAULT_KEY_PREFIX
 // applies to a 64-hex vaultId, this key is a fixed namespaced literal.
 const LAST_UPDATED_KEY = "vault-meta:lastUpdatedAt";
+
+// The vault's ETag, written in the same MSET as the vault so the two can
+// never disagree. Lets a conditional pull read a few bytes instead of the
+// whole vault. Not under VAULT_KEY_PREFIX, so count() and the sentinel
+// cleanup never mistake it for a vault.
+const ETAG_KEY_PREFIX = "vault-etag:";
+
+function etagKey(vaultId: string): string {
+  return ETAG_KEY_PREFIX + vaultId;
+}
 
 function vaultKey(vaultId: string): string {
   return VAULT_KEY_PREFIX + vaultId;
@@ -109,8 +122,12 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
   }
 
   async put(vaultId: string, data: string): Promise<Result<boolean>> {
+    const etag = await etagOf(data);
     return tryUpstash(async () => {
-      await this.client.set(vaultKey(vaultId), data);
+      await this.client.mset({
+        [vaultKey(vaultId)]: data,
+        [etagKey(vaultId)]: etag,
+      });
       // Best-effort meta write. We deliberately don't roll back the vault
       // SET on meta failure — the vault is the source of truth; the meta
       // key is observability only. A failed meta write surfaces as a stale
@@ -124,8 +141,18 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
     });
   }
 
+  async getEtag(vaultId: string): Promise<Result<string | null>> {
+    return tryUpstash(async () => {
+      const etag = await this.client.get<string>(etagKey(vaultId));
+      return typeof etag === "string" ? etag : null;
+    });
+  }
+
   async delete(vaultId: string): Promise<Result<boolean>> {
     return tryUpstash(async () => {
+      // ETag first: a stale ETag left behind by a failed second DEL would
+      // answer 304 for a vault that no longer exists.
+      await this.client.del(etagKey(vaultId));
       await this.client.del(vaultKey(vaultId));
       // Idempotent: SyncStorageAdapter.delete returns ok whether the key
       // existed or not. Mirrors filesystem/blob adapter contracts.

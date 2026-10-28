@@ -37,6 +37,12 @@ function fakeClient(): UpstashSyncClient & {
       store.set(key, String(value));
       return "OK";
     },
+    async mset(entries) {
+      for (const [key, value] of Object.entries(entries)) {
+        store.set(key, String(value));
+      }
+      return "OK";
+    },
     async del(key) {
       const had = store.has(key);
       store.delete(key);
@@ -96,6 +102,9 @@ describe("UpstashSyncAdapter", () => {
         async set() {
           return "OK";
         },
+        async mset() {
+          return "OK";
+        },
         async del() {
           return 0;
         },
@@ -128,6 +137,9 @@ describe("UpstashSyncAdapter", () => {
           return null;
         },
         async set() {
+          throw new Error("redis error");
+        },
+        async mset() {
           throw new Error("redis error");
         },
         async del() {
@@ -164,6 +176,9 @@ describe("UpstashSyncAdapter", () => {
           return null;
         },
         async set() {
+          return "OK";
+        },
+        async mset() {
           return "OK";
         },
         async del() {
@@ -214,6 +229,9 @@ describe("UpstashSyncAdapter", () => {
         async set() {
           return "OK";
         },
+        async mset() {
+          return "OK";
+        },
         async del() {
           return 0;
         },
@@ -239,6 +257,9 @@ describe("UpstashSyncAdapter", () => {
           return null;
         },
         async set() {
+          return "OK";
+        },
+        async mset() {
           return "OK";
         },
         async del() {
@@ -281,6 +302,12 @@ describe("UpstashSyncAdapter", () => {
           store.set(key, String(value));
           return "OK";
         },
+        async mset(entries) {
+          for (const [key, value] of Object.entries(entries)) {
+            store.set(key, String(value));
+          }
+          return "OK";
+        },
         async del() { return 1; },
         async scan() { return [0, []]; },
       };
@@ -321,13 +348,14 @@ describe("UpstashSyncAdapter", () => {
     it("uses 'vault' namespace for all keys — no collision with license: namespace", async () => {
       await adapter.put(VAULT_ID, SAMPLE_VAULT_JSON);
       const keys = [...client.store.keys()];
-      // The vault namespace covers both 'vault:<id>' payload keys and the
-      // observability-only 'vault-meta:lastUpdatedAt' singleton. Neither
-      // collides with the license module's 'license:*' / 'customer:*'.
-      // The hyphen on the meta key keeps it OUT of the 'vault:*' SCAN
-      // pattern used by `count()` — see VAULT_KEY_PREFIX in upstash-adapter.
+      // The vault namespace covers 'vault:<id>' payload keys, their
+      // 'vault-etag:<id>' companions, and the observability-only
+      // 'vault-meta:lastUpdatedAt' singleton. None collides with the
+      // license module's 'license:*' / 'customer:*'. The hyphen keeps the
+      // etag and meta keys OUT of the 'vault:*' SCAN pattern used by
+      // `count()` — see VAULT_KEY_PREFIX in upstash-adapter.
       expect(
-        keys.every((k) => k.startsWith("vault:") || k.startsWith("vault-meta:")),
+        keys.every((k) => /^vault(:|-etag:|-meta:)/.test(k)),
       ).toBe(true);
       expect(keys.some((k) => k.startsWith("license:"))).toBe(false);
       expect(keys.some((k) => k.startsWith("customer:"))).toBe(false);
