@@ -165,7 +165,7 @@ Endpoints:
 - `POST /api/page` (body: `{ "url": "..." }`) — Proxies web page requests for full-text extraction. Rate-limited.
 - `/api/sync` — GET / HEAD / PUT / DELETE encrypted vault. Storage: Upstash KV (`vault:<vaultId>`).
 - `/api/catalog` — `action=count`, `action=popular`, `?url=<...>` lookup. Storage: Upstash KV (`catalog:feed:*` + `catalog:ranking` sorted set).
-- `/api/stats-sync` — Vault count for the public stats page. Reads the same backend as `/api/sync`.
+- `/api/stats-sync` — Vault count for the public stats page. Reads the same backend as `/api/sync`. On Upstash the count is cached for ten minutes (`vault-meta:count`), because computing it SCANs the whole keyspace and the endpoint is public.
 - `POST /api/license/verify`, `POST /api/license/issue` — License Bearer-token verification and (admin-only) issuance. Storage: Upstash KV (`license:record:*`, `license:revoked:*`, `customer:*:keys`).
 - `POST /api/stripe/webhook` — Stripe webhook receiver with signature verification + event-id dedup. Dedup store: Upstash KV (`seen-event:<eventId>`). `customer.subscription.created` reads `current_period_end` (trial-end date for trialing subscriptions) and pins the issued license to it; `invoice.paid` extends the license on first charge.
 - `POST /api/checkout/create-session` — Stripe Checkout Session creation with priceId allowlist. Injects a server-controlled 30-day free trial via `subscription_data.trial_period_days` — see [ADR 015](decisions/015-stripe-side-trial.md).
