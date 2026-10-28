@@ -14,8 +14,6 @@ export interface CatalogFeed {
   status: "active" | "dead" | "error";
   /** Total anonymous proxy request count (aggregate, not per-user). */
   requestCount: number;
-  /** When any user last fetched this feed via the proxy. */
-  lastRequestedAt: string;
   /** When the server last crawled this feed. */
   lastCrawledAt: string | null;
   /** Consecutive error count during crawling. */
