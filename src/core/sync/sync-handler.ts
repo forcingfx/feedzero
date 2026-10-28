@@ -124,17 +124,17 @@ async function answerFromStoredEtag(
   adapter: SyncStorageAdapter,
   vaultId: string,
 ): Promise<Response | null> {
-  if (!adapter.getEtag) return null;
+  const ifNoneMatch = request.headers.get("if-none-match");
+  const isHead = request.method === "HEAD";
+  if (!adapter.getEtag || (!ifNoneMatch && !isHead)) return null;
+
   const stored = await adapter.getEtag(vaultId);
   if (!stored.ok || stored.value === null) return null;
   const headers = apiHeadersWithEtag(stored.value);
-  if (request.headers.get("if-none-match") === stored.value) {
+  if (ifNoneMatch === stored.value) {
     return new Response(null, { status: 304, headers });
   }
-  if (request.method === "HEAD") {
-    return new Response(null, { status: 200, headers });
-  }
-  return null;
+  return isHead ? new Response(null, { status: 200, headers }) : null;
 }
 
 async function handleGet(
