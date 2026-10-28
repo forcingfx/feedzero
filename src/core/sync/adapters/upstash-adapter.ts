@@ -143,8 +143,8 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
 
   async count(): Promise<Result<number>> {
     return tryUpstash(async () => {
-      const cached = await this.client.get<string>(COUNT_CACHE_KEY);
-      if (cached !== null && cached !== undefined) return Number(cached);
+      const cached = await this.readCachedCount();
+      if (cached !== null) return cached;
       const total = await this.scanVaultCount();
       await this.client.set(COUNT_CACHE_KEY, String(total), {
         ex: COUNT_CACHE_TTL_SECONDS,
@@ -153,22 +153,28 @@ export class UpstashSyncAdapter implements SyncStorageAdapter {
     });
   }
 
+  /** The cached count, or null on a miss or a value that isn't a count. */
+  private async readCachedCount(): Promise<number | null> {
+    const raw = await this.client.get<string>(COUNT_CACHE_KEY);
+    if (raw === null || raw === undefined) return null;
+    const count = Number(raw);
+    return Number.isInteger(count) && count >= 0 ? count : null;
+  }
+
   private async scanVaultCount(): Promise<number> {
-    {
-      let cursor: number | string = 0;
-      let total = 0;
-      do {
-        const [nextCursor, keys] = await this.client.scan(cursor, {
-          match: `${VAULT_KEY_PREFIX}*`,
-          count: SCAN_PAGE_SIZE,
-        });
-        total += keys.length;
-        cursor = nextCursor;
-        // Upstash REST returns cursor as a string "0" to mean "done". Be
-        // defensive and treat both 0 and "0" as completion.
-      } while (cursor !== 0 && cursor !== "0");
-      return total;
-    }
+    let cursor: number | string = 0;
+    let total = 0;
+    do {
+      const [nextCursor, keys] = await this.client.scan(cursor, {
+        match: `${VAULT_KEY_PREFIX}*`,
+        count: SCAN_PAGE_SIZE,
+      });
+      total += keys.length;
+      cursor = nextCursor;
+      // Upstash REST returns cursor as a string "0" to mean "done". Be
+      // defensive and treat both 0 and "0" as completion.
+    } while (cursor !== 0 && cursor !== "0");
+    return total;
   }
 
   async lastUpdatedAt(): Promise<Result<number | null>> {

@@ -274,6 +274,16 @@ describe("UpstashSyncAdapter", () => {
       expect(writes).toEqual([["vault-meta:count", "0", { ex: 600 }]]);
     });
 
+    it("rescans when the cached count is not a count", async () => {
+      client.store.set(`vault:${"a".repeat(64)}`, "v1");
+      client.store.set("vault-meta:count", "garbage");
+
+      const result = await adapter.count();
+
+      expect(result).toEqual({ ok: true, value: 1 });
+      expect(client.store.get("vault-meta:count")).toBe("1");
+    });
+
     it("returns Result.err when SCAN throws on any page", async () => {
       const broken: UpstashSyncClient = {
         async get() {
