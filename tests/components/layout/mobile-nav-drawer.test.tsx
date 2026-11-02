@@ -355,23 +355,6 @@ describe("MobileNavDrawer", () => {
     expect(sidebarWrapper!.className).not.toContain("min-h-svh");
   });
 
-  it("scrollable feed list area has bottom padding to clear iOS Safari browser chrome", async () => {
-    const user = userEvent.setup();
-    const { container } = renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
-
-    const drawer = await waitFor(() => {
-      const d = container.ownerDocument.querySelector("[data-testid='drawer-content']");
-      if (!d) throw new Error("drawer not mounted");
-      return d;
-    });
-    // The scroll container's bottom padding must respect the safe-area inset so the
-    // new-folder input isn't hidden behind the iOS URL bar after rubber-banding.
-    const safeAreaPadded = drawer.querySelector("[data-testid='drawer-scroll']");
-    expect(safeAreaPadded).not.toBeNull();
-    expect(safeAreaPadded!.className).toContain("safe-area-inset-bottom");
-  });
-
   it("renders a single Settings entry that navigates to /settings", async () => {
     // The drawer footer no longer inlines individual settings items. Tapping
     // Settings now navigates to the stage page at /settings — one tap, one
@@ -545,70 +528,77 @@ describe("MobileNavDrawer", () => {
     expect(footer.className).not.toMatch(/100vh[\s_]*-[\s_]*100dvh/);
   });
 
-  describe("browser-chrome occlusion fix (permanent regression guard)", () => {
-    // Context (2026-05-13 second mobile bug report): on iOS Safari with the
-    // bottom toolbar visible, the drawer's bottom content was hidden behind
-    // the toolbar. The outer Drawer.Content is positioned by vaul (which
-    // overrides any inline `bottom`/`height` style we pass), so the fix
-    // lives on the INNER scroll container's `padding-bottom`. The previous
-    // fix used `env(safe-area-inset-bottom) + 2rem` — that covers the
-    // home-indicator strip but the fixed `2rem` is too small for iOS
-    // Safari's dynamic bottom toolbar (~70-80px on iPhones).
-    //
-    // Permanent fix: extend the padding-bottom to include
-    //   `calc(100vh - 100dvh)`
-    // which evaluates to the toolbar height when the iOS Safari toolbar is
-    // visible and 0 when it isn't. Combined with the existing
-    // `env(safe-area-inset-bottom)` for the home indicator and the visual
-    // `2rem` breathing room, the last scrollable item is always reachable.
-    //
-    // These tests pin the CSS expression shape structurally. happy-dom
-    // doesn't compute the visual viewport, so we assert the expression is
-    // present rather than the resolved pixel offset.
+  it("feed list scroll carries no bottom-edge insets: the pinned footer owns that clearance", async () => {
+    // Trade-off: the scroll used to pad by env(safe-area-inset-bottom) +
+    // (100vh - 100dvh) from when its bottom WAS the screen edge
+    // (2026-05-13 toolbar-occlusion report). Since the footer was pinned
+    // below it, that padding only bought dead space, and once the drawer
+    // became content-sized (2026-11-02 report) the dead space showed as a
+    // blank gap under a short feed list. Occlusion is guarded on the
+    // footer instead ("pinned footer pads for the home indicator only").
+    const user = userEvent.setup();
+    renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    const scroll = await screen.findByTestId("drawer-scroll");
+    expect(scroll.className).not.toContain("safe-area-inset-bottom");
+    expect(scroll.className).not.toMatch(/100vh[\s_]*-[\s_]*100dvh/);
+  });
 
-    async function getDrawerScroll(): Promise<HTMLElement> {
-      const { container } = renderDrawer();
-      await userEvent.click(screen.getByRole("button", { name: "Open feed list" }));
-      const scroll = await waitFor(() => {
-        const s = container.ownerDocument.querySelector(
-          "[data-testid='drawer-scroll']",
-        );
-        if (!s) throw new Error("drawer scroll not mounted");
-        return s as HTMLElement;
-      });
-      return scroll;
+  describe("lean footer and content-sized drawer (2026-11-02 report)", () => {
+    // The open drawer spent ~200px on three full-width rows (New folder,
+    // Refresh all, Settings) and was a fixed 85dvh tall, so a short feed
+    // list sat above a large blank gap. The footer is now one icon row and
+    // the drawer sizes to its content, capped at 85dvh.
+
+    async function openDrawer() {
+      const user = userEvent.setup();
+      renderDrawer();
+      await user.click(screen.getByRole("button", { name: "Open feed list" }));
+      return { user, drawer: await screen.findByTestId("drawer-content") };
     }
 
-    it("inner scroll padding-bottom includes env(safe-area-inset-bottom) for the iOS home indicator", async () => {
-      const scroll = await getDrawerScroll();
-      expect(scroll.getAttribute("class") ?? "").toContain(
-        "safe-area-inset-bottom",
-      );
+    it("puts New folder, Refresh all and Settings on a single icon row", async () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      const { drawer } = await openDrawer();
+      const row = within(drawer).getByTestId("drawer-footer-actions");
+      for (const name of [/new folder/i, /refresh all/i, /^settings$/i]) {
+        const btn = within(row).getByRole("button", { name });
+        // Icon-only: the accessible name lives in aria-label, no visible text.
+        expect(btn.textContent?.trim()).toBe("");
+      }
     });
 
-    it("inner scroll padding-bottom includes (100vh - 100dvh) for the iOS Safari bottom toolbar", async () => {
-      // The bug we're preventing: a previous version used only
-      // `env(safe-area-inset-bottom) + 2rem` which left the last drawer
-      // item occluded by the iOS Safari toolbar (~75px). The fix adds
-      // `(100vh - 100dvh)` so the padding grows with the toolbar.
-      // Tailwind arbitrary values use `_` to escape spaces in className
-      // tokens — the regex tolerates either separator.
-      const scroll = await getDrawerScroll();
-      expect(scroll.getAttribute("class") ?? "").toMatch(
-        /100vh[\s_]*-[\s_]*100dvh/,
-      );
+    it("keeps the refresh/sync status on the same row as the actions", async () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("f1", "Feed 1")],
+        lastRefreshAllAt: Date.now() - 5 * 60 * 1000,
+      });
+      const { drawer } = await openDrawer();
+      const row = within(drawer).getByTestId("drawer-footer-actions");
+      expect(within(row).getByText(/refreshed .* ago/i)).toBeInTheDocument();
     });
 
-    it("padding-bottom is delivered via Tailwind arbitrary-value `pb-[calc(...)]` (not split into multiple utilities)", async () => {
-      // Pins the single-source-of-truth shape: the entire expression is in
-      // ONE `pb-[calc(…)]` token. A future "let's split this into a CSS
-      // var" refactor would still need to surface the safe-area + toolbar
-      // expressions somewhere; this test fails if the `pb-[calc(...)]`
-      // token disappears entirely so the reviewer is forced to confirm
-      // the alternative form covers both insets.
-      const scroll = await getDrawerScroll();
-      const className = scroll.getAttribute("class") ?? "";
-      expect(className).toMatch(/pb-\[calc\(/);
+    it("footer action buttons meet the 44px tap-target floor (size-11)", async () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      const { drawer } = await openDrawer();
+      const row = within(drawer).getByTestId("drawer-footer-actions");
+      for (const name of [/new folder/i, /refresh all/i, /^settings$/i]) {
+        expect(within(row).getByRole("button", { name }).className).toContain("size-11");
+      }
+    });
+
+    it("tapping the New folder icon reveals the folder name input", async () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      const { user, drawer } = await openDrawer();
+      await user.click(within(drawer).getByRole("button", { name: /new folder/i }));
+      expect(within(drawer).getByPlaceholderText("Folder name")).toHaveFocus();
+    });
+
+    it("sizes to its content, capped at 85dvh, instead of a fixed 85dvh height", async () => {
+      const { drawer } = await openDrawer();
+      const style = (drawer as HTMLElement).style;
+      expect(style.maxHeight).toBe("85dvh");
+      expect(style.height).toBe("");
     });
   });
 
