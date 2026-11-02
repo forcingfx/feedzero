@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { ChevronUp, Compass, Layers, RefreshCw, Settings } from "lucide-react";
+import { ChevronUp, Compass, FolderPlus, Layers, RefreshCw, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@feedzero/core/utils/constants";
 import { stableDockFeeds, MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
-import { SidebarMenu, SidebarProvider } from "@/components/ui/sidebar.tsx";
+import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
-import { NewFolderInput } from "@/components/sidebar/new-folder-input.tsx";
+import { NewFolderForm } from "@/components/sidebar/new-folder-input.tsx";
 import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
@@ -17,8 +17,12 @@ interface MobileNavDrawerProps {
   onFeedSelect: (feedId: string) => void;
 }
 
+const FOOTER_ICON_BUTTON =
+  "flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent disabled:opacity-50";
+
 export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const navigate = useNavigate();
   // The strip's handle pill advertises "drag me up" — honor it: an
   // upward-dominant drag on the strip opens the drawer (tapping the
@@ -172,19 +176,23 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
         <Drawer.Content
           data-testid="drawer-content"
+          // Content-sized up to 85dvh: a short feed list gets a short
+          // drawer instead of a blank gap above the footer (2026-11-02).
           className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-background border-t rounded-t-xl focus:outline-none overflow-hidden"
-          style={{ height: "85dvh" }}
+          style={{ maxHeight: "85dvh" }}
         >
           <div className="mx-auto w-10 h-1 rounded-full bg-muted-foreground/30 mt-3 mb-1 shrink-0" />
 
-          <SidebarProvider defaultOpen={false} className="flex-1 flex flex-col min-h-0">
+          {/* No flex-1 below: these blocks shrink from their content size
+              (min-h-0) when the 85dvh cap bites, and otherwise stay as
+              tall as the list, so the drawer hugs a short list. */}
+          <SidebarProvider defaultOpen={false} className="flex flex-col min-h-0">
             <div
               data-testid="drawer-scroll"
-              // pb-[calc(env(safe-area-inset-bottom) + (100vh - 100dvh)):
-              //   home-indicator inset + iOS Safari toolbar slack. The
-              //   2rem breathing room previously lived here; now the pinned
-              //   Settings footer provides that floor instead.
-              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-[calc(env(safe-area-inset-bottom)_+_(100vh_-_100dvh))]"
+              // No safe-area or toolbar padding: the pinned footer sits
+              // between this scroll and the screen edge and owns that
+              // clearance. Padding here would be a visible blank gap.
+              className="min-h-0 overflow-y-auto overflow-x-hidden pb-1"
             >
               <div data-testid="drawer-section" className="w-full py-1 px-3">
                 <SidebarBody
@@ -213,36 +221,43 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
               data-testid="drawer-section"
               className="shrink-0 border-t bg-background px-3 py-1 pb-[calc(env(safe-area-inset-bottom)_+_0.25rem)]"
             >
-              <SidebarMenu>
-                <NewFolderInput trailing={<AutoOrganizePill />} />
-              </SidebarMenu>
-              {feeds.length > 0 && (
+              {creatingFolder && <NewFolderForm onDone={() => setCreatingFolder(false)} />}
+              {/* One lean row: status on the left, icon actions on the
+                  right. The status text truncates before any action is
+                  squeezed off the row. */}
+              <div data-testid="drawer-footer-actions" className="flex items-center gap-1">
+                <div className="min-w-0 flex-1 truncate px-2">
+                  <SyncStatusBadge onClick={() => setOpen(false)} />
+                </div>
+                <AutoOrganizePill />
                 <button
                   type="button"
-                  data-testid="drawer-refresh-all"
-                  onClick={() => void refreshAll()}
-                  disabled={isRefreshingAll}
-                  className="flex items-center gap-3 w-full px-2 py-3 text-left text-sm font-medium rounded-md hover:bg-accent disabled:opacity-50"
+                  aria-label="New folder"
+                  onClick={() => setCreatingFolder(true)}
+                  className={FOOTER_ICON_BUTTON}
                 >
-                  <RefreshCw
-                    className={`size-4 shrink-0 text-muted-foreground ${isRefreshingAll ? "animate-spin" : ""}`}
-                  />
-                  {isRefreshingAll ? "Refreshing…" : "Refresh all"}
+                  <FolderPlus className="size-5" />
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={handleSettings}
-                className="flex items-center gap-3 w-full px-2 py-3 text-left text-sm font-medium rounded-md hover:bg-accent"
-              >
-                <Settings className="size-4 shrink-0 text-muted-foreground" />
-                Settings
-              </button>
-              {/* Full refresh/sync status line — the mobile header only
-                  shows the color dot, the words live here next to the
-                  refresh control they describe. */}
-              <div className="px-2 pb-1">
-                <SyncStatusBadge onClick={() => setOpen(false)} />
+                {feeds.length > 0 && (
+                  <button
+                    type="button"
+                    data-testid="drawer-refresh-all"
+                    aria-label={isRefreshingAll ? "Refreshing…" : "Refresh all"}
+                    onClick={() => void refreshAll()}
+                    disabled={isRefreshingAll}
+                    className={FOOTER_ICON_BUTTON}
+                  >
+                    <RefreshCw className={`size-5 ${isRefreshingAll ? "animate-spin" : ""}`} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  aria-label="Settings"
+                  onClick={handleSettings}
+                  className={FOOTER_ICON_BUTTON}
+                >
+                  <Settings className="size-5" />
+                </button>
               </div>
             </div>
           </SidebarProvider>
