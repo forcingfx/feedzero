@@ -50,7 +50,7 @@ describe("SubscribeDeeplink", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    renderAt("/?subscribe=personal-monthly", { paidTierVisible: false });
+    renderAt("/?subscribe=personal-yearly", { paidTierVisible: false });
     await new Promise((r) => setTimeout(r, 30));
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -62,7 +62,7 @@ describe("SubscribeDeeplink", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    renderAt("/?subscribe=personal-monthly", {
+    renderAt("/?subscribe=personal-yearly", {
       priceIds: { personalYearly: "" },
     });
     await new Promise((r) => setTimeout(r, 30));
@@ -81,7 +81,7 @@ describe("SubscribeDeeplink", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const originalLocation = window.location;
-    const locationMock = { href: "https://my.feedzero.app/?subscribe=personal-monthly", origin: "https://my.feedzero.app" };
+    const locationMock = { href: "https://my.feedzero.app/?subscribe=personal-yearly", origin: "https://my.feedzero.app" };
     Object.defineProperty(window, "location", {
       configurable: true,
       value: locationMock,
@@ -89,7 +89,7 @@ describe("SubscribeDeeplink", () => {
     });
 
     try {
-      renderAt("/?subscribe=personal-monthly");
+      renderAt("/?subscribe=personal-yearly");
 
       await waitFor(() => {
         const calls = fetchMock.mock.calls as Array<[RequestInfo | URL, RequestInit?]>;
@@ -136,18 +136,18 @@ describe("SubscribeDeeplink", () => {
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
       configurable: true,
-      value: { href: "https://my.feedzero.app/?subscribe=personal-monthly", origin: "https://my.feedzero.app" },
+      value: { href: "https://my.feedzero.app/?subscribe=personal-yearly", origin: "https://my.feedzero.app" },
       writable: true,
     });
 
     try {
-      const { unmount } = renderAt("/?subscribe=personal-monthly");
+      const { unmount } = renderAt("/?subscribe=personal-yearly");
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
       });
       unmount();
 
-      renderAt("/?subscribe=personal-monthly");
+      renderAt("/?subscribe=personal-yearly");
       await new Promise((r) => setTimeout(r, 30));
 
       // Second mount of the same session must not re-fire checkout.

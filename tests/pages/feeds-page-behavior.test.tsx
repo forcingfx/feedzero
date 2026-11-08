@@ -246,19 +246,19 @@ describe("FeedsPage behavior — desktop", () => {
   });
 
   it("preserves the query string when auto-redirecting to /explore (deeplink survives)", async () => {
-    // Production bug: landing on /feeds?subscribe=personal-monthly with 0 or 1
+    // Production bug: landing on /feeds?subscribe=personal-yearly with 0 or 1
     // feeds triggered an auto-redirect to /explore that dropped the search
     // string. SubscribeDeeplink then ran at /explore with no ?subscribe= and
     // no Stripe Checkout fired. Search must survive both this redirect and
     // the catchall in app.tsx (covered by NavigateWithSearch tests).
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
 
-    renderPage("/feeds?subscribe=personal-monthly");
+    renderPage("/feeds?subscribe=personal-yearly");
 
     await vi.waitFor(() => {
       expect(currentUrl).toBe("/explore");
     });
-    expect(currentSearch).toBe("?subscribe=personal-monthly");
+    expect(currentSearch).toBe("?subscribe=personal-yearly");
   });
 
   it("auto-navigates to /explore when only one feed exists (starter state)", async () => {

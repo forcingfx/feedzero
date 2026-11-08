@@ -5,9 +5,8 @@
  * on, this component fires a Stripe Checkout Session for the matching price
  * and redirects the customer to the hosted Checkout page.
  *
- * The link source is the landing page's pricing CTA — `feedzero-landing/
- * pricing/index.html` links to `https://my.feedzero.app/?subscribe=
- * personal-monthly`. The deeplink consumer keeps the app's own routing
+ * The link source is the landing page's pricing CTA, which links to
+ * `https://my.feedzero.app/?subscribe=personal-yearly`. The deeplink consumer keeps the app's own routing
  * untouched (no /buy URL hack, no special routes) and works alongside any
  * page the customer lands on.
  *

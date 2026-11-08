@@ -2,7 +2,7 @@
  * <NavigateWithSearch> preserves the query string when redirecting.
  *
  * The fix targets a real production bug: clicking
- * https://my.feedzero.app/?subscribe=personal-monthly hit the catchall
+ * https://my.feedzero.app/?subscribe=personal-yearly hit the catchall
  * `<Route path="*" element={<Navigate to="/feeds" replace />} />` which
  * dropped the search string. SubscribeDeeplink then ran at /explore with
  * no ?subscribe= param and silently no-op'd — zero Stripe Checkout
@@ -38,10 +38,10 @@ function renderAt(initialUrl: string) {
 
 describe("NavigateWithSearch", () => {
   it("preserves the search string when redirecting", () => {
-    renderAt("/?subscribe=personal-monthly");
+    renderAt("/?subscribe=personal-yearly");
 
     expect(capturedPath).toBe("/feeds");
-    expect(capturedSearch).toBe("?subscribe=personal-monthly");
+    expect(capturedSearch).toBe("?subscribe=personal-yearly");
   });
 
   it("redirects with an empty search string when there was none", () => {
