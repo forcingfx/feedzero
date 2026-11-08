@@ -15,7 +15,7 @@ async function articleMetrics(page: import("@playwright/test").Page) {
     return {
       fontSize: parseFloat(style.fontSize),
       lineHeight: parseFloat(style.lineHeight),
-      width: el.getBoundingClientRect().width,
+      maxWidth: style.maxWidth,
     };
   });
 }
@@ -46,5 +46,8 @@ test("larger text, full width and relaxed spacing reach the reader", async ({
 
   expect(after.fontSize).toBeGreaterThan(before.fontSize);
   expect(after.lineHeight / after.fontSize).toBeGreaterThan(before.lineHeight / before.fontSize);
-  expect(after.width).toBeGreaterThanOrEqual(before.width);
+  // The panel is often narrower than the Medium cap, so rendered widths
+  // can match; what Full changes is that the column has no cap at all.
+  expect(before.maxWidth).not.toBe("none");
+  expect(after.maxWidth).toBe("none");
 });
