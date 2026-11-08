@@ -23,11 +23,13 @@ describe("parseSubscribeIntent", () => {
     ).toBeNull();
   });
 
-  it("returns the priceKey for 'personal-monthly'", () => {
-    const intent = parseSubscribeIntent(
-      new URLSearchParams("subscribe=personal-monthly"),
-    );
-    expect(intent).toEqual({ priceKey: "personal-monthly" });
+  it("treats the retired 'personal-monthly' key as unknown", () => {
+    // ADR 029: the key was kept only while the landing page still emitted
+    // it, and it resolved to the annual price — a lie by name. Landing has
+    // linked to personal-yearly since 2026-09, so the key is now retired.
+    expect(
+      parseSubscribeIntent(new URLSearchParams("subscribe=personal-monthly")),
+    ).toBeNull();
   });
 
   it("returns the priceKey for 'personal-yearly'", () => {
@@ -39,27 +41,15 @@ describe("parseSubscribeIntent", () => {
 
   it("ignores other query params alongside subscribe", () => {
     const intent = parseSubscribeIntent(
-      new URLSearchParams("foo=bar&subscribe=personal-monthly&baz=qux"),
+      new URLSearchParams("foo=bar&subscribe=personal-yearly&baz=qux"),
     );
-    expect(intent).toEqual({ priceKey: "personal-monthly" });
+    expect(intent).toEqual({ priceKey: "personal-yearly" });
   });
 });
 
 describe("resolvePriceId", () => {
   it("maps personal-yearly to its env-injected Stripe price ID", () => {
     const id = resolvePriceId("personal-yearly", {
-      personalYearly: "price_live_yearly_xyz",
-    });
-    expect(id).toBe("price_live_yearly_xyz");
-  });
-
-  it("resolves the retired personal-monthly key to the annual price", () => {
-    // Billing went annual-only, but `?subscribe=personal-monthly` links are
-    // already out in the world — on the landing page, in the support
-    // runbook, in old emails. Failing closed on those would send a
-    // customer at the point of highest intent to a dead end, so the key
-    // stays parseable and resolves to the only price there is.
-    const id = resolvePriceId("personal-monthly", {
       personalYearly: "price_live_yearly_xyz",
     });
     expect(id).toBe("price_live_yearly_xyz");
@@ -72,7 +62,7 @@ describe("resolvePriceId", () => {
 
   it("typescript guards: every PriceKey has a mapping (exhaustiveness check)", () => {
     // If we add a third PriceKey, this loop forces resolvePriceId() to handle it.
-    const keys: PriceKey[] = ["personal-monthly", "personal-yearly"];
+    const keys: PriceKey[] = ["personal-yearly"];
     for (const key of keys) {
       const id = resolvePriceId(key, {
         personalYearly: "y",

@@ -96,4 +96,4 @@ Unit tests prove the handler emits `subscription_data.trial_period_days`. They c
 
 - **Abuse vector**: a determined user can claim a trial twice via different emails or email aliases (`user+1@gmail.com`). Stripe does not natively block this. Out of scope; revisit if smoke metrics show real abuse.
 - **No "X days left" UI in the app.** License payload doesn't carry a trialing-vs-active flag. Surfacing it would require either a payload-format change or an extra `/api/license/status` call. Future work if customer confusion becomes a support driver.
-- **Legacy `?subscribe=personal-monthly` links** still resolve, but to the annual price — the key name no longer describes what it does. It stays parseable so links already in the wild keep selling; drop it once the landing page and the support runbook stop emitting it.
+- **Legacy `?subscribe=personal-monthly` links** were retired on 2026-11-08 (issue #283). The landing page has linked to `personal-yearly` since the ADR 029 cutover, so an old monthly link now opens the app normally without starting checkout.

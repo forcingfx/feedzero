@@ -246,6 +246,11 @@ Only after the last monthly renewal:
 Check for stragglers with the dry run: when it reports zero to migrate and no
 `already-scheduled` skips, every schedule has completed its first phase.
 
+**Status 2026-11-08:** every subscription on the $5/month price is canceled,
+and both remaining schedules are in their annual phase. The deeplink key is
+removed in code. The two live-account steps (archive the prices, trim the
+allowlist) are tracked in issue #283.
+
 ---
 
 ## Verifying a single migration

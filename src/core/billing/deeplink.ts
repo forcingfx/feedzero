@@ -18,14 +18,12 @@
  */
 
 /**
- * Both keys stay parseable even though billing is annual-only.
- *
- * `?subscribe=personal-monthly` links are already out in the world — on the
- * landing page, in the support runbook, in old emails — and rejecting them
- * would fail closed at the point of highest purchase intent. They resolve
- * to the annual price; see {@link resolvePriceId}.
+ * The one price key. `personal-monthly` was retired (ADR 029): it resolved
+ * to the annual price, and no live link emits it any more, so an old
+ * `?subscribe=personal-monthly` URL now opens the app without starting
+ * checkout.
  */
-export const PRICE_KEYS = ["personal-monthly", "personal-yearly"] as const;
+export const PRICE_KEYS = ["personal-yearly"] as const;
 export type PriceKey = (typeof PRICE_KEYS)[number];
 
 export interface SubscribeIntent {
@@ -58,10 +56,8 @@ export interface PriceIdMap {
  * the env var is unset (e.g. local dev without Stripe wired) so the caller
  * can fail closed instead of hitting Stripe with an empty priceId.
  *
- * Every key resolves to the annual price: there is only one. The retired
- * `personal-monthly` key is deliberately not special-cased into a rejection
- * — an old link should still sell the plan that exists, not 404 the
- * customer.
+ * There is only one price, so the key is not consulted; the parameter
+ * keeps the call sites honest if a second plan is ever added.
  */
 export function resolvePriceId(
   _key: PriceKey,
