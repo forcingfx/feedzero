@@ -268,8 +268,12 @@ describe("handleFeedbackRequest", () => {
    * outage (5xx). Without it the form failed silently for months.
    */
   describe("operator log on upstream failure", () => {
-    function capturedLogLines(spy: ReturnType<typeof vi.spyOn>): Record<string, unknown>[] {
-      return spy.mock.calls.map((call) => JSON.parse(String(call[0])));
+    function loggedText(spy: { mock: { calls: unknown[][] } }): string[] {
+      return spy.mock.calls.map((call) => String(call[0]));
+    }
+
+    function capturedLogLines(spy: { mock: { calls: unknown[][] } }): Record<string, unknown>[] {
+      return loggedText(spy).map((line) => JSON.parse(line));
     }
 
     it("logs GitHub's status when GitHub rejects the issue", async () => {
@@ -309,7 +313,7 @@ describe("handleFeedbackRequest", () => {
         postJson({ message: "secret-message-body", email: "reader@example.org" }),
       );
 
-      const logged = errSpy.mock.calls.map((call) => String(call[0])).join("\n");
+      const logged = loggedText(errSpy).join("\n");
       expect(logged).not.toContain("secret-message-body");
       expect(logged).not.toContain("reader@example.org");
     });
