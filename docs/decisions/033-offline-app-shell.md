@@ -77,6 +77,13 @@ Both static hosts set it (`vercel.json`, `server.ts`). A worker runs
 from the user's browser, so the only fix for a bad one is shipping a
 good `/sw.js`.
 
+The hosted app also sends `Cloudflare-CDN-Cache-Control: no-store` on
+`/sw.js` (issue #326). Cloudflare, in front of `my.feedzero.app`, replaced
+`no-cache` with the zone's 4-hour Browser Cache TTL, but only on responses
+its edge caches. Keeping `/sw.js` out of the edge cache leaves the browser
+header as sent. Self-hosters behind Cloudflare can add the same header, or
+set the zone's Browser Cache TTL to "Respect Existing Headers".
+
 ### Registered in production builds only
 
 `src/lib/register-service-worker.ts` is called from `src/main.tsx`. It

@@ -31,6 +31,17 @@ describe("vercel.json: /sw.js", () => {
     expect(cacheControl?.value).toBe("no-cache");
   });
 
+  it("tells Cloudflare's edge not to cache it, so its Browser Cache TTL leaves no-cache alone (#326)", () => {
+    // Cloudflare sits in front of my.feedzero.app and rewrote the browser-
+    // facing header to the zone's max-age=14400, but only on responses its
+    // edge caches: uncached (DYNAMIC) responses kept their origin header.
+    // The Cloudflare-only header keeps /sw.js out of the edge cache. Vercel
+    // ignores it (it reads CDN-Cache-Control and Vercel-CDN-Cache-Control).
+    const edge = rule?.headers.find((h) => h.key === "Cloudflare-CDN-Cache-Control");
+
+    expect(edge?.value).toBe("no-store");
+  });
+
   it("is served as JavaScript, which browsers require before they will install it", () => {
     const contentType = rule?.headers.find((h) => h.key === "Content-Type");
 
