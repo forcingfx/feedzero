@@ -3,12 +3,43 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-10-04T11:00:00Z</updated>
+  <updated>2026-11-08T20:43:37Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.16.0</id>
+    <title>v0.16.0: Offline startup, article retention, and more reading options</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-11-08T20:43:37Z</published>
+    <updated>2026-11-08T20:43:37Z</updated>
+    <summary>The app opens without a connection after one online visit. Unstarred articles older than 30 days are now removed, and Settings gains larger text, a full-width reader, and line spacing.</summary>
+    <content type="html"><![CDATA[<p>The app opens without a connection after one online visit. Unstarred articles older than 30 days are now removed, and Settings gains larger text, a full-width reader, and line spacing.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added offline startup. After one online visit, the app opens without a connection on any route.</li>
+  <li>Added article retention. Unstarred articles older than the chosen period are removed at the end of each refresh, read or unread. The default is 30 days, and Settings, Reading, Keep articles offers periods from 7 days to 1 year, or Forever.</li>
+  <li>Added an Extra large text size, a Full reading width, and a Line spacing setting with Compact, Normal, and Relaxed options in Settings, Reading.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Trimmed existing libraries to the 30-day default on the first refresh after updating. Starred articles are kept.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed the feedback form, which had failed with a 502 error since May because the server's GitHub credential had expired. The server now logs the cause of such failures and warns two weeks before the credential expires.</li>
+  <li>Fixed the article list on desktop returning to its default width on every load. It now keeps the width it was dragged to.</li>
+  <li>Fixed the hosted app's service worker script being sent with a four-hour browser cache lifetime. It is now revalidated on every check, as intended.</li>
+  <li>Updated DOMPurify, undici, and zod to clear critical and high-severity security advisories.</li>
+</ul>
+<h3>Removed</h3>
+<ul>
+  <li>Removed the retired monthly subscribe link. An old link with subscribe=personal-monthly now opens the app without starting checkout.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.15.0</id>
     <title>v0.15.0: Larger sync vaults and a smoother mobile reader</title>
