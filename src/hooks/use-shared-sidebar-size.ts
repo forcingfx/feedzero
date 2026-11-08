@@ -1,5 +1,7 @@
-import { useCallback, useRef } from "react";
-import type { PanelSize } from "react-resizable-panels";
+import {
+  usePersistedPanelWidth,
+  type PersistedPanelWidth,
+} from "./use-persisted-panel-width.ts";
 
 /**
  * localStorage key for the sidebar's preferred width in absolute pixels.
@@ -19,33 +21,6 @@ import type { PanelSize } from "react-resizable-panels";
  */
 export const SIDEBAR_WIDTH_STORAGE_KEY = "feedzero:sidebar-width-px";
 
-function readStored(): number | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
-    if (!raw) return null;
-    const num = Number(raw);
-    return Number.isFinite(num) && num > 0 ? num : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStored(value: number) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(value));
-  } catch {
-    // localStorage may be unavailable (private mode, quota exceeded).
-    // The in-memory ref still serves the current session.
-  }
-}
-
-interface UseSharedSidebarSizeResult {
-  onResize: (panelSize: PanelSize) => void;
-  defaultSize: string | undefined;
-}
-
 /**
  * Persists the sidebar's user-dragged pixel width across reloads.
  *
@@ -61,17 +36,6 @@ interface UseSharedSidebarSizeResult {
  * width only changes when the user drags or resizes the window" was held
  * by correction rather than by construction.
  */
-export function useSharedSidebarSize(): UseSharedSidebarSizeResult {
-  const sizeRef = useRef<number | null>(readStored());
-
-  const onResize = useCallback((panelSize: PanelSize) => {
-    sizeRef.current = panelSize.inPixels;
-    writeStored(panelSize.inPixels);
-  }, []);
-
-  const initial = sizeRef.current;
-  return {
-    onResize,
-    defaultSize: initial != null ? `${initial}px` : undefined,
-  };
+export function useSharedSidebarSize(): PersistedPanelWidth {
+  return usePersistedPanelWidth(SIDEBAR_WIDTH_STORAGE_KEY);
 }

@@ -13,6 +13,7 @@ import { shouldCommitSwipeBack } from "@/lib/swipe-back.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
+import { usePersistedPanelWidth } from "@/hooks/use-persisted-panel-width.ts";
 import { PANEL_LAYOUT_ID } from "@feedzero/core/utils/constants";
 import { findNextArticle, findPrevArticle } from "@/lib/next-article.ts";
 import {
@@ -48,10 +49,17 @@ const ExploreCatalog = lazy(() =>
  * When the user has no feeds, redirects to /explore — the empty state
  * for "feeds" is the catalog itself.
  */
+/**
+ * localStorage key for the article list's preferred width in pixels. Kept
+ * per device rather than synced: the right width depends on the screen.
+ */
+export const ARTICLE_LIST_WIDTH_STORAGE_KEY = "feedzero:article-list-width-px";
+
 export function FeedsRoute() {
   const { feedId, articleId } = useParams();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
+  const articleListWidth = usePersistedPanelWidth(ARTICLE_LIST_WIDTH_STORAGE_KEY);
   const feeds = useFeedStore((s) => s.feeds);
   const feedsLoaded = useFeedStore((s) => s.feedsLoaded);
   const selectFeed = useFeedStore((s) => s.selectFeed);
@@ -207,7 +215,8 @@ export function FeedsRoute() {
     >
       <ResizablePanel
         id="article-list"
-        defaultSize="40%"
+        defaultSize={articleListWidth.defaultSize ?? "40%"}
+        onResize={articleListWidth.onResize}
         minSize="180px"
         className="overflow-hidden"
       >
@@ -216,7 +225,10 @@ export function FeedsRoute() {
       <ResizableHandle />
       <ResizablePanel
         id="reader"
-        defaultSize="60%"
+        // With a restored list width the reader must take the remainder. A
+        // fixed 60% beside a pixel width leaves space unassigned, and the
+        // library spreads it over both panels, widening the restored list.
+        defaultSize={articleListWidth.defaultSize ? undefined : "60%"}
         minSize="200px"
         className="overflow-hidden"
       >
