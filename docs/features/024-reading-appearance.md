@@ -17,6 +17,16 @@ and minimal look" plus browser-reader-style width control. They ship
 together because they are the same request seen from four angles, and
 because the first three share a storage path.
 
+### Update 2026-11-08 (issue #341)
+
+A second user asked for "bigger text, more line-height and more width".
+Text size gained **Extra large**, reading width gained **Full** (no max
+width), and a new synced **Line spacing** preference (`readerLineHeight`:
+Compact / Normal / Relaxed) was added. Like the measure, line spacing is
+set only on the reader's `<article>` column; `ArticleContent` carries no
+leading of its own. Covered by `tests/e2e/reading-appearance.spec.ts`,
+which asserts the computed font size and line height.
+
 ## Behaviour
 
 ```gherkin
@@ -80,7 +90,7 @@ Feature: Reading appearance
 
 | File | Role |
 |------|------|
-| `packages/core/src/types/index.ts` | `ReaderWidth`, `readerWidth`, `hideReadArticles`, `showArticleFeedIcons` and their defaults |
+| `packages/core/src/types/index.ts` | `ReaderWidth`, `readerWidth`, `ReaderLineHeight`, `readerLineHeight`, `hideReadArticles`, `showArticleFeedIcons` and their defaults |
 | `src/components/settings/tabs/reading-tab.tsx` | The four controls; `SegmentedPreference` backs the two segmented ones |
 | `src/components/reader/reader-panel.tsx` | `READER_WIDTH_CLASS`; sole owner of the reading measure |
 | `src/components/reader/article-content.tsx` | Carries no measure of its own |

@@ -48,7 +48,9 @@ the vault with timestamp last-write-wins — see [ADR 022](decisions/022-prefere
 | articleSortMode   | `"newest" \| "oldest" \| "unread-first"` | Article list ordering          |
 | groupArticleFloods| boolean                               | Collapse same-feed bursts         |
 | theme             | `"light" \| "dark" \| "system"`       | Color scheme (synced; bridged into next-themes by `<ThemeBridge>`) |
-| readerTextSize    | `"small" \| "medium" \| "large"` (optional) | Reader body text scale; absent on rows from older clients → treated as "medium" |
+| readerTextSize    | `"small" \| "medium" \| "large" \| "x-large"` (optional) | Reader body text scale; absent on rows from older clients → treated as "medium" |
+| readerWidth       | `"narrow" \| "medium" \| "wide" \| "full"` (optional) | Reader column measure; absent → "medium" |
+| readerLineHeight  | `"compact" \| "normal" \| "relaxed"` (optional) | Reader line spacing; absent → "normal" (the historical leading). An older client that receives a value it does not know renders its default |
 | articleRetention  | `7 \| 14 \| 30 \| 90 \| 365 \| "never"` (optional) | Days an unstarred article is kept after publication; absent → 30, so existing vaults are purged at the default on upgrade |
 
 ### Meta (internal)
