@@ -32,6 +32,31 @@
  */
 export const releases = [
   {
+    version: "0.16.0",
+    date: "2026-11-08T20:43:37Z",
+    title: "Offline startup, article retention, and more reading options",
+    subtitle:
+      "The app opens without a connection after one online visit. Unstarred articles older than 30 days are now removed, and Settings gains larger text, a full-width reader, and line spacing.",
+    affects: ["offline"],
+    added: [
+      "Added offline startup. After one online visit, the app opens without a connection on any route.",
+      "Added article retention. Unstarred articles older than the chosen period are removed at the end of each refresh, read or unread. The default is 30 days, and Settings, Reading, Keep articles offers periods from 7 days to 1 year, or Forever.",
+      "Added an Extra large text size, a Full reading width, and a Line spacing setting with Compact, Normal, and Relaxed options in Settings, Reading.",
+    ],
+    changed: [
+      "Trimmed existing libraries to the 30-day default on the first refresh after updating. Starred articles are kept.",
+    ],
+    fixed: [
+      "Fixed the feedback form, which had failed with a 502 error since May because the server's GitHub credential had expired. The server now logs the cause of such failures and warns two weeks before the credential expires.",
+      "Fixed the article list on desktop returning to its default width on every load. It now keeps the width it was dragged to.",
+      "Fixed the hosted app's service worker script being sent with a four-hour browser cache lifetime. It is now revalidated on every check, as intended.",
+      "Updated DOMPurify, undici, and zod to clear critical and high-severity security advisories.",
+    ],
+    removed: [
+      "Removed the retired monthly subscribe link. An old link with subscribe=personal-monthly now opens the app without starting checkout.",
+    ],
+  },
+  {
     version: "0.15.0",
     date: "2026-10-04T11:00:00Z",
     title: "Larger sync vaults and a smoother mobile reader",
