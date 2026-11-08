@@ -262,6 +262,59 @@ describe("handleFeedbackRequest", () => {
     expect(body.error).toMatch(/try again/i);
   });
 
+  /**
+   * The 502 is deliberately generic for the user, so the log line is the
+   * only place an operator can tell an expired token (401) from a GitHub
+   * outage (5xx). Without it the form failed silently for months.
+   */
+  describe("operator log on upstream failure", () => {
+    function capturedLogLines(spy: ReturnType<typeof vi.spyOn>): Record<string, unknown>[] {
+      return spy.mock.calls.map((call) => JSON.parse(String(call[0])));
+    }
+
+    it("logs GitHub's status when GitHub rejects the issue", async () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response("Bad credentials", { status: 401 })),
+      );
+
+      await handleFeedbackRequest(postJson({ message: "Hi" }));
+
+      const [line] = capturedLogLines(errSpy);
+      expect(line).toMatchObject({
+        route: "/api/feedback",
+        method: "POST",
+        status: 502,
+        errClass: "GitHubRejected",
+      });
+      expect(line.errMsg).toContain("401");
+    });
+
+    it("logs the error class when the call to GitHub throws", async () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+
+      await handleFeedbackRequest(postJson({ message: "Hi" }));
+
+      const [line] = capturedLogLines(errSpy);
+      expect(line).toMatchObject({ route: "/api/feedback", status: 502, errClass: "TypeError" });
+    });
+
+    it("never logs the feedback message or the reply-to email", async () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("x", { status: 403 })));
+
+      await handleFeedbackRequest(
+        postJson({ message: "secret-message-body", email: "reader@example.org" }),
+      );
+
+      const logged = errSpy.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(logged).not.toContain("secret-message-body");
+      expect(logged).not.toContain("reader@example.org");
+    });
+  });
+
   it("sets nosniff and json content-type on every response", async () => {
     vi.stubGlobal(
       "fetch",
