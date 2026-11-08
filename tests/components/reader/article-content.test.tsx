@@ -43,10 +43,15 @@ describe("ArticleContent", () => {
     expect(bareMaxWidth).toEqual([]);
   });
 
-  it("has leading-relaxed class for readability", () => {
+  it("sets no line height of its own, so the reader's line spacing preference applies", () => {
+    // Same rule as the measure above: ReaderPanel's <article> column owns
+    // line spacing. A leading-* class here would override the preference.
     const { container } = render(<ArticleContent html="<p>text</p>" />);
     const wrapper = container.firstElementChild;
-    expect(wrapper?.className).toContain("leading-relaxed");
+    const leading = (wrapper?.className ?? "")
+      .split(/\s+/)
+      .filter((token) => token.startsWith("leading-"));
+    expect(leading).toEqual([]);
   });
 
   it("has refined link underline styling", () => {
