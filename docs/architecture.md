@@ -189,6 +189,16 @@ to inspect the one part of the system that was working. Narrow untrusted
 fields to their expected type before using them, and return `jsonResponse` from
 the method guard too.
 
+The same endpoint taught the converse lesson. A generic error is right for the
+user, but it must not be the *only* record. `/api/feedback` turned every GitHub
+refusal into one 502 and logged nothing, so an expired `GITHUB_FEEDBACK_TOKEN`
+(GitHub answers 401) looked exactly like a GitHub outage, and the form failed
+silently from roughly May to November 2026. When a handler hides an upstream
+failure behind a generic status, log the upstream status or error class with
+`logError` (never the user's payload). The fine-grained token expires, so
+renew it before its expiry date; a `GitHubRejected` / `upstream 401` line in
+the runtime logs means it has lapsed.
+
 ### Production data layer: Upstash KV
 
 Per [ADR 008](decisions/008-upstash-as-production-data-layer.md), five distinct server-side concerns share one Upstash REST KV instance with non-overlapping key prefixes (`license:*`, `customer:*`, `vault:*`, `seen-event:*`, `catalog:*`, `ratelimit:*`). The credential cascade `UPSTASH_REDIS_REST_URL/TOKEN` → `KV_REST_API_URL/TOKEN` → memory fallback is shared by every adapter, so an operator configures Upstash once and all five subsystems pick it up.

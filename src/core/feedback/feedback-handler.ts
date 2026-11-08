@@ -11,6 +11,10 @@
  * before the user types it — see <FeedbackDialog>.
  */
 
+import { logError } from "../../../packages/core/src/utils/log-error";
+import { newTraceId } from "../../../packages/core/src/utils/trace-id";
+
+const ROUTE = "/api/feedback";
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_EMAIL_LENGTH = 254;
 
@@ -92,19 +96,32 @@ export async function handleFeedbackRequest(
     );
 
     if (!response.ok) {
-      return jsonResponse(
-        { ok: false, error: "Could not submit feedback. Please try again." },
-        502,
-      );
+      return upstreamFailure("GitHubRejected", `upstream ${response.status}`);
     }
 
     return jsonResponse({ ok: true });
-  } catch {
-    return jsonResponse(
-      { ok: false, error: "Could not submit feedback. Please try again." },
-      502,
-    );
+  } catch (err) {
+    return upstreamFailure(errorClassOf(err), "GitHub request failed");
   }
+}
+
+/**
+ * Answer the user with a generic 502 and log the cause for the operator.
+ * The log carries only GitHub's status or the error class, never the
+ * message or reply-to email (ADR 032): enough to tell an expired token
+ * (401) from a GitHub outage (5xx).
+ */
+function upstreamFailure(errClass: string, errMsg: string): Response {
+  const status = 502;
+  logError({ route: ROUTE, method: "POST", status, traceId: newTraceId(), errClass, errMsg });
+  return jsonResponse(
+    { ok: false, error: "Could not submit feedback. Please try again." },
+    status,
+  );
+}
+
+function errorClassOf(err: unknown): string {
+  return err instanceof Error ? err.constructor.name : "Unknown";
 }
 
 /**
