@@ -114,6 +114,7 @@ describe("ReaderPanel", () => {
     it.each([
       ["narrow", "max-w-150"],
       ["wide", "max-w-240"],
+      ["full", "max-w-none"],
     ] as const)(
       "applies the persisted %s reading width",
       async (width, expectedClass) => {
@@ -169,8 +170,42 @@ describe("ReaderPanel", () => {
     });
 
     it.each([
+      [undefined, "leading-relaxed"],
+      ["compact", "leading-normal"],
+      ["normal", "leading-relaxed"],
+      ["relaxed", "leading-loose"],
+    ] as const)(
+      "applies the %s line spacing to the article column (undefined = unset, reads as normal)",
+      async (lineHeight, expectedClass) => {
+        const { usePreferencesStore } = await import(
+          "@/stores/preferences-store.ts"
+        );
+        const { DEFAULT_PREFERENCES } = await import("@feedzero/core/types");
+        usePreferencesStore.setState({
+          preferences: { ...DEFAULT_PREFERENCES, readerLineHeight: lineHeight },
+        });
+        useArticleStore.setState({
+          selectedArticle: mockArticle(),
+          articles: [],
+          isLoading: false,
+        });
+
+        render(<ReaderPanel />);
+
+        const articleEl = screen
+          .getByRole("heading", { level: 2 })
+          .closest("article");
+        expect(articleEl!.className).toContain(expectedClass);
+        usePreferencesStore.setState({
+          preferences: { ...DEFAULT_PREFERENCES },
+        });
+      },
+    );
+
+    it.each([
       ["small", "text-sm"],
       ["large", "text-lg"],
+      ["x-large", "text-xl"],
     ] as const)(
       "applies the persisted %s reader text size",
       async (size, expectedClass) => {

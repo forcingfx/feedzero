@@ -118,6 +118,49 @@ describe("<ReadingTab>", () => {
     });
   });
 
+  describe("issue #341: larger text, full width, line height", () => {
+    it("offers an Extra large text size and persists it", async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      renderTab();
+      const group = screen.getByRole("group", { name: /text size/i });
+
+      fireEvent.click(within(group).getByRole("button", { name: /^extra large$/i }));
+
+      expect(usePreferencesStore.getState().preferences.readerTextSize).toBe("x-large");
+    });
+
+    it("offers a Full reading width and persists it", async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      renderTab();
+      const group = screen.getByRole("group", { name: /reading width/i });
+
+      fireEvent.click(within(group).getByRole("button", { name: /^full$/i }));
+
+      expect(usePreferencesStore.getState().preferences.readerWidth).toBe("full");
+    });
+
+    it("renders a three-way line spacing control defaulting to Normal", () => {
+      renderTab();
+      const group = screen.getByRole("group", { name: /line spacing/i });
+      expect(within(group).getByRole("button", { name: /^normal$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(within(group).getByRole("button", { name: /^compact$/i })).toBeInTheDocument();
+      expect(within(group).getByRole("button", { name: /^relaxed$/i })).toBeInTheDocument();
+    });
+
+    it("selecting Relaxed line spacing persists the preference", async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      renderTab();
+      const group = screen.getByRole("group", { name: /line spacing/i });
+
+      fireEvent.click(within(group).getByRole("button", { name: /^relaxed$/i }));
+
+      expect(usePreferencesStore.getState().preferences.readerLineHeight).toBe("relaxed");
+    });
+  });
+
   describe("hide read articles", () => {
     it("is off by default", () => {
       renderTab();

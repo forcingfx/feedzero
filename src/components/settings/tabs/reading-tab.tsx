@@ -11,6 +11,7 @@
  */
 import { useState } from "react";
 import {
+  AlignJustify,
   CheckCheck,
   Image as ImageIcon,
   Layers,
@@ -25,18 +26,26 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { usePreferencesStore } from "@/stores/preferences-store";
-import type { ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
+import type { ReaderLineHeight, ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
 
 const TEXT_SIZES: { value: ReaderTextSize; label: string }[] = [
   { value: "small", label: "Small" },
   { value: "medium", label: "Medium" },
   { value: "large", label: "Large" },
+  { value: "x-large", label: "Extra large" },
 ];
 
 const READER_WIDTHS: { value: ReaderWidth; label: string }[] = [
   { value: "narrow", label: "Narrow" },
   { value: "medium", label: "Medium" },
   { value: "wide", label: "Wide" },
+  { value: "full", label: "Full" },
+];
+
+const LINE_HEIGHTS: { value: ReaderLineHeight; label: string }[] = [
+  { value: "compact", label: "Compact" },
+  { value: "normal", label: "Normal" },
+  { value: "relaxed", label: "Relaxed" },
 ];
 import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
 import { ThemeToggle } from "../theme-toggle";
@@ -52,6 +61,9 @@ export function ReadingTab() {
   );
   const readerWidth = usePreferencesStore(
     (s) => s.preferences.readerWidth ?? "medium",
+  );
+  const readerLineHeight = usePreferencesStore(
+    (s) => s.preferences.readerLineHeight ?? "normal",
   );
   const hideReadArticles = usePreferencesStore(
     (s) => s.preferences.hideReadArticles ?? false,
@@ -92,6 +104,15 @@ export function ReadingTab() {
         options={READER_WIDTHS}
         value={readerWidth}
         onChange={(value) => void updatePreferences({ readerWidth: value })}
+      />
+
+      <SegmentedPreference
+        icon={<AlignJustify className="size-4 text-muted-foreground" />}
+        title="Line spacing"
+        description="Space between lines of article text."
+        options={LINE_HEIGHTS}
+        value={readerLineHeight}
+        onChange={(value) => void updatePreferences({ readerLineHeight: value })}
       />
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">

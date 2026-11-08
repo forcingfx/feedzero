@@ -191,7 +191,7 @@ export const ARTICLE_SORT_MODES: readonly ArticleSortMode[] = [
  * follow-up PR); until then it stays undefined.
  */
 /** Reader body text scale. "medium" is the historical default. */
-export type ReaderTextSize = "small" | "medium" | "large";
+export type ReaderTextSize = "small" | "medium" | "large" | "x-large";
 
 /**
  * Reading measure (max column width) in the reader panel. "medium" is the
@@ -199,7 +199,13 @@ export type ReaderTextSize = "small" | "medium" | "large";
  * "wide" opens it up on large displays, mirroring the width control in
  * browser reader modes.
  */
-export type ReaderWidth = "narrow" | "medium" | "wide";
+export type ReaderWidth = "narrow" | "medium" | "wide" | "full";
+
+/**
+ * Line spacing of the reader's body copy. "normal" is the historical
+ * relaxed leading; "compact" and "relaxed" sit either side of it.
+ */
+export type ReaderLineHeight = "compact" | "normal" | "relaxed";
 
 /**
  * How long an unstarred article is kept, in days since it was published,
@@ -225,6 +231,8 @@ export interface UserPreferences {
   readerTextSize?: ReaderTextSize;
   /** Optional for the same reason as `readerTextSize`; `undefined` reads as "medium". */
   readerWidth?: ReaderWidth;
+  /** Optional for the same reason as `readerTextSize`; `undefined` reads as "normal". */
+  readerLineHeight?: ReaderLineHeight;
   /**
    * Unread-only reading mode: read articles drop out of the list so a
    * finished session leaves an empty view. Optional for the same
@@ -259,6 +267,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   theme: "system",
   readerTextSize: "medium",
   readerWidth: "medium",
+  readerLineHeight: "normal",
   hideReadArticles: false,
   showArticleFeedIcons: true,
   articleRetention: DEFAULT_ARTICLE_RETENTION,

@@ -18,6 +18,7 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       theme: "system",
       readerTextSize: "medium",
       readerWidth: "medium",
+      readerLineHeight: "normal",
       hideReadArticles: false,
       showArticleFeedIcons: true,
       // 30 days, not "never": bounds vault size by default (owner's call,

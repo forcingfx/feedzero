@@ -12,7 +12,7 @@ import { decodeEntities } from "@/lib/decode-entities.ts";
 import { shareArticle } from "@/lib/share-article.ts";
 import { TAP_TARGET_EXPAND, TAP_TARGET_EXPAND_Y } from "@/lib/tap-target.ts";
 import { usePreferencesStore } from "@/stores/preferences-store.ts";
-import type { ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
+import type { ReaderLineHeight, ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
 
 /**
  * Body scale per readerTextSize preference. Headings keep their absolute
@@ -23,6 +23,7 @@ const TEXT_SIZE_CLASS: Record<ReaderTextSize, string> = {
   small: "text-sm",
   medium: "",
   large: "text-lg",
+  "x-large": "text-xl",
 };
 
 /**
@@ -35,6 +36,17 @@ const READER_WIDTH_CLASS: Record<ReaderWidth, string> = {
   narrow: "max-w-150",
   medium: "max-w-180",
   wide: "max-w-240",
+  full: "max-w-none",
+};
+
+/**
+ * Line spacing per readerLineHeight preference. Like the measure, it is
+ * set only on the column: ArticleContent carries no leading of its own.
+ */
+const LINE_HEIGHT_CLASS: Record<ReaderLineHeight, string> = {
+  compact: "leading-normal",
+  normal: "leading-relaxed",
+  relaxed: "leading-loose",
 };
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -91,6 +103,9 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   );
   const readerWidth = usePreferencesStore(
     (s) => s.preferences.readerWidth ?? "medium",
+  );
+  const readerLineHeight = usePreferencesStore(
+    (s) => s.preferences.readerLineHeight ?? "normal",
   );
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
@@ -301,6 +316,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           "p-4 px-6 mx-auto",
           READER_WIDTH_CLASS[readerWidth],
           TEXT_SIZE_CLASS[readerTextSize],
+          LINE_HEIGHT_CLASS[readerLineHeight],
         )}
       >
         <header className="mb-3">
