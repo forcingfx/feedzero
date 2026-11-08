@@ -195,9 +195,10 @@ refusal into one 502 and logged nothing, so an expired `GITHUB_FEEDBACK_TOKEN`
 (GitHub answers 401) looked exactly like a GitHub outage, and the form failed
 silently from roughly May to November 2026. When a handler hides an upstream
 failure behind a generic status, log the upstream status or error class with
-`logError` (never the user's payload). The fine-grained token expires, so
-renew it before its expiry date; a `GitHubRejected` / `upstream 401` line in
-the runtime logs means it has lapsed.
+`logError` (never the user's payload). The fine-grained token expires: from
+14 days out, each successful submission logs `TokenExpiringSoon` (read from
+GitHub's `github-authentication-token-expiration` response header), and a
+`GitHubRejected` / `upstream 401` line means it has already lapsed.
 
 ### Production data layer: Upstash KV
 

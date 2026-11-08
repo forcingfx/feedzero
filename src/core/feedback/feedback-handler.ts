@@ -16,6 +16,9 @@ import { newTraceId } from "../../../packages/core/src/utils/trace-id";
 
 const ROUTE = "/api/feedback";
 const MAX_MESSAGE_LENGTH = 2000;
+const TOKEN_EXPIRY_HEADER = "github-authentication-token-expiration";
+const TOKEN_EXPIRY_WARNING_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_EMAIL_LENGTH = 254;
 
 /**
@@ -99,6 +102,7 @@ export async function handleFeedbackRequest(
       return upstreamFailure("GitHubRejected", `upstream ${response.status}`);
     }
 
+    warnIfTokenExpiresSoon(response.headers.get(TOKEN_EXPIRY_HEADER));
     return jsonResponse({ ok: true });
   } catch (err) {
     return upstreamFailure(errorClassOf(err), "GitHub request failed");
@@ -118,6 +122,34 @@ function upstreamFailure(errClass: string, errMsg: string): Response {
     { ok: false, error: "Could not submit feedback. Please try again." },
     status,
   );
+}
+
+/**
+ * Log a warning once the GitHub token has under two weeks left. GitHub
+ * stamps every response made with a fine-grained token with its expiry
+ * (e.g. "2027-11-08 11:36:55 UTC"); without this, the first sign of an
+ * expired token was users unable to send feedback, for months.
+ */
+function warnIfTokenExpiresSoon(expiryHeader: string | null): void {
+  const expiresAt = parseGitHubTimestamp(expiryHeader);
+  if (expiresAt === null) return;
+  const daysLeft = Math.floor((expiresAt - Date.now()) / DAY_MS);
+  if (daysLeft >= TOKEN_EXPIRY_WARNING_DAYS) return;
+  logError({
+    route: ROUTE,
+    method: "POST",
+    status: 200,
+    traceId: newTraceId(),
+    errClass: "TokenExpiringSoon",
+    errMsg: `GITHUB_FEEDBACK_TOKEN expires in ${daysLeft} days`,
+  });
+}
+
+function parseGitHubTimestamp(value: string | null): number | null {
+  if (!value) return null;
+  const iso = value.trim().replace(" UTC", "Z").replace(" ", "T");
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : ms;
 }
 
 function errorClassOf(err: unknown): string {

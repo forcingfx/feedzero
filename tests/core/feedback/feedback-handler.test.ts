@@ -319,6 +319,66 @@ describe("handleFeedbackRequest", () => {
     });
   });
 
+  /**
+   * GitHub stamps every response made with a fine-grained token with its
+   * expiry. Warning two weeks ahead turns the next silent outage (the form
+   * was down May–Nov 2026 on an expired token) into a log line on-call sees.
+   */
+  describe("token expiry warning", () => {
+    const EXPIRY_HEADER = "github-authentication-token-expiration";
+
+    function created(expiry?: string): Response {
+      const headers = new Headers({ "Content-Type": "application/json" });
+      if (expiry) headers.set(EXPIRY_HEADER, expiry);
+      return new Response(JSON.stringify({ number: 1 }), { status: 201, headers });
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2027-11-01T00:00:00Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("logs a warning when the token expires within 14 days", async () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(created("2027-11-08 11:36:55 UTC")));
+
+      const res = await handleFeedbackRequest(postJson({ message: "Hi" }));
+
+      expect(res.status).toBe(200);
+      const [line] = errSpy.mock.calls.map((call) => JSON.parse(String(call[0])));
+      expect(line).toMatchObject({ route: "/api/feedback", errClass: "TokenExpiringSoon" });
+      expect(line.errMsg).toContain("7 days");
+    });
+
+    it("stays quiet when the token has more than 14 days left", async () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(created("2027-12-01 00:00:00 UTC")));
+
+      await handleFeedbackRequest(postJson({ message: "Hi" }));
+
+      expect(errSpy).not.toHaveBeenCalled();
+    });
+
+    it("stays quiet when GitHub sends no expiry or an unreadable one", async () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(created())
+        .mockResolvedValueOnce(created("not a date"));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await handleFeedbackRequest(postJson({ message: "Hi" }));
+      const res = await handleFeedbackRequest(postJson({ message: "Hi" }));
+
+      expect(res.status).toBe(200);
+      expect(errSpy).not.toHaveBeenCalled();
+    });
+  });
+
   it("sets nosniff and json content-type on every response", async () => {
     vi.stubGlobal(
       "fetch",
