@@ -300,4 +300,29 @@ describe("ArticleItem", () => {
       expect(side.contains(favicon)).toBe(true);
     });
   });
+
+  describe("imageUrl prop (#340)", () => {
+    it("renders the image through the icon proxy, lazily, without a referrer", () => {
+      render(
+        <ArticleItem
+          article={mockArticle()}
+          isSelected={false}
+          onSelect={() => {}}
+          imageUrl="https://cdn.example.com/lead.jpg"
+        />,
+      );
+      const img = screen.getByTestId("article-image");
+      expect(img).toHaveAttribute(
+        "src",
+        "/api/icon?url=" + encodeURIComponent("https://cdn.example.com/lead.jpg"),
+      );
+      expect(img).toHaveAttribute("loading", "lazy");
+      expect(img).toHaveAttribute("referrerpolicy", "no-referrer");
+    });
+
+    it("renders no image element when the prop is absent", () => {
+      render(<ArticleItem article={mockArticle()} isSelected={false} onSelect={() => {}} />);
+      expect(screen.queryByTestId("article-image")).toBeNull();
+    });
+  });
 });

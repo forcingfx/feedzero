@@ -27,6 +27,7 @@ Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 | title       | string  | Article title                       |
 | link        | string  | Original article URL                |
 | content     | string  | Sanitized HTML content              |
+| imageUrl    | string (optional) | Lead image, absolute http(s) only; shown in the list only when `showArticleImages` is on (#340) |
 | summary     | string  | Sanitized summary/description       |
 | author      | string  | Author name, default ''             |
 | publishedAt | number  | Unix ms timestamp, nullable           |
@@ -52,6 +53,7 @@ the vault with timestamp last-write-wins — see [ADR 022](decisions/022-prefere
 | readerWidth       | `"narrow" \| "medium" \| "wide" \| "full"` (optional) | Reader column measure; absent → "medium" |
 | readerLineHeight  | `"compact" \| "normal" \| "relaxed"` (optional) | Reader line spacing; absent → "normal" (the historical leading). An older client that receives a value it does not know renders its default |
 | openArticlesIn    | `"feed" \| "full-text"` (optional) | Default view for opened articles; absent → "feed". A folder's own `openArticlesIn` overrides it |
+| showArticleImages | boolean (optional) | Show lead images in the article list; absent → false. Off by default for privacy |
 | articleRetention  | `7 \| 14 \| 30 \| 90 \| 365 \| "never"` (optional) | Days an unstarred article is kept after publication; absent → 30, so existing vaults are purged at the default on upgrade |
 
 ### Meta (internal)

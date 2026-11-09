@@ -67,6 +67,7 @@ export function createArticle({
   summary = "",
   author = "",
   publishedAt = null,
+  imageUrl,
 }: CreateArticleInput): Result<Article> {
   if (!feedId || !title || !link)
     return err("Article requires feedId, title, and link");
@@ -79,6 +80,7 @@ export function createArticle({
     content,
     summary,
     author,
+    imageUrl,
     publishedAt: publishedAt ?? Date.now(),
     read: false,
     createdAt: Date.now(),

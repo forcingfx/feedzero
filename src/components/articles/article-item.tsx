@@ -10,6 +10,8 @@ interface ArticleItemProps {
   onSelect: (article: Article) => void;
   feedTitle?: string;
   feedSiteUrl?: string;
+  /** Lead image to show at the left; the caller gates it on the user's setting. */
+  imageUrl?: string;
 }
 
 function formatDate(timestamp: number): string {
@@ -30,6 +32,7 @@ export const ArticleItem = memo(function ArticleItem({
   onSelect,
   feedTitle,
   feedSiteUrl,
+  imageUrl,
 }: ArticleItemProps) {
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") {
@@ -55,6 +58,21 @@ export const ArticleItem = memo(function ArticleItem({
       onKeyDown={handleKeyDown}
       className="pl-2 pr-3.5 py-2 border-b border-border border-l-2 border-l-transparent cursor-pointer hover:bg-accent aria-selected:bg-accent aria-selected:border-l-primary flex gap-3 transition-colors duration-150"
     >
+      {imageUrl && (
+        <img
+          data-testid="article-image"
+          src={`/api/icon?url=${encodeURIComponent(imageUrl)}`}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          className="size-14 shrink-0 rounded-md object-cover bg-muted"
+          onError={(e) => {
+            // A dead or non-image URL leaves no broken-image box behind.
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      )}
       <div className="min-w-0 flex-1 flex gap-2 items-start">
         <span
           className={`rounded-full size-1.5 shrink-0 mt-1.5 transition-colors duration-500 ${
