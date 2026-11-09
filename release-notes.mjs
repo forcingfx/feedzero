@@ -37,7 +37,7 @@ export const releases = [
     title: "Offline startup, article retention, and more reading options",
     subtitle:
       "The app opens without a connection after one online visit. Unstarred articles older than 30 days are now removed, and Settings gains larger text, a full-width reader, and line spacing.",
-    affects: ["offline"],
+    affects: ["offline", "reading", "retention"],
     added: [
       "Added offline startup. After one online visit, the app opens without a connection on any route.",
       "Added article retention. Unstarred articles older than the chosen period are removed at the end of each refresh, read or unread. The default is 30 days, and Settings, Reading, Keep articles offers periods from 7 days to 1 year, or Forever.",
