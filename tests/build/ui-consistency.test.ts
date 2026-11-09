@@ -58,7 +58,7 @@ describe("UI consistency", () => {
       const lines = read(f).split("\n");
       lines.forEach((line, i) => {
         if (!/size="icon"/.test(line)) return;
-        const window = lines.slice(Math.max(0, i - 4), i + 8).join("\n");
+        const window = lines.slice(Math.max(0, i - 4), i + 12).join("\n");
         if (!/aria-label=|title=|sr-only|aria-labelledby=/.test(window)) offenders.push(`${f}:${i + 1}`);
       });
     }

@@ -33,7 +33,7 @@ is for testing, not merged by the audit.
   `core/briefings` (4%) for every visitor through the stores.
 - UI surface: 25 dialog/sheet components outside `ui/`, 52 toast call
   sites (most announce routine successes), 7 files with native `<select>`,
-  0 with the shadcn `Select`, 11 icon-only buttons without `aria-label`,
+  0 with the shadcn `Select`, every icon-only button already has an accessible name (`aria-label`, `title` or screen-reader text; the first count of 11 missed labels placed further down),
   13 text sites at 9–11 px, about 80 hard-coded accent colours
   (amber/emerald/violet/green) outside the token system.
 - Security headers present on both hosts: CSP (`img-src 'self' data:
@@ -78,8 +78,8 @@ buttons have no accessible name. The app reads as louder than its content.
 **Buys:** semantic tokens (`success`, `warning`, `info`, `accent`) in
 `index.css` used everywhere a hard-coded accent is today; folder colour as
 a left bar and tinted text instead of a filled row; errors as a muted
-warning glyph with a tooltip; `text-xs` as the floor; every icon button
-labelled. Light and dark mode stay consistent by construction.
+warning glyph with a tooltip; `text-xs` as the floor; a pin test keeps every icon button
+named. Light and dark mode stay consistent by construction.
 **Why now:** the owner's brief names "calmer" first; this is the visible
 half of it.
 **Sized:** medium.

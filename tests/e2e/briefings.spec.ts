@@ -93,16 +93,9 @@ test.describe("Signal Briefings — sidebar + free-tier upgrade splash", () => {
     await keyInput.fill("sk-ant-test-key-from-e2e");
     await page.getByRole("button", { name: /^Save$/i }).first().click();
 
-    // Successful save renders BOTH the sonner toast AND the inline
-    // emerald "saved" badge next to the field. The toast is the more
-    // specific signal — assert on it directly to avoid a strict-mode
-    // violation against the two simultaneous matches.
-    await expect(
-      page
-        .locator("[data-sonner-toast]")
-        .filter({ hasText: /saved/i })
-        .first(),
-    ).toBeVisible({ timeout: 10000 });
+    // A successful save shows the inline "saved" badge next to the field;
+    // the toast that used to duplicate it is gone (audit 2026-Q4).
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 10000 });
   });
 
   test("Switching the model preference updates the radio selection", async ({
