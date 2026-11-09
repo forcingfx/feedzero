@@ -108,16 +108,16 @@ export function SyncStatusBadge({ compact = false, onClick }: SyncStatusBadgePro
   // pill background; idle is text-muted-foreground on transparent.
   const tone = (() => {
     if (isError)
-      return "text-rose-700 dark:text-rose-300 ring-rose-500/30 bg-rose-500/10 ring-1 ring-inset";
+      return "text-destructive  ring-destructive/30 bg-destructive/10 ring-1 ring-inset";
     if (isActive)
-      return "text-sky-700 dark:text-sky-300 ring-sky-500/30 bg-sky-500/10 ring-1 ring-inset";
+      return "text-info  ring-info/30 bg-info/10 ring-1 ring-inset";
     return "text-muted-foreground";
   })();
 
   const dotColor = (() => {
-    if (isError) return "bg-rose-500";
-    if (isActive) return "bg-sky-500";
-    if (status === "synced") return "bg-emerald-500/70";
+    if (isError) return "bg-destructive";
+    if (isActive) return "bg-info";
+    if (status === "synced") return "bg-success/70";
     return "bg-muted-foreground/50";
   })();
 

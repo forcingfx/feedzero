@@ -538,7 +538,7 @@ describe("ArticleList", () => {
     const dots = container.querySelectorAll(".rounded-full.size-1\\.5");
     const unreadDot = dots[0];
     const readDot = dots[1];
-    expect(unreadDot.className).toContain("bg-blue-400");
+    expect(unreadDot.className).toContain("bg-info");
     expect(readDot.className).toContain("bg-transparent");
   });
 

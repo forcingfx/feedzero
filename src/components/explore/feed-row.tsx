@@ -93,7 +93,7 @@ export function FeedRow({
           )}
         </button>
         <div className="flex items-center gap-1 shrink-0">
-          {isSelected && <Kbd className="h-4 text-[9px] px-1">p</Kbd>}
+          {isSelected && <Kbd className="h-4 text-xs px-1">p</Kbd>}
           <Button
             variant="ghost"
             size="icon"
@@ -127,7 +127,7 @@ export function FeedRow({
               <span>Add</span>
             </Button>
           )}
-          {isSelected && <Kbd className="h-4 text-[9px] px-1">Enter</Kbd>}
+          {isSelected && <Kbd className="h-4 text-xs px-1">Enter</Kbd>}
         </div>
       </div>
       <FeedPreviewSheet

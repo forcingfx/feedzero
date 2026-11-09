@@ -142,10 +142,10 @@ export function NewBriefingDialog({ open, onOpenChange }: Props) {
                 <span
                   className={
                     scoreBand(previewScore.score) === "strong"
-                      ? "text-emerald-600"
+                      ? "text-success"
                       : scoreBand(previewScore.score) === "moderate"
-                        ? "text-amber-600"
-                        : "text-rose-600"
+                        ? "text-warning"
+                        : "text-destructive"
                   }
                 >
                   {scoreBand(previewScore.score)} signal · {previewScore.score}/100

@@ -64,7 +64,7 @@ function Body({ folder, onClose }: { folder: Folder; onClose: () => void }) {
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <FolderIcon className="size-4 text-violet-500" />
+          <FolderIcon className="size-4 text-primary" />
           Settings — {folder.name}
         </DialogTitle>
         <DialogDescription>

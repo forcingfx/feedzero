@@ -158,7 +158,7 @@ function ListView({
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <Settings2 className="size-4 text-violet-500" />
+          <Settings2 className="size-4 text-primary" />
           Rules for {feed?.title ?? "this feed"}
         </DialogTitle>
         <DialogDescription>

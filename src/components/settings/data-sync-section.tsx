@@ -195,12 +195,12 @@ export function DataSyncSection() {
     <div className="space-y-4">
       <div
         className={`relative overflow-hidden rounded-lg border border-border bg-card ${
-          gated ? "min-h-[160px]" : ""
+ gated ?"min-h-[160px]" : ""
         }`}
       >
         <div
           className={`p-4 space-y-3 ${
-            gated ? "pointer-events-none select-none opacity-60" : ""
+ gated ?"pointer-events-none select-none opacity-60" : ""
           }`}
           aria-hidden={gated || undefined}
         >
@@ -448,8 +448,8 @@ function DeleteAllDataConfirm({
         </DialogHeader>
 
         {paid && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs">
-            <Info className="size-4 shrink-0 text-amber-600 mt-0.5" />
+          <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-bg p-3 text-xs">
+            <Info className="size-4 shrink-0 text-warning mt-0.5" />
             <div className="space-y-2">
               <p>
                 Your Stripe subscription will keep billing after deletion.

@@ -56,7 +56,7 @@ export function WelcomeStep() {
         ))}
       </div>
 
-      <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+      <div className="rounded-md bg-warning-bg border border-warning/30 p-3 text-xs text-warning">
         <strong>Alpha:</strong> FeedZero is in early development. Your data is
         stored locally and encrypted, but may be lost during updates. Cloud
         sync is experimental.
