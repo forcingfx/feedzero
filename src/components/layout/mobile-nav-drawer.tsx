@@ -114,7 +114,12 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
         <TabButton label="Explore" current={section === "explore"} onClick={() => navigate("/explore")}>
           <Compass className="size-5" />
         </TabButton>
-        <TabButton label="Signal" current={section === "signal"} onClick={() => navigate("/signal")}>
+        <TabButton
+          label="Signal"
+          current={section === "signal"}
+          data-testid="sidebar-signal-link"
+          onClick={() => navigate("/signal")}
+        >
           <Sparkles className="size-5" />
         </TabButton>
         <TabButton label="Settings" current={section === "settings"} onClick={() => goToSettings(navigate)}>
