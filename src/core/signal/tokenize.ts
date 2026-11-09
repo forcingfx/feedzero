@@ -109,3 +109,11 @@ export function tokenize(input: string): string[] {
 export function stripHtml(input: string): string {
   return input.replace(/<[^>]*>/g, " ").replace(/&[a-z0-9#]+;/gi, " ");
 }
+
+/** Jaccard overlap of two token sets; 0 when either is empty. */
+export function jaccard(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const t of a) if (b.has(t)) intersection += 1;
+  return intersection / (a.size + b.size - intersection);
+}

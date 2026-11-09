@@ -1,5 +1,5 @@
 import type { Article, SimilarityLevel } from "@feedzero/core/types";
-import { tokenize } from "@/core/signal/tokenize.ts";
+import { jaccard, tokenize } from "@/core/signal/tokenize.ts";
 
 /** One story as the list shows it: the newest copy, plus the copies folded under it. */
 export interface SimilarStory {
@@ -49,11 +49,4 @@ export function collapseSimilarStories(
   }
 
   return stories.map((s) => s.story);
-}
-
-function jaccard(a: Set<string>, b: Set<string>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let intersection = 0;
-  for (const t of a) if (b.has(t)) intersection += 1;
-  return intersection / (a.size + b.size - intersection);
 }

@@ -12,7 +12,7 @@
  * O(n²) similarity comparison is cheap.
  */
 
-import { tokenize } from "./tokenize.ts";
+import { jaccard, tokenize } from "./tokenize.ts";
 import { STORY_SIMILARITY, type Story } from "./types.ts";
 import type { Article } from "../../../packages/core/src/types";
 
@@ -72,11 +72,4 @@ function toStory(members: Article[]): { story: Story; headTime: number } {
     },
     headTime: head.publishedAt,
   };
-}
-
-function jaccard(a: Set<string>, b: Set<string>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let intersection = 0;
-  for (const t of a) if (b.has(t)) intersection += 1;
-  return intersection / (a.size + b.size - intersection);
 }
