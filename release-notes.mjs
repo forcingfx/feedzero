@@ -32,6 +32,29 @@
  */
 export const releases = [
   {
+    version: "0.17.0",
+    date: "2026-11-09T21:18:48Z",
+    title: "Duplicate stories, full text by default, and lead images",
+    subtitle:
+      "Folders can fold near-identical headlines under the newest copy, articles can open in full text by default, and the list can show each article's lead image. Sync and the feed catalog cost less to run.",
+    affects: ["full-text", "duplicates", "reading"],
+    added: [
+      "Added Collapse similar stories to folder settings. Near-identical headlines from the folder's feeds fold under the newest copy behind an Also in N more sources row. Opening the lead marks the folded copies read. Choose Loose, Normal, or Strict.",
+      "Added Open articles in to Settings, Reading, with Feed text or Full text. A folder or a feed can choose differently in its own settings.",
+      "Added Show article images to Settings, Reading. Off by default. When on, each row shows the article's lead image, loaded through FeedZero's proxy.",
+      "Added a Link condition to rules and smart filters, so a rule such as link contains /shorts/ can mute YouTube Shorts.",
+    ],
+    changed: [
+      "Reduced the mobile feed drawer's footer to one row and sized the drawer to its content.",
+      "Answered unchanged sync pulls without reading the vault, so sync uses far less bandwidth.",
+      "Cut the storage commands behind each feed fetch and cached the public vault count.",
+      "Updated dependencies to their latest minor and patch versions.",
+    ],
+    fixed: [
+      "Fixed articles losing their blurb and opening in Full text after a sync pull from another device.",
+    ],
+  },
+  {
     version: "0.16.0",
     date: "2026-11-08T20:43:37Z",
     title: "Offline startup, article retention, and more reading options",
