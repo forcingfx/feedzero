@@ -33,7 +33,7 @@ is for testing, not merged by the audit.
   `core/briefings` (4%) for every visitor through the stores.
 - UI surface: 25 dialog/sheet components outside `ui/`, 52 toast call
   sites (most announce routine successes), 7 files with native `<select>`,
-  0 with the shadcn `Select`, 11 icon-only buttons without `aria-label`,
+  0 with the shadcn `Select`, 1 icon-only button with no accessible name (10 more rely on `title` or screen-reader text),
   13 text sites at 9–11 px, about 80 hard-coded accent colours
   (amber/emerald/violet/green) outside the token system.
 - Security headers present on both hosts: CSP (`img-src 'self' data:
@@ -87,13 +87,14 @@ half of it.
 ## Finding 4 — Quieter feedback (UX)
 
 **Costs:** a floating "Mark N read" pill covers the last visible row of the
-list; 52 toasts announce routine successes ("Feed added", "Link copied",
-"Removed X") that the UI already shows; confirmation dialogs vary in
-footer wording.
-**Buys:** the mark-read action moves into the list header beside the sort
-control; toasts remain for failures, for undo, and for multi-step results
-(imports, bulk adds); dialog footers use one vocabulary (primary verb +
-"Cancel", or "Close" alone).
+list; of 52 toast sites, ten announce routine successes ("Feed added",
+"Removed X", "API key saved") that the row, the closing dialog or the
+status line already shows.
+**Buys:** the mark-read action moves into the list title bar on desktop and
+into the view-options menu on phones, still undoable from its toast; the
+ten routine toasts go, while failures, undo, copies, bulk results and sync
+changes keep theirs. Dialog footers were checked and left alone: "Cancel"
+aborts, "Close" dismisses, "Done" ends a wizard, which is one vocabulary.
 **Why now:** Nielsen's "aesthetic and minimalist design" and "visibility of
 system status" both point here, and it touches no data path.
 **Sized:** medium.

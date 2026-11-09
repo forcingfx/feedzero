@@ -15,7 +15,6 @@ import { ArticleListControls } from "./article-list-controls.tsx";
 import { groupArticles } from "@/lib/group-articles.ts";
 import { collapseSimilarStories } from "@/lib/collapse-similar-stories.ts";
 import { inheritedFolderValue } from "@/core/feeds/folder-tree.ts";
-import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
 import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indicator.tsx";
@@ -240,11 +239,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     return out;
   }, [leads, duplicatesByLead, groupArticleFloods, isAggregatedView, expandedGroups, expandedSimilar]);
 
-  const unreadCount = useMemo(() => {
-    let count = 0;
-    for (const a of articles) if (!a.read) count++;
-    return count;
-  }, [articles]);
 
   const feedsById = useMemo(
     () => Object.fromEntries(feeds.map((f) => [f.id, f])),
@@ -373,10 +367,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       <ul
         role="listbox"
         aria-label="Articles"
-        // pb-12 reserves space at the end of the list so the sticky "Mark N
-        // read" pill (h-7 + bottom-3 = ~40px) cannot overlap the last article
-        // when the user scrolls to the bottom. See GitLab #11.
-        className="list-none m-0 p-0 pb-12 relative"
+        className="list-none m-0 p-0 relative"
         style={{ height: totalSize }}
       >
         {virtualItems.map((virtualItem) => {
@@ -445,10 +436,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           );
         })}
       </ul>
-      <MarkReadPill
-        unreadCount={unreadCount}
-        onMarkAll={() => void markAllReadWithUndo()}
-      />
     </div>
   );
 }
@@ -521,49 +508,6 @@ function CaughtUpArticleList() {
       <p className="text-xs text-muted-foreground max-w-xs">
         Read articles are hidden. Turn that off in Settings &rarr; Reading.
       </p>
-    </div>
-  );
-}
-
-function MarkReadPill({
-  unreadCount,
-  onMarkAll,
-}: {
-  unreadCount: number;
-  onMarkAll: () => void;
-}) {
-  const [visible, setVisible] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    if (unreadCount > 0) {
-      setMounted(true);
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => setVisible(true)),
-      );
-    } else {
-      setVisible(false);
-      const timer = setTimeout(() => setMounted(false), 200);
-      return () => clearTimeout(timer);
-    }
-  }, [unreadCount]);
-
-  if (!mounted) return null;
-
-  return (
-    <div className="sticky bottom-3 flex justify-center pointer-events-none">
-      <Button
-        variant="secondary"
-        size="sm"
-        className={`h-7 rounded-full px-3 text-xs shadow-md pointer-events-auto
-          hover:shadow-lg hover:scale-105 hover:bg-primary hover:text-primary-foreground
-          active:scale-95 transition-all duration-200
-          ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}
-        onClick={onMarkAll}
-      >
-        <CheckCheck className="size-3 mr-1.5" />
-        Mark {unreadCount} read
-      </Button>
     </div>
   );
 }

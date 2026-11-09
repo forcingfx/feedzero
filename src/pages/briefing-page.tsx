@@ -161,7 +161,6 @@ export function BriefingPage() {
   async function handleDelete() {
     if (!briefing) return;
     await removeBriefing(briefing.id);
-    toast.success("Briefing deleted");
     goToBriefing(navigate);
   }
 

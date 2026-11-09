@@ -38,7 +38,6 @@ export function SuggestedFeedsList({ suggestions }: Props) {
     const result = await addFeed(url);
     setSubscribing(null);
     if (result.ok) {
-      toast.success(`Subscribed to ${suggestion.resolvedTitle ?? url}`);
     } else {
       toast.error(result.error);
     }

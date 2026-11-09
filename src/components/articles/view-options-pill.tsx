@@ -1,4 +1,4 @@
-import { Check, SlidersHorizontal } from "lucide-react";
+import { Check, CheckCheck, SlidersHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +9,8 @@ import {
 import { ExpandingPill } from "@/components/ui/expanding-pill.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSettingsTarget } from "./settings-pill.tsx";
+import { useUnreadCount } from "./article-list-controls.tsx";
+import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
 import { ARTICLE_SORT_MODES } from "@feedzero/core/types";
 import type { ArticleSortMode } from "@feedzero/core/types";
 
@@ -30,6 +32,7 @@ export function ViewOptionsPill() {
   const sortMode = useArticleStore((s) => s.articleSortMode);
   const setSortMode = useArticleStore((s) => s.setArticleSortMode);
   const { target, open } = useSettingsTarget();
+  const unread = useUnreadCount();
 
   return (
     <DropdownMenu>
@@ -52,6 +55,15 @@ export function ViewOptionsPill() {
             {SORT_LABELS[m]}
           </DropdownMenuItem>
         ))}
+        {unread > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => void markAllReadWithUndo()}>
+              <CheckCheck className="size-3.5 mr-1.5" />
+              Mark {unread} read
+            </DropdownMenuItem>
+          </>
+        )}
         {target && (
           <>
             <DropdownMenuSeparator />

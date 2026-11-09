@@ -134,7 +134,6 @@ function AnthropicKeyPanel() {
     }
     setKeyInput("");
     setHasKey(true);
-    toast.success("Anthropic API key saved");
   }
 
   async function handleClear() {
@@ -144,7 +143,6 @@ function AnthropicKeyPanel() {
       return;
     }
     setHasKey(false);
-    toast.success("Anthropic API key removed");
   }
 
   return (

@@ -1,4 +1,4 @@
-import {
+import { CheckCheck,
   Layers,
   PanelLeft,
   PanelLeftClose,
@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
+import { useArticleStore } from "@/stores/article-store.ts";
+import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
 import { useIsMobile } from "@/hooks/use-mobile.ts";
 import { useOptionalSidebar } from "@/components/ui/sidebar.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -62,6 +64,7 @@ export function ArticleListControls({
       <SidebarCollapseButton />
       <FeedIndicator />
       <div className="ml-auto flex items-center gap-2 pointer-events-auto">
+        <MarkAllReadButton />
         <SettingsPill />
         <SortPill mode={sortMode} onChange={onSortChange} />
       </div>
@@ -201,5 +204,33 @@ export function MobileHeaderPills() {
     >
       <ViewOptionsPill />
     </div>
+  );
+}
+
+/** Unread articles in the current view; the sweep below marks them all. */
+export function useUnreadCount(): number {
+  return useArticleStore((s) => s.articles.reduce((n, a) => n + (a.read ? 0 : 1), 0));
+}
+
+/**
+ * "Mark N read" as a title-bar action. It used to float over the list and
+ * covered the last visible row (audit 2026-Q4, finding 4). The sweep is
+ * undoable from its toast, so no confirmation is asked.
+ */
+function MarkAllReadButton() {
+  const unread = useUnreadCount();
+  if (unread === 0) return null;
+  const label = `Mark ${unread} read`;
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={label}
+      title={label}
+      data-testid="mark-all-read"
+      onClick={() => void markAllReadWithUndo()}
+    >
+      <CheckCheck className="size-4" />
+    </Button>
   );
 }

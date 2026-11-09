@@ -89,7 +89,7 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
     setIsAddingFeed(false);
 
     if (result.ok) {
-      toast.success("Feed added", { id: toastId });
+      toast.dismiss(toastId);
       setSearchQuery("");
       const newFeedId = useFeedStore.getState().selectedFeedId;
       if (newFeedId && onFeedAdded) onFeedAdded(newFeedId);

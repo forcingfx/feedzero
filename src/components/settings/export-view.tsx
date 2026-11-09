@@ -32,7 +32,6 @@ export function ExportView() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    toast("OPML file downloaded");
   }, [feeds, folders]);
 
   const handleCopyUrls = useCallback(async () => {
