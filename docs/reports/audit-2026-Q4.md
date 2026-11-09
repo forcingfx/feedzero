@@ -59,10 +59,13 @@ limit. Same code on all three entry points.
 library used for one slide-in and a WASM hasher that only runs when a
 passphrase is derived. Users praise the speed; the first load on a phone
 is where it is weakest.
-**Buys:** replace the one `motion.div` with a CSS transition and drop the
-dependency; give `hash-wasm` and `fast-xml-parser` their own chunks so the
-existing lazy imports stay lazy. Expected: eager gzipped JS from ~437 kB
-to ~350 kB, no behaviour change. Measured again after the change.
+**Buys:** the `motion` code is the swipe-back gesture itself, which the
+gesture rules forbid rebuilding without real hardware, so it stays as it
+is and moves into a lazy chunk: desktop never mounts the layer and a phone
+needs it only once an article is open. `hash-wasm` gets its own chunk so
+its existing lazy import stays lazy. Measured: eager gzipped JS 437 kB →
+387 kB (the vendor chunk 174 kB → 120 kB); the mobile navigation E2E spec
+passes unchanged.
 **Why now:** the fix is mechanical and the measurement is in hand.
 **Sized:** small.
 
