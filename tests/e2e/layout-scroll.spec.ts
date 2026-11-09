@@ -252,7 +252,7 @@ test.describe("Layout — mobile", () => {
     await page.getByRole("button", { name: /open feed list/i }).click();
 
     await expect(drawerContent).toBeVisible({ timeout: 5000 });
-    await expect(drawerContent.getByText("Settings")).toBeVisible();
+    await expect(drawerContent.getByRole("button", { name: "Settings" })).toBeVisible();
   });
 
   test("nav drawer closes when a feed is tapped", async ({
