@@ -42,6 +42,12 @@ Feature: Per-feed rules
     Then the article appears starred at ingest
     And it cascades into existing offline-prefetch (starred → cached)
 
+  Scenario: Mute YouTube Shorts by link (issue #343)
+    Given I subscribe to a YouTube channel feed
+    And I add a rule "link contains '/shorts/' → mute"
+    When the channel publishes a Short
+    Then it is muted at ingest, and its regular videos are not
+
   Scenario: Route an article to a different folder
     Given f-tech lives in folder "Tech"
     And I add a rule "title contains 'crypto' → route-to-folder folder-Crypto"

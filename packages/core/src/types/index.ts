@@ -350,6 +350,7 @@ export type Condition =
   | { kind: "title";        op: "contains" | "not-contains" | "equals" | "matches"; value: string }
   | { kind: "author";       op: "contains" | "not-contains" | "equals"; value: string }
   | { kind: "content";      op: "contains" | "not-contains" | "matches"; value: string }
+  | { kind: "link";         op: "contains" | "not-contains" | "matches"; value: string }
   | { kind: "feed";         op: "in" | "not-in"; value: string[] }
   | { kind: "folder";       op: "in" | "not-in"; value: string[] }
   | { kind: "tag";          op: "in" | "not-in"; value: string[] }

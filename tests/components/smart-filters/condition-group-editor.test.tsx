@@ -7,7 +7,9 @@
  * keep evaluating correctly; only the editor affordance is gone.
  */
 import { describe, it, expect } from "vitest";
+import { useState } from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ConditionGroupEditor } from "@/components/smart-filters/condition-group-editor.tsx";
 import type { ConditionGroup } from "@feedzero/core/types";
 
@@ -30,5 +32,24 @@ describe("ConditionGroupEditor", () => {
       <ConditionGroupEditor group={emptyGroup()} onChange={() => {}} />,
     );
     expect(screen.getByLabelText("Match mode")).toBeInTheDocument();
+  });
+
+  it("offers a Link field so a rule can mute YouTube Shorts by URL (issue #343)", async () => {
+    function Harness() {
+      const [group, setGroup] = useState<ConditionGroup>({
+        kind: "group",
+        match: "all",
+        children: [{ kind: "title", op: "contains", value: "" }],
+      });
+      return <ConditionGroupEditor group={group} onChange={setGroup} />;
+    }
+    render(<Harness />);
+
+    await userEvent.selectOptions(screen.getByLabelText("Field"), "link");
+    await userEvent.type(screen.getByLabelText("Value"), "/shorts/");
+
+    expect(screen.getByLabelText("Field")).toHaveValue("link");
+    expect(screen.getByLabelText("Operator")).toHaveValue("contains");
+    expect(screen.getByLabelText("Value")).toHaveValue("/shorts/");
   });
 });

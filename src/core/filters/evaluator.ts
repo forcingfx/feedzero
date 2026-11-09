@@ -109,6 +109,8 @@ export function evaluateCondition(
         condition.op,
         condition.value,
       );
+    case "link":
+      return evalTextField(article.link, condition.op, condition.value);
     case "feed":
       return evalMembership(article.feedId, condition.op, condition.value);
     case "folder": {
