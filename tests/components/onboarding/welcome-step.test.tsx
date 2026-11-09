@@ -36,19 +36,14 @@ describe("WelcomeStep", () => {
     expect(mark).not.toBeNull();
   });
 
-  it("renders tagline about privacy", () => {
+  it("renders the one-line tagline (audit 2026-Q4: headline, one line, one action)", () => {
     renderInDialog(<WelcomeStep />);
-    expect(screen.getByText(/your feeds, your privacy/i)).toBeInTheDocument();
+    expect(screen.getByText(/fast, private reading/i)).toBeInTheDocument();
+    expect(screen.queryByText(/add your favorite/i)).toBeNull();
+    expect(screen.queryByText(/pocket/i)).toBeNull();
+    expect(screen.getByText(/alpha software/i)).toBeInTheDocument();
   });
 
-  it("renders numbered feature list with icons", () => {
-    renderInDialog(<WelcomeStep />);
-    expect(screen.getByText(/add your favorite/i)).toBeInTheDocument();
-    expect(screen.getByText(/read distraction-free/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/what you read is your business/i),
-    ).toBeInTheDocument();
-  });
 
   it("renders Get Started button", () => {
     renderInDialog(<WelcomeStep />);
@@ -97,13 +92,4 @@ describe("WelcomeStep", () => {
     expect(useOnboardingStore.getState().step).toBe("recovery");
   });
 
-  it("surfaces a migration hint naming Pocket, Omnivore, and TT-RSS", () => {
-    // Refugees from category-wide shutdowns (Pocket 2025-11, Omnivore
-    // 2024-11, TT-RSS 2025-11) need to see the product recognises their
-    // export type before they invest in setup. See strategy 001 + 003 §2.
-    renderInDialog(<WelcomeStep />);
-    expect(screen.getByText(/pocket/i)).toBeInTheDocument();
-    expect(screen.getByText(/omnivore/i)).toBeInTheDocument();
-    expect(screen.getByText(/tt-rss/i)).toBeInTheDocument();
-  });
 });

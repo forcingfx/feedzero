@@ -1,4 +1,3 @@
-import { Plus, BookOpen, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -10,24 +9,11 @@ import {
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { BrandMark } from "@/components/brand/brand-mark";
 
-const FEATURES = [
-  {
-    number: 1,
-    icon: Plus,
-    text: "Add your favorite RSS feeds",
-  },
-  {
-    number: 2,
-    icon: BookOpen,
-    text: "Read distraction-free, no algorithms",
-  },
-  {
-    number: 3,
-    icon: ShieldCheck,
-    text: "What you read is your business. Fully end-to-end encrypted.",
-  },
-] as const;
-
+/**
+ * One headline, one line, one action (audit 2026-Q4, finding 6). The
+ * three-step feature list, the alpha banner and the import hint each have
+ * a home elsewhere: the app itself, a muted footnote, and Explore.
+ */
 export function WelcomeStep() {
   const setStep = useOnboardingStore((s) => s.setStep);
 
@@ -39,33 +25,11 @@ export function WelcomeStep() {
 
       <DialogHeader className="text-center sm:text-center">
         <DialogTitle className="text-xl">Welcome to FeedZero</DialogTitle>
-        <DialogDescription>Your feeds, your privacy.</DialogDescription>
+        <DialogDescription>
+          Fast, private reading. Your feeds stay on this device unless you
+          turn on sync.
+        </DialogDescription>
       </DialogHeader>
-
-      <div className="space-y-4 py-2">
-        {FEATURES.map(({ number, icon: Icon, text }) => (
-          <div key={number} className="flex items-center gap-4">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
-              {number}
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Icon className="size-4 text-muted-foreground" />
-              <span>{text}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-md bg-warning-bg border border-warning/30 p-3 text-xs text-warning">
-        <strong>Alpha:</strong> FeedZero is in early development. Your data is
-        stored locally and encrypted, but may be lost during updates. Cloud
-        sync is experimental.
-      </div>
-
-      <p className="text-center text-xs text-muted-foreground">
-        Coming from Pocket, Omnivore, or TT-RSS? Import your export after
-        setup.
-      </p>
 
       <DialogFooter className="sm:justify-center sm:flex-col sm:gap-2">
         <Button size="lg" onClick={() => setStep("storage-choice")} autoFocus>
@@ -80,6 +44,10 @@ export function WelcomeStep() {
           Already have a FeedZero passphrase? Restore from cloud
         </button>
       </DialogFooter>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Alpha software. Keep a backup: cloud sync or an OPML export.
+      </p>
     </>
   );
 }
