@@ -20,6 +20,12 @@ import path from "node:path";
  *   primitive (`ExpandingPill`) hid its label until hover and gave the
  *   title bar a second button vocabulary; it is gone.
  *
+ * - Round 2: every page title (`<h1>`) is `text-xl`. Nine titles were
+ *   2xl, five xl and two lg with no rule behind the difference.
+ * - Round 2: the destructive button variant appears only inside a
+ *   confirm dialog (Dialog / AlertDialog). A red button on a page is
+ *   a threat; inside a confirmation it is the answer to a question.
+ *
  * The allowlist names the one file that draws data, not status.
  */
 import { existsSync } from "node:fs";
@@ -62,6 +68,29 @@ describe("UI consistency", () => {
     expect(existsSync(path.join(root, "src/components/ui/expanding-pill.tsx"))).toBe(false);
     const importers = files.filter((f) => /expanding-pill/.test(read(f)));
     expect(importers).toEqual([]);
+  });
+
+  it("sets every page title to text-xl", () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = read(f);
+      const re = /<h1\b[^>]*className="([^"]*)"/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(src))) {
+        if (!/\btext-xl\b/.test(m[1])) offenders.push(`${f}: ${m[1]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("uses the destructive button variant only inside confirm dialogs", () => {
+    const offenders = files.filter((f) => {
+      const src = read(f);
+      const hasDestructiveButton = /<Button\b[^>]*variant="destructive"/s.test(src.replace(/\n\s*/g, " "));
+      const inDialog = /from "@\/components\/ui\/(alert-)?dialog(\.tsx)?"/.test(src);
+      return hasDestructiveButton && !inDialog;
+    });
+    expect(offenders).toEqual([]);
   });
 
   it("gives every icon-only button an accessible name", () => {
