@@ -205,7 +205,8 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
         <div>
           <h1 className="text-xl font-semibold">Explore</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Discover feeds from our curated library
+            Discover feeds from our curated library, or import from Pocket,
+            Omnivore, TT-RSS or any OPML.
           </p>
         </div>
         <Button
