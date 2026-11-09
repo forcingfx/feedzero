@@ -215,7 +215,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         variant="ghost"
                         size="icon"
                         disabled={isRefreshingAll}
-                        aria-label="Refresh all feeds"
                         onClick={() => refreshAll()}
                         className="size-8"
                       >
