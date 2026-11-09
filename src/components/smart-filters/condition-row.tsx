@@ -61,6 +61,7 @@ export function ConditionRow({
         <option value="title">Title</option>
         <option value="author">Author</option>
         <option value="content">Content</option>
+        <option value="link">Link</option>
         <option value="feed">Feed</option>
         <option value="folder">Folder</option>
         <option value="tag">Tag</option>
@@ -150,7 +151,8 @@ function ValueWidget({
   if (
     condition.kind === "title" ||
     condition.kind === "author" ||
-    condition.kind === "content"
+    condition.kind === "content" ||
+    condition.kind === "link"
   ) {
     return (
       <Input
@@ -371,6 +373,12 @@ function operatorsFor(kind: Condition["kind"]): OperatorOption[] {
         { value: "not-contains", label: "doesn't contain" },
         { value: "equals", label: "equals" },
       ];
+    case "link":
+      return [
+        { value: "contains", label: "contains" },
+        { value: "not-contains", label: "doesn't contain" },
+        { value: "matches", label: "matches regex" },
+      ];
     case "feed":
     case "folder":
     case "tag":
@@ -405,6 +413,7 @@ function defaultConditionFor(kind: Condition["kind"]): Condition {
     case "title":
     case "author":
     case "content":
+    case "link":
       return { kind, op: "contains", value: "" };
     case "feed":
     case "folder":

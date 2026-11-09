@@ -157,6 +157,32 @@ describe("evaluateCondition — title", () => {
   });
 });
 
+// --- condition: link (issue #343: YouTube Shorts) ------------------------------
+
+describe("evaluateCondition — link", () => {
+  it("contains matches the article URL, so Shorts can be muted by /shorts/", () => {
+    const shorts = article({ link: "https://www.youtube.com/shorts/abc123" });
+    const video = article({ link: "https://www.youtube.com/watch?v=abc123" });
+    const cond = { kind: "link", op: "contains", value: "/shorts/" } as const;
+    expect(evaluateCondition(cond, shorts, ctxWith())).toBe(true);
+    expect(evaluateCondition(cond, video, ctxWith())).toBe(false);
+  });
+
+  it("not-contains is the inverse", () => {
+    const shorts = article({ link: "https://www.youtube.com/shorts/abc123" });
+    expect(
+      evaluateCondition({ kind: "link", op: "not-contains", value: "/shorts/" }, shorts, ctxWith()),
+    ).toBe(false);
+  });
+
+  it("matches runs a regex over the URL", () => {
+    const a = article({ link: "https://example.com/2026/11/post" });
+    expect(
+      evaluateCondition({ kind: "link", op: "matches", value: "/20\\d{2}/" }, a, ctxWith()),
+    ).toBe(true);
+  });
+});
+
 // --- condition: author / content ---------------------------------------------
 
 describe("evaluateCondition — author + content", () => {

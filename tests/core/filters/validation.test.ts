@@ -13,6 +13,11 @@ import type {
 const okGroup: ConditionGroup = { kind: "group", match: "all", children: [] };
 
 describe("validateCondition", () => {
+  it("accepts a link condition and rejects an empty one", () => {
+    expect(validateCondition({ kind: "link", op: "contains", value: "/shorts/" }).ok).toBe(true);
+    expect(validateCondition({ kind: "link", op: "contains", value: " " }).ok).toBe(false);
+  });
+
   it("accepts well-formed text conditions", () => {
     const c: Condition = { kind: "title", op: "contains", value: "AI" };
     expect(validateCondition(c).ok).toBe(true);

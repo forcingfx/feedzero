@@ -38,6 +38,7 @@ export function validateCondition(condition: Condition): Result<void> {
     case "title":
     case "author":
     case "content":
+    case "link":
       if (!condition.value || !condition.value.trim()) {
         return err(`${condition.kind} ${condition.op} requires a value`);
       }
