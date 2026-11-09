@@ -245,20 +245,22 @@ describe("FeedSettingsDialog", () => {
     await waitFor(() => expect(refreshBtn).toBeEnabled());
   });
 
-  it("Refresh now confirms completion with a toast", async () => {
+  it("Refresh now shows no toast; the feed's own status is the feedback (audit 2026-Q4)", async () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
     renderDialog();
     await user.click(screen.getByTestId("feed-settings-refresh"));
-    await waitFor(() => expect(toast).toHaveBeenCalled());
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(toast).not.toHaveBeenCalled();
   });
 
-  it("Clear cached articles confirms completion with a toast", async () => {
+  it("Clear cached articles shows no toast; the emptied list is the feedback (audit 2026-Q4)", async () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feedSettingsDialogId: "f-tech" });
     renderDialog();
     await user.click(screen.getByTestId("feed-settings-clear-cache"));
-    await waitFor(() => expect(toast).toHaveBeenCalled());
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it("Delete button shows a confirmation, then calls removeFeed when confirmed", async () => {

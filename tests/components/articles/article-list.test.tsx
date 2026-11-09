@@ -336,32 +336,6 @@ describe("ArticleList", () => {
     expect(scrollToSpy).not.toHaveBeenCalled();
   });
 
-  it("reserves bottom space inside the scroll container so the sticky 'Mark N read' pill does not overlap the last article", () => {
-    // The pill is `sticky bottom-3` with height `h-7`. Without bottom padding
-    // on the list, the last article sits flush against the pill at the end
-    // of the scroll container — that's GitLab #11. Reserving padding equal
-    // to or greater than the pill's height + offset keeps them apart.
-    useFeedStore.setState({
-      feeds: [],
-      selectedFeedId: "f1",
-      isLoading: false,
-      error: null,
-    });
-    useArticleStore.setState({
-      articles: [
-        mockArticle("a1", "First", false),
-        mockArticle("a2", "Second", false),
-      ],
-      selectedArticle: null,
-      isLoading: false,
-    });
-
-    const { container } = render(<ArticleList />);
-    const list = container.querySelector('ul[role="listbox"]');
-    expect(list).not.toBeNull();
-    // pb-12 = 48px ≥ pill height (h-7 = 28px) + bottom offset (bottom-3 = 12px).
-    expect(list!.className).toContain("pb-12");
-  });
 
   it("shows a row skeleton during the initial silent load instead of a blank panel", () => {
     useFeedStore.setState({
@@ -384,40 +358,18 @@ describe("ArticleList", () => {
     expect(screen.queryByText(/no articles here yet/i)).toBeNull();
   });
 
-  it("clicking the 'Mark N read' pill marks everything read and offers Undo", async () => {
-    const { toast } = await import("sonner");
-    const user = userEvent.setup();
+  it("renders no floating 'Mark N read' pill over the rows (audit 2026-Q4: it is a header action now)", () => {
     const a1 = mockArticle("a1", "First", false);
     const a2 = mockArticle("a2", "Second", false);
-    useFeedStore.setState({
-      feeds: [mockFeed("f1", "Feed 1")],
-      selectedFeedId: "f1",
-      isLoading: false,
-      error: null,
-    });
-    useArticleStore.setState({
-      articles: [a1, a2],
-      articlesByFeedId: { f1: [a1, a2] },
-      selectedArticle: null,
-      isLoading: false,
-    });
+    useFeedStore.setState({ feeds: [mockFeed("f1", "Feed 1")], selectedFeedId: "f1", isLoading: false, error: null });
+    useArticleStore.setState({ articles: [a1, a2], articlesByFeedId: { f1: [a1, a2] }, selectedArticle: null, isLoading: false });
 
-    render(<ArticleList />);
-    await user.click(screen.getByRole("button", { name: /mark 2 read/i }));
+    const { container } = render(<ArticleList />);
 
-    await vi.waitFor(() => {
-      expect(useArticleStore.getState().articles.every((a) => a.read)).toBe(
-        true,
-      );
-    });
-    // Mistaken sweeps must be recoverable without a confirmation dialog
-    // taxing the common case — the toast carries the escape hatch.
-    expect(toast).toHaveBeenCalledWith(
-      "Marked 2 read",
-      expect.objectContaining({
-        action: expect.objectContaining({ label: "Undo" }),
-      }),
-    );
+    // The action lives in the title bar; nothing sticks over the rows.
+    const action = screen.getByRole("button", { name: /mark 2 read/i });
+    expect(action.closest('[data-testid="article-list-controls"]')).not.toBeNull();
+    expect(container.querySelector(".sticky.bottom-3")).toBeNull();
   });
 
   it("changing selection to a visible article does not scroll the list (regardless of which call site triggers the change)", async () => {

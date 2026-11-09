@@ -56,7 +56,6 @@ export function FeedRow({
     setIsAdding(false);
     if (result.ok) {
       setJustAdded(true);
-      toast.success(`Added ${name}`);
     } else if (result.reason === "free-quota-exceeded") {
       upgradeToast(result.error, navigate);
     } else {
@@ -69,7 +68,6 @@ export function FeedRow({
     if (match) {
       await removeFeed(match.id);
       setJustAdded(false);
-      toast.success(`Removed ${name}`);
     }
   }
 
