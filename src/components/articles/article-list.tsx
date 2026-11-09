@@ -6,12 +6,15 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useAppStore } from "@/stores/app-store.ts";
 import { usePreferencesStore } from "@/stores/preferences-store.ts";
-import { isAggregatedFeedId } from "@feedzero/core/utils/constants";
+import { isAggregatedFeedId, fromFolderFeedId } from "@feedzero/core/utils/constants";
 import { Button } from "@/components/ui/button.tsx";
 import { ArticleItem } from "./article-item.tsx";
 import { ArticleGroupSummaryRow } from "./article-group-summary-row.tsx";
+import { SimilarStoriesRow } from "./similar-stories-row.tsx";
 import { ArticleListControls } from "./article-list-controls.tsx";
 import { groupArticles } from "@/lib/group-articles.ts";
+import { collapseSimilarStories } from "@/lib/collapse-similar-stories.ts";
+import { inheritedFolderValue } from "@/core/feeds/folder-tree.ts";
 import { markAllReadWithUndo } from "@/lib/mark-all-read-with-undo.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
@@ -32,6 +35,13 @@ type FlatEntry =
       kind: "summary";
       groupId: string;
       feedId: string;
+      hiddenCount: number;
+      open: boolean;
+    }
+  | {
+      /** Near-duplicate copies folded under the lead article above (issue #343). */
+      kind: "similar";
+      leadId: string;
       hiddenCount: number;
       open: boolean;
     };
@@ -74,6 +84,8 @@ function isItemVisible(scrollEl: HTMLElement, articleId: string): boolean {
 
 export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
+  const folders = useFeedStore((s) => s.folders);
+  const markAsRead = useArticleStore((s) => s.markAsRead);
   const isRefreshing = useFeedStore((s) => s.isRefreshingAll);
   const feeds = useFeedStore((s) => s.feeds);
   const articles = useArticleStore((s) => s.articles);
@@ -131,6 +143,17 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     });
   }, []);
 
+  // Expand state for folded near-duplicates, keyed by lead article id.
+  const [expandedSimilar, setExpandedSimilar] = useState<Set<string>>(() => new Set());
+  const toggleSimilar = useCallback((leadId: string) => {
+    setExpandedSimilar((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  }, []);
+
   // Unread-only mode. The article you're reading is exempt: selecting an
   // article auto-marks it read, so filtering purely on `read` would yank
   // the current row out from under the reader mid-sentence. It drops out
@@ -152,44 +175,67 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   // views). In a single-feed view the user has already chosen to focus
   // on that source, so collapsing floods would just hide content they
   // explicitly asked to see.
-  const entries: FlatEntry[] = useMemo(() => {
-    if (!groupArticleFloods || !isAggregatedView) {
-      return visibleArticles.map((article) => ({
-        kind: "article" as const,
-        article,
-      }));
+  // "Collapse similar stories" is a per-folder setting (inherited by
+  // subfolders), so it only applies to folder views. Everything below
+  // works on the leads; folded copies reappear under their lead.
+  const collapseLevel = useMemo(() => {
+    const folderId = selectedFeedId ? fromFolderFeedId(selectedFeedId) : null;
+    return folderId
+      ? inheritedFolderValue(folderId, folders, (f) => f.collapseSimilar)
+      : undefined;
+  }, [selectedFeedId, folders]);
+
+  const { leads, duplicatesByLead } = useMemo(() => {
+    if (!collapseLevel) {
+      return { leads: visibleArticles, duplicatesByLead: new Map<string, Article[]>() };
     }
+    const stories = collapseSimilarStories(visibleArticles, collapseLevel);
+    const byLead = new Map<string, Article[]>();
+    for (const story of stories) {
+      if (story.duplicates.length > 0) byLead.set(story.lead.id, story.duplicates);
+    }
+    return { leads: stories.map((story) => story.lead), duplicatesByLead: byLead };
+  }, [visibleArticles, collapseLevel]);
+
+  const entries: FlatEntry[] = useMemo(() => {
     const out: FlatEntry[] = [];
-    for (const grouped of groupArticles(visibleArticles)) {
+    // Every rendered article may carry folded copies; they follow it as
+    // hidden rows behind an "Also in N more sources" toggle, or inline
+    // when expanded, with the collapse toggle after them.
+    const pushArticle = (article: Article) => {
+      out.push({ kind: "article", article });
+      const duplicates = duplicatesByLead.get(article.id);
+      if (!duplicates) return;
+      const open = expandedSimilar.has(article.id);
+      if (open) for (const dup of duplicates) out.push({ kind: "article", article: dup });
+      out.push({ kind: "similar", leadId: article.id, hiddenCount: duplicates.length, open });
+    };
+
+    if (!groupArticleFloods || !isAggregatedView) {
+      for (const article of leads) pushArticle(article);
+      return out;
+    }
+    for (const grouped of groupArticles(leads)) {
       if (grouped.kind === "article") {
-        out.push({ kind: "article", article: grouped.article });
+        pushArticle(grouped.article);
         continue;
       }
       const isOpen = expandedGroups.has(grouped.id);
       if (isOpen) {
-        for (const article of grouped.articles) {
-          out.push({ kind: "article", article });
-        }
-        out.push({
-          kind: "summary",
-          groupId: grouped.id,
-          feedId: grouped.feedId,
-          hiddenCount: grouped.articles.length - 1,
-          open: true,
-        });
+        for (const article of grouped.articles) pushArticle(article);
       } else {
-        out.push({ kind: "article", article: grouped.articles[0]! });
-        out.push({
-          kind: "summary",
-          groupId: grouped.id,
-          feedId: grouped.feedId,
-          hiddenCount: grouped.articles.length - 1,
-          open: false,
-        });
+        pushArticle(grouped.articles[0]!);
       }
+      out.push({
+        kind: "summary",
+        groupId: grouped.id,
+        feedId: grouped.feedId,
+        hiddenCount: grouped.articles.length - 1,
+        open: isOpen,
+      });
     }
     return out;
-  }, [visibleArticles, groupArticleFloods, isAggregatedView, expandedGroups]);
+  }, [leads, duplicatesByLead, groupArticleFloods, isAggregatedView, expandedGroups, expandedSimilar]);
 
   const unreadCount = useMemo(() => {
     let count = 0;
@@ -209,9 +255,16 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const handleSelect = useCallback(
     (article: Article) => {
       selectArticle(article);
+      // Opening a lead reads its folded copies too (owner's call, 2026-11-09):
+      // the user has seen the story. Expanded copies are visible rows and
+      // keep their own read state.
+      const folded = duplicatesByLead.get(article.id);
+      if (folded && !expandedSimilar.has(article.id)) {
+        for (const dup of folded) void markAsRead(dup.id);
+      }
       if (onArticleSelect) onArticleSelect(article);
     },
-    [selectArticle, onArticleSelect],
+    [selectArticle, onArticleSelect, duplicatesByLead, expandedSimilar, markAsRead],
   );
 
   const virtualizer = useVirtualizer({
@@ -227,9 +280,13 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       // reuse the same node and the label/icon swap would still happen,
       // but a fresh remount is cheaper than the alternative of fighting
       // memoisation.
-      return entry.kind === "summary"
-        ? `summary:${entry.groupId}:${entry.open ? "open" : "closed"}`
-        : entry.article.id;
+      if (entry.kind === "summary") {
+        return `summary:${entry.groupId}:${entry.open ? "open" : "closed"}`;
+      }
+      if (entry.kind === "similar") {
+        return `similar:${entry.leadId}:${entry.open ? "open" : "closed"}`;
+      }
+      return entry.article.id;
     },
   });
 
@@ -323,13 +380,17 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           const entry = entries[virtualItem.index];
           if (!entry) return null;
           const feedId =
-            entry.kind === "article" ? entry.article.feedId : entry.feedId;
+            entry.kind === "article"
+              ? entry.article.feedId
+              : entry.kind === "summary"
+                ? entry.feedId
+                : undefined;
           // Always pass the source feed's title to the summary row so it
           // can render "+N more from <Feed>" regardless of view mode —
           // per-feed views skip the title on ArticleItem (redundant) but
           // the summary row benefits from it as the dominant
           // disambiguator.
-          const summaryFeedTitle = feedsById[feedId]?.title;
+          const summaryFeedTitle = feedId ? feedsById[feedId]?.title : undefined;
           const itemFeedTitle = isAggregatedView ? summaryFeedTitle : undefined;
           // Withholding the site URL is how "no icon" is expressed: an
           // ArticleItem with no source to render also drops the side
@@ -337,7 +398,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           // gutter.
           const itemFeedSiteUrl =
             isAggregatedView && showArticleFeedIcons
-              ? feedsById[feedId]?.siteUrl
+              ? (feedId ? feedsById[feedId]?.siteUrl : undefined)
               : undefined;
           return (
             <div
@@ -362,12 +423,18 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                     feedSiteUrl={itemFeedSiteUrl}
                   />
                 </SwipeToReadRow>
-              ) : (
+              ) : entry.kind === "summary" ? (
                 <ArticleGroupSummaryRow
                   open={entry.open}
                   hiddenCount={entry.hiddenCount}
                   feedTitle={summaryFeedTitle}
                   onToggle={() => toggleGroup(entry.groupId)}
+                />
+              ) : (
+                <SimilarStoriesRow
+                  open={entry.open}
+                  hiddenCount={entry.hiddenCount}
+                  onToggle={() => toggleSimilar(entry.leadId)}
                 />
               )}
             </div>

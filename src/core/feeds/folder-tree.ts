@@ -82,3 +82,25 @@ export function depthOf(folder: Folder, folders: Folder[]): number {
   }
   return depth;
 }
+
+/**
+ * The value of a per-folder setting as seen from `folderId`: the folder's
+ * own value, or the nearest ancestor's. Undefined when no folder in the
+ * chain sets it, the folder is missing, or the chain cycles.
+ */
+export function inheritedFolderValue<T>(
+  folderId: string | undefined,
+  folders: readonly Folder[],
+  pick: (folder: Folder) => T | undefined,
+): T | undefined {
+  const byId = new Map(folders.map((f) => [f.id, f]));
+  const visited = new Set<string>();
+  let current = folderId ? byId.get(folderId) : undefined;
+  while (current && !visited.has(current.id) && visited.size < MAX_DEPTH) {
+    const value = pick(current);
+    if (value !== undefined) return value;
+    visited.add(current.id);
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+  return undefined;
+}

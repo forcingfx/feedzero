@@ -52,6 +52,7 @@ import type {
   Rule,
   CreateRuleInput,
   OpenArticlesIn,
+  SimilarityLevel,
 } from "@feedzero/core/types";
 import type { Result } from "@feedzero/core/utils/result";
 import { ok, err } from "@feedzero/core/utils/result";
@@ -182,6 +183,8 @@ interface FeedStore {
   updateFolderColor: (folderId: string, color: string | undefined) => Promise<void>;
   /** Set or clear (undefined) the folder's "Open articles in" override. */
   setFolderOpenArticlesIn: (folderId: string, value: OpenArticlesIn | undefined) => Promise<void>;
+  /** Set or clear (undefined) the folder's "Collapse similar stories" level. */
+  setFolderCollapseSimilar: (folderId: string, value: SimilarityLevel | undefined) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveFeedToFolder: (feedId: string, folderId: string | null) => Promise<void>;
   applyAutoOrganize: (
@@ -799,6 +802,14 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const folder = get().folders.find((f) => f.id === folderId);
     if (!folder) return;
     await dbUpdateFolder({ ...folder, openArticlesIn: value });
+    await reloadFolders(set);
+    schedulePush();
+  },
+
+  setFolderCollapseSimilar: async (folderId, value) => {
+    const folder = get().folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    await dbUpdateFolder({ ...folder, collapseSimilar: value });
     await reloadFolders(set);
     schedulePush();
   },

@@ -65,7 +65,7 @@ the vault with timestamp last-write-wins — see [ADR 022](decisions/022-prefere
 
 - `feeds` — keyPath: `id`, index: `url` (unique)
 - `articles` — keyPath: `id`, indexes: `feedId`, `[feedId+guid]` (compound)
-- `folders` — keyPath: `id`. Folder records may carry `openArticlesIn` (`"feed" | "full-text"`, optional; absent = use the app setting or an ancestor's)
+- `folders` — keyPath: `id`. Folder records may carry `openArticlesIn` (`"feed" | "full-text"`, optional; absent = use the app setting or an ancestor's) and `collapseSimilar` (`"loose" | "normal" | "strict"`, optional; absent = off or an ancestor's; feature 026)
 - `smartFilters` — keyPath: `id`
 - `preferences` — keyPath: `id` (single row)
 - `meta` — keyPath: `key`
