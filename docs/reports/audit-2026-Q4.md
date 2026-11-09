@@ -157,27 +157,35 @@ line, a permanent quota line and a storage-warning card, Settings tabs
 built from one card per setting, and a mobile bottom strip that mixes
 recent-feed favicons with Explore, Settings and a chevron.
 
-Rules applied, one commit each:
+Rules applied, one commit each (all on `audit/calmer-app`):
 
-1. **One button vocabulary.** Icon actions are `ghost` icon buttons with
-   a tooltip, everywhere (sidebar header, list title bar, mobile header).
-   The hover-expanding pill is removed; its three users become plain
-   buttons that open the same menus and dialogs.
-2. **Settings are rows, not cards.** A `SettingRow` (label, optional one
-   line of help, control on the right) under plain section headings:
-   Appearance, Reading, Feeds. The segmented controls stay; the per-card
-   icon and two-line description go.
-3. **The sidebar shows status only when it matters.** The "Refreshed just
-   now · local" line and the storage-warning card go (Sync & Data already
-   carries that information; the warning returns only as a one-line note
-   there). The feed quota line appears from 80 percent of the cap. "New
-   filter" and "New folder" fold into one "+" menu in the feed-list
-   header.
-4. **One page-title size** (`text-xl`) and one header height on every
-   page.
-5. **A standard mobile bar.** Four tabs: Feeds (opens the drawer), Explore,
-   Signal, Settings. Recently viewed feeds move into the drawer as its
-   first row. Needs the owner's phone check (CLAUDE.md step 8).
-6. **Destructive styling only where it confirms.** The `destructive`
-   variant is reserved for the confirming button inside an alert dialog;
-   elsewhere the action is an `outline` button with destructive text.
+1. **One button vocabulary** (`8c356ff`). Icon actions are `ghost` icon
+   buttons with a tooltip, everywhere. `ExpandingPill` is deleted; sort,
+   settings cog, view options and mark-read are `HeaderAction`s. Pinned
+   in `tests/build/ui-consistency.test.ts`.
+2. **Settings are rows, not cards** (`e30167a`). `SettingsGroup` /
+   `SettingRow` / `SegmentedControl` in `setting-row.tsx`; the Reading
+   tab is rows under Appearance, Reading, Feeds, Signal. Per-setting
+   icons gone; rows stack below `sm`. Theme is an inline segmented
+   radiogroup. Pinned in `reading-tab.test.tsx`.
+3. **The sidebar shows status only when it matters** (`9642dca`). Header
+   status line and local-only warning card removed on desktop (the
+   consequence and both remedies now sit in Sync & Data's local-only
+   text); quota line from 80 percent; `SidebarAddMenu` ("+": Add feed,
+   New folder, New filter) replaces the two create rows; the folder
+   input opens at the top of the list from the menu's close hook.
+4. **One page-title size** (`1ef9d35`): every `h1` is `text-xl`.
+5. **A standard mobile bar** (`96270a2`). Feeds / Explore / Signal /
+   Settings tabs, labelled, current one marked; recent feeds become the
+   drawer's first row; the drawer drops its Explore, Signal and footer
+   Settings duplicates. Gesture code untouched. **Needs the owner's
+   phone check** (CLAUDE.md step 8).
+6. **Destructive styling only where it confirms** (`1dbcafd`). Already
+   true on the branch (both destructive buttons sit in confirm dialogs);
+   now pinned so a red button cannot land on a page.
+
+Not done in round 2, deliberately: the Sync & Data, Subscription and
+Help tabs still use cards (`ImportExportCard`, the Cloud sync card, the
+plan card). Converting them is the same `SettingRow` move but touches
+the sync flows, which deserve their own review. The mobile header
+(feed name, status dot, view options) is unchanged.
