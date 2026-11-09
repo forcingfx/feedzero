@@ -1,30 +1,13 @@
 /**
- * Reading preferences — Settings → Reading tab.
+ * Settings → Reading. Rows under four headings:
+ *   Appearance (theme, type), Reading (how articles open and what the
+ *   list shows), Feeds (organising), Signal.
  *
- * Folds in the reading-adjacent items that used to live in the sidebar
- * SettingsMenu dropdown:
- *   - Group article floods (toggle, persists via useAppStore)
- *   - Auto-organize feeds (button → existing AutoOrganizeDialog)
- *
- * AutoOrganize stays as its own modal — the multi-step flow wants its
- * own surface. Reading tab is the launcher.
+ * AutoOrganize stays as its own modal; this tab is the launcher.
  */
 import { useState } from "react";
-import {
-  AlignJustify,
-  BookOpenText,
-  CheckCheck,
-  Images,
-  Image as ImageIcon,
-  Layers,
-  MoveHorizontal,
-  Type,
-  Wand2,
-  Palette,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { usePreferencesStore } from "@/stores/preferences-store";
@@ -34,6 +17,12 @@ import type {
   ReaderTextSize,
   ReaderWidth,
 } from "@feedzero/core/types";
+import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
+import { ThemeToggle } from "../theme-toggle";
+import { RulesAuditPanel } from "./rules-audit-panel";
+import { SignalSection } from "../signal-section";
+import { ArticleRetentionSetting } from "../article-retention-setting";
+import { SegmentedControl, SettingRow, SettingsGroup } from "../setting-row";
 
 const TEXT_SIZES: { value: ReaderTextSize; label: string }[] = [
   { value: "small", label: "Small" },
@@ -59,264 +48,119 @@ const LINE_HEIGHTS: { value: ReaderLineHeight; label: string }[] = [
   { value: "normal", label: "Normal" },
   { value: "relaxed", label: "Relaxed" },
 ];
-import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
-import { ThemeToggle } from "../theme-toggle";
-import { RulesAuditPanel } from "./rules-audit-panel";
-import { SignalSection } from "../signal-section";
-import { ArticleRetentionSetting } from "../article-retention-setting";
 
 export function ReadingTab() {
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
   const setGroupArticleFloods = useAppStore((s) => s.setGroupArticleFloods);
-  const readerTextSize = usePreferencesStore(
-    (s) => s.preferences.readerTextSize ?? "medium",
-  );
-  const readerWidth = usePreferencesStore(
-    (s) => s.preferences.readerWidth ?? "medium",
-  );
-  const readerLineHeight = usePreferencesStore(
-    (s) => s.preferences.readerLineHeight ?? "normal",
-  );
-  const openArticlesIn = usePreferencesStore(
-    (s) => s.preferences.openArticlesIn ?? "feed",
-  );
-  const hideReadArticles = usePreferencesStore(
-    (s) => s.preferences.hideReadArticles ?? false,
-  );
-  const showArticleFeedIcons = usePreferencesStore(
-    (s) => s.preferences.showArticleFeedIcons ?? true,
-  );
-  const showArticleImages = usePreferencesStore(
-    (s) => s.preferences.showArticleImages ?? false,
-  );
+  const prefs = usePreferencesStore((s) => s.preferences);
   const updatePreferences = usePreferencesStore((s) => s.update);
   const hasFeeds = useFeedStore((s) => s.feeds.length > 0);
   const [autoOrganizeOpen, setAutoOrganizeOpen] = useState(false);
 
   return (
-    <div className="space-y-4 py-2">
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Palette className="size-4 text-muted-foreground" />
-          <p className="text-sm font-medium">Theme</p>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Light, dark, or follow your system.
-        </p>
-        <ThemeToggle />
-      </div>
+    <div className="space-y-8 py-2">
+      <SettingsGroup title="Appearance">
+        <SettingRow label="Theme" description="Light, dark, or follow your system.">
+          <ThemeToggle />
+        </SettingRow>
+        <SettingRow label="Text size" description="Body text size in the reader.">
+          <SegmentedControl
+            label="Text size"
+            options={TEXT_SIZES}
+            value={prefs.readerTextSize ?? "medium"}
+            onChange={(value) => void updatePreferences({ readerTextSize: value })}
+          />
+        </SettingRow>
+        <SettingRow label="Reading width" description="How wide the article column gets.">
+          <SegmentedControl
+            label="Reading width"
+            options={READER_WIDTHS}
+            value={prefs.readerWidth ?? "medium"}
+            onChange={(value) => void updatePreferences({ readerWidth: value })}
+          />
+        </SettingRow>
+        <SettingRow label="Line spacing" description="Space between lines of article text.">
+          <SegmentedControl
+            label="Line spacing"
+            options={LINE_HEIGHTS}
+            value={prefs.readerLineHeight ?? "normal"}
+            onChange={(value) => void updatePreferences({ readerLineHeight: value })}
+          />
+        </SettingRow>
+      </SettingsGroup>
 
-      <SegmentedPreference
-        icon={<BookOpenText className="size-4 text-muted-foreground" />}
-        title="Open articles in"
-        description="Full text fetches the whole article from the publisher when you open it. A folder or feed can choose differently in its own settings."
-        options={OPEN_ARTICLES_IN}
-        value={openArticlesIn}
-        onChange={(value) => void updatePreferences({ openArticlesIn: value })}
-      />
-
-      <SegmentedPreference
-        icon={<Type className="size-4 text-muted-foreground" />}
-        title="Text size"
-        description="Body text size in the reader."
-        options={TEXT_SIZES}
-        value={readerTextSize}
-        onChange={(value) => void updatePreferences({ readerTextSize: value })}
-      />
-
-      <SegmentedPreference
-        icon={<MoveHorizontal className="size-4 text-muted-foreground" />}
-        title="Reading width"
-        description="How wide the article column gets before it stops growing."
-        options={READER_WIDTHS}
-        value={readerWidth}
-        onChange={(value) => void updatePreferences({ readerWidth: value })}
-      />
-
-      <SegmentedPreference
-        icon={<AlignJustify className="size-4 text-muted-foreground" />}
-        title="Line spacing"
-        description="Space between lines of article text."
-        options={LINE_HEIGHTS}
-        value={readerLineHeight}
-        onChange={(value) => void updatePreferences({ readerLineHeight: value })}
-      />
-
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <CheckCheck className="size-4 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Hide read articles</p>
-              <p className="text-xs text-muted-foreground">
-                Show only unread items, so the list empties as you work
-                through it. The article you have open stays put until you
-                move on.
-              </p>
-            </div>
-          </div>
+      <SettingsGroup title="Reading">
+        <SettingRow
+          label="Open articles in"
+          description="Full text fetches the whole article from the publisher when you open it. A folder or feed can choose differently in its own settings."
+        >
+          <SegmentedControl
+            label="Open articles in"
+            options={OPEN_ARTICLES_IN}
+            value={prefs.openArticlesIn ?? "feed"}
+            onChange={(value) => void updatePreferences({ openArticlesIn: value })}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Hide read articles"
+          description="Show only unread items. The article you have open stays until you move on."
+        >
           <Switch
             aria-label="Hide read articles"
-            checked={hideReadArticles}
-            onCheckedChange={(v) =>
-              void updatePreferences({ hideReadArticles: !!v })
-            }
+            checked={prefs.hideReadArticles ?? false}
+            onCheckedChange={(v) => void updatePreferences({ hideReadArticles: !!v })}
           />
-        </div>
-      </div>
-
-      <ArticleRetentionSetting />
-
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <ImageIcon className="size-4 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Show feed icons</p>
-              <p className="text-xs text-muted-foreground">
-                Source favicons on article rows in All items and folder
-                views. Feed names stay either way.
-              </p>
-            </div>
-          </div>
+        </SettingRow>
+        <SettingRow
+          label="Show feed icons"
+          description="Source favicons on article rows in All items and folder views."
+        >
           <Switch
             aria-label="Show feed icons"
-            checked={showArticleFeedIcons}
-            onCheckedChange={(v) =>
-              void updatePreferences({ showArticleFeedIcons: !!v })
-            }
+            checked={prefs.showArticleFeedIcons ?? true}
+            onCheckedChange={(v) => void updatePreferences({ showArticleFeedIcons: !!v })}
           />
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Images className="size-4 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Show article images</p>
-              <p className="text-xs text-muted-foreground">
-                Show each article&apos;s lead image in the list. Images load
-                through FeedZero&apos;s proxy, but each one is still a request
-                for that article&apos;s image host, so it learns what you are
-                reading. Off by default.
-              </p>
-            </div>
-          </div>
+        </SettingRow>
+        <SettingRow
+          label="Show article images"
+          description="Each article's lead image in the list. Images load through FeedZero's proxy, but each is still a request to that article's image host, so it learns what you are reading."
+        >
           <Switch
             aria-label="Show article images"
-            checked={showArticleImages}
+            checked={prefs.showArticleImages ?? false}
             onCheckedChange={(v) => void updatePreferences({ showArticleImages: !!v })}
           />
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Layers className="size-4 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Group article floods</p>
-              <p className="text-xs text-muted-foreground">
-                Collapse runs of articles from the same feed posted close
-                together so they don&apos;t crowd the timeline.
-              </p>
-            </div>
-          </div>
+        </SettingRow>
+        <SettingRow
+          label="Group article floods"
+          description="Collapse runs of articles from one feed posted close together."
+        >
           <Switch
             aria-label="Group article floods"
             checked={groupArticleFloods}
             onCheckedChange={(v) => setGroupArticleFloods(!!v)}
           />
-        </div>
-      </div>
+        </SettingRow>
+        <ArticleRetentionSetting />
+      </SettingsGroup>
 
-      {hasFeeds && (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Wand2 className="size-4 text-muted-foreground" />
-            <p className="text-sm font-medium">Auto-organize feeds</p>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Group your feeds into topic folders automatically. You can rename
-            topics, add keywords, and remove ones that don&apos;t fit.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setAutoOrganizeOpen(true)}
+      <SettingsGroup title="Feeds">
+        {hasFeeds && (
+          <SettingRow
+            label="Auto-organize feeds"
+            description="Group your feeds into topic folders. You can rename topics, add keywords, and remove ones that don't fit."
           >
-            <Wand2 className="mr-2 size-4" />
-            Auto-organize feeds…
-          </Button>
-        </div>
-      )}
+            <Button type="button" variant="outline" size="sm" onClick={() => setAutoOrganizeOpen(true)}>
+              Auto-organize…
+            </Button>
+          </SettingRow>
+        )}
+        <RulesAuditPanel />
+      </SettingsGroup>
 
       <SignalSection />
 
-      <RulesAuditPanel />
-
-      <AutoOrganizeDialog
-        open={autoOrganizeOpen}
-        onOpenChange={setAutoOrganizeOpen}
-      />
-    </div>
-  );
-}
-
-/**
- * One labelled card holding a segmented (single-choice) preference.
- *
- * `role="group"` + `aria-label` matter beyond a11y hygiene: the tab now
- * carries two segmented controls that both offer a "Medium" option, so
- * without the grouping neither a screen reader nor a test can say which
- * "Medium" it means.
- */
-function SegmentedPreference<T extends string>({
-  icon,
-  title,
-  description,
-  options,
-  value,
-  onChange,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        {icon}
-        <p className="text-sm font-medium">{title}</p>
-      </div>
-      <p className="text-xs text-muted-foreground">{description}</p>
-      <div
-        role="group"
-        aria-label={title}
-        className="flex rounded-md border border-border overflow-hidden w-fit"
-      >
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            aria-pressed={value === option.value}
-            onClick={() => onChange(option.value)}
-            className={cn(
-              "px-3 py-1.5 text-xs transition-colors",
-              value === option.value
-                ? "bg-foreground text-background font-medium"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      <AutoOrganizeDialog open={autoOrganizeOpen} onOpenChange={setAutoOrganizeOpen} />
     </div>
   );
 }

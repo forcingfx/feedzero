@@ -377,6 +377,34 @@ describe("<ReadingTab>", () => {
       expect(useSignalModeStore.getState().nightly).toBe(true);
     });
   });
+
+  /**
+   * Audit 2026-Q4, round 2, rule 2. Settings are rows under headings,
+   * not a stack of bordered cards. Each row is a label plus description
+   * on the left and its control on the right; headings group the rows by
+   * what they change. Pinned because the card stack read as fourteen
+   * equal announcements and took three screens on a phone.
+   */
+  describe("layout: rows under headings", () => {
+    it("groups the rows under Appearance, Reading, Feeds and Signal headings", () => {
+      renderTab();
+      for (const name of [/^appearance$/i, /^reading$/i, /^feeds$/i, /^signal$/i]) {
+        expect(screen.getByRole("heading", { name })).toBeInTheDocument();
+      }
+    });
+
+    it("draws no card chrome around individual settings", () => {
+      const { container } = renderTab();
+      expect(container.querySelectorAll(".bg-card").length).toBe(0);
+    });
+
+    it("keeps Theme as a radiogroup inside the Appearance section", () => {
+      renderTab();
+      const appearance = screen.getByRole("heading", { name: /^appearance$/i }).closest("section");
+      expect(appearance).not.toBeNull();
+      expect(within(appearance as HTMLElement).getByRole("radiogroup", { name: /theme/i })).toBeInTheDocument();
+    });
+  });
 });
 
 // These end-of-file hooks would normally be dead imports; they exist so

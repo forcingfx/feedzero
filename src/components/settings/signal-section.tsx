@@ -13,7 +13,8 @@
  * its different modalities.
  */
 import { useEffect, useState } from "react";
-import { CheckCircle2, Cpu, KeyRound, Sparkles, Trash2 } from "lucide-react";
+import { CheckCircle2, Cpu, Sparkles, Trash2 } from "lucide-react";
+import { SettingRow, SettingsGroup } from "./setting-row";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -42,16 +43,10 @@ export function SignalSection() {
   const [mode, setMode] = useSignalMode();
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-      <header className="flex items-center gap-2">
-        <Sparkles className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">Signal</h2>
-      </header>
-      <p className="text-xs text-muted-foreground">
-        Cross-feed intelligence — the local frequency engine, an optional
-        AI overview, and saved briefings.
-      </p>
-
+    <SettingsGroup
+      title="Signal"
+      description="Cross-feed intelligence: the local frequency engine, an optional AI overview, and saved briefings."
+    >
       <ModePanel mode={mode} setMode={setMode} />
 
       {mode === "ai" ? (
@@ -61,7 +56,7 @@ export function SignalSection() {
           <NightlyRefreshPanel />
         </>
       ) : null}
-    </div>
+    </SettingsGroup>
   );
 }
 
@@ -73,13 +68,10 @@ function ModePanel({
   setMode: (mode: SignalMode) => void;
 }) {
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">Mode</p>
-      <p className="text-xs text-muted-foreground">
-        Local runs entirely on-device — no LLM, no third-party calls.
-        AI uses your Anthropic key to generate the overview and saved
-        briefings.
-      </p>
+    <SettingRow
+      label="Mode"
+      description="Local runs entirely on this device, no LLM, no third-party calls. AI uses your Anthropic key for the overview and saved briefings."
+    >
       <ToggleGroup
         type="single"
         value={mode}
@@ -108,7 +100,7 @@ function ModePanel({
           <span className="ml-1 text-xs">AI</span>
         </ToggleGroupItem>
       </ToggleGroup>
-    </div>
+    </SettingRow>
   );
 }
 
@@ -146,18 +138,21 @@ function AnthropicKeyPanel() {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <KeyRound className="size-4 text-muted-foreground" />
-        <p className="text-sm font-medium">Anthropic API key</p>
-        {hasKey === true ? (
-          <span className="flex items-baseline gap-1 text-xs text-success">
-            <CheckCircle2 className="size-3" />
-            saved
-          </span>
-        ) : null}
-      </div>
-      <p className="text-xs text-muted-foreground">
+    <SettingRow
+      stacked
+      label={
+        <span className="flex items-center gap-2">
+          Anthropic API key
+          {hasKey === true ? (
+            <span className="flex items-baseline gap-1 text-xs text-success">
+              <CheckCircle2 className="size-3" />
+              saved
+            </span>
+          ) : null}
+        </span>
+      }
+      description={
+        <>
         The AI overview and saved briefings call Anthropic with a key
         you supply. The key is encrypted at rest in your vault. On every
         call your key + payload transit FeedZero's relay
@@ -174,7 +169,9 @@ function AnthropicKeyPanel() {
           console.anthropic.com
         </a>
         .
-      </p>
+        </>
+      }
+    >
       <div className="flex gap-2">
         <Input
           type="password"
@@ -202,23 +199,18 @@ function AnthropicKeyPanel() {
           Remove stored key
         </Button>
       ) : null}
-    </div>
+    </SettingRow>
   );
 }
 
 function ModelPanel() {
   const [model, setModel] = useBriefingModelPreference();
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Sparkles className="size-4 text-muted-foreground" />
-        <p className="text-sm font-medium">Preferred model</p>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Which Claude model your AI overview and saved briefings use.
-        You pay Anthropic per token — match the model to your budget and
-        quality tradeoff. Device-local.
-      </p>
+    <SettingRow
+      stacked
+      label="Preferred model"
+      description="Which Claude model your AI overview and saved briefings use. You pay Anthropic per token, so match the model to your budget. Device-local."
+    >
       <div className="space-y-2">
         {BRIEFING_MODELS.map((m) => (
           <label
@@ -248,31 +240,18 @@ function ModelPanel() {
           </label>
         ))}
       </div>
-    </div>
+    </SettingRow>
   );
 }
 
 function NightlyRefreshPanel() {
   const [nightly, setNightly] = useSignalNightlyRefresh();
   return (
-    <div className="space-y-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">Refresh Signal nightly</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Around midnight in your local timezone, regenerate the AI
-            overview and any saved briefings flagged for daily refresh.
-            Each run costs Anthropic tokens against your key (~5–10¢
-            per nightly AI overview). Only fires while a FeedZero tab
-            is open.
-          </p>
-        </div>
-        <Switch
-          checked={nightly}
-          onCheckedChange={setNightly}
-          aria-label="Refresh Signal nightly"
-        />
-      </div>
-    </div>
+    <SettingRow
+      label="Refresh Signal nightly"
+      description="Around midnight local time, regenerate the AI overview and any saved briefings flagged for daily refresh. Each run costs Anthropic tokens against your key (about 5 to 10 cents per overview). Only fires while a FeedZero tab is open."
+    >
+      <Switch checked={nightly} onCheckedChange={setNightly} aria-label="Refresh Signal nightly" />
+    </SettingRow>
   );
 }
