@@ -1,7 +1,7 @@
 import { Settings as SettingsIcon } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
-import { ExpandingPill } from "@/components/ui/expanding-pill.tsx";
+import { HeaderAction } from "./header-action.tsx";
 import {
   ALL_FEEDS_ID,
   STARRED_FEED_ID,
@@ -12,7 +12,7 @@ import {
 } from "@feedzero/core/utils/constants";
 
 /**
- * Floating cog above the article list. Context-aware: clicks
+ * Settings cog in the article-list title bar. Context-aware: clicks
  * dispatch to the right settings dialog based on the current
  * selectedFeedId type. Hides itself on aggregated views that have
  * nothing to configure (ALL_FEEDS, STARRED) and on broken
@@ -24,13 +24,9 @@ export function SettingsPill() {
   if (!target) return null;
 
   return (
-    <ExpandingPill
-      icon={<SettingsIcon />}
-      label={target.label}
-      aria-label={target.label}
-      dataTestId="settings-pill"
-      onClick={open}
-    />
+    <HeaderAction label={target.label} data-testid="settings-pill" onClick={open}>
+      <SettingsIcon className="size-4" />
+    </HeaderAction>
   );
 }
 

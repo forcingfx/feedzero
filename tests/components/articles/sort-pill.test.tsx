@@ -1,7 +1,6 @@
 /**
- * SortPill — the article-sort control rebuilt on ExpandingPill.
- * Replaces the previous SortMenu (text+icon button). Same modes,
- * same handler, new visual.
+ * SortPill — the article-sort control: a ghost icon button whose
+ * accessible name states the current mode, opening a menu of modes.
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
@@ -21,9 +20,9 @@ describe("SortPill", () => {
     return render(<SortPill mode={mode} onChange={onChange} />);
   }
 
-  it("shows the current mode label", () => {
+  it("names the current mode in the button's accessible name", () => {
     renderPill("unread-first");
-    expect(screen.getByText("Unread first")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort: Unread first" })).toBeInTheDocument();
   });
 
   it("opens a menu with every sort mode when clicked", async () => {
