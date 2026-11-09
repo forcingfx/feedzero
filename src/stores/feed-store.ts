@@ -51,6 +51,7 @@ import type {
   FeedSortMode,
   Rule,
   CreateRuleInput,
+  OpenArticlesIn,
 } from "@feedzero/core/types";
 import type { Result } from "@feedzero/core/utils/result";
 import { ok, err } from "@feedzero/core/utils/result";
@@ -179,6 +180,8 @@ interface FeedStore {
   createFolder: (name: string, parentId?: string) => Promise<void>;
   renameFolder: (folderId: string, name: string) => Promise<void>;
   updateFolderColor: (folderId: string, color: string | undefined) => Promise<void>;
+  /** Set or clear (undefined) the folder's "Open articles in" override. */
+  setFolderOpenArticlesIn: (folderId: string, value: OpenArticlesIn | undefined) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveFeedToFolder: (feedId: string, folderId: string | null) => Promise<void>;
   applyAutoOrganize: (
@@ -788,6 +791,14 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const folder = get().folders.find((f) => f.id === folderId);
     if (!folder) return;
     await dbUpdateFolder({ ...folder, color });
+    await reloadFolders(set);
+    schedulePush();
+  },
+
+  setFolderOpenArticlesIn: async (folderId, value) => {
+    const folder = get().folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    await dbUpdateFolder({ ...folder, openArticlesIn: value });
     await reloadFolders(set);
     schedulePush();
   },

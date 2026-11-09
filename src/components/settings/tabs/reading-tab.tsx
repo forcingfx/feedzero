@@ -12,6 +12,7 @@
 import { useState } from "react";
 import {
   AlignJustify,
+  BookOpenText,
   CheckCheck,
   Image as ImageIcon,
   Layers,
@@ -26,7 +27,12 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { usePreferencesStore } from "@/stores/preferences-store";
-import type { ReaderLineHeight, ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
+import type {
+  OpenArticlesIn,
+  ReaderLineHeight,
+  ReaderTextSize,
+  ReaderWidth,
+} from "@feedzero/core/types";
 
 const TEXT_SIZES: { value: ReaderTextSize; label: string }[] = [
   { value: "small", label: "Small" },
@@ -40,6 +46,11 @@ const READER_WIDTHS: { value: ReaderWidth; label: string }[] = [
   { value: "medium", label: "Medium" },
   { value: "wide", label: "Wide" },
   { value: "full", label: "Full" },
+];
+
+const OPEN_ARTICLES_IN: { value: OpenArticlesIn; label: string }[] = [
+  { value: "feed", label: "Feed text" },
+  { value: "full-text", label: "Full text" },
 ];
 
 const LINE_HEIGHTS: { value: ReaderLineHeight; label: string }[] = [
@@ -65,6 +76,9 @@ export function ReadingTab() {
   const readerLineHeight = usePreferencesStore(
     (s) => s.preferences.readerLineHeight ?? "normal",
   );
+  const openArticlesIn = usePreferencesStore(
+    (s) => s.preferences.openArticlesIn ?? "feed",
+  );
   const hideReadArticles = usePreferencesStore(
     (s) => s.preferences.hideReadArticles ?? false,
   );
@@ -87,6 +101,15 @@ export function ReadingTab() {
         </p>
         <ThemeToggle />
       </div>
+
+      <SegmentedPreference
+        icon={<BookOpenText className="size-4 text-muted-foreground" />}
+        title="Open articles in"
+        description="Full text fetches the whole article from the publisher when you open it. A folder or feed can choose differently in its own settings."
+        options={OPEN_ARTICLES_IN}
+        value={openArticlesIn}
+        onChange={(value) => void updatePreferences({ openArticlesIn: value })}
+      />
 
       <SegmentedPreference
         icon={<Type className="size-4 text-muted-foreground" />}

@@ -60,6 +60,7 @@ import { pickExtractedContent } from "@/lib/pick-extracted-content.ts";
 // re-exports it for backwards compatibility, but importing from the
 // dedicated module here is what actually keeps Defuddle out.
 import { needsExtraction } from "@/core/extractor/needs-extraction.ts";
+import { shouldOpenInFullText } from "@/core/extractor/open-in-full-text.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Article } from "@feedzero/core/types";
 import { Kbd } from "@/components/ui/kbd.tsx";
@@ -139,9 +140,11 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
     resetForArticle();
     if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     if (article?.link?.startsWith("http")) {
-      const feed = useFeedStore.getState().feeds.find((f) => f.id === article.feedId);
+      const { feeds, folders } = useFeedStore.getState();
+      const feed = feeds.find((f) => f.id === article.feedId);
+      const appDefault = usePreferencesStore.getState().preferences.openArticlesIn;
       const emptyBlurb = isFeedBlurbEmpty(article.content, article.summary);
-      if (feed?.preferFullText || emptyBlurb) {
+      if (shouldOpenInFullText(feed, folders, appDefault) || emptyBlurb) {
         switchToExtracted(article.link);
       }
     }

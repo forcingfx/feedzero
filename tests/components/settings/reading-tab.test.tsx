@@ -161,6 +161,27 @@ describe("<ReadingTab>", () => {
     });
   });
 
+  describe("issue #342: open articles in", () => {
+    it("defaults to Feed text", () => {
+      renderTab();
+      const group = screen.getByRole("group", { name: /open articles in/i });
+      expect(within(group).getByRole("button", { name: /^feed text$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    it("choosing Full text persists the preference", async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      renderTab();
+      const group = screen.getByRole("group", { name: /open articles in/i });
+
+      fireEvent.click(within(group).getByRole("button", { name: /^full text$/i }));
+
+      expect(usePreferencesStore.getState().preferences.openArticlesIn).toBe("full-text");
+    });
+  });
+
   describe("hide read articles", () => {
     it("is off by default", () => {
       renderTab();

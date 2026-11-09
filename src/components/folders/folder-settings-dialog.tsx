@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { FolderColorPicker } from "./folder-color-picker.tsx";
-import type { Folder } from "@feedzero/core/types";
+import type { Folder, OpenArticlesIn } from "@feedzero/core/types";
 
 export function FolderSettingsDialog() {
   const folderId = useFeedStore((s) => s.folderSettingsDialogId);
@@ -77,6 +77,7 @@ function Body({ folder, onClose }: { folder: Folder; onClose: () => void }) {
       <div className="space-y-5">
         <NameSection folder={folder} />
         <ColorSection folder={folder} />
+        <OpenArticlesInSection folder={folder} />
         <DeleteSection folder={folder} onClose={onClose} />
       </div>
 
@@ -86,6 +87,41 @@ function Body({ folder, onClose }: { folder: Folder; onClose: () => void }) {
         </Button>
       </DialogFooter>
     </>
+  );
+}
+
+const FOLDER_DEFAULT = "default";
+
+/**
+ * Per-folder override of Settings → Reading → Open articles in. A native
+ * select, like the retention setting: three options, no extra component.
+ */
+function OpenArticlesInSection({ folder }: { folder: Folder }) {
+  const setOpenArticlesIn = useFeedStore((s) => s.setFolderOpenArticlesIn);
+
+  return (
+    <section className="space-y-2">
+      <Label htmlFor="folder-settings-open-articles-in">Open articles in</Label>
+      <select
+        id="folder-settings-open-articles-in"
+        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        value={folder.openArticlesIn ?? FOLDER_DEFAULT}
+        onChange={(e) => {
+          const value = e.target.value;
+          void setOpenArticlesIn(
+            folder.id,
+            value === FOLDER_DEFAULT ? undefined : (value as OpenArticlesIn),
+          );
+        }}
+      >
+        <option value={FOLDER_DEFAULT}>App default (Settings → Reading)</option>
+        <option value="feed">Feed text</option>
+        <option value="full-text">Full text</option>
+      </select>
+      <p className="text-xs text-muted-foreground">
+        Applies to every feed in this folder and its subfolders.
+      </p>
+    </section>
   );
 }
 
