@@ -77,11 +77,19 @@ describe("QuotaIndicator", () => {
     expect(screen.queryByText(capPattern())).toBeNull();
   });
 
-  it("shows the current count vs limit for free hosted users", () => {
-    seedFeeds(7);
+  it("renders nothing while the quota is comfortably far away (below 80%)", () => {
+    // Audit 2026-Q4 round 2: "7 / 100 feeds" was a permanent sidebar line
+    // for a fact that only matters when the limit is near.
+    seedFeeds(Math.ceil(FREE_FEED_LIMIT * 0.8) - 1);
     renderInRouter();
-    // Tolerant of "7 / N", "7 of N", "7 / N feeds" etc.
-    expect(screen.getByText(/\b7\b/)).toBeInTheDocument();
+    expect(screen.queryByTestId("quota-indicator")).toBeNull();
+  });
+
+  it("shows the current count vs limit once the quota is near (80% and up)", () => {
+    const near = Math.ceil(FREE_FEED_LIMIT * 0.8);
+    seedFeeds(near);
+    renderInRouter();
+    expect(screen.getByText(new RegExp(`\\b${near}\\b`))).toBeInTheDocument();
     expect(
       screen.getByText(new RegExp(String(FREE_FEED_LIMIT))),
     ).toBeInTheDocument();
@@ -104,7 +112,7 @@ describe("QuotaIndicator", () => {
   });
 
   it("does not offer an Upgrade button below the limit", () => {
-    seedFeeds(20);
+    seedFeeds(FREE_FEED_LIMIT - 1);
     renderInRouter();
     expect(screen.queryByRole("button", { name: /upgrade/i })).toBeNull();
   });

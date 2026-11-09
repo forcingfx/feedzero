@@ -535,10 +535,10 @@ describe("FeedsPage layout — desktop", () => {
     const { container } = renderPage();
     const sidebarHeader = container.querySelector("[data-slot='sidebar-header']");
     expect(sidebarHeader).not.toBeNull();
-    const badgeInHeader = sidebarHeader!.querySelector(
-      "[data-testid='sync-status-badge']",
-    );
-    expect(badgeInHeader).not.toBeNull();
+    // Audit 2026-Q4 round 2: the header line itself is gone on desktop;
+    // sync status lives on the footer Settings chip. The pin that stays
+    // is "no floating overlay anywhere".
+    expect(sidebarHeader!.querySelector("[data-testid='sync-status-badge']")).toBeNull();
     // No floating viewport overlay anywhere.
     expect(container.querySelector("[data-testid='floating-sync-badge']")).toBeNull();
   });

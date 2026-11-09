@@ -7,7 +7,6 @@ import { ArrowUpDown, Check } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
 import { toFolderFeedId } from "@feedzero/core/utils/constants";
-import { SidebarSeparator } from "@/components/ui/sidebar.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { FeedItem } from "./feed-item.tsx";
 import { FolderItem } from "./folder-item.tsx";
-import { NewFolderInput } from "./new-folder-input.tsx";
+import { NewFolderForm } from "./new-folder-input.tsx";
+import { SidebarMenuItem } from "@/components/ui/sidebar.tsx";
 import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import type { Feed } from "@feedzero/core/types";
 
@@ -27,7 +27,12 @@ interface SidebarFeedListProps {
    * of the list. The mobile drawer renders its own copy in the pinned
    * footer so it stays reachable regardless of feed-list length.
    */
-  hideNewFolderInput?: boolean;
+  /**
+   * Render the inline folder-name input (opened from the sidebar "+"
+   * menu) at the top of the list. The mobile drawer turns this off and
+   * hosts its own input in the pinned footer.
+   */
+  showFolderCreator?: boolean;
 }
 
 function UnfiledDropZone({ children }: { children: React.ReactNode }) {
@@ -59,9 +64,11 @@ const SORT_LABELS: Record<string, string> = {
 
 export function SidebarFeedList({
   onFeedSelect,
-  hideNewFolderInput,
+  showFolderCreator = true,
 }: SidebarFeedListProps) {
   const feeds = useFeedStore((s) => s.feeds);
+  const folderCreatorOpen = useFeedStore((s) => s.folderCreatorOpen);
+  const closeFolderCreator = useFeedStore((s) => s.closeFolderCreator);
   const folders = useFeedStore((s) => s.folders);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
@@ -223,9 +230,15 @@ export function SidebarFeedList({
 
   return (
     <>
-      {/* Sort toggle — only shown when there are feeds */}
+      {showFolderCreator && folderCreatorOpen && (
+        <SidebarMenuItem>
+          <NewFolderForm onDone={closeFolderCreator} />
+        </SidebarMenuItem>
+      )}
+      {/* List header: auto-organize wand (when it applies) and the sort toggle. */}
       {feeds.length > 0 && (
-        <div className="flex items-center justify-end px-1 py-0.5">
+        <div className="flex items-center justify-end gap-1 px-1 py-0.5">
+          <AutoOrganizePill />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -291,13 +304,6 @@ export function SidebarFeedList({
           ) : null}
         </DragOverlay>
       </DndContext>
-
-      {!hideNewFolderInput && (
-        <>
-          <SidebarSeparator className="mx-0 my-1" />
-          <NewFolderInput trailing={<AutoOrganizePill />} />
-        </>
-      )}
 
     </>
   );

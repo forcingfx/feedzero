@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
   RefreshCw,
   Search,
   Settings,
-  X,
 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useCommandPaletteStore } from "@/stores/command-palette-store.ts";
@@ -31,10 +29,10 @@ import { useSyncStore } from "@/stores/sync-store.ts";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
+import { SidebarAddMenu } from "@/components/layout/sidebar-add-menu.tsx";
 import { QuotaIndicator } from "@/components/feeds/quota-indicator.tsx";
-import { goToSettings, goToSyncSetup } from "@/lib/go-to-settings.ts";
+import { goToSettings } from "@/lib/go-to-settings.ts";
 import { BrandMark } from "@/components/brand/brand-mark.tsx";
-import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
@@ -117,57 +115,6 @@ function SidebarFooterMenu() {
   );
 }
 
-const LOCAL_STORAGE_WARNING_KEY = "feedzero:local-warning-dismissed";
-
-function LocalStorageWarning() {
-  const feeds = useFeedStore((s) => s.feeds);
-  const syncStatus = useSyncStore((s) => s.status);
-  const navigate = useNavigate();
-  const [dismissed, setDismissed] = useState(() => {
-    try {
-      return localStorage.getItem(LOCAL_STORAGE_WARNING_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
-
-  if (dismissed || feeds.length === 0 || syncStatus !== "local-only") {
-    return null;
-  }
-
-  function handleDismiss() {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_WARNING_KEY, "true");
-    } catch {
-      // localStorage unavailable
-    }
-    setDismissed(true);
-  }
-
-  return (
-    <div className="mx-2 mb-2 rounded-md border border-warning/30 bg-warning-bg p-3 text-xs text-warning">
-      <div className="flex items-start justify-between gap-2">
-        <p>
-          Your feeds are stored locally. Clearing browser data will delete them.
-        </p>
-        <button
-          onClick={handleDismiss}
-          className="shrink-0 text-warning hover:text-warning"
-          aria-label="Dismiss"
-        >
-          <X className="size-3.5" />
-        </button>
-      </div>
-      <button
-        onClick={() => goToSyncSetup(navigate)}
-        className="mt-1.5 underline hover:no-underline font-medium"
-      >
-        Enable cloud sync
-      </button>
-    </div>
-  );
-}
-
 export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const refreshAll = useFeedStore((s) => s.refreshAll);
@@ -191,6 +138,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                 FeedZero
               </span>
               <div className="flex items-center gap-1">
+                <SidebarAddMenu />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -231,11 +179,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                 )}
               </div>
             </div>
-            {/* Anchored to the sidebar so it can't overlap the reader's
-                article title in the stage panel. */}
-            <div>
-              <SyncStatusBadge />
-            </div>
           </div>
         </SidebarHeader>
 
@@ -252,7 +195,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
 
         <SidebarFooter>
           <QuotaIndicator />
-          <LocalStorageWarning />
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarFooterMenu />

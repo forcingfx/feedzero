@@ -240,6 +240,14 @@ interface FeedStore {
   folderSettingsDialogId: string | null;
   openFolderSettings: (folderId: string) => void;
   closeFolderSettings: () => void;
+  /**
+   * Whether the inline "Folder name" input is showing at the top of the
+   * desktop feed list. Opened from the sidebar "+" menu, closed when the
+   * folder is created or the input is abandoned.
+   */
+  folderCreatorOpen: boolean;
+  openFolderCreator: () => void;
+  closeFolderCreator: () => void;
 }
 
 function readSortMode(): FeedSortMode {
@@ -515,6 +523,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   folderSettingsDialogId: null,
   openFolderSettings: (folderId) => set({ folderSettingsDialogId: folderId }),
   closeFolderSettings: () => set({ folderSettingsDialogId: null }),
+  folderCreatorOpen: false,
+  openFolderCreator: () => set({ folderCreatorOpen: true }),
+  closeFolderCreator: () => set({ folderCreatorOpen: false }),
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
