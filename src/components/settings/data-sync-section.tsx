@@ -179,7 +179,7 @@ export function DataSyncSection() {
     }
     switch (status) {
       case "local-only":
-        return "Your data stays in this browser only.";
+        return "Your data stays in this browser only. Clearing site data deletes it; turn on sync or export an OPML backup to keep a copy.";
       case "synced":
         return "Your data is encrypted and synced across devices.";
       case "syncing":

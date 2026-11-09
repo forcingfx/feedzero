@@ -1,11 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { FolderPlus } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar.tsx";
-
-interface NewFolderInputProps {
-  trailing?: ReactNode;
-}
 
 interface NewFolderFormProps {
   /** Called after the folder is created or the input is abandoned. */
@@ -37,27 +32,5 @@ export function NewFolderForm({ onDone }: NewFolderFormProps) {
         onKeyDown={(e) => { if (e.key === "Escape") onDone(); }}
       />
     </form>
-  );
-}
-
-export function NewFolderInput({ trailing }: NewFolderInputProps = {}) {
-  const [creating, setCreating] = useState(false);
-
-  if (creating) {
-    return (
-      <SidebarMenuItem>
-        <NewFolderForm onDone={() => setCreating(false)} />
-      </SidebarMenuItem>
-    );
-  }
-
-  return (
-    <SidebarMenuItem className="flex items-center">
-      <SidebarMenuButton className="text-muted-foreground flex-1" onClick={() => setCreating(true)}>
-        <FolderPlus className="size-4" />
-        <span>New folder</span>
-      </SidebarMenuButton>
-      {trailing && <div className="shrink-0 pr-1">{trailing}</div>}
-    </SidebarMenuItem>
   );
 }

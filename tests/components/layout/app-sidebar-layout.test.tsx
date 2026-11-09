@@ -227,4 +227,32 @@ describe("AppSidebar layout structure", () => {
       expect(footer!.textContent).not.toMatch(/\bLocal\b/);
     });
   });
+
+  /**
+   * Audit 2026-Q4, round 2, rule 3: the sidebar shows status only when
+   * it matters. The permanent "Refreshed just now · local" line and the
+   * local-only warning card were two always-on notices for facts that
+   * change nothing about what the user does next; sync status stays on
+   * the Settings button chip, and the local-only consequence is stated
+   * in Settings, Sync & Data.
+   */
+  describe("quiet chrome", () => {
+    it("the header carries no status line", () => {
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() });
+      const { container } = renderSidebar();
+      const header = container.querySelector("[data-sidebar='header']");
+      expect(header!.querySelector("[data-testid='sync-status-badge']")).toBeNull();
+      expect(header!.textContent).not.toMatch(/Refreshed/);
+    });
+
+    it("shows no local-only warning card", () => {
+      useSyncStore.setState({ status: "local-only" });
+      useFeedStore.setState({
+        feeds: [{ id: "f1", url: "https://a.com/rss", title: "A", description: "", siteUrl: "https://a.com", createdAt: 0, updatedAt: 0 }],
+      });
+      renderSidebar();
+      expect(screen.queryByText(/stored locally/i)).toBeNull();
+      expect(screen.queryByRole("button", { name: /enable cloud sync/i })).toBeNull();
+    });
+  });
 });

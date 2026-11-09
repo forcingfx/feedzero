@@ -121,12 +121,20 @@ describe("SidebarFeedList", () => {
     expect(screen.getByText("Orphaned Feed")).toBeInTheDocument();
   });
 
-  it("shows New folder button", () => {
+  it("carries no 'New folder' row (creation lives in the sidebar '+' menu)", () => {
     useFeedStore.setState({ feeds: [mockFeed("f1", "Feed")], folders: [], selectedFeedId: null });
 
     renderList();
 
-    expect(screen.getByText("New folder")).toBeInTheDocument();
+    expect(screen.queryByText("New folder")).toBeNull();
+  });
+
+  it("shows the folder-name input at the top of the list while the folder creator is open", () => {
+    useFeedStore.setState({ feeds: [mockFeed("f1", "Feed")], folders: [], selectedFeedId: null, folderCreatorOpen: true });
+
+    renderList();
+
+    expect(screen.getByPlaceholderText("Folder name")).toBeInTheDocument();
   });
 
   it("clicking a folder calls onFeedSelect with the folder-aggregated feed id", async () => {
@@ -172,7 +180,7 @@ describe("SidebarFeedList", () => {
     expect(screen.getByTestId("auto-organize-trigger")).toBeInTheDocument();
   });
 
-  it("auto-organize wand trigger appears inline with the New folder row", () => {
+  it("auto-organize wand trigger appears in the list's header row, beside the sort toggle", () => {
     const feeds = Array.from({ length: 12 }, (_, i) =>
       mockFeed(`f${i}`, `Feed ${i}`),
     );
@@ -181,9 +189,8 @@ describe("SidebarFeedList", () => {
     renderList();
 
     const trigger = screen.getByTestId("auto-organize-trigger");
-    const newFolderBtn = screen.getByText("New folder").closest("[data-sidebar='menu-item']");
-    // wand trigger must be a descendant of the same menu-item as "New folder"
-    expect(newFolderBtn?.contains(trigger)).toBe(true);
+    const headerRow = screen.getByTestId("sort-toggle").parentElement;
+    expect(headerRow?.contains(trigger)).toBe(true);
   });
 
   it("does NOT render the auto-organize wand trigger with few feeds", () => {

@@ -19,6 +19,8 @@ import { FREE_FEED_LIMIT } from "@/core/features/quotas";
 import { goToUpgrade } from "@/lib/go-to-settings";
 import { cn } from "@/lib/utils";
 
+const NEAR_LIMIT = Math.ceil(FREE_FEED_LIMIT * 0.8);
+
 export function QuotaIndicator() {
   const tier = useLicenseStore((s) => s.tier);
   const count = useFeedStore((s) => s.feeds.length);
@@ -26,11 +28,15 @@ export function QuotaIndicator() {
 
   if (tier !== "free") return null;
   if (isSelfHosted()) return null;
+  // Only once the limit is near: a permanent "7 / 100 feeds" line told the
+  // user nothing they could act on (audit 2026-Q4, round 2).
+  if (count < NEAR_LIMIT) return null;
 
   const atOrOverLimit = count >= FREE_FEED_LIMIT;
 
   return (
     <div
+      data-testid="quota-indicator"
       className={cn(
         "text-muted-foreground border-sidebar-border flex items-center justify-between border-t px-3 py-2 text-xs",
         atOrOverLimit && "text-destructive",

@@ -27,7 +27,7 @@ Feature: Smart filters
 
   Scenario: A Personal user creates a smart filter
     Given a Personal-tier user with two feeds
-    When they open the "New filter" affordance in the sidebar
+    When they choose "New filter" from the sidebar "+" menu
     And they enter a name "Recent AI"
     And they add a condition "title contains AI"
     And they add a condition "read is false"
@@ -82,7 +82,8 @@ Feature: Smart filters
 
 ### Flow
 
-1. User clicks "New filter" in the sidebar (or "Edit" on an existing
+1. User chooses "New filter" from the sidebar "+" menu (desktop) or the
+   row in the mobile drawer (or "Edit" on an existing
    row).
 2. `useSmartFilterStore.openEditor(target?)` flips `editorOpen = true`
    and stores `editorTarget`. Gate-locked: free users get a toast
