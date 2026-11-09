@@ -3,12 +3,40 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-11-08T20:43:37Z</updated>
+  <updated>2026-11-09T21:18:48Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.17.0</id>
+    <title>v0.17.0: Duplicate stories, full text by default, and lead images</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-11-09T21:18:48Z</published>
+    <updated>2026-11-09T21:18:48Z</updated>
+    <summary>Folders can fold near-identical headlines under the newest copy, articles can open in full text by default, and the list can show each article's lead image. Sync and the feed catalog cost less to run.</summary>
+    <content type="html"><![CDATA[<p>Folders can fold near-identical headlines under the newest copy, articles can open in full text by default, and the list can show each article's lead image. Sync and the feed catalog cost less to run.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added Collapse similar stories to folder settings. Near-identical headlines from the folder's feeds fold under the newest copy behind an Also in N more sources row. Opening the lead marks the folded copies read. Choose Loose, Normal, or Strict.</li>
+  <li>Added Open articles in to Settings, Reading, with Feed text or Full text. A folder or a feed can choose differently in its own settings.</li>
+  <li>Added Show article images to Settings, Reading. Off by default. When on, each row shows the article's lead image, loaded through FeedZero's proxy.</li>
+  <li>Added a Link condition to rules and smart filters, so a rule such as link contains /shorts/ can mute YouTube Shorts.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Reduced the mobile feed drawer's footer to one row and sized the drawer to its content.</li>
+  <li>Answered unchanged sync pulls without reading the vault, so sync uses far less bandwidth.</li>
+  <li>Cut the storage commands behind each feed fetch and cached the public vault count.</li>
+  <li>Updated dependencies to their latest minor and patch versions.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed articles losing their blurb and opening in Full text after a sync pull from another device.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.16.0</id>
     <title>v0.16.0: Offline startup, article retention, and more reading options</title>
