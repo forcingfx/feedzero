@@ -101,6 +101,9 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const showArticleFeedIcons = usePreferencesStore(
     (s) => s.preferences.showArticleFeedIcons ?? true,
   );
+  const showArticleImages = usePreferencesStore(
+    (s) => s.preferences.showArticleImages ?? false,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Pull-to-refresh (touch only). Refreshes the current view exactly like
@@ -421,6 +424,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                     onSelect={handleSelect}
                     feedTitle={itemFeedTitle}
                     feedSiteUrl={itemFeedSiteUrl}
+                    imageUrl={showArticleImages ? entry.article.imageUrl : undefined}
                   />
                 </SwipeToReadRow>
               ) : entry.kind === "summary" ? (

@@ -18,6 +18,8 @@ export interface ParsedArticle {
   summary: string;
   author: string;
   publishedAt: number | null;
+  /** Lead image, absolute http(s) only. See pickItemImage. */
+  imageUrl?: string;
   guid: string;
 }
 
@@ -42,6 +44,8 @@ export interface ParseResult {
 /**
  * Parse an RSS, Atom, RDF, or JSON Feed string using feedsmith.
  */
+import { pickItemImage } from "./item-image.ts";
+
 export function parse(text: string, feedUrl: string): Result<ParseResult> {
   if (!text || typeof text !== "string" || !text.trim()) {
     return err("Feed content is empty or not a string");
@@ -132,6 +136,7 @@ function mapRssFeed(
       summary: sanitize(cleanFeedContent(decodeEntities(summary), itemTitle)),
       author: decodeEntities(author),
       publishedAt: parseDate(item.pubDate),
+      imageUrl: pickItemImage(item, fullContent),
       guid: item.guid?.value || item.link || "",
     };
   });
@@ -161,6 +166,7 @@ function mapAtomFeed(
       summary: sanitize(cleanFeedContent(decodeEntities(entry.summary || ""), entryTitle)),
       author: decodeEntities(entry.authors?.[0]?.name || ""),
       publishedAt: parseDate(entry.published || entry.updated),
+      imageUrl: pickItemImage(entry, entry.content || entry.summary || ""),
       guid: entry.id || findLink(entry.links) || "",
     };
   });
@@ -198,6 +204,9 @@ function mapJsonFeed(
       summary: sanitize(cleanFeedContent((item.summary as string) || "", itemTitle)),
       author: authors?.[0]?.name || "",
       publishedAt: parseDate(item.date_published as string),
+      imageUrl:
+        pickItemImage({ media: { thumbnails: [{ url: item.image as string }] } }) ??
+        pickItemImage({}, (item.content_html as string) || ""),
       guid: (item.id as string) || (item.url as string) || "",
     };
   });

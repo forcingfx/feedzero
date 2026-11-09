@@ -182,6 +182,24 @@ describe("<ReadingTab>", () => {
     });
   });
 
+  describe("issue #340: show article images", () => {
+    it("is off by default and names the privacy trade-off", () => {
+      renderTab();
+      expect(screen.getByRole("switch", { name: /show article images/i })).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+      expect(screen.getByText(/image host/i)).toBeInTheDocument();
+    });
+
+    it("flipping it on persists the preference", async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      renderTab();
+      await userEvent.click(screen.getByRole("switch", { name: /show article images/i }));
+      expect(usePreferencesStore.getState().preferences.showArticleImages).toBe(true);
+    });
+  });
+
   describe("hide read articles", () => {
     it("is off by default", () => {
       renderTab();

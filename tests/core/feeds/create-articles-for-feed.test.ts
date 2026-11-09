@@ -42,4 +42,19 @@ describe("createArticlesForFeed", () => {
       "https://x.test/also-good",
     ]);
   });
+
+  it("carries the parsed lead image onto the stored Article (#340)", () => {
+    const parsed: ParsedArticle = {
+      title: "Pictured",
+      link: "https://example.com/p",
+      content: "<p>x</p>",
+      summary: "",
+      author: "",
+      publishedAt: 1_700_000_000_000,
+      guid: "https://example.com/p",
+      imageUrl: "https://cdn.example.com/lead.jpg",
+    };
+    const [article] = createArticlesForFeed("feed-1", [parsed]);
+    expect(article?.imageUrl).toBe("https://cdn.example.com/lead.jpg");
+  });
 });

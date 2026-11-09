@@ -123,6 +123,12 @@ export interface Article {
   publishedAt: number;
   read: boolean;
   createdAt: number;
+  /**
+   * Absolute http(s) URL of the item's lead image (media:thumbnail, image
+   * enclosure, or first <img>). Shown in the list only when the user turns
+   * "Show article images" on; loaded through the icon proxy.
+   */
+  imageUrl?: string;
   /** User has flagged this article as worth keeping. Drives the starred view. */
   starred?: boolean;
   /** Unix epoch ms of the most recent star action; used to sort the starred view. */
@@ -253,6 +259,12 @@ export interface UserPreferences {
   /** App-wide default view for opened articles; `undefined` reads as "feed". */
   openArticlesIn?: OpenArticlesIn;
   /**
+   * Show each article's lead image in the list. Off by default: every
+   * row's image is a request to a third-party host, which tells that host
+   * what the reader is looking at. `undefined` reads as false.
+   */
+  showArticleImages?: boolean;
+  /**
    * Unread-only reading mode: read articles drop out of the list so a
    * finished session leaves an empty view. Optional for the same
    * back-compat reason as the fields above; `undefined` reads as false.
@@ -288,6 +300,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   readerWidth: "medium",
   readerLineHeight: "normal",
   openArticlesIn: "feed",
+  showArticleImages: false,
   hideReadArticles: false,
   showArticleFeedIcons: true,
   articleRetention: DEFAULT_ARTICLE_RETENTION,
@@ -302,6 +315,7 @@ export interface CreateArticleInput {
   summary?: string;
   author?: string;
   publishedAt?: number | null;
+  imageUrl?: string;
 }
 
 /**

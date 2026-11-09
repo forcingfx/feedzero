@@ -14,6 +14,7 @@ import {
   AlignJustify,
   BookOpenText,
   CheckCheck,
+  Images,
   Image as ImageIcon,
   Layers,
   MoveHorizontal,
@@ -84,6 +85,9 @@ export function ReadingTab() {
   );
   const showArticleFeedIcons = usePreferencesStore(
     (s) => s.preferences.showArticleFeedIcons ?? true,
+  );
+  const showArticleImages = usePreferencesStore(
+    (s) => s.preferences.showArticleImages ?? false,
   );
   const updatePreferences = usePreferencesStore((s) => s.update);
   const hasFeeds = useFeedStore((s) => s.feeds.length > 0);
@@ -181,6 +185,28 @@ export function ReadingTab() {
             onCheckedChange={(v) =>
               void updatePreferences({ showArticleFeedIcons: !!v })
             }
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Images className="size-4 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Show article images</p>
+              <p className="text-xs text-muted-foreground">
+                Show each article&apos;s lead image in the list. Images load
+                through FeedZero&apos;s proxy, but each one is still a request
+                for that article&apos;s image host, so it learns what you are
+                reading. Off by default.
+              </p>
+            </div>
+          </div>
+          <Switch
+            aria-label="Show article images"
+            checked={showArticleImages}
+            onCheckedChange={(v) => void updatePreferences({ showArticleImages: !!v })}
           />
         </div>
       </div>

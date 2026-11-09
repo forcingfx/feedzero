@@ -875,6 +875,7 @@ export async function reloadFeed(
         summary: parsed.summary,
         author: parsed.author,
         publishedAt: parsed.publishedAt,
+        imageUrl: parsed.imageUrl,
       });
       if (articleResult.ok) articles.push(articleResult.value);
     }

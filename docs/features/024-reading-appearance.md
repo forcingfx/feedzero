@@ -27,6 +27,19 @@ set only on the reader's `<article>` column; `ArticleContent` carries no
 leading of its own. Covered by `tests/e2e/reading-appearance.spec.ts`,
 which asserts the computed font size and line height.
 
+### Update 2026-11-10 (issue #340)
+
+**Show article images** (Settings → Reading, off by default) puts each
+article's lead image at the left of its row. The parser picks the image
+per item (`src/core/parser/item-image.ts`: media:thumbnail, then an image
+media:content, then an image enclosure, then the first `<img>` in the
+body; absolute http(s) only) and stores it as `Article.imageUrl`. The row
+loads it through `/api/icon?url=` with `referrerPolicy="no-referrer"`,
+lazily, and hides itself on error. Off by default because every row's
+image is a request that tells the image host what the reader is looking
+at; the setting's copy says so. The list passes `imageUrl` to the row only
+when the preference is on, so a disabled setting renders no `<img>` at all.
+
 ## Behaviour
 
 ```gherkin

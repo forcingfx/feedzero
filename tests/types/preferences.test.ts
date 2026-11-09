@@ -20,6 +20,8 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       readerWidth: "medium",
       readerLineHeight: "normal",
       openArticlesIn: "feed",
+      // Off: every row's image is a request to a third-party host (#340).
+      showArticleImages: false,
       hideReadArticles: false,
       showArticleFeedIcons: true,
       // 30 days, not "never": bounds vault size by default (owner's call,
