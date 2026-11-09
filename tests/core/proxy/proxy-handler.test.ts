@@ -609,4 +609,48 @@ describe("conditional-fetch (ETag / Last-Modified) passthrough", () => {
       "Thu, 22 Oct 2026 09:00:00 GMT",
     );
   });
+
+  /**
+   * Audit 2026-Q4, finding 1. /api/icon?url= proxies any URL the SSRF
+   * validator allows and, since #340, one per article row. Image mode is
+   * keyed off the default content type the three entry points already
+   * pass ("image/x-icon"), so no wrapper has to remember a new option.
+   */
+  describe("image mode caps (default content type image/*)", () => {
+    const ICON_REQ = new Request("http://localhost/api/icon?url=https://cdn.example.com/a.png");
+    const png = (bytes: number, headers: Record<string, string> = {}) =>
+      new Response(new Uint8Array(bytes), { status: 200, headers: { "content-type": "image/png", ...headers } });
+
+    it("refuses a non-image upstream with 415 instead of relaying it", async () => {
+      fetchSpy.mockResolvedValue(new Response("<html>login</html>", { status: 200, headers: { "content-type": "text/html" } }));
+      const res = await handleProxyRequest(ICON_REQ, "image/x-icon");
+      expect(res.status).toBe(415);
+      expect(await res.text()).not.toContain("<html>");
+    });
+
+    it("refuses an image whose Content-Length exceeds 2 MB with 413", async () => {
+      fetchSpy.mockResolvedValue(png(16, { "content-length": String(3 * 1024 * 1024) }));
+      const res = await handleProxyRequest(ICON_REQ, "image/x-icon");
+      expect(res.status).toBe(413);
+    });
+
+    it("refuses an image that turns out larger than 2 MB with 413", async () => {
+      fetchSpy.mockResolvedValue(png(2 * 1024 * 1024 + 1));
+      const res = await handleProxyRequest(ICON_REQ, "image/x-icon");
+      expect(res.status).toBe(413);
+    });
+
+    it("passes a small image through with its content type", async () => {
+      fetchSpy.mockResolvedValue(png(512));
+      const res = await handleProxyRequest(ICON_REQ, "image/x-icon");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/png");
+    });
+
+    it("leaves feed mode alone: an HTML upstream still relays for text/xml callers", async () => {
+      fetchSpy.mockResolvedValue(new Response("<html>not a feed</html>", { status: 200, headers: { "content-type": "text/html" } }));
+      const res = await handleProxyRequest(new Request("http://localhost/api/feed?url=https://example.com/feed"), "text/xml");
+      expect(res.status).toBe(200);
+    });
+  });
 });
