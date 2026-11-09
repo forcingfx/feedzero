@@ -51,6 +51,7 @@ the vault with timestamp last-write-wins — see [ADR 022](decisions/022-prefere
 | readerTextSize    | `"small" \| "medium" \| "large" \| "x-large"` (optional) | Reader body text scale; absent on rows from older clients → treated as "medium" |
 | readerWidth       | `"narrow" \| "medium" \| "wide" \| "full"` (optional) | Reader column measure; absent → "medium" |
 | readerLineHeight  | `"compact" \| "normal" \| "relaxed"` (optional) | Reader line spacing; absent → "normal" (the historical leading). An older client that receives a value it does not know renders its default |
+| openArticlesIn    | `"feed" \| "full-text"` (optional) | Default view for opened articles; absent → "feed". A folder's own `openArticlesIn` overrides it |
 | articleRetention  | `7 \| 14 \| 30 \| 90 \| 365 \| "never"` (optional) | Days an unstarred article is kept after publication; absent → 30, so existing vaults are purged at the default on upgrade |
 
 ### Meta (internal)
@@ -64,7 +65,7 @@ the vault with timestamp last-write-wins — see [ADR 022](decisions/022-prefere
 
 - `feeds` — keyPath: `id`, index: `url` (unique)
 - `articles` — keyPath: `id`, indexes: `feedId`, `[feedId+guid]` (compound)
-- `folders` — keyPath: `id`
+- `folders` — keyPath: `id`. Folder records may carry `openArticlesIn` (`"feed" | "full-text"`, optional; absent = use the app setting or an ancestor's)
 - `smartFilters` — keyPath: `id`
 - `preferences` — keyPath: `id` (single row)
 - `meta` — keyPath: `key`
