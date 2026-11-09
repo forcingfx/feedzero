@@ -20,7 +20,7 @@ export function UpgradeSplash({ feature }: { feature: Feature }) {
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {gate.requiredTierLabel} feature
         </p>
-        <h1 className="text-2xl font-semibold">Unlock {gate.featureName}</h1>
+        <h1 className="text-xl font-semibold">Unlock {gate.featureName}</h1>
         <p className="text-sm text-muted-foreground">{gate.description}</p>
       </div>
       <Button onClick={gate.promptUpgrade} className="w-full" size="lg">

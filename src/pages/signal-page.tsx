@@ -132,7 +132,7 @@ function LockedSplash({ count }: { count: number }) {
     <div className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-6 px-6 py-12 text-center">
       <Sparkles className="size-10 text-primary" />
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Signal</h1>
+        <h1 className="text-xl font-semibold">Signal</h1>
         <p className="text-sm text-muted-foreground">
           What's loud across your feeds — the topics multiple outlets are
           converging on right now.
