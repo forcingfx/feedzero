@@ -143,11 +143,12 @@ describe("AutoOrganizePill (wand trigger + popover)", () => {
     ).toBeInTheDocument();
   });
 
-  it("wand trigger has a violet color scheme", () => {
+  it("wand trigger uses the primary accent token, not a raw hue (audit 2026-Q4)", () => {
     setFeeds(12, 0);
     renderWithRouter(<AutoOrganizePill />);
     const trigger = screen.getByTestId("auto-organize-trigger");
-    expect(trigger.className).toMatch(/violet/);
+    expect(trigger.className).toMatch(/text-primary/);
+    expect(trigger.className).not.toMatch(/violet/);
   });
 
   describe("dismiss behavior", () => {

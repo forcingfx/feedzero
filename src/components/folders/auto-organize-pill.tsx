@@ -82,7 +82,7 @@ export function AutoOrganizePill() {
             data-testid="auto-organize-trigger"
             type="button"
             aria-label="Auto-organize feeds"
-            className="rounded p-1 text-violet-600 hover:bg-violet-500/10 dark:text-violet-400 transition-colors"
+            className="rounded p-1 text-primary hover:bg-primary/10 transition-colors"
           >
             <Wand2 className="size-3.5" />
           </button>

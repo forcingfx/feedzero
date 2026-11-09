@@ -231,7 +231,7 @@ export function SidebarFeedList({
               <button
                 data-testid="sort-toggle"
                 type="button"
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 aria-label={`Sort: ${SORT_LABELS[feedSortMode]}`}
               >
                 <ArrowUpDown className="size-3" />
@@ -241,7 +241,7 @@ export function SidebarFeedList({
             <DropdownMenuContent align="end" className="min-w-36">
               {(["name", "count", "custom"] as const).map((mode) => (
                 <DropdownMenuItem key={mode} onClick={() => setFeedSortMode(mode)}>
-                  <Check className={`size-3.5 mr-1.5 ${feedSortMode === mode ? "opacity-100" : "opacity-0"}`} />
+                  <Check className={`size-3.5 mr-1.5 ${feedSortMode === mode ?"opacity-100" : "opacity-0"}`} />
                   {SORT_LABELS[mode]}
                 </DropdownMenuItem>
               ))}

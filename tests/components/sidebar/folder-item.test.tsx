@@ -146,7 +146,7 @@ describe("FolderItem", () => {
     expect(toggle.className).toContain("hover:text-foreground");
   });
 
-  it("chevron uses a brighter color hover on colored folders (no fill)", () => {
+  it("chevron keeps the muted hover on coloured folders too (the row is no longer filled)", () => {
     const coloredFolder = { ...mockFolder, color: "#7c3aed" };
     render(
       <SidebarProvider>
@@ -156,8 +156,8 @@ describe("FolderItem", () => {
       </SidebarProvider>
     );
     const toggle = screen.getByRole("button", { name: /toggle folder/i });
-    expect(toggle.className).not.toContain("hover:bg-white/20");
-    expect(toggle.className).toContain("hover:text-white");
+    expect(toggle.className).not.toContain("text-white");
+    expect(toggle.className).toContain("hover:text-foreground");
   });
 
   it("marks the folder header active when isSelected is true", () => {
@@ -327,7 +327,9 @@ describe("FolderItem", () => {
       expect(btn?.className).toContain("font-semibold");
     });
 
-    it("applies colored background when folder has a color", () => {
+    it("shows the folder colour as a left bar, not a filled row (audit 2026-Q4)", () => {
+      // A sidebar of saturated filled rows shouted over the content; the
+      // colour is still there, as a 3 px bar at the row's left edge.
       const coloredFolder = { ...mockFolder, color: "#7c3aed" };
       render(
         <SidebarProvider>
@@ -338,10 +340,12 @@ describe("FolderItem", () => {
       );
       const btn = screen.getByText("Tech News").closest("[data-sidebar='menu-button']");
       const style = (btn as HTMLElement)?.getAttribute("style") ?? "";
-      expect(style).toContain("background");
+      expect(style).toContain("inset 3px 0 0");
+      expect(style).toContain("#7c3aed");
+      expect(style).not.toContain("background");
     });
 
-    it("applies white text when folder has a color", () => {
+    it("keeps the normal text colour when folder has a color", () => {
       const coloredFolder = { ...mockFolder, color: "#7c3aed" };
       render(
         <SidebarProvider>
@@ -352,7 +356,8 @@ describe("FolderItem", () => {
       );
       const btn = screen.getByText("Tech News").closest("[data-sidebar='menu-button']");
       const style = (btn as HTMLElement)?.getAttribute("style") ?? "";
-      expect(style).toContain("color");
+      expect(style).not.toContain("color: rgb(255, 255, 255)");
+      expect(style).not.toContain("#ffffff");
     });
 
     // The color picker lived in the dropdown; it now lives in

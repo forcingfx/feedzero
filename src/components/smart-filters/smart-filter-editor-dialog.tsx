@@ -145,7 +145,7 @@ export function SmartFilterEditorDialog() {
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Filter className="size-4 text-violet-500" />
+            <Filter className="size-4 text-primary" />
             {editorTarget ? "Edit filter" : "New smart filter"}
           </DialogTitle>
           <DialogDescription>

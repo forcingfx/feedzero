@@ -66,7 +66,7 @@ export function SignalTabs({ active }: Props) {
           {staleCount > 0 && (
             <span
               aria-label={`${staleCount} briefing(s) have new matching articles`}
-              className="ml-1.5 size-1.5 rounded-full bg-amber-500"
+              className="ml-1.5 size-1.5 rounded-full bg-warning"
             />
           )}
         </ToggleGroupItem>

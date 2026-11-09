@@ -69,7 +69,7 @@ export function PreflightPanel({ runPreflight }: Props) {
       {state.kind === "done" ? (
         <div className="space-y-2 pt-2">
           {state.report.allPassed ? (
-            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            <p className="text-sm font-medium text-success">
               All checks passed ✓
             </p>
           ) : (
@@ -81,7 +81,7 @@ export function PreflightPanel({ runPreflight }: Props) {
             {state.report.checks.map((c) => (
               <li key={c.id} className="flex items-start gap-2 text-xs">
                 {c.passed ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                  <CheckCircle2 className="size-4 shrink-0 text-success mt-0.5" />
                 ) : (
                   <XCircle className="size-4 shrink-0 text-destructive mt-0.5" />
                 )}

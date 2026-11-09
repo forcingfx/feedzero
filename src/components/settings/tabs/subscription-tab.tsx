@@ -195,7 +195,7 @@ function PaidView({ tier }: PaidViewProps) {
     <div className="space-y-4 py-2">
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-success-bg text-success border-success/30">
             <Sparkles className="size-3" />
             {planLabel}
           </span>
@@ -245,7 +245,7 @@ function PaidView({ tier }: PaidViewProps) {
                 title={copied ? "Copied!" : "Copy"}
               >
                 {copied ? (
-                  <Check className="size-4 text-emerald-600" />
+                  <Check className="size-4 text-success" />
                 ) : (
                   <Copy className="size-4" />
                 )}

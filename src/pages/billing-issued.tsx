@@ -110,9 +110,9 @@ export function BillingIssued() {
   // success
   return (
     <div className="mx-auto max-w-md p-8 space-y-6">
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 p-5 space-y-3">
+      <div className="rounded-lg border border-success/30 bg-success-bg p-5 space-y-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="size-5 text-emerald-600" />
+          <Sparkles className="size-5 text-success" />
           <h1 className="text-lg font-semibold">
             Welcome back to {tier === "personal" ? "Personal" : "FeedZero"}
           </h1>

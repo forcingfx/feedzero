@@ -52,7 +52,7 @@ function resolveVirtualFeed(
     return {
       label: "Starred",
       Icon: Star,
-      iconClass: "size-4 shrink-0 text-amber-500",
+      iconClass: "size-4 shrink-0 text-warning",
     };
   }
   if (selectedFeedId && isFilterFeedId(selectedFeedId)) {
@@ -61,7 +61,7 @@ function resolveVirtualFeed(
     return {
       label: filter?.name ?? "Filter",
       Icon: Filter,
-      iconClass: "size-4 shrink-0 text-violet-500",
+      iconClass: "size-4 shrink-0 text-primary",
     };
   }
   return null;

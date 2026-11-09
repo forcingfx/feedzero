@@ -24,7 +24,7 @@ const ROW_CLASS =
   "flex w-full flex-col gap-1 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none";
 
 const MULTI_BADGE_CLASS =
-  "inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary";
+  "inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary";
 
 interface StoryRowProps {
   story: Story;

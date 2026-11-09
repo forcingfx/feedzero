@@ -83,7 +83,7 @@ function Body({ feed, onClose }: { feed: Feed; onClose: () => void }) {
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <Settings2 className="size-4 text-violet-500" />
+          <Settings2 className="size-4 text-primary" />
           Settings — {feed.title}
         </DialogTitle>
         <DialogDescription>
@@ -330,7 +330,7 @@ function ActionsSection({ feed }: { feed: Feed }) {
           disabled={busy !== null}
           onClick={handleRefresh}
         >
-          <RefreshCw className={`size-4 ${busy === "refresh" ? "animate-spin" : ""}`} />
+          <RefreshCw className={`size-4 ${busy ==="refresh" ? "animate-spin" : ""}`} />
           {busy === "refresh" ? "Refreshing…" : "Refresh now"}
         </Button>
         <Button
@@ -341,7 +341,7 @@ function ActionsSection({ feed }: { feed: Feed }) {
           disabled={busy !== null}
           onClick={handleClear}
         >
-          <RotateCcw className={`size-4 ${busy === "clear" ? "animate-spin" : ""}`} />
+          <RotateCcw className={`size-4 ${busy ==="clear" ? "animate-spin" : ""}`} />
           {busy === "clear" ? "Clearing…" : "Clear cached articles"}
         </Button>
         <AlertDialog>

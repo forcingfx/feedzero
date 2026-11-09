@@ -76,7 +76,7 @@ export const ArticleItem = memo(function ArticleItem({
       <div className="min-w-0 flex-1 flex gap-2 items-start">
         <span
           className={`rounded-full size-1.5 shrink-0 mt-1.5 transition-colors duration-500 ${
-            article.read ? "bg-transparent" : "bg-blue-400 dark:bg-blue-500"
+ article.read ?"bg-transparent" : "bg-info "
           }`}
         />
         <div className="min-w-0">
@@ -107,7 +107,7 @@ export const ArticleItem = memo(function ArticleItem({
             <Star
               data-testid="article-star-indicator"
               aria-label="Starred"
-              className="size-3.5 text-amber-500 fill-current"
+              className="size-3.5 text-warning fill-current"
             />
           )}
           {feedSiteUrl && (

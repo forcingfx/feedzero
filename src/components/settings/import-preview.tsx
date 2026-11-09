@@ -110,7 +110,7 @@ export function ImportPreview({
         {unfiled.length > 0 && (
           <div data-testid="preview-unfiled" className="space-y-0.5 pt-1">
             {folders.length > 0 && (
-              <p className="px-2 pt-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              <p className="px-2 pt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
                 Unfiled
               </p>
             )}
@@ -148,10 +148,10 @@ function PreviewFolderRow({ folder }: { folder: FolderGroup }) {
       >
         <ChevronDown
           className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
-            open ? "" : "-rotate-90"
+ open ?"" : "-rotate-90"
           }`}
         />
-        <FolderClosed className="size-3.5 shrink-0 text-violet-500" />
+        <FolderClosed className="size-3.5 shrink-0 text-primary" />
         <span className="flex-1 truncate font-medium">{folder.name}</span>
         <span
           className="text-xs tabular-nums text-muted-foreground"

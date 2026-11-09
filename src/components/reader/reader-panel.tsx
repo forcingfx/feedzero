@@ -454,7 +454,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                   "inline-flex items-center justify-center h-7 w-7 rounded-full border border-border transition-colors",
                   TAP_TARGET_EXPAND,
                   article.starred
-                    ? "text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+                    ? "text-warning hover:text-warning hover:bg-warning/10"
                     : "text-muted-foreground/70 hover:text-foreground hover:bg-accent",
                 )}
               >
