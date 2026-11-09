@@ -1,4 +1,5 @@
 import type { Feed, Folder, OpenArticlesIn } from "../../../packages/core/src/types";
+import { inheritedFolderValue } from "../feeds/folder-tree";
 
 /**
  * Whether an article from `feed` opens in extracted full text.
@@ -14,21 +15,6 @@ export function shouldOpenInFullText(
   appDefault: OpenArticlesIn | undefined,
 ): boolean {
   if (feed?.preferFullText) return true;
-  const folderChoice = nearestFolderChoice(feed?.folderId, folders);
+  const folderChoice = inheritedFolderValue(feed?.folderId, folders, (f) => f.openArticlesIn);
   return (folderChoice ?? appDefault) === "full-text";
-}
-
-function nearestFolderChoice(
-  folderId: string | undefined,
-  folders: readonly Folder[],
-): OpenArticlesIn | undefined {
-  const byId = new Map(folders.map((f) => [f.id, f]));
-  const visited = new Set<string>();
-  let current = folderId ? byId.get(folderId) : undefined;
-  while (current && !visited.has(current.id)) {
-    if (current.openArticlesIn) return current.openArticlesIn;
-    visited.add(current.id);
-    current = current.parentId ? byId.get(current.parentId) : undefined;
-  }
-  return undefined;
 }

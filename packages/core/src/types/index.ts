@@ -98,7 +98,15 @@ export interface Folder {
    * ancestor folder's choice).
    */
   openArticlesIn?: OpenArticlesIn;
+  /**
+   * Fold near-identical headlines from the folder's feeds under the newest
+   * copy, at this strictness. Undefined = off. Inherited by subfolders.
+   */
+  collapseSimilar?: SimilarityLevel;
 }
+
+/** How alike two titles must be to count as one story: loose 40%, normal 60%, strict 80% token overlap. */
+export type SimilarityLevel = "loose" | "normal" | "strict";
 
 /** Which view an article opens in: the feed's own text, or extracted full text. */
 export type OpenArticlesIn = "feed" | "full-text";

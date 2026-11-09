@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { FolderColorPicker } from "./folder-color-picker.tsx";
-import type { Folder, OpenArticlesIn } from "@feedzero/core/types";
+import type { Folder, OpenArticlesIn, SimilarityLevel } from "@feedzero/core/types";
 
 export function FolderSettingsDialog() {
   const folderId = useFeedStore((s) => s.folderSettingsDialogId);
@@ -78,6 +78,7 @@ function Body({ folder, onClose }: { folder: Folder; onClose: () => void }) {
         <NameSection folder={folder} />
         <ColorSection folder={folder} />
         <OpenArticlesInSection folder={folder} />
+        <CollapseSimilarSection folder={folder} />
         <DeleteSection folder={folder} onClose={onClose} />
       </div>
 
@@ -120,6 +121,44 @@ function OpenArticlesInSection({ folder }: { folder: Folder }) {
       </select>
       <p className="text-xs text-muted-foreground">
         Applies to every feed in this folder and its subfolders.
+      </p>
+    </section>
+  );
+}
+
+const COLLAPSE_OFF = "off";
+
+/**
+ * Per-folder "Collapse similar stories" (issue #343). Several feeds in a
+ * news folder often run one story with small title changes; this folds
+ * them under the newest copy in the folder's article list.
+ */
+function CollapseSimilarSection({ folder }: { folder: Folder }) {
+  const setCollapseSimilar = useFeedStore((s) => s.setFolderCollapseSimilar);
+
+  return (
+    <section className="space-y-2">
+      <Label htmlFor="folder-settings-collapse-similar">Collapse similar stories</Label>
+      <select
+        id="folder-settings-collapse-similar"
+        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        value={folder.collapseSimilar ?? COLLAPSE_OFF}
+        onChange={(e) => {
+          const value = e.target.value;
+          void setCollapseSimilar(
+            folder.id,
+            value === COLLAPSE_OFF ? undefined : (value as SimilarityLevel),
+          );
+        }}
+      >
+        <option value={COLLAPSE_OFF}>Off</option>
+        <option value="loose">Loose (titles share about 40% of their words)</option>
+        <option value="normal">Normal (about 60%)</option>
+        <option value="strict">Strict (about 80%)</option>
+      </select>
+      <p className="text-xs text-muted-foreground">
+        Near-identical headlines from this folder's feeds fold under the newest copy.
+        Opening it marks the folded copies read. Applies to subfolders too.
       </p>
     </section>
   );
