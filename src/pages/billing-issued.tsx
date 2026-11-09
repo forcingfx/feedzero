@@ -72,7 +72,7 @@ export function BillingIssued() {
       `body=${encodeURIComponent(supportBody)}`;
     return (
       <div className="mx-auto max-w-md p-8 space-y-4">
-        <h1 className="text-2xl font-semibold">Recovery link {phase === "missing-token" ? "missing" : "invalid"}</h1>
+        <h1 className="text-xl font-semibold">Recovery link {phase === "missing-token" ? "missing" : "invalid"}</h1>
         <Alert variant="destructive" role="alert">
           <AlertDescription>
             {error ??
@@ -99,7 +99,7 @@ export function BillingIssued() {
   if (phase === "issuing") {
     return (
       <div className="mx-auto max-w-md p-8 space-y-4 text-center">
-        <h1 className="text-2xl font-semibold">Restoring your license…</h1>
+        <h1 className="text-xl font-semibold">Restoring your license…</h1>
         <p className="text-sm text-muted-foreground">
           This usually takes a couple of seconds.
         </p>
@@ -113,7 +113,7 @@ export function BillingIssued() {
       <div className="rounded-lg border border-success/30 bg-success-bg p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Sparkles className="size-5 text-success" />
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-xl font-semibold">
             Welcome back to {tier === "personal" ? "Personal" : "FeedZero"}
           </h1>
         </div>

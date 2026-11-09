@@ -84,7 +84,7 @@ export function InvalidKeysScreen() {
         <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10">
           <AlertTriangle className="size-6 text-destructive" />
         </div>
-        <h1 className="text-lg font-semibold">Can't open your local data</h1>
+        <h1 className="text-xl font-semibold">Can't open your local data</h1>
         <p className="text-sm text-muted-foreground">
           Your stored keys couldn't decrypt the local FeedZero database on this
           device. Your cloud vault is untouched — restore from it with your
