@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router";
-import { ChevronUp, Compass, FolderPlus, Layers, RefreshCw, Settings } from "lucide-react";
+import { useState, useEffect, useRef, forwardRef } from "react";
+import { useLocation, useNavigate } from "react-router";
+import { Compass, FolderPlus, Layers, RefreshCw, Settings, Sparkles } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@feedzero/core/utils/constants";
-import { stableDockFeeds, MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
+import { MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
@@ -24,6 +23,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   // The strip's handle pill advertises "drag me up" — honor it: an
   // upward-dominant drag on the strip opens the drawer (tapping the
   // chevron still works). Tracked per-gesture so a horizontal scrub
@@ -62,19 +62,23 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     setOpen(false);
   }
 
-  function handleSettings() {
-    setOpen(false);
-    goToSettings(navigate);
-  }
-
   const recentFeedIds = useFeedStore((s) => s.recentFeedIds);
-  // The closed strip is a quick-switch dock, not a status line: showing the
-  // current feed name here just echoed the header. Instead, surface the
-  // feeds the user actually hops between. Recency picks WHICH feeds are
-  // here; sidebar order picks WHERE — see stableDockFeeds for why the
-  // dock must never reorder on a tap.
-  const dockFeeds = stableDockFeeds(feeds, recentFeedIds, MOBILE_DOCK_FEED_CAP);
-  const allActive = selectedFeedId === ALL_FEEDS_ID;
+  // Recent feeds: the first row of the open drawer. Recency picks WHICH
+  // feeds are here, sidebar order picks WHERE, so the row never reorders
+  // under the thumb. Unlike the old closed dock, the row is not padded
+  // with never-viewed feeds: the full list is right below it.
+  const recentSet = new Set(recentFeedIds.slice(0, MOBILE_DOCK_FEED_CAP));
+  const recentFeeds = feeds.filter((feed) => recentSet.has(feed.id));
+
+  // Which tab is current. Feeds covers every route that is not one of the
+  // other three sections (the list, a folder, a filter, an article).
+  const section: "feeds" | "explore" | "signal" | "settings" = pathname.startsWith("/explore")
+    ? "explore"
+    : pathname.startsWith("/signal")
+      ? "signal"
+      : pathname.startsWith("/settings")
+        ? "settings"
+        : "feeds";
 
   return (
     // No `snapPoints` here: with a single snap point and an inline height,
@@ -95,81 +99,27 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
         //   pl/pr-[max(0.75rem,env(safe-area-inset-left|right))] holds a
         //   visual gutter from the rounded display corners in portrait and
         //   clears the notch/camera cutout in landscape.
-        className="relative flex items-center gap-1 shrink-0 border-t bg-background pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] h-[calc(60px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]"
+        className="relative flex items-center shrink-0 border-t bg-background pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] h-[calc(60px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]"
       >
         <div className="absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-muted-foreground/30" />
 
-        {/* Quick-switch dock: All-items + most-recently-viewed feed
-            favicons. Tapping switches feeds directly (the drawer is
-            already closed); the chevron opens the full list. */}
-        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-          <button
-            type="button"
-            aria-label="All items"
-            aria-pressed={allActive}
-            onClick={() => onFeedSelect(ALL_FEEDS_ID)}
-            className={`flex items-center justify-center size-11 shrink-0 rounded-md ${
-              allActive
-                ? "bg-accent text-foreground"
-                : "text-muted-foreground hover:bg-accent/50"
-            }`}
-          >
-            <Layers className="size-5" />
-          </button>
-          {dockFeeds.map((feed) => {
-            const active = feed.id === selectedFeedId;
-            return (
-              <button
-                key={feed.id}
-                type="button"
-                aria-label={feed.title}
-                aria-pressed={active}
-                onClick={() => onFeedSelect(feed.id)}
-                className={`flex items-center justify-center size-11 shrink-0 rounded-md hover:bg-accent/50 ${
-                  active
-                    ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
-                    : ""
-                }`}
-              >
-                <FeedFavicon siteUrl={feed.siteUrl} className="size-6" />
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Fixed shortcuts: Explore and Settings ride the dock instead of
-            hiding behind the drawer chevron — the bottom edge is the
-            cheapest thumb real estate on a phone, and these are the two
-            most-reached non-feed surfaces. Signal/Stats stay in the
-            drawer to keep the strip from crowding out feed favicons. */}
-        <button
-          type="button"
-          aria-label="Explore"
-          onClick={() => navigate("/explore")}
-          className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
-        >
-          <Compass className="size-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Settings"
-          onClick={() => goToSettings(navigate)}
-          className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
-        >
-          <Settings className="size-5" />
-        </button>
+        {/* Four tabs, the standard phone bottom bar: Feeds opens the drawer,
+            the other three navigate. Every tab is labelled and the current
+            section is marked (audit 2026-Q4, round 2, rule 5). */}
         <Drawer.Trigger asChild>
-          <button
-            type="button"
-            aria-label="Open feed list"
-            className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
-          >
-            <ChevronUp
-              data-testid="drawer-open-chevron"
-              className={`size-5 transition-transform ${open ? "rotate-180" : ""}`}
-            />
-          </button>
+          <TabButton label="Feeds" aria-label="Feeds, open feed list" current={section === "feeds"}>
+            <Layers className="size-5" />
+          </TabButton>
         </Drawer.Trigger>
+        <TabButton label="Explore" current={section === "explore"} onClick={() => navigate("/explore")}>
+          <Compass className="size-5" />
+        </TabButton>
+        <TabButton label="Signal" current={section === "signal"} onClick={() => navigate("/signal")}>
+          <Sparkles className="size-5" />
+        </TabButton>
+        <TabButton label="Settings" current={section === "settings"} onClick={() => goToSettings(navigate)}>
+          <Settings className="size-5" />
+        </TabButton>
       </div>
 
       <Drawer.Portal>
@@ -194,6 +144,31 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
               // clearance. Padding here would be a visible blank gap.
               className="min-h-0 overflow-y-auto overflow-x-hidden pb-1"
             >
+              {recentFeeds.length > 0 && (
+                <div
+                  data-testid="drawer-recent-feeds"
+                  aria-label="Recent feeds"
+                  className="flex items-center gap-1 overflow-x-auto px-3 pt-1 pb-2"
+                >
+                  {recentFeeds.map((feed) => {
+                    const active = feed.id === selectedFeedId;
+                    return (
+                      <button
+                        key={feed.id}
+                        type="button"
+                        aria-label={feed.title}
+                        aria-pressed={active}
+                        onClick={() => handleSelect(feed.id)}
+                        className={`flex items-center justify-center size-11 shrink-0 rounded-md hover:bg-accent/50 ${
+                          active ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""
+                        }`}
+                      >
+                        <FeedFavicon siteUrl={feed.siteUrl} className="size-6" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div data-testid="drawer-section" className="w-full py-1 px-3">
                 <SidebarBody
                   onFeedSelect={handleSelect}
@@ -250,14 +225,6 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                     <RefreshCw className={`size-5 ${isRefreshingAll ? "animate-spin" : ""}`} />
                   </button>
                 )}
-                <button
-                  type="button"
-                  aria-label="Settings"
-                  onClick={handleSettings}
-                  className={FOOTER_ICON_BUTTON}
-                >
-                  <Settings className="size-5" />
-                </button>
               </div>
             </div>
           </SidebarProvider>
@@ -266,3 +233,28 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     </Drawer.Root>
   );
 }
+
+/**
+ * One tab of the closed bottom bar: icon over a 12 px label, 44 px tall,
+ * sharing the width with its siblings. Forwards the ref so it can be the
+ * drawer's trigger.
+ */
+const TabButton = forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; current: boolean }
+>(function TabButton({ label, current, className, children, ...rest }, ref) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      aria-current={current ? "page" : undefined}
+      className={`flex h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-md text-xs ${
+        current ? "text-foreground" : "text-muted-foreground hover:bg-accent/50"
+      } ${className ?? ""}`}
+      {...rest}
+    >
+      {children}
+      <span className="leading-none">{label}</span>
+    </button>
+  );
+});

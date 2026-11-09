@@ -108,116 +108,50 @@ describe("MobileNavDrawer", () => {
     });
   });
 
-  describe("closed-state quick-switch dock", () => {
-    it("shows the selected feed's favicons in the closed strip (no drawer open needed)", () => {
-      useFeedStore.setState({
-        feeds: [makeFeed("f1", "Hacker News"), makeFeed("f2", "The Verge")],
-        recentFeedIds: ["f1", "f2"],
-      });
-      renderDrawer();
-      const strip = screen.getByTestId("drawer-handle-strip");
-      // Favicon buttons are labelled by feed title and present while closed.
-      expect(within(strip).getByRole("button", { name: "Hacker News" })).toBeInTheDocument();
-      expect(within(strip).getByRole("button", { name: "The Verge" })).toBeInTheDocument();
-    });
-
-    it("anchors an All-items quick button in the closed strip", () => {
-      useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
-      renderDrawer();
-      const strip = screen.getByTestId("drawer-handle-strip");
-      expect(within(strip).getByRole("button", { name: "All items" })).toBeInTheDocument();
-    });
-
-    it("switches feed when a dock favicon is tapped, without opening the drawer", async () => {
-      const user = userEvent.setup();
-      const onFeedSelect = vi.fn();
+  /**
+   * Audit 2026-Q4, round 2, rule 5. The closed strip is a standard
+   * four-tab bar (Feeds, Explore, Signal, Settings) instead of a
+   * favicon dock plus two shortcuts plus a chevron: every tab has a
+   * label, the current section is marked, and recent feeds move to the
+   * first row of the open drawer. Needs the owner's phone check.
+   */
+  describe("closed-state tab bar", () => {
+    it("shows exactly four labelled tabs: Feeds, Explore, Signal, Settings", () => {
       useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")], recentFeedIds: ["f1"] });
-      renderDrawer({ onFeedSelect });
-
+      renderDrawer();
       const strip = screen.getByTestId("drawer-handle-strip");
-      await user.click(within(strip).getByRole("button", { name: "Hacker News" }));
-
-      expect(onFeedSelect).toHaveBeenCalledWith("f1");
-      // Drawer stays closed: the open-chevron must not be rotated.
-      expect(screen.getByTestId("drawer-open-chevron").className).not.toContain("rotate-180");
+      const labels = within(strip).getAllByRole("button").map((b) => b.textContent?.trim());
+      expect(labels).toEqual(["Feeds", "Explore", "Signal", "Settings"]);
+      // No favicon buttons in the strip any more.
+      expect(within(strip).queryByRole("button", { name: "Hacker News" })).toBeNull();
     });
 
-    it("switches to All items when the anchored dock button is tapped", async () => {
+    it("the Feeds tab opens the drawer", async () => {
       const user = userEvent.setup();
-      const onFeedSelect = vi.fn();
       useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
-      renderDrawer({ onFeedSelect });
-
-      const strip = screen.getByTestId("drawer-handle-strip");
-      await user.click(within(strip).getByRole("button", { name: "All items" }));
-
-      expect(onFeedSelect).toHaveBeenCalledWith("all");
+      renderDrawer();
+      await user.click(screen.getByRole("button", { name: /open feed list/i }));
+      await waitFor(() => expect(screen.getByTestId("drawer-content")).toBeInTheDocument());
     });
 
-    it("dock keeps sidebar order regardless of recency (no reorder under the thumb)", () => {
-      useFeedStore.setState({
-        feeds: [makeFeed("f1", "Alpha"), makeFeed("f2", "Bravo"), makeFeed("f3", "Charlie")],
-        recentFeedIds: ["f3", "f1"],
-      });
+    it("marks the current section with aria-current", () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
       renderDrawer();
       const strip = screen.getByTestId("drawer-handle-strip");
-      const labels = within(strip)
-        .getAllByRole("button")
-        .map((b) => b.getAttribute("aria-label"));
-      // Recency only decides WHICH feeds occupy dock slots; POSITION is
-      // sidebar order. Earlier the dock re-sorted most-recent-first, which
-      // shuffled the buttons on every tap — jarring on a strip you tap
-      // by muscle memory (user feedback on PR #237).
-      expect(labels).toEqual([
-        "All items",
-        "Alpha",
-        "Bravo",
-        "Charlie",
-        "Explore",
-        "Settings",
-        "Open feed list",
-      ]);
+      expect(within(strip).getByRole("button", { name: /open feed list/i })).toHaveAttribute("aria-current", "page");
+      expect(within(strip).getByRole("button", { name: /explore/i })).not.toHaveAttribute("aria-current");
     });
 
-    it("caps the number of dock favicons and leaves the rest behind the full list", () => {
-      useFeedStore.setState({
-        feeds: Array.from({ length: 20 }, (_, i) => makeFeed(`f${i}`, `Feed ${i}`)),
-      });
-      renderDrawer();
-      const strip = screen.getByTestId("drawer-handle-strip");
-      const faviconButtons = within(strip)
-        .getAllByRole("button")
-        .filter((b) => /^Feed \d+$/.test(b.getAttribute("aria-label") ?? ""));
-      expect(faviconButtons.length).toBeLessThanOrEqual(6);
-      expect(faviconButtons.length).toBeGreaterThan(0);
-    });
-
-    it("marks the active feed's dock button as pressed", () => {
-      useFeedStore.setState({
-        feeds: [makeFeed("f1", "Hacker News")],
-        recentFeedIds: ["f1"],
-        selectedFeedId: "f1",
-      });
-      renderDrawer();
-      const strip = screen.getByTestId("drawer-handle-strip");
-      expect(
-        within(strip).getByRole("button", { name: "Hacker News" }),
-      ).toHaveAttribute("aria-pressed", "true");
-    });
-
-    it("dock buttons meet the 44px tap-target floor (size-11)", () => {
-      useFeedStore.setState({
-        feeds: [makeFeed("f1", "Feed 1")],
-        recentFeedIds: ["f1"],
-      });
+    it("tabs meet the 44px tap-target floor", () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
       renderDrawer();
       const strip = screen.getByTestId("drawer-handle-strip");
       for (const btn of within(strip).getAllByRole("button")) {
-        expect(btn.className).toContain("size-11");
+        expect(btn.className).toMatch(/\bh-11\b|\bsize-11\b/);
       }
     });
 
-    it("swiping up on the dock strip opens the drawer (the handle pill advertises it)", async () => {
+    it("swiping up on the strip opens the drawer (the handle pill advertises it)", async () => {
       useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
       renderDrawer();
       const strip = screen.getByTestId("drawer-handle-strip");
@@ -243,32 +177,56 @@ describe("MobileNavDrawer", () => {
       });
     });
 
-    it("has a fixed Explore shortcut that navigates without opening the drawer", async () => {
+    it("Explore, Signal and Settings navigate without opening the drawer", async () => {
       const user = userEvent.setup();
       useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
       renderDrawer();
-
       const strip = screen.getByTestId("drawer-handle-strip");
-      await user.click(
-        within(strip).getByRole("button", { name: /explore/i }),
-      );
 
+      await user.click(within(strip).getByRole("button", { name: /explore/i }));
       expect(screen.getByTestId("probe-path")).toHaveTextContent("/explore");
-      expect(screen.queryByTestId("drawer-content")).toBeNull();
-    });
-
-    it("has a fixed Settings shortcut that navigates without opening the drawer", async () => {
-      const user = userEvent.setup();
-      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
-      renderDrawer();
-
-      const strip = screen.getByTestId("drawer-handle-strip");
-      await user.click(
-        within(strip).getByRole("button", { name: /settings/i }),
-      );
-
+      await user.click(within(strip).getByRole("button", { name: /signal/i }));
+      expect(screen.getByTestId("probe-path")).toHaveTextContent("/signal");
+      await user.click(within(strip).getByRole("button", { name: /settings/i }));
       expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings");
       expect(screen.queryByTestId("drawer-content")).toBeNull();
+    });
+  });
+
+  describe("recent feeds row in the open drawer", () => {
+    async function openDrawer() {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: /open feed list/i }));
+      await waitFor(() => expect(screen.getByTestId("drawer-content")).toBeInTheDocument());
+      return user;
+    }
+
+    it("shows the most-recently-viewed feeds as favicon buttons, in stable sidebar order", async () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("f1", "Alpha"), makeFeed("f2", "Bravo"), makeFeed("f3", "Charlie")],
+        recentFeedIds: ["f3", "f1"],
+      });
+      renderDrawer();
+      await openDrawer();
+      const row = screen.getByTestId("drawer-recent-feeds");
+      const labels = within(row).getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+      expect(labels).toEqual(["Alpha", "Charlie"]);
+    });
+
+    it("tapping a recent feed selects it (and the drawer closes, like any row)", async () => {
+      const onFeedSelect = vi.fn();
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Alpha")], recentFeedIds: ["f1"] });
+      renderDrawer({ onFeedSelect });
+      const user = await openDrawer();
+      await user.click(within(screen.getByTestId("drawer-recent-feeds")).getByRole("button", { name: "Alpha" }));
+      expect(onFeedSelect).toHaveBeenCalledWith("f1");
+    });
+
+    it("is absent when nothing has been viewed yet", async () => {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Alpha")], recentFeedIds: [] });
+      renderDrawer();
+      await openDrawer();
+      expect(screen.queryByTestId("drawer-recent-feeds")).toBeNull();
     });
   });
 
@@ -290,18 +248,18 @@ describe("MobileNavDrawer", () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Feed One")] });
     renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
     expect(await screen.findByText("All items")).toBeInTheDocument();
   });
 
-  it("renders an Explore entry that navigates to the explore catalog", async () => {
+  it("carries no Explore or Signal rows: the tab bar owns those sections", async () => {
     const user = userEvent.setup();
+    useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
     renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
-    const explore = await screen.findByText("Explore");
-    expect(explore).toBeInTheDocument();
-    // The button should be reachable via role
-    expect(explore.closest("button, a")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
+    const content = await screen.findByTestId("drawer-content");
+    expect(within(content).queryByText("Explore")).toBeNull();
+    expect(within(content).queryByText("Signal")).toBeNull();
   });
 
   it("calls onFeedSelect with ALL_FEEDS_ID when All items is tapped", async () => {
@@ -309,7 +267,7 @@ describe("MobileNavDrawer", () => {
     const onFeedSelect = vi.fn();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Feed One")] });
     renderDrawer({ onFeedSelect });
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
     await user.click(await screen.findByText("All items"));
     expect(onFeedSelect).toHaveBeenCalledWith("all");
   });
@@ -318,7 +276,7 @@ describe("MobileNavDrawer", () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News"), makeFeed("f2", "The Verge")] });
     renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
     expect(await screen.findByText("Hacker News")).toBeInTheDocument();
     expect(screen.getByText("The Verge")).toBeInTheDocument();
   });
@@ -328,7 +286,7 @@ describe("MobileNavDrawer", () => {
     const onFeedSelect = vi.fn();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
     renderDrawer({ onFeedSelect });
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
     await user.click(await screen.findByText("Hacker News"));
     expect(onFeedSelect).toHaveBeenCalledWith("f1");
   });
@@ -336,7 +294,7 @@ describe("MobileNavDrawer", () => {
   it("drawer content stacks vertically (no horizontal flex layout from SidebarProvider)", async () => {
     const user = userEvent.setup();
     const { container } = renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
 
     const wrapper = await waitFor(() => {
       const w = container.ownerDocument.querySelector("[data-slot='sheet-content'], [data-slot='drawer-content'], [data-testid='drawer-content']");
@@ -355,27 +313,12 @@ describe("MobileNavDrawer", () => {
     expect(sidebarWrapper!.className).not.toContain("min-h-svh");
   });
 
-  it("renders a single Settings entry that navigates to /settings", async () => {
-    // The drawer footer no longer inlines individual settings items. Tapping
-    // Settings now navigates to the stage page at /settings — one tap, one
-    // destination — rather than opening a centered modal.
-    const user = userEvent.setup();
-    useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
-    renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
-
-    const settingsBtn = await screen.findByRole("button", { name: "Settings" });
-    await user.click(settingsBtn);
-
-    expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings");
-  });
-
   it("renders a 'Refresh all' row that refreshes every feed when feeds exist", async () => {
     const { refreshAllFeeds } = await import("@/core/feeds/feed-service.ts");
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
     renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
 
     const refreshBtn = await screen.findByTestId("drawer-refresh-all");
     await user.click(refreshBtn);
@@ -387,9 +330,9 @@ describe("MobileNavDrawer", () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [] });
     renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
-    // Settings is always present; refresh row is feed-gated.
-    await screen.findByRole("button", { name: "Settings" });
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
+    // The footer's New folder is always present; the refresh row is feed-gated.
+    await screen.findByRole("button", { name: "New folder" });
     expect(screen.queryByTestId("drawer-refresh-all")).toBeNull();
   });
 
@@ -397,7 +340,7 @@ describe("MobileNavDrawer", () => {
     const user = userEvent.setup();
     useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
     const { container } = renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
 
     const drawer = await waitFor(() => {
       const d = container.ownerDocument.querySelector(
@@ -420,43 +363,8 @@ describe("MobileNavDrawer", () => {
     }
   });
 
-  it("Settings stays pinned outside the scroll container so it's reachable with many feeds", async () => {
-    // 2026-05-19 bug report: with a long feed list, the inner scroll
-    // wasn't reaching the Settings row at the bottom — vaul's snap-point
-    // mode intercepts vertical drags before the inner scroll can run
-    // them. Fixing the scroll is one half (remove snapPoints below);
-    // pinning Settings as a fixed drawer footer is the other half — even
-    // if scroll regresses again, Settings stays accessible. Belt and
-    // suspenders for the always-reachable invariant.
-    const user = userEvent.setup();
-    useFeedStore.setState({
-      feeds: Array.from({ length: 50 }, (_, i) =>
-        makeFeed(`f${i}`, `Feed ${i}`),
-      ),
-    });
-    const { container } = renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
-
-    const drawer = await waitFor(() => {
-      const d = container.ownerDocument.querySelector(
-        "[data-testid='drawer-content']",
-      );
-      if (!d) throw new Error("drawer not mounted");
-      return d;
-    });
-    const scroll = drawer.querySelector("[data-testid='drawer-scroll']");
-    const settingsBtn = await screen.findByRole("button", { name: "Settings" });
-
-    // The Settings button must not be a descendant of the scrollable area;
-    // it lives in the drawer's pinned footer alongside (but not inside)
-    // the scroll.
-    expect(scroll).not.toBeNull();
-    expect(scroll!.contains(settingsBtn)).toBe(false);
-    expect(drawer.contains(settingsBtn)).toBe(true);
-  });
-
-  it("'New folder' affordance also stays pinned outside the scroll so it's reachable with many feeds", async () => {
-    // Same always-reachable invariant as Settings: with a 50-feed list,
+  it("'New folder' stays pinned outside the scroll so it's reachable with many feeds", async () => {
+    // Always-reachable invariant (2026-05-19 bug report): with a 50-feed list,
     // a power user shouldn't have to scroll past every feed to reach
     // folder management. NewFolderInput renders inside SidebarFeedList
     // by default; the mobile drawer suppresses that and renders its own
@@ -468,7 +376,7 @@ describe("MobileNavDrawer", () => {
       ),
     });
     const { container } = renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
 
     const drawer = await waitFor(() => {
       const d = container.ownerDocument.querySelector(
@@ -496,7 +404,7 @@ describe("MobileNavDrawer", () => {
   it("drawer scroll container prevents horizontal scrolling", async () => {
     const user = userEvent.setup();
     const { container } = renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
     const scroll = await waitFor(() => {
       const s = container.ownerDocument.querySelector("[data-testid='drawer-scroll']");
       if (!s) throw new Error("scroll not mounted");
@@ -517,11 +425,11 @@ describe("MobileNavDrawer", () => {
     // not this padding.
     const user = userEvent.setup();
     const { container } = renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
-    const settingsBtn = await screen.findByRole("button", { name: "Settings" });
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
+    const newFolderBtn = await screen.findByRole("button", { name: "New folder" });
     const drawer = container.ownerDocument.querySelector("[data-testid='drawer-content']")!;
     const footer = [...drawer.querySelectorAll("[data-testid='drawer-section']")].find(
-      (section) => section.contains(settingsBtn),
+      (section) => section.contains(newFolderBtn),
     )!;
 
     expect(footer.className).toContain("safe-area-inset-bottom");
@@ -538,7 +446,7 @@ describe("MobileNavDrawer", () => {
     // footer instead ("pinned footer pads for the home indicator only").
     const user = userEvent.setup();
     renderDrawer();
-    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(screen.getByRole("button", { name: /open feed list/i }));
     const scroll = await screen.findByTestId("drawer-scroll");
     expect(scroll.className).not.toContain("safe-area-inset-bottom");
     expect(scroll.className).not.toMatch(/100vh[\s_]*-[\s_]*100dvh/);
@@ -553,15 +461,16 @@ describe("MobileNavDrawer", () => {
     async function openDrawer() {
       const user = userEvent.setup();
       renderDrawer();
-      await user.click(screen.getByRole("button", { name: "Open feed list" }));
+      await user.click(screen.getByRole("button", { name: /open feed list/i }));
       return { user, drawer: await screen.findByTestId("drawer-content") };
     }
 
-    it("puts New folder, Refresh all and Settings on a single icon row", async () => {
+    it("puts New folder and Refresh all on a single icon row (Settings lives in the tab bar)", async () => {
       useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
       const { drawer } = await openDrawer();
       const row = within(drawer).getByTestId("drawer-footer-actions");
-      for (const name of [/new folder/i, /refresh all/i, /^settings$/i]) {
+      expect(within(row).queryByRole("button", { name: /^settings$/i })).toBeNull();
+      for (const name of [/new folder/i, /refresh all/i]) {
         const btn = within(row).getByRole("button", { name });
         // Icon-only: the accessible name lives in aria-label, no visible text.
         expect(btn.textContent?.trim()).toBe("");
@@ -582,7 +491,7 @@ describe("MobileNavDrawer", () => {
       useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
       const { drawer } = await openDrawer();
       const row = within(drawer).getByTestId("drawer-footer-actions");
-      for (const name of [/new folder/i, /refresh all/i, /^settings$/i]) {
+      for (const name of [/new folder/i, /refresh all/i]) {
         expect(within(row).getByRole("button", { name }).className).toContain("size-11");
       }
     });
@@ -605,18 +514,12 @@ describe("MobileNavDrawer", () => {
   it("toggles open when feedzero:toggle-sidebar event is dispatched", async () => {
     const { container } = renderDrawer();
     const doc = container.ownerDocument;
+    expect(screen.queryByTestId("drawer-content")).toBeNull();
 
-    // Starts collapsed — chevron points up (no rotate-180)
-    const chevronBefore = doc.querySelector("[data-testid='drawer-open-chevron']");
-    expect(chevronBefore?.getAttribute("class")).not.toContain("rotate-180");
-
-    // Dispatch the toggle event
     doc.dispatchEvent(new CustomEvent("feedzero:toggle-sidebar"));
 
-    // Drawer should now be open — chevron rotates 180°
     await waitFor(() => {
-      const chevron = doc.querySelector("[data-testid='drawer-open-chevron']");
-      expect(chevron?.getAttribute("class")).toContain("rotate-180");
+      expect(screen.getByTestId("drawer-content")).toBeInTheDocument();
     });
   });
 });

@@ -19,7 +19,7 @@ async function setupFeed(page: import("@playwright/test").Page) {
 /**
  * Adds a feed on mobile. After adding via Explore, the app already navigates
  * the user to the new feed's article list — no need to re-select via the
- * mobile drawer (it lives in MobileNavDrawer with aria-label "Open feed list",
+ * mobile drawer (the Feeds tab in MobileNavDrawer, accessible name "Feeds, open feed list",
  * not the old "Toggle Sidebar" sheet).
  */
 async function setupFeedMobile(page: import("@playwright/test").Page) {
@@ -244,7 +244,7 @@ test.describe("Layout — mobile", () => {
   }) => {
     // Mobile feed nav is a Vaul bottom drawer (MobileNavDrawer), not the
     // desktop Sidebar's offcanvas sheet. The trigger is a button with
-    // aria-label "Open feed list"; the content lives under
+    // the Feeds tab ("Feeds, open feed list"); the content lives under
     // data-testid="drawer-content".
     const drawerContent = page.getByTestId("drawer-content");
     await expect(drawerContent).toBeHidden();
@@ -252,7 +252,7 @@ test.describe("Layout — mobile", () => {
     await page.getByRole("button", { name: /open feed list/i }).click();
 
     await expect(drawerContent).toBeVisible({ timeout: 5000 });
-    await expect(drawerContent.getByRole("button", { name: "Settings" })).toBeVisible();
+    await expect(drawerContent.getByRole("button", { name: "New folder" })).toBeVisible();
   });
 
   test("nav drawer closes when a feed is tapped", async ({
