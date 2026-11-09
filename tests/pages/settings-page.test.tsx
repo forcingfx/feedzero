@@ -1,7 +1,7 @@
 /**
  * <SettingsPage> — focused tests for the stage page's tab wiring.
  *
- * Verifies the page reads `?tab=` from the URL, defaults to "subscription",
+ * Verifies the page reads `?tab=` from the URL, defaults to "reading",
  * renders the new collapsed tab list, redirects legacy tab names, and
  * hides the Subscription tab in self-hosted mode.
  */
@@ -52,9 +52,9 @@ describe("<SettingsPage>", () => {
     ).toBeInTheDocument();
   });
 
-  it("defaults to the Subscription tab when no ?tab= is set", () => {
+  it("defaults to the Reading tab when no ?tab= is set (audit 2026-Q4: settings open on what people came to change, not a price list)", () => {
     renderAt("/settings");
-    expect(screen.getByTestId("subscription-tab")).toBeInTheDocument();
+    expect(screen.getByTestId("reading-tab")).toBeInTheDocument();
   });
 
   it("reads the active tab from ?tab=", () => {
@@ -62,9 +62,9 @@ describe("<SettingsPage>", () => {
     expect(screen.getByTestId("sync-and-data-tab")).toBeInTheDocument();
   });
 
-  it("falls back to Subscription when ?tab= is unknown", () => {
+  it("falls back to Reading when ?tab= is unknown", () => {
     renderAt("/settings?tab=bogus");
-    expect(screen.getByTestId("subscription-tab")).toBeInTheDocument();
+    expect(screen.getByTestId("reading-tab")).toBeInTheDocument();
   });
 
   it("redirects legacy ?tab=recovery to the Subscription tab", () => {
@@ -89,6 +89,12 @@ describe("<SettingsPage>", () => {
     expect(screen.getByLabelText(/sync and data/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^reading$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^help$/i)).toBeInTheDocument();
+  });
+
+  it("orders the tabs Reading, Sync & Data, Subscription, Help", () => {
+    renderAt("/settings");
+    const names = screen.getAllByRole("radio").map((el) => el.getAttribute("aria-label"));
+    expect(names).toEqual(["Reading", "Sync and data", "Subscription", "Help"]);
   });
 
   it("does not render a Briefings tab (folded into Reading → Signal section)", () => {
@@ -122,9 +128,9 @@ describe("<SettingsPage>", () => {
       expect(screen.queryByLabelText(/subscription/i)).toBeNull();
     });
 
-    it("defaults to the Sync & Data tab when no ?tab= is set", () => {
+    it("defaults to the Reading tab too (no Subscription tab to skip)", () => {
       renderAt("/settings");
-      expect(screen.getByTestId("sync-and-data-tab")).toBeInTheDocument();
+      expect(screen.getByTestId("reading-tab")).toBeInTheDocument();
     });
   });
 });

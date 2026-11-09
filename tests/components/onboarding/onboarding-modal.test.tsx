@@ -129,6 +129,15 @@ describe("OnboardingModal", () => {
     ).toBeInTheDocument();
   });
 
+  it("welcome is one headline, one line and one action (audit 2026-Q4)", () => {
+    render(<OnboardingModal />);
+    expect(screen.queryByText(/Coming from Pocket/i)).toBeNull();
+    expect(screen.queryByText(/Add your favorite RSS feeds/i)).toBeNull();
+    expect(screen.queryByText(/^Alpha:/)).toBeNull();
+    expect(screen.getByRole("button", { name: /get started/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /restore from cloud/i })).toBeInTheDocument();
+  });
+
   it("advances from welcome to storage-choice on Get Started", async () => {
     const user = userEvent.setup();
     render(<OnboardingModal />);

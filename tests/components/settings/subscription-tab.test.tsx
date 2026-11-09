@@ -93,16 +93,15 @@ describe("<SubscriptionTab>", () => {
       expect(link.getAttribute("href")).toMatch(/\/billing\/recover/);
     });
 
-    it("shows the 'or subscribe' divider and the tier cards below it", () => {
+    it("keeps the price to one line and reveals the tier cards on Compare plans (audit 2026-Q4)", async () => {
       renderTab();
-      expect(screen.getByText(/or subscribe/i)).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: /^Supporter$/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: /Self-host/i }),
-      ).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: /^Pro$/i })).toBeNull();
+      expect(screen.getByText(/\$9\/year/)).toBeInTheDocument();
+      expect(screen.queryByText(/or subscribe/i)).toBeNull();
+      expect(screen.queryByRole("heading", { name: /^Supporter$/i })).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: /compare plans/i }));
+
+      expect(screen.getByRole("heading", { name: /^Supporter$/i })).toBeInTheDocument();
     });
 
     it("does not show license-token controls when free", () => {

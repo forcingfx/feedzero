@@ -90,11 +90,12 @@ export function SubscriptionTab() {
 
 function FreeView() {
   const [activateOpen, setActivateOpen] = useState(false);
+  const [comparing, setComparing] = useState(false);
 
   return (
     <div className="space-y-4 py-2">
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-slate-50 text-slate-600 border-slate-200">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border bg-muted text-muted-foreground">
           Free
         </span>
         <span className="text-sm text-muted-foreground">
@@ -102,36 +103,46 @@ function FreeView() {
         </span>
       </div>
 
+      {/* One card, one line of price. The full comparison opens on request
+          instead of filling the tab (audit 2026-Q4, finding 5). */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <Button
-          type="button"
-          size="lg"
-          className="w-full"
-          onClick={() => setActivateOpen(true)}
-        >
-          <KeyRound className="mr-2 size-4" />
-          Activate existing license
-        </Button>
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-sm">
+          Supporter adds unlimited feeds, Signal, smart filters, auto-organize
+          and offline prefetch. {PAID_PLAN.display}, {PAID_PLAN.trialDays} days
+          free.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-expanded={comparing}
+            onClick={() => setComparing((c) => !c)}
+          >
+            {comparing ? "Hide plans" : "Compare plans"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setActivateOpen(true)}
+          >
+            <KeyRound className="mr-2 size-4" />
+            Activate existing license
+          </Button>
           <a
             href="/billing/recover"
             target="_blank"
             rel="noreferrer noopener"
-            className="underline hover:no-underline inline-flex items-center gap-1"
+            className="text-xs text-muted-foreground underline hover:no-underline inline-flex items-center gap-1"
           >
             Lost your license?
             <ExternalLink className="size-3" />
           </a>
-        </p>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        <span>or subscribe</span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <SubscriptionUpgrade />
+      {comparing && <SubscriptionUpgrade />}
 
       <ActivateLicenseDialog open={activateOpen} onOpenChange={setActivateOpen} />
     </div>
