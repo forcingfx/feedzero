@@ -2,7 +2,8 @@ import { ok, err } from "../../../packages/core/src/utils/result";
 import type { Result } from "../../../packages/core/src/utils/result";
 import { SYNC } from "../../../packages/core/src/utils/constants";
 import { uint8ArrayToBase64 } from "../../../packages/core/src/utils/base64";
-import { exportAll, importAll } from "../storage/db.ts";
+import { exportAll, getAllArticles, importAll } from "../storage/db.ts";
+import type { Article } from "../../../packages/core/src/types";
 import {
   deriveVaultId,
   deriveVaultKey,
@@ -164,13 +165,42 @@ export async function exportVault(): Promise<Result<VaultData>> {
 export async function importVault(vault: VaultData): Promise<Result<boolean>> {
   return importAll({
     feeds: vault.feeds,
-    articles: vault.articles,
+    articles: await withLocalBodies(vault.articles),
     folders: vault.folders,
     smartFilters: vault.smartFilters,
     preferences: vault.preferences,
     preferencesUpdatedAt: vault.preferencesUpdatedAt,
     briefings: vault.briefings,
     anthropicKey: vault.secrets?.anthropicKey,
+  });
+}
+
+/**
+ * Refill the body fields `exportVault` strips, from this device's copy.
+ *
+ * Every vault arrives with blank `content` / `summary`, so importing it
+ * verbatim wipes each blurb this device already has. The reader then
+ * treats the article as having no blurb and opens it in Full text. A
+ * refresh does not heal it: the feed's synced ETag usually earns a 304.
+ *
+ * Matched by id, then guid, because two devices that fetched a feed
+ * before first syncing hold the same item under different ids. If the
+ * local read fails the vault is imported as it came: blank bodies are
+ * the pre-fix behaviour, never data loss.
+ */
+async function withLocalBodies(incoming: Article[]): Promise<Article[]> {
+  const local = await getAllArticles();
+  if (!local.ok || local.value.length === 0) return incoming;
+  const byId = new Map(local.value.map((a) => [a.id, a]));
+  const byGuid = new Map(local.value.map((a) => [a.guid, a]));
+  return incoming.map((article) => {
+    const mine = byId.get(article.id) ?? byGuid.get(article.guid);
+    if (!mine) return article;
+    return {
+      ...article,
+      content: article.content || mine.content,
+      summary: article.summary || mine.summary,
+    };
   });
 }
 
