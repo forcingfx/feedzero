@@ -295,6 +295,34 @@ describe("catalog integration", () => {
     expect(entry.value!.requestCount).toBe(1);
   });
 
+  // Pin-test (product decision): the catalog counts *fresh content served*,
+  // not polls. A 304 Not Modified is a client's 30-minute conditional
+  // refresh finding nothing new; counting it would rank feeds by how often
+  // clients poll rather than by how many people read them, and it is the
+  // bulk of proxy traffic, so each one would spend paid Upstash commands
+  // on noise. Only a 2xx upstream response records a catalog hit.
+  it.each([304, 302, 300])(
+    "does not upsert when upstream answers %i (only 2xx counts as a catalog hit)",
+    async (status) => {
+      fetchSpy.mockResolvedValue(new Response(null, { status }));
+      const catalog = createMemoryCatalogAdapter();
+
+      const req = new Request("http://localhost/api/feed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: "https://example.com/feed.xml", etag: "\"v1\"" }),
+      });
+      await handleProxyRequest(req, "text/xml", { catalogAdapter: catalog });
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      const entry = await catalog.get("https://example.com/feed.xml");
+      expect(entry.ok).toBe(true);
+      if (!entry.ok) return;
+      expect(entry.value).toBeNull();
+    },
+  );
+
   it("does not upsert on proxy error", async () => {
     fetchSpy.mockRejectedValue(new Error("fail"));
     const catalog = createMemoryCatalogAdapter();

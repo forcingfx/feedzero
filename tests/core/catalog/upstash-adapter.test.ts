@@ -20,41 +20,58 @@ import {
   type UpstashCatalogClient,
 } from "@/core/catalog/adapters/upstash-adapter";
 
-/** In-memory fake of the small Upstash subset the adapter needs. */
+/**
+ * In-memory fake of the small Upstash subset the adapter needs. It records
+ * every command name in `commands` because Upstash bills per command:
+ * the command count of a hot path is a production cost, so tests assert it.
+ */
 function fakeClient(): UpstashCatalogClient & {
   store: Map<string, unknown>;
   zset: Map<string, number>;
+  commands: string[];
 } {
   const store = new Map<string, unknown>();
   const zset = new Map<string, number>(); // member -> score
+  const commands: string[] = [];
+  const rankedDesc = () => [...zset.entries()].sort((a, b) => b[1] - a[1]);
   return {
     store,
     zset,
+    commands,
     async get<T = unknown>(key: string): Promise<T | null> {
+      commands.push("get");
       return store.has(key) ? (store.get(key) as T) : null;
     },
-    async set(key, value) {
+    async set(key, value, opts) {
+      commands.push(opts?.nx ? "set nx" : "set");
+      if (opts?.nx && store.has(key)) return null;
       store.set(key, value);
       return "OK";
     },
-    async zadd(_key, scoreMember) {
-      // Upstash zadd accepts { score, member }. Our fake supports only the
-      // single-pair variant the adapter uses.
-      zset.set(scoreMember.member, scoreMember.score);
-      return 1;
+    async zincrby(_key, increment, member) {
+      commands.push("zincrby");
+      const score = (zset.get(member) ?? 0) + increment;
+      zset.set(member, score);
+      return score;
+    },
+    async zscore(_key, member) {
+      commands.push("zscore");
+      return zset.get(member) ?? null;
     },
     async zcard(_key) {
+      commands.push("zcard");
       return zset.size;
     },
     async zrange(_key, start, stop, opts) {
-      // Sorted desc when opts.rev = true; the adapter always passes rev: true
-      // for popular(). Return member URLs in score order.
-      const entries = [...zset.entries()].sort((a, b) =>
-        opts?.rev ? b[1] - a[1] : a[1] - b[1],
-      );
-      return entries.slice(start, stop + 1).map(([m]) => m);
+      // The adapter always walks the ranking highest-first. Real Upstash
+      // returns a flat [member, score, member, score, ...] with withScores.
+      commands.push("zrange");
+      const entries = opts?.rev ? rankedDesc() : rankedDesc().reverse();
+      const slice = entries.slice(start, stop + 1);
+      return opts?.withScores ? slice.flat() : slice.map(([m]) => m);
     },
     async mget<T = unknown>(...keys: string[]): Promise<Array<T | null>> {
+      commands.push("mget");
       return keys.map((k) => (store.has(k) ? (store.get(k) as T) : null));
     },
   };
@@ -109,11 +126,42 @@ describe("UpstashCatalogAdapter", () => {
       expect(client.zset.get(URL2)).toBe(2);
     });
 
+    it("issues at most 2 Upstash commands per upsert and never a GET (billed per command)", async () => {
+      // Every 2xx /api/feed fetch upserts, so this is the hottest Upstash
+      // path in the app. The previous read-modify-write (GET + SET + ZADD)
+      // spent 3 commands per fetch and exhausted the paid plan.
+      const client = fakeClient();
+      const adapter = new UpstashCatalogAdapter(client);
+
+      await adapter.upsert(URL1); // first sighting
+      expect(client.commands.length).toBeLessThanOrEqual(2);
+      expect(client.commands).not.toContain("get");
+
+      client.commands.length = 0;
+      await adapter.upsert(URL1); // repeat sighting
+      expect(client.commands.length).toBeLessThanOrEqual(2);
+      expect(client.commands).not.toContain("get");
+    });
+
+    it("never overwrites an existing record (metadata written by updateMetadata survives)", async () => {
+      const client = fakeClient();
+      const adapter = new UpstashCatalogAdapter(client);
+      await adapter.upsert(URL1);
+      await adapter.updateMetadata(URL1, { title: "Example Feed" });
+      await adapter.upsert(URL1);
+
+      const got = await adapter.get(URL1);
+      if (!got.ok) throw new Error(got.error);
+      expect(got.value!.title).toBe("Example Feed");
+      expect(got.value!.requestCount).toBe(2);
+    });
+
     it("returns Result.err when the underlying client throws", async () => {
       const broken: UpstashCatalogClient = {
         async get() { return null; },
         async set() { throw new Error("redis error"); },
-        async zadd() { return 0; },
+        async zincrby() { return 0; },
+        async zscore() { return null; },
         async zcard() { return 0; },
         async zrange() { return []; },
         async mget() { return []; },
@@ -236,6 +284,56 @@ describe("UpstashCatalogAdapter", () => {
       const got = await adapter.get(URL1);
       if (!got.ok) return;
       expect(got.value).toBeNull();
+    });
+  });
+
+  describe("records written before the ZINCRBY change", () => {
+    // Production holds records written by the old GET+SET+ZADD upsert:
+    // they carry a requestCount field and a lastRequestedAt timestamp. The
+    // ranking score is the only count that keeps moving now, so reads must
+    // take the count from it and must not echo a lastRequestedAt that is
+    // no longer updated (it would silently lie about recency).
+    function seedLegacy(client: ReturnType<typeof fakeClient>, score: number) {
+      client.store.set("catalog:feed:" + URL1, {
+        url: URL1,
+        title: "Legacy",
+        description: null,
+        siteUrl: null,
+        status: "active",
+        requestCount: 7,
+        lastRequestedAt: "2026-05-01T00:00:00.000Z",
+        lastCrawledAt: null,
+        errorCount: 0,
+        lastError: null,
+        createdAt: "2026-04-01T00:00:00.000Z",
+      });
+      client.zset.set(URL1, score);
+    }
+
+    it("get() reports the ranking score as requestCount and omits lastRequestedAt", async () => {
+      const client = fakeClient();
+      seedLegacy(client, 7);
+      const adapter = new UpstashCatalogAdapter(client);
+      await adapter.upsert(URL1);
+
+      const got = await adapter.get(URL1);
+      if (!got.ok) throw new Error(got.error);
+      expect(got.value!.requestCount).toBe(8);
+      expect(got.value!.title).toBe("Legacy");
+      expect(got.value).not.toHaveProperty("lastRequestedAt");
+    });
+
+    it("popular() reports the ranking score as requestCount", async () => {
+      const client = fakeClient();
+      seedLegacy(client, 7);
+      const adapter = new UpstashCatalogAdapter(client);
+      await adapter.upsert(URL1);
+      await adapter.upsert(URL1);
+
+      const result = await adapter.popular(5);
+      if (!result.ok) throw new Error(result.error);
+      expect(result.value[0].requestCount).toBe(9);
+      expect(result.value[0]).not.toHaveProperty("lastRequestedAt");
     });
   });
 

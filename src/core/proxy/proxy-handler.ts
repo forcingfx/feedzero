@@ -153,8 +153,10 @@ export async function handleProxyRequest(
       cache.set(url, body, contentType, response.status);
     }
 
-    // Record anonymous feed request in catalog (fire-and-forget)
-    if (options?.catalogAdapter && response.status >= 200 && response.status < 400) {
+    // Record an anonymous catalog hit (fire-and-forget) only for fresh
+    // content. 304s returned above and other 3xx are polls, not readers;
+    // each upsert costs paid Upstash commands.
+    if (options?.catalogAdapter && response.status >= 200 && response.status < 300) {
       options.catalogAdapter.upsert(url).catch(() => {});
     }
 

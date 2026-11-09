@@ -102,4 +102,24 @@ describe.skipIf(SKIP)("production /api/catalog (live)", () => {
       expect(feed.requestCount).toBeGreaterThan(0);
     }
   }, 10_000);
+
+  it("popular counts come from the ranking: sorted descending, no stale lastRequestedAt", async () => {
+    // After the ZINCRBY change the ranking score is the only request
+    // count. If records and ranking disagreed (e.g. a read path still
+    // returning a record's frozen requestCount), the leaderboard would
+    // come back out of order. lastRequestedAt is no longer maintained,
+    // so echoing a legacy value would misreport recency.
+    const res = await fetch(
+      `${BASE_URL}/api/catalog?action=popular&limit=20`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const counts: number[] = body.feeds.map(
+      (f: { requestCount: number }) => f.requestCount,
+    );
+    expect(counts).toEqual([...counts].sort((x, y) => y - x));
+    for (const feed of body.feeds) {
+      expect(feed).not.toHaveProperty("lastRequestedAt");
+    }
+  }, 10_000);
 });
