@@ -1,4 +1,4 @@
-# Feature 019: Floating settings cog (replaces sidebar dropdowns)
+# Feature 019: Title-bar settings cog (replaces sidebar dropdowns)
 
 ## Status
 Implemented
@@ -8,7 +8,7 @@ Implemented
 Every per-row three-dot dropdown in the sidebar — for feeds, folders,
 and smart filters — has been replaced by a single **context-aware
 floating cog** at the top-right of the article list, paired with the
-existing **sort selector** (now rebuilt as an expanding-pill).
+existing **sort selector**.
 
 The cog opens the right settings dialog based on the currently
 selected view:
@@ -20,11 +20,12 @@ selected view:
 | Smart filter view (`filter:filter-recent`) | existing `SmartFilterEditorDialog` against that filter |
 | `ALL_FEEDS_ID`, `STARRED_FEED_ID`, no selection | Cog is hidden |
 
-The two pills (sort + cog) share the same `ExpandingPill` primitive:
-icon-only circle by default, hover (desktop) or always-on (mobile)
-expands a label rightward via a CSS `max-width` animation. The
-sidebar rows are now select-only — no rename input, no dropdown, no
-swap-on-hover badge logic.
+Sort, cog and mark-read are `HeaderAction`s: ghost icon buttons with a
+tooltip, the same shape as every other icon action in the app. (Audit
+2026-Q4 round 2 replaced the earlier circle-to-pill `ExpandingPill`
+primitive, which hid its label until hover and gave the title bar a
+button vocabulary of its own.) The sidebar rows are select-only: no
+rename input, no dropdown, no swap-on-hover badge logic.
 
 ## Behaviour
 
@@ -34,7 +35,7 @@ Feature: Floating cog over the article list
   Scenario: Open per-feed settings
     Given I have selected a single feed
     When I hover the cog at the top of the article list
-    Then the cog expands to "Feed settings"
+    Then a tooltip reads "Feed settings"
     When I click the cog
     Then the FeedSettingsDialog opens against that feed
     And it contains Name, Display (Prefer + Prefetch), Folder, Rules, Refresh, Clear cached, Delete
@@ -78,9 +79,9 @@ Feature: Floating cog over the article list
 
 | File | Role |
 |------|------|
-| `src/components/ui/expanding-pill.tsx` | Reusable circle-to-pill primitive. Animates label `max-width` via CSS only. |
+| `src/components/articles/header-action.tsx` | Ghost icon `Button` with a tooltip; the one shape for title-bar actions. |
 | `src/components/articles/article-list-controls.tsx` | Sticky-top flex container hosting `SettingsPill` + `SortPill`. Replaces the old `SortMenu` mount site. |
-| `src/components/articles/sort-pill.tsx` | Article-sort selector rebuilt on `ExpandingPill`. Same modes + handler as before; new visual. |
+| `src/components/articles/sort-pill.tsx` | Article-sort selector. Accessible name and tooltip state the current mode. |
 | `src/components/articles/settings-pill.tsx` | Context-aware cog. Hides on aggregated views and broken refs; dispatches to the right dialog action. |
 | `src/components/feeds/feed-settings-dialog.tsx` | Per-feed dialog (Name, Display, Folder, Rules, Actions). |
 | `src/components/folders/folder-settings-dialog.tsx` | Per-folder dialog (Name, Color, Delete). |
@@ -94,8 +95,8 @@ Feature: Floating cog over the article list
 
 | File | Coverage |
 |------|----------|
-| `tests/components/ui/expanding-pill.test.tsx` | Primitive renders as button, label in DOM, click + Enter activation, collapsed/expanded class wiring, mobile alwaysExpanded mode, disabled state. |
-| `tests/components/articles/sort-pill.test.tsx` | Shows current mode label, opens menu with every mode, calls onChange. |
+| `tests/build/ui-consistency.test.ts` | Pins that `ExpandingPill` stays gone and every icon button has a name. |
+| `tests/components/articles/sort-pill.test.tsx` | Names the current mode, opens menu with every mode, calls onChange. |
 | `tests/components/articles/settings-pill.test.tsx` | Visibility matrix (ALL/STARRED/no-selection/deleted-folder/deleted-filter all return null) and dispatch matrix (feed/folder/filter each call the right store action, label adapts per context). |
 | `tests/stores/feed-store-settings-dialogs.test.ts` | Open/close store actions for both new dialogs, including swap-target-without-close and independence between dialogs. |
 | `tests/components/feeds/feed-settings-dialog.test.tsx` | Every section's write path — rename, prefer toggle, prefetch toggle, folder picker, unfiled, manage rules, refresh, clear, delete with confirm + cancel. |

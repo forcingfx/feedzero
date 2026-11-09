@@ -15,8 +15,14 @@ import path from "node:path";
  *   readable on a phone.
  * - Every icon-only button has an accessible name.
  *
+ * - Round 2: header actions are ghost icon `Button`s with a tooltip, like
+ *   every other icon action in the app. The bespoke circle-to-pill
+ *   primitive (`ExpandingPill`) hid its label until hover and gave the
+ *   title bar a second button vocabulary; it is gone.
+ *
  * The allowlist names the one file that draws data, not status.
  */
+import { existsSync } from "node:fs";
 const root = path.resolve(__dirname, "../..");
 const UI_DIRS = ["src/components", "src/pages"];
 const RAW_HUE =
@@ -50,6 +56,12 @@ describe("UI consistency", () => {
   it("never sets text below 12 px", () => {
     const offenders = files.flatMap((f) => (read(f).match(TINY_TEXT) ?? []).map((m) => `${f}: ${m}`));
     expect(offenders).toEqual([]);
+  });
+
+  it("has no second button vocabulary: ExpandingPill is gone", () => {
+    expect(existsSync(path.join(root, "src/components/ui/expanding-pill.tsx"))).toBe(false);
+    const importers = files.filter((f) => /expanding-pill/.test(read(f)));
+    expect(importers).toEqual([]);
   });
 
   it("gives every icon-only button an accessible name", () => {
