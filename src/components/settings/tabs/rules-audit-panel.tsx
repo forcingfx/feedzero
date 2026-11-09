@@ -8,8 +8,9 @@
  * logic of its own.
  */
 
-import { Play, Settings2 } from "lucide-react";
+import { Play } from "lucide-react";
 import { toast } from "sonner";
+import { SettingRow } from "../setting-row";
 import { Button } from "@/components/ui/button";
 import { useFeedStore } from "@/stores/feed-store";
 import { useFeatureGate } from "@/hooks/use-feature-gate";
@@ -78,29 +79,21 @@ export function RulesAuditPanel() {
   const totalRules = groups.reduce((sum, g) => sum + g.rules.length, 0);
 
   return (
-    <div
-      className="rounded-lg border border-border bg-card p-4 space-y-3"
+    <SettingRow
+      label="Rules"
+      description="Per-feed rules run as new articles arrive: mute, star, mark read, or route to a folder. Edit rules from each feed's settings."
+      stacked={totalRules > 0}
       data-testid="rules-audit-panel"
     >
-      <div className="flex items-center gap-2">
-        <Settings2 className="size-4 text-muted-foreground" />
-        <p className="text-sm font-medium">Rules</p>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Per-feed rules run as new articles arrive — mute, star, mark
-        read, or route to a folder. Edit rules from each feed&apos;s menu.
-      </p>
-
       {totalRules === 0 ? (
         <p
-          className="text-sm text-muted-foreground"
+          className="text-xs text-muted-foreground"
           data-testid="rules-audit-empty"
         >
-          No rules yet. Open any feed&apos;s menu and choose &quot;Rules…&quot;
-          to add one.
+          No rules yet
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="w-full space-y-2">
           {groups.map(({ feed, rules }) => (
             <div
               key={feed.id}
@@ -158,6 +151,6 @@ export function RulesAuditPanel() {
           ))}
         </div>
       )}
-    </div>
+    </SettingRow>
   );
 }
