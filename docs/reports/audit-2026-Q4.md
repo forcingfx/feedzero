@@ -145,3 +145,39 @@ it has a home elsewhere.
   covers.
 - Removing drag-and-drop (`@dnd-kit`, 15 kB gzipped): it is a feature.
 - Chasing detector A/B counts: housekeeping, not a user's bug.
+
+## Round 2 (2026-11-10): menus, buttons, layouts
+
+The owner asked for a deeper pass: "menus, buttons, layouts all need an
+overhaul for max simplicity." Inventory on the branch after round 1:
+three hover-expanding pills (a pattern unique to the list title bar),
+58 `outline` / 46 `ghost` / 14 `destructive` buttons, 6 dropdown menus,
+22 dialogs, three page-title sizes, a sidebar with a permanent status
+line, a permanent quota line and a storage-warning card, Settings tabs
+built from one card per setting, and a mobile bottom strip that mixes
+recent-feed favicons with Explore, Settings and a chevron.
+
+Rules applied, one commit each:
+
+1. **One button vocabulary.** Icon actions are `ghost` icon buttons with
+   a tooltip, everywhere (sidebar header, list title bar, mobile header).
+   The hover-expanding pill is removed; its three users become plain
+   buttons that open the same menus and dialogs.
+2. **Settings are rows, not cards.** A `SettingRow` (label, optional one
+   line of help, control on the right) under plain section headings:
+   Appearance, Reading, Feeds. The segmented controls stay; the per-card
+   icon and two-line description go.
+3. **The sidebar shows status only when it matters.** The "Refreshed just
+   now · local" line and the storage-warning card go (Sync & Data already
+   carries that information; the warning returns only as a one-line note
+   there). The feed quota line appears from 80 percent of the cap. "New
+   filter" and "New folder" fold into one "+" menu in the feed-list
+   header.
+4. **One page-title size** (`text-xl`) and one header height on every
+   page.
+5. **A standard mobile bar.** Four tabs: Feeds (opens the drawer), Explore,
+   Signal, Settings. Recently viewed feeds move into the drawer as its
+   first row. Needs the owner's phone check (CLAUDE.md step 8).
+6. **Destructive styling only where it confirms.** The `destructive`
+   variant is reserved for the confirming button inside an alert dialog;
+   elsewhere the action is an `outline` button with destructive text.
