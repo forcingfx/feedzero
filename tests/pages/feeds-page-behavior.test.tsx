@@ -629,7 +629,7 @@ describe("FeedsPage behavior — mobile", () => {
   // (user feedback on PR #237): tap goes IN, swipe goes OUT, and the
   // list underneath never moves or unmounts.
 
-  it("mobile: reader renders as an overlay only when an article is open; the list stays mounted beneath", () => {
+  it("mobile: reader renders as an overlay only when an article is open; the list stays mounted beneath", async () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({
       articles: [makeArticle("art-1")],
@@ -641,7 +641,9 @@ describe("FeedsPage behavior — mobile", () => {
     closed.unmount();
 
     const open = renderPage("/feeds/feed-1/articles/art-1");
-    expect(open.container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+    await waitFor(() => {
+      expect(open.container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+    });
     // The list is still in the DOM underneath — scroll position survives.
     expect(open.container.querySelector("[role='main']")).not.toBeNull();
   });
@@ -652,14 +654,16 @@ describe("FeedsPage behavior — mobile", () => {
     expect(container.querySelector(".snap-x")).toBeNull();
   });
 
-  it("mobile: a deeplink with articleId shows the reader overlay immediately", () => {
+  it("mobile: a deeplink with articleId shows the reader overlay", async () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({
       articles: [makeArticle("art-1")],
       selectedArticle: makeArticle("art-1"),
     });
     const { container } = renderPage("/feeds/feed-1/articles/art-1");
-    expect(container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+    await waitFor(() => {
+      expect(container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+    });
   });
 
   it("mobile: navigating to a different feed closes the reader overlay", async () => {
@@ -681,7 +685,9 @@ describe("FeedsPage behavior — mobile", () => {
         </Routes>
       </MemoryRouter>
     );
-    expect(container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+    await waitFor(() => {
+      expect(container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+    });
 
     await user.click(screen.getByTestId("nav-to-go-feed-2"));
 
@@ -705,7 +711,11 @@ describe("FeedsPage behavior — mobile", () => {
       selectedArticle: makeArticle("art-1"),
     });
     const { container } = renderPage("/feeds/feed-1/articles/art-1");
-    // Let the (instant, under skipAnimations) slide-in settle.
+    // The layer is a lazy chunk; wait for it, then let the (instant,
+    // under skipAnimations) slide-in settle.
+    await waitFor(() => {
+      expect(container.querySelector("[data-testid='reader-layer']")).not.toBeNull();
+    });
     await act(() => new Promise((r) => setTimeout(r, 50)));
     return container.querySelector("[data-testid='reader-layer']") as HTMLElement;
   }
