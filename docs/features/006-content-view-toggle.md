@@ -7,6 +7,26 @@ Implemented
 
 Articles can be viewed in two modes: Feed (original RSS content) and Extracted (Defuddle full-text, fetched on demand). When an article's summary is distinct from its feed content, it is displayed as a styled subheading above the feed content rather than as a separate tab. The toggle intelligently hides redundant modes based on content similarity and completeness, showing only relevant options. When a single mode remains, the toggle bar is hidden entirely.
 
+### Default view (issue #342, 2026-11-09)
+
+Which view an article opens in is chosen by the most specific setting:
+the feed's own "Prefer full text" toggle, then the nearest folder whose
+settings set "Open articles in" (subfolders inherit), then Settings →
+Reading → "Open articles in" (`UserPreferences.openArticlesIn`, default
+Feed text). The rule lives in `src/core/extractor/open-in-full-text.ts`.
+It is free: it automates the Full text click, which is free. Background
+prefetch for offline reading stays a paid feature.
+
+```gherkin
+Scenario: App-wide full text, one folder kept on feed text
+  Given Settings → Reading → Open articles in is "Full text"
+  And folder "Podcasts" is set to "Feed text"
+  When I open an article from a feed in "Podcasts"
+  Then it opens in Feed text
+  When I open an article from a feed outside that folder
+  Then it opens in Full text
+```
+
 ## Behaviour
 
 ```gherkin

@@ -819,6 +819,58 @@ describe("ReaderPanel", () => {
     });
   });
 
+  describe("Open articles in full text by default (issue #342)", () => {
+    const baseFeed = {
+      id: "f1",
+      url: "https://example.com/feed",
+      title: "Example",
+      description: "",
+      siteUrl: "https://example.com",
+      createdAt: 0,
+      updatedAt: 0,
+    };
+
+    async function renderWith(opts: {
+      preference: "feed" | "full-text";
+      folderChoice?: "feed" | "full-text";
+    }) {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      const { DEFAULT_PREFERENCES } = await import("@feedzero/core/types");
+      usePreferencesStore.setState({
+        preferences: { ...DEFAULT_PREFERENCES, openArticlesIn: opts.preference },
+      });
+      useFeedStore.setState({
+        feeds: [{ ...baseFeed, folderId: "news" }],
+        folders: [{ id: "news", name: "News", createdAt: 0, openArticlesIn: opts.folderChoice }],
+        selectedFeedId: "f1",
+      });
+      const article = mockArticle({ link: "https://example.com/post-a" });
+      useExtractionStore.setState({
+        cache: { [article.link]: "<p>full text from cache</p>" },
+        statusMap: { [article.link]: "available" },
+        viewMode: "feed",
+      });
+      useArticleStore.setState({ selectedArticle: article, articles: [], isLoading: false });
+      render(<ReaderPanel />);
+      usePreferencesStore.setState({ preferences: { ...DEFAULT_PREFERENCES } });
+    }
+
+    it("opens in full text when the app-wide setting says so", async () => {
+      await renderWith({ preference: "full-text" });
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+    });
+
+    it("a folder set to Feed text overrides the app-wide Full text", async () => {
+      await renderWith({ preference: "full-text", folderChoice: "feed" });
+      expect(useExtractionStore.getState().viewMode).toBe("feed");
+    });
+
+    it("a folder set to Full text overrides the app-wide Feed text", async () => {
+      await renderWith({ preference: "feed", folderChoice: "full-text" });
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+    });
+  });
+
   describe("Prefer full text per feed", () => {
     it("opens articles in extracted view when the feed has preferFullText=true", () => {
       const feed = {

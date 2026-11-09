@@ -92,7 +92,16 @@ export interface Folder {
    * descendant of the moved folder. See `src/core/feeds/folder-tree.ts`.
    */
   parentId?: string;
+  /**
+   * Overrides the app-wide `openArticlesIn` for feeds in this folder and
+   * its subfolders. Undefined means "use the app setting" (or an
+   * ancestor folder's choice).
+   */
+  openArticlesIn?: OpenArticlesIn;
 }
+
+/** Which view an article opens in: the feed's own text, or extracted full text. */
+export type OpenArticlesIn = "feed" | "full-text";
 
 export interface Article {
   id: string;
@@ -233,6 +242,8 @@ export interface UserPreferences {
   readerWidth?: ReaderWidth;
   /** Optional for the same reason as `readerTextSize`; `undefined` reads as "normal". */
   readerLineHeight?: ReaderLineHeight;
+  /** App-wide default view for opened articles; `undefined` reads as "feed". */
+  openArticlesIn?: OpenArticlesIn;
   /**
    * Unread-only reading mode: read articles drop out of the list so a
    * finished session leaves an empty view. Optional for the same
@@ -268,6 +279,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   readerTextSize: "medium",
   readerWidth: "medium",
   readerLineHeight: "normal",
+  openArticlesIn: "feed",
   hideReadArticles: false,
   showArticleFeedIcons: true,
   articleRetention: DEFAULT_ARTICLE_RETENTION,
