@@ -13,6 +13,9 @@ import { newTraceId } from "../../../packages/core/src/utils/trace-id";
  */
 export const SUPPORTED_METHODS: readonly string[] = ["GET", "POST"];
 
+/** Largest image the icon route relays; favicons and list thumbnails are far smaller. */
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+
 /**
  * Per-client rate-limit hook. Caller injects a `limiter` and a
  * `clientIdFor` function that derives the bucket key from the Request.
@@ -146,7 +149,26 @@ export async function handleProxyRequest(
       });
     }
 
+    // Image mode (the /api/icon route passes an image default type): relay
+    // only images, and only small ones. Since #340 every article row can
+    // ask for one, so a feed could otherwise point rows at a non-image or
+    // a multi-megabyte file and have the function buffer all of it.
+    const imageOnly = /^image\//i.test(defaultContentType);
+    const upstreamOk = response.status >= 200 && response.status < 300;
+    if (imageOnly && upstreamOk) {
+      if (!/^image\//i.test(contentType)) {
+        return new Response("Not an image", { status: 415 });
+      }
+      const declared = Number(response.headers.get("content-length"));
+      if (declared > MAX_IMAGE_BYTES) {
+        return new Response("Image too large", { status: 413 });
+      }
+    }
+
     const body = await response.arrayBuffer();
+    if (imageOnly && upstreamOk && body.byteLength > MAX_IMAGE_BYTES) {
+      return new Response("Image too large", { status: 413 });
+    }
 
     // Cache successful feed/page responses
     if (cache && response.status >= 200 && response.status < 400) {
