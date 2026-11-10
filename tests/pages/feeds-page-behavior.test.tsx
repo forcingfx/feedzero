@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { installVirtualizerShims, restoreVirtualizerShims } from "../helpers/virtualizer-shims.ts";
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense } from "react";
 import { AppLayout } from "@/pages/app-layout.tsx";
@@ -219,6 +220,58 @@ describe("FeedsPage behavior — desktop", () => {
     expect(
       container.querySelector("[data-slot='resizable-panel-group']"),
     ).not.toBeNull();
+  });
+
+  /**
+   * Race (pre-existing, found 2026-11-10; flaky e2e "select article shows
+   * reader content"): on desktop the app opens a feed's first article once
+   * the feed finishes loading. It checked the URL as it was when loading
+   * started, so an article the user clicked while the feed loaded was
+   * replaced by the first one. The user's choice must win.
+   */
+  it("does not replace an article the user opened while the feed was loading", async () => {
+    const a1 = makeArticle("art-1");
+    const a2 = makeArticle("art-2");
+    let finishLoading: (v: { ok: true; value: Article[] }) => void = () => {};
+    vi.mocked(db.getArticles).mockImplementation(
+      () => new Promise((resolve) => { finishLoading = resolve; }),
+    );
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({ articles: [a1, a2], articlesByFeedId: { "feed-1": [a1, a2] } });
+
+    installVirtualizerShims();
+    try {
+      renderPage("/feeds/feed-1");
+      await userEvent.click(await screen.findByText("Article art-2"));
+      expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
+
+      await act(async () => finishLoading({ ok: true, value: [a1, a2] }));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
+    } finally {
+      restoreVirtualizerShims();
+    }
+  });
+
+  it("does not auto-open the first article when one is already selected but its URL has not rendered yet", async () => {
+    // The router renders navigations as transitions, so a click's push can
+    // land before React renders the previous /feeds/<id> URL. The effect
+    // for that stale render saw no articleId and replaced the user's
+    // article. A click selects the article in the store synchronously,
+    // before it navigates, so the store is the reliable signal.
+    const a1 = makeArticle("art-1");
+    const a2 = makeArticle("art-2");
+    let finishLoading: (v: { ok: true; value: Article[] }) => void = () => {};
+    vi.mocked(db.getArticles).mockImplementation(
+      () => new Promise((resolve) => { finishLoading = resolve; }),
+    );
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+
+    renderPage("/feeds/feed-1");
+    act(() => useArticleStore.setState({ selectedArticle: a2 }));
+    await act(async () => finishLoading({ ok: true, value: [a1, a2] }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(currentUrl).toBe("/feeds/feed-1");
   });
 
   it("selects feed from URL on mount", () => {
