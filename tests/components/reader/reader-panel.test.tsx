@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -474,6 +474,49 @@ describe("ReaderPanel", () => {
     render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
     const pill = screen.getByTestId("next-pill");
     expect(pill.className).toContain("rounded-full");
+  });
+
+  /**
+   * Immersive reader (2026-11-10). The reader's scroller lets the native
+   * bounce through (`overscroll-y-contain` stops the chain to the page
+   * without disabling the bounce; `overscroll-y-none` killed it on iPhone).
+   * The nav pills float over the text and step out of the way while the
+   * reader scrolls down, returning on the first scroll up.
+   */
+  describe("immersive reader", () => {
+    function mountMobile() {
+      mockIsDesktop = false;
+      useArticleStore.setState({ selectedArticle: mockArticle(), articles: [], isLoading: false });
+      const nextArt = { ...mockArticle(), id: "a2", title: "Next Article" };
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} onBack={vi.fn()} />);
+      return screen.getByTestId("reader-scroll-container");
+    }
+    function scrollTo(el: HTMLElement, top: number) {
+      Object.defineProperty(el, "scrollTop", { value: top, configurable: true, writable: true });
+      fireEvent.scroll(el);
+    }
+
+    it("keeps the native rubber band: overscroll-y-contain, never -none", () => {
+      const scroller = mountMobile();
+      expect(scroller.className).toContain("overscroll-y-contain");
+      expect(scroller.className).not.toContain("overscroll-y-none");
+    });
+
+    it("hides the nav pills while scrolling down and shows them again on scroll up", () => {
+      const scroller = mountMobile();
+      const bar = screen.getByTestId("nav-pills-bar");
+      expect(bar).toHaveAttribute("data-hidden", "false");
+      scrollTo(scroller, 200);
+      expect(bar).toHaveAttribute("data-hidden", "true");
+      scrollTo(scroller, 150);
+      expect(bar).toHaveAttribute("data-hidden", "false");
+    });
+
+    it("does not hide the pills for a small jitter near the top", () => {
+      const scroller = mountMobile();
+      scrollTo(scroller, 10);
+      expect(screen.getByTestId("nav-pills-bar")).toHaveAttribute("data-hidden", "false");
+    });
   });
 
   it("nav pills bar has no border-t (mobile floating, not a separator bar)", () => {

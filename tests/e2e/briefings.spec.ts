@@ -27,15 +27,7 @@ test.describe("Signal Briefings — sidebar + free-tier upgrade splash", () => {
     // is "Signal" (testId `sidebar-signal-link`), clicking it lands on
     // /signal, and the "Briefings" sub-tab navigates to /signal/briefings
     // where the gate-locked upgrade splash renders for free-tier users.
-    const isMobile = page.viewportSize() && page.viewportSize()!.width < 768;
-    if (isMobile) {
-      const drawerHandle = page
-        .getByRole("button", { name: /Menu|Drawer|Open/i })
-        .first();
-      if (await drawerHandle.isVisible().catch(() => false)) {
-        await drawerHandle.click();
-      }
-    }
+    // Desktop: the sidebar row. Mobile: the Signal tab in the bottom bar.
     const signalLink = page.getByTestId("sidebar-signal-link").first();
     await expect(signalLink).toBeVisible({ timeout: 10000 });
     await signalLink.click();

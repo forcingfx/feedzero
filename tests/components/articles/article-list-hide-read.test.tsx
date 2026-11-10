@@ -6,7 +6,7 @@
  * sweep, and the view empties.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -126,6 +126,47 @@ describe("ArticleList — hide read articles", () => {
     // Auto-mark-as-read fires the moment you open an article; yanking it
     // out from under the reader would be hostile.
     expect(screen.getByText("Read one")).toBeInTheDocument();
+  });
+
+  /**
+   * Owner report (2026-11-10): with Hide read on, opening a second article
+   * removed the first from the list in the same frame, so every row
+   * shifted up while the reader was still sliding in. Articles read during
+   * a visit now stay until you leave the view; nothing reflows as you read.
+   */
+  it("keeps every article read during this visit until you leave the view", () => {
+    setHideRead(true);
+    const first = article("a1", "First read", true);
+    const second = article("a2", "Second read", true);
+    useArticleStore.setState({
+      articles: [first, second, article("a3", "Still unread", false)],
+      selectedArticle: first as never,
+    });
+    const { rerender } = render(<ArticleList />);
+
+    act(() => useArticleStore.setState({ selectedArticle: second as never }));
+    rerender(<ArticleList />);
+    expect(screen.getByText("First read")).toBeInTheDocument();
+    expect(screen.getByText("Second read")).toBeInTheDocument();
+  });
+
+  it("drops the kept read articles once you switch to another view and back", () => {
+    setHideRead(true);
+    const first = article("a1", "First read", true);
+    useArticleStore.setState({
+      articles: [first, article("a3", "Still unread", false)],
+      selectedArticle: first as never,
+    });
+    const { rerender } = render(<ArticleList />);
+
+    act(() => {
+      useFeedStore.setState({ selectedFeedId: "other" });
+      useArticleStore.setState({ selectedArticle: null });
+    });
+    rerender(<ArticleList />);
+    act(() => useFeedStore.setState({ selectedFeedId: "f1" }));
+    rerender(<ArticleList />);
+    expect(screen.queryByText("First read")).toBeNull();
   });
 
   it("shows a caught-up empty state once everything in the view is read", () => {

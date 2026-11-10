@@ -14,6 +14,48 @@ This replaced two earlier models: the original drill-down-with-back-buttons, and
 ```gherkin
 Feature: Mobile navigation
 
+  Rule: Reading is immersive
+
+  Scenario: The shell gets out of the way while an article is open
+    Given the user opens an article on mobile
+    Then the reader covers the top bar and the tab bar as a fixed
+      full-screen layer (z-40), padded clear of the status bar
+    And the bars stay mounted underneath, so the list never reflows when
+      an article opens or closes (unmounting them made the list jump)
+    And the reader's own pills (back, previous, next) float over the text
+    When the user scrolls down past the first 48 px
+    Then the pills slide off the bottom edge
+    When the user scrolls up by any amount
+    Then the pills return
+    And the reader's scroller keeps the native rubber band
+      (overscroll-y-contain stops the chain to the page without killing
+      the bounce; overscroll-y-none had killed it on iPhone)
+
+  Rule: The bars are glass
+
+  Scenario: Content scrolls underneath the header and the tab bar
+    Given the user is on any mobile page
+    Then the header is a translucent, blurred bar (`.glass-bar`)
+    And the tab bar is a floating liquid-glass capsule (`.liquid-glass`),
+      inset 16 px from the sides and 8 px above the home indicator
+    And every mobile scroller pads by --chrome-top / --chrome-bottom so
+      its first and last rows rest clear of the glass
+    And with "reduce transparency" on, or without backdrop-filter
+      support, both are opaque
+
+  Rule: The tab bar minimizes while you scroll (Apple HIG, Tab bars, iOS)
+
+  Scenario: Scrolling down recedes the capsule to the current tab
+    Given the tab bar is expanded
+    When any page scroller moves down past its first 48 px
+    Then the capsule shrinks to a circle at the bottom-left showing only
+      the current section's icon (the feed-list icon on the list)
+    And taps beside the circle reach the content underneath
+    When the user taps the circle, or scrolls back up
+    Then the full capsule returns
+    And moving to another section always shows the full capsule
+    And scrolling inside the reader or the open drawer never minimizes it
+
   Rule: Tap goes in, swipe goes out
 
   Scenario: Tap opens the reader overlay
@@ -91,31 +133,22 @@ Feature: Mobile navigation
     Then the sidebar, article list, and reader are all visible
     And resizable panel handles allow layout adjustment
 
-  Rule: The closed bottom drawer is a quick-switch favicon dock
+  Rule: The closed bottom strip is a four-tab bar
 
-  Scenario: Closed drawer surfaces recent feeds instead of the current feed name
+  Scenario: The bar names the four sections
     Given the user is on mobile with the bottom drawer closed
-    Then the strip shows an anchored "All items" button
-    And the favicons of the most-recently-viewed feeds in stable sidebar order
-    And fixed Explore and Settings shortcuts beside the chevron
-    And it does not repeat the current feed name (the header already shows it)
+    Then the strip shows four labelled tabs: Feeds, Explore, Signal, Settings
+    And the tab for the current section is marked (aria-current)
+    And swiping up on the strip, or tapping Feeds, opens the feed drawer
 
-  Scenario: Dock slots never reorder under the thumb
-    Given the dock shows a set of feed favicons
-    When the user taps one of them
-    Then the dock's buttons keep their positions
-    And only viewing a feed from outside the dock swaps a slot
-
-  Scenario: Tapping a dock favicon switches feed without opening the drawer
-    Given the closed drawer dock shows a feed's favicon
-    When the user taps that favicon
-    Then the app navigates to that feed
-    And the drawer stays closed
-
-  Scenario: Overflow lives behind the full list
-    Given the user has more feeds than fit the dock cap
-    Then only the most-recently-viewed feeds (up to MOBILE_DOCK_FEED_CAP) show
-    And the chevron opens the full feed list for the rest
+  Scenario: Recent feeds sit in the drawer's first row
+    Given the user has viewed at least one feed on this device
+    When the drawer opens
+    Then a row of favicon buttons shows the most-recently-viewed feeds
+      (up to MOBILE_DOCK_FEED_CAP) in stable sidebar order
+    And tapping one selects that feed and closes the drawer
+    And the drawer carries no Explore, Signal or Settings rows
+      (the tab bar owns those sections)
 ```
 
 ## Architecture
@@ -140,11 +173,13 @@ Gesture ownership map (mobile):
 |------|------|
 | `src/pages/feeds-route.tsx` | Mobile branch renders `<main>` (list) + conditional `<MobileReaderLayer>`; auto-select suppression; empty-stage→list fallback (present→absent transition guard) |
 | `src/pages/feeds-route.tsx` (`MobileReaderLayer`) | Motion drag (`motion/react`): touch-only start via `useDragControls`, direction lock, slide off then `onBack`, spring back on an early release |
+| `src/components/layout/mobile-chrome.ts` | `MOBILE_CHROME_VARS` (the shell's --chrome-top / --chrome-bottom), `CLEAR_MOBILE_CHROME` (scroller padding), `MOBILE_HEADER_PX` (the article list virtualizer's scrollMargin) |
+| `src/hooks/use-scroll-direction.ts` | `useScrollingDown(ref)`: scroll-event only (no touch events), 12 px slop, nothing hides within 48 px of the top |
 | `src/lib/swipe-back.ts` | `shouldCommitSwipeBack()`: speed OR distance decides the release (flick ≥ 400px/s, or ≥ 35% of the width) |
 | `src/index.css` | `touch-action: pan-y pinch-zoom` on `[data-reader-layer]` and its `[data-reader-scroll]` scrollers; `auto` on `<pre>` |
 | `src/hooks/use-media-query.ts` | `useIsDesktop()` hook for responsive breakpoint detection |
-| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = quick-switch favicon dock + Explore/Settings shortcuts; open state = content-sized feed list (capped at 85dvh) + one-row footer: status line, then icon-only New folder / Auto-organize / Refresh all / Settings |
-| `src/lib/recent-feeds.ts` | Pure `stableDockFeeds()` / `recordRecentFeed()` helpers + `MOBILE_DOCK_FEED_CAP` |
+| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = floating liquid-glass capsule with four tabs, minimized on scroll (`useMinimizeOnScroll`, capture-phase `scroll` listener, ignores the reader and the drawer); was a four-tab bar (Feeds opens the drawer; Explore, Signal, Settings navigate); open state = recent-feeds row + content-sized feed list (capped at 85dvh) + one-row footer: status line, then icon-only Auto-organize / New folder / Refresh all |
+| `src/lib/recent-feeds.ts` | `recordRecentFeed()` + `MOBILE_DOCK_FEED_CAP` (and `stableDockFeeds()`, now unused by the drawer) |
 | `src/stores/feed-store.ts` | Tracks `recentFeedIds` (device-local, persisted) — recorded in `selectFeed`, pruned in `removeFeed` |
 
 ### Tests
@@ -153,7 +188,7 @@ Gesture ownership map (mobile):
 |------|----------|
 | `tests/pages/feeds-page-behavior.test.tsx` | Back button navigation, auto-select suppression, URL state |
 | `tests/components/layout/feeds-page-layout.test.tsx` | Mobile vs desktop layout structure, Back button visibility |
-| `tests/components/layout/mobile-nav-drawer.test.tsx` | Closed-state quick-switch dock, open-state feed list/footer |
+| `tests/components/layout/mobile-nav-drawer.test.tsx` | Closed-state tab bar, recent-feeds row, open-state feed list/footer |
 | `tests/lib/recent-feeds.test.ts` | Recency ordering, cap, dedupe |
 | `tests/stores/feed-store.test.ts` | `selectFeed` records recency; `removeFeed` prunes it |
 
@@ -192,7 +227,7 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
 
 - **Empty-stage fallback is a transition, not a state** — The reader bounces back to the article list only when the viewed article goes from *present* to *absent* (tracked with `viewedArticlePresentRef`). A deeplink to a feed that simply loads empty is left alone so the reader can show its own empty state — distinguishing "the thing I was reading vanished" from "there was never anything here."
 
-- **Closed drawer is a dock, not a label** — The closed strip previously showed the selected feed's name next to a generic icon, duplicating the header. Since the drawer's job is cross-feed navigation, the closed state now previews *where you can go* — an anchored "All items" plus your most-recently-viewed feed favicons — rather than echoing *where you are*. Recency (`recentFeedIds`) is device-local and never syncs: it's a per-device interaction trail, and metering it server-side would contradict the privacy principles.
+- **Closed strip is a standard tab bar (audit 2026-Q4, round 2)** — Earlier versions showed the selected feed's name, then a favicon dock with two shortcuts and a chevron. Both put unlabelled targets where phones put a labelled tab bar. The strip is now Feeds / Explore / Signal / Settings, each labelled, the current one marked; the recent-feed favicons moved to the first row of the open drawer. Recency (`recentFeedIds`) stays device-local and never syncs.
 
 ## Limitations
 

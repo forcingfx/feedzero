@@ -285,6 +285,18 @@ describe("SignalPage", () => {
     expect(screen.queryByText(/no preview available/i)).toBeNull();
   });
 
+  it("on mobile, Signal's own scroller runs under the glass tab bar and clears it", async () => {
+    // Signal scrolls inside its own box (its tabs stay pinned under the
+    // header), so it pads by the shell's --chrome-bottom itself.
+    mockViewport(false);
+    seedReadyCorpus();
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
+    const scroller = screen.getByTestId("signal-scroll");
+    expect(scroller.className).toContain("pb-[var(--chrome-bottom,0px)]");
+    expect(scroller.className).toContain("overflow-y-auto");
+  });
+
   it("on mobile, tapping a story opens a preview then 'Open in reader' navigates", async () => {
     mockViewport(false);
     seedReadyCorpus();

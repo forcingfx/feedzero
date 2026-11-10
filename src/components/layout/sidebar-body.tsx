@@ -27,8 +27,9 @@ interface SidebarBodyProps {
    * (e.g. close the mobile drawer or the offcanvas sidebar). */
   onBeforeNavigate?: () => void;
   /**
-   * Set by the mobile drawer. The drawer has no "+" header menu yet, so it
-   * keeps the inline "New filter" row, and it renders its own "New folder"
+   * Set by the mobile drawer. The bottom tab bar owns Explore and Signal,
+   * so those rows are hidden; the drawer has no "+" header menu, so it
+   * keeps the inline "New filter" row; and it renders its own "New folder"
    * input in the pinned footer instead of the desktop list's creator.
    */
   inDrawer?: boolean;
@@ -109,6 +110,9 @@ export function SidebarBody({
 
   return (
     <SidebarMenu>
+      {/* In the drawer, the bottom tab bar owns Explore and Signal. */}
+      {!inDrawer && (
+      <>
       <SidebarMenuItem>
         <SidebarMenuButton
           isActive={isExplorePage}
@@ -142,6 +146,8 @@ export function SidebarBody({
           ) : null}
         </SidebarMenuButton>
       </SidebarMenuItem>
+      </>
+      )}
       {feeds.length > 0 && (
         <>
           <SidebarMenuItem key="all-items">

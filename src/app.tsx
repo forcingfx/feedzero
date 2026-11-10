@@ -97,7 +97,7 @@ function SettingsRoute() {
 
 function SignalRoute() {
   return (
-    <StageView>
+    <StageView selfScrolling>
       <Suspense fallback={<StageSkeleton />}>
         <SignalPage />
       </Suspense>

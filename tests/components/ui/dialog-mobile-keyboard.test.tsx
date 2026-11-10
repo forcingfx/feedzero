@@ -47,7 +47,10 @@ describe("DialogContent — mobile keyboard cover prevention", () => {
     const content = baseElement.querySelector('[role="dialog"]');
     expect(content).toBeTruthy();
     const className = content?.getAttribute("class") ?? "";
-    expect(className).toMatch(/max-h-\[calc\(100dvh-2rem\)\]/);
+    // Safe-area aware (2026-11-10): the dialog is fixed, so the body's
+    // safe-area padding does not apply to it; without subtracting the
+    // insets a tall dialog's close button sat under the status bar.
+    expect(className).toMatch(/max-h-\[calc\(100dvh-2rem-env\(safe-area-inset-top\)-env\(safe-area-inset-bottom\)\)\]/);
   });
 
   it("includes overflow-y-auto so focused inputs can scroll into view", () => {
@@ -73,7 +76,8 @@ describe("DialogContent — mobile keyboard cover prevention", () => {
     const { baseElement } = mountOpenDialog();
     const content = baseElement.querySelector('[role="dialog"]');
     const className = content?.getAttribute("class") ?? "";
-    expect(className).toMatch(/top-\[50dvh\]/);
+    // Centered within the safe area, not the raw viewport.
+    expect(className).toMatch(/top-\[calc\(50dvh\+\(env\(safe-area-inset-top\)-env\(safe-area-inset-bottom\)\)\/2\)\]/);
     // The bug was specifically `top-[50%]` — assert it's gone.
     expect(className).not.toMatch(/top-\[50%\]/);
   });

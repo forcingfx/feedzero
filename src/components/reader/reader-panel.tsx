@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useScrollingDown } from "@/hooks/use-scroll-direction.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import {
   ChevronLeft,
@@ -95,6 +96,9 @@ interface ReaderPanelProps {
   onBack?: () => void;
 }
 
+/** Bottom padding so the last paragraph clears the floating pills. */
+const READER_PILLS_CLEARANCE = "pb-[calc(4rem+env(safe-area-inset-bottom))]";
+
 export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: ReaderPanelProps = {}) {
   const isDesktop = useIsDesktop();
   const article = useArticleStore((s) => s.selectedArticle);
@@ -175,11 +179,20 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   // the article list panel always visible plus j/k keyboard shortcuts —
   // the pills would just clutter the reader. On mobile the reader takes
   // the full screen, so the pills are the primary nav affordance.
+  // The pills float over the text and step aside while the reader scrolls
+  // down, returning on the first scroll up (immersive reader, 2026-11-10).
+  const pillsHidden = useScrollingDown(scrollContainerRef);
   const navPills =
     !isDesktop && onNavigate && (prevArticle || nextArticle || onBack) ? (
       <div
         data-testid="nav-pills-bar"
-        className="flex items-center gap-2 px-4 pb-4 pt-2 shrink-0"
+        data-hidden={pillsHidden}
+        className={cn(
+          "absolute inset-x-0 bottom-0 flex items-center gap-2 px-4 pt-6 pb-[calc(1rem+env(safe-area-inset-bottom))]",
+          "bg-gradient-to-t from-background via-background/80 to-transparent",
+          "transition-transform duration-200 motion-reduce:transition-none",
+          pillsHidden && "translate-y-full",
+        )}
       >
         {onBack && (
           <Button
@@ -227,11 +240,11 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   function wrap(content: ReactNode) {
     if (onNavigate) {
       return (
-        <div className="h-full flex flex-col">
+        <div className="relative h-full flex flex-col">
           <div
             ref={scrollContainerRef}
             data-testid="reader-scroll-container" data-reader-scroll
-            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none"
+            className={cn("flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain", navPills && READER_PILLS_CLEARANCE)}
           >
             {content}
           </div>
@@ -503,8 +516,8 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
 
   if (onNavigate) {
     return (
-      <div className="h-full flex flex-col">
-        <div ref={scrollContainerRef} data-testid="reader-scroll-container" data-reader-scroll className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none">
+      <div className="relative h-full flex flex-col">
+        <div ref={scrollContainerRef} data-testid="reader-scroll-container" data-reader-scroll className={cn("flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain", navPills && READER_PILLS_CLEARANCE)}>
           {articleBody}
         </div>
         {navPills}

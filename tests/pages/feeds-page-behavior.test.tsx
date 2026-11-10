@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { installVirtualizerShims, restoreVirtualizerShims } from "../helpers/virtualizer-shims.ts";
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense } from "react";
 import { AppLayout } from "@/pages/app-layout.tsx";
@@ -221,6 +222,58 @@ describe("FeedsPage behavior — desktop", () => {
     ).not.toBeNull();
   });
 
+  /**
+   * Race (pre-existing, found 2026-11-10; flaky e2e "select article shows
+   * reader content"): on desktop the app opens a feed's first article once
+   * the feed finishes loading. It checked the URL as it was when loading
+   * started, so an article the user clicked while the feed loaded was
+   * replaced by the first one. The user's choice must win.
+   */
+  it("does not replace an article the user opened while the feed was loading", async () => {
+    const a1 = makeArticle("art-1");
+    const a2 = makeArticle("art-2");
+    let finishLoading: (v: { ok: true; value: Article[] }) => void = () => {};
+    vi.mocked(db.getArticles).mockImplementation(
+      () => new Promise((resolve) => { finishLoading = resolve; }),
+    );
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({ articles: [a1, a2], articlesByFeedId: { "feed-1": [a1, a2] } });
+
+    installVirtualizerShims();
+    try {
+      renderPage("/feeds/feed-1");
+      await userEvent.click(await screen.findByText("Article art-2"));
+      expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
+
+      await act(async () => finishLoading({ ok: true, value: [a1, a2] }));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
+    } finally {
+      restoreVirtualizerShims();
+    }
+  });
+
+  it("does not auto-open the first article when one is already selected but its URL has not rendered yet", async () => {
+    // The router renders navigations as transitions, so a click's push can
+    // land before React renders the previous /feeds/<id> URL. The effect
+    // for that stale render saw no articleId and replaced the user's
+    // article. A click selects the article in the store synchronously,
+    // before it navigates, so the store is the reliable signal.
+    const a1 = makeArticle("art-1");
+    const a2 = makeArticle("art-2");
+    let finishLoading: (v: { ok: true; value: Article[] }) => void = () => {};
+    vi.mocked(db.getArticles).mockImplementation(
+      () => new Promise((resolve) => { finishLoading = resolve; }),
+    );
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+
+    renderPage("/feeds/feed-1");
+    act(() => useArticleStore.setState({ selectedArticle: a2 }));
+    await act(async () => finishLoading({ ok: true, value: [a1, a2] }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(currentUrl).toBe("/feeds/feed-1");
+  });
+
   it("selects feed from URL on mount", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
 
@@ -429,11 +482,51 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
-  it("shows 'Articles' fallback in header when articleId present but no feed in store", () => {
+  /**
+   * Immersive reader without the jump (owner report, 2026-11-10): the
+   * first version unmounted the top bar and the tab bar while an article
+   * was open, so the list reflowed by their height on every open and
+   * close and the bars flashed in between. The bars now stay mounted and
+   * the reader covers them as a fixed full-screen layer above them.
+   */
+  it("keeps the mobile header and the tab bar mounted while an article is open", () => {
     useArticleStore.setState({ articles: [makeArticle("art-1")] });
-    renderPage("/feeds/feed-1/articles/art-1");
-    // With breadcrumbs, mobile header shows fallback "Articles" when feed isn't in store
-    expect(screen.getByText("Articles")).toBeInTheDocument();
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+    expect(container.querySelector("header")).not.toBeNull();
+    expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
+  });
+
+  it("the reader is a fixed full-screen layer above the bars, clear of the status bar", async () => {
+    const layer = await openReaderOnMobile();
+    expect(layer.className).toMatch(/\bfixed\b/);
+    expect(layer.className).toMatch(/\binset-0\b/);
+    expect(layer.className).toMatch(/\bz-40\b/);
+    expect(layer.className).toContain("pt-[env(safe-area-inset-top)]");
+  });
+
+  /**
+   * Glass bars (owner request, 2026-11-10): the header and the tab bar
+   * float over the content as translucent blurred overlays; the content
+   * scrolls underneath and clears them through the --chrome-top and
+   * --chrome-bottom variables the shell sets.
+   */
+  it("draws the header and the tab bar as glass overlays over the content", () => {
+    const { container } = renderPage("/feeds/feed-1");
+    const header = container.querySelector("header")!;
+    expect(header.className).toContain("glass-bar");
+    expect(header.className).toMatch(/\babsolute\b/);
+    // The tab bar is a floating liquid-glass capsule (see mobile-nav-drawer tests).
+    const capsule = container.ownerDocument.querySelector<HTMLElement>("[data-testid='tab-capsule']")!;
+    expect(capsule.className).toContain("liquid-glass");
+    const shell = header.parentElement!;
+    expect(shell.style.getPropertyValue("--chrome-top")).toBe("48px");
+    expect(shell.style.getPropertyValue("--chrome-bottom")).toContain("72px");
+  });
+
+  it("shows the mobile header and the tab bar on the article list", () => {
+    const { container } = renderPage("/feeds/feed-1");
+    expect(container.querySelector("header")).not.toBeNull();
+    expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
   });
 
   it("navigates back to the article list when the viewed article's stage goes empty (mobile)", async () => {

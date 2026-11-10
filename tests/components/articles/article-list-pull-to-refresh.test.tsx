@@ -157,4 +157,34 @@ describe("ArticleList pull-to-refresh", () => {
 
     expect(refreshFeed).not.toHaveBeenCalled();
   });
+
+  it("clears the glass bars: the scroller pads by the shell's chrome variables", () => {
+    const scroller = renderList();
+    expect(scroller.className).toContain("pt-[var(--chrome-top,0px)]");
+    expect(scroller.className).toContain("pb-[var(--chrome-bottom,0px)]");
+  });
+
+  /**
+   * Mobile has no split view: the list never shows a persistent selection
+   * highlight, so opening and closing the reader never paints a row as
+   * "selected" or moves that highlight between rows (owner report,
+   * 2026-11-10). Desktop keeps it: there the list and reader sit side by side.
+   */
+  // aria-selected stays the truth on both (screen readers and j/k
+  // navigation read it); only the visual highlight is desktop-only.
+  it("shows no persistent selection highlight on mobile, but keeps aria-selected", () => {
+    renderList();
+    act(() => useArticleStore.setState({ selectedArticle: article as never }));
+    const row = document.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
+    expect(row).not.toBeNull();
+    expect(row!.className).not.toContain("aria-selected:bg-accent");
+  });
+
+  it("keeps the selection highlight on desktop", () => {
+    vi.mocked(useIsDesktop).mockReturnValue(true);
+    renderList();
+    act(() => useArticleStore.setState({ selectedArticle: article as never }));
+    const row = document.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
+    expect(row!.className).toContain("aria-selected:bg-accent");
+  });
 });

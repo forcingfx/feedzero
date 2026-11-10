@@ -79,6 +79,22 @@ export function FeedsRoute() {
   // loads when the effect re-fires for the same param.
   const loadedFeedRef = useRef<string | null>(null);
 
+  // The URL as of the latest render. The load below resolves after the
+  // user may already have opened an article (cached rows are clickable
+  // while the view refreshes), so it must read the URL then, not the
+  // value captured when loading started.
+  const latestArticleIdRef = useRef(articleId);
+  latestArticleIdRef.current = articleId;
+
+  // Desktop opens a feed's first article only when the user has not chosen
+  // one. The URL can lag a click: the router renders navigations as
+  // transitions, so an effect for a stale /feeds/<id> render could replace
+  // the user's article. A click selects the article in the store
+  // synchronously, before it navigates, so the store is checked too.
+  function userHasChosenArticle(): boolean {
+    return Boolean(latestArticleIdRef.current || useArticleStore.getState().selectedArticle);
+  }
+
   // Feed switch: select feed and start loading when feedId changes
   useEffect(() => {
     if (!feedId || feedId === loadedFeedRef.current) return;
@@ -92,14 +108,16 @@ export function FeedsRoute() {
       // article list is a first-class destination — tapping a feed should
       // land there, not skip past it into the reader.
       if (!isDesktop) return;
+      // The user moved to another feed while this one loaded.
+      if (loadedFeedRef.current !== feedId) return;
       const { articles: loaded } = useArticleStore.getState();
-      if (loaded.length > 0 && !articleId && !skipAutoSelectRef.current) {
+      if (loaded.length > 0 && !userHasChosenArticle() && !skipAutoSelectRef.current) {
         navigate(`/feeds/${feedId}/articles/${loaded[0].id}`, {
           replace: true,
         });
       }
     });
-  }, [feedId, selectFeed, selectArticle, loadArticles, articleId, navigate, isDesktop]);
+  }, [feedId, selectFeed, selectArticle, loadArticles, navigate, isDesktop]);
 
   // Article sync + auto-select. Waits until loading completes, then either
   // syncs articleId from URL or auto-selects the first article on desktop.
@@ -113,7 +131,7 @@ export function FeedsRoute() {
         selectArticle(article);
         lastSyncedArticleIdRef.current = articleId;
       }
-    } else if (isDesktop && !skipAutoSelectRef.current) {
+    } else if (isDesktop && !skipAutoSelectRef.current && !userHasChosenArticle()) {
       navigate(`/feeds/${feedId}/articles/${articles[0].id}`, {
         replace: true,
       });
@@ -189,7 +207,7 @@ export function FeedsRoute() {
         {articleId && feedId && (
           <Suspense
             fallback={
-              <div className="absolute inset-0 z-20 bg-background" aria-busy="true" />
+              <div className="fixed inset-0 z-40 bg-background" aria-busy="true" />
             }
           >
             <MobileReaderLayer onBack={closeReader}>

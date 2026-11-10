@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router";
-import { ChevronUp, Compass, FolderPlus, Layers, RefreshCw, Settings } from "lucide-react";
+import { useState, useEffect, useRef, forwardRef } from "react";
+import { useLocation, useNavigate } from "react-router";
+import { Compass, FolderPlus, Layers, RefreshCw, Settings, Sparkles } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { ALL_FEEDS_ID } from "@feedzero/core/utils/constants";
-import { stableDockFeeds, MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
+import { MOBILE_DOCK_FEED_CAP } from "@/lib/recent-feeds.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
@@ -12,6 +11,23 @@ import { NewFolderForm } from "@/components/sidebar/new-folder-input.tsx";
 import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
+import { useMinimizeOnScroll } from "@/hooks/use-scroll-direction.ts";
+import { cn } from "@/lib/utils";
+
+type Section = "feeds" | "explore" | "signal" | "settings";
+
+const SECTION_LABEL: Record<Section, string> = {
+  feeds: "Feeds",
+  explore: "Explore",
+  signal: "Signal",
+  settings: "Settings",
+};
+
+/** The icon the minimized tab bar shows: the current section's tab. */
+function SectionIcon({ section }: { section: Section }) {
+  const Icon = { feeds: Layers, explore: Compass, signal: Sparkles, settings: Settings }[section];
+  return <Icon className="size-5" />;
+}
 
 interface MobileNavDrawerProps {
   onFeedSelect: (feedId: string) => void;
@@ -24,6 +40,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   // The strip's handle pill advertises "drag me up" — honor it: an
   // upward-dominant drag on the strip opens the drawer (tapping the
   // chevron still works). Tracked per-gesture so a horizontal scrub
@@ -62,19 +79,24 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     setOpen(false);
   }
 
-  function handleSettings() {
-    setOpen(false);
-    goToSettings(navigate);
-  }
-
   const recentFeedIds = useFeedStore((s) => s.recentFeedIds);
-  // The closed strip is a quick-switch dock, not a status line: showing the
-  // current feed name here just echoed the header. Instead, surface the
-  // feeds the user actually hops between. Recency picks WHICH feeds are
-  // here; sidebar order picks WHERE — see stableDockFeeds for why the
-  // dock must never reorder on a tap.
-  const dockFeeds = stableDockFeeds(feeds, recentFeedIds, MOBILE_DOCK_FEED_CAP);
-  const allActive = selectedFeedId === ALL_FEEDS_ID;
+  // Recent feeds: the first row of the open drawer. Recency picks WHICH
+  // feeds are here, sidebar order picks WHERE, so the row never reorders
+  // under the thumb. Unlike the old closed dock, the row is not padded
+  // with never-viewed feeds: the full list is right below it.
+  const recentSet = new Set(recentFeedIds.slice(0, MOBILE_DOCK_FEED_CAP));
+  const recentFeeds = feeds.filter((feed) => recentSet.has(feed.id));
+
+  // Which tab is current. Feeds covers every route that is not one of the
+  // other three sections (the list, a folder, a filter, an article).
+  const section: Section = pathname.startsWith("/explore")
+    ? "explore"
+    : pathname.startsWith("/signal")
+      ? "signal"
+      : pathname.startsWith("/settings")
+        ? "settings"
+        : "feeds";
+  const [minimized, setMinimized] = useMinimizeOnScroll(section);
 
   return (
     // No `snapPoints` here: with a single snap point and an inline height,
@@ -85,92 +107,74 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     // mode keeps vaul's standard "scroll until top, then drag to dismiss"
     // pattern, which is exactly what we want.
     <Drawer.Root open={open} onOpenChange={setOpen}>
-      <div
+      {/* Liquid-glass tab bar (Apple HIG, Tab bars, iOS): a capsule that
+          floats above content, minimizes to the current tab at the
+          bottom-left while content scrolls down, and comes back when that
+          tab is tapped or content scrolls up. The strip itself lets taps
+          through, so content beside the minimized capsule stays usable;
+          an upward swipe on the capsule still opens the feed list. */}
+      <nav
         data-testid="drawer-handle-strip"
+        data-minimized={minimized}
+        aria-label="Sections"
         onTouchStart={handleStripTouchStart}
         onTouchMove={handleStripTouchMove}
-        // iOS safe-area clearance:
-        //   pb-[env(safe-area-inset-bottom)] + matching h-[calc()] keeps the
-        //   60px dock content area above the home indicator.
-        //   pl/pr-[max(0.75rem,env(safe-area-inset-left|right))] holds a
-        //   visual gutter from the rounded display corners in portrait and
-        //   clears the notch/camera cutout in landscape.
-        className="relative flex items-center gap-1 shrink-0 border-t bg-background pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] h-[calc(60px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
       >
-        <div className="absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-muted-foreground/30" />
-
-        {/* Quick-switch dock: All-items + most-recently-viewed feed
-            favicons. Tapping switches feeds directly (the drawer is
-            already closed); the chevron opens the full list. */}
-        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-          <button
-            type="button"
-            aria-label="All items"
-            aria-pressed={allActive}
-            onClick={() => onFeedSelect(ALL_FEEDS_ID)}
-            className={`flex items-center justify-center size-11 shrink-0 rounded-md ${
-              allActive
-                ? "bg-accent text-foreground"
-                : "text-muted-foreground hover:bg-accent/50"
-            }`}
+        <div className="relative h-14">
+          <div
+            data-testid="tab-capsule"
+            className={cn(
+              "liquid-glass pointer-events-auto absolute bottom-0 left-0 h-14 overflow-hidden rounded-full",
+              "transition-[width] duration-300 ease-out motion-reduce:transition-none",
+              minimized ? "w-14" : "w-full",
+            )}
           >
-            <Layers className="size-5" />
-          </button>
-          {dockFeeds.map((feed) => {
-            const active = feed.id === selectedFeedId;
-            return (
-              <button
-                key={feed.id}
-                type="button"
-                aria-label={feed.title}
-                aria-pressed={active}
-                onClick={() => onFeedSelect(feed.id)}
-                className={`flex items-center justify-center size-11 shrink-0 rounded-md hover:bg-accent/50 ${
-                  active
-                    ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
-                    : ""
-                }`}
+            <div
+              aria-hidden={minimized || undefined}
+              className={cn(
+                "absolute inset-0 flex items-center gap-1 px-1.5 transition-opacity duration-200 motion-reduce:transition-none",
+                minimized && "pointer-events-none opacity-0",
+              )}
+            >
+              <Drawer.Trigger asChild>
+                <TabButton label="Feeds" aria-label="Feeds, open feed list" current={section === "feeds"} tabIndex={minimized ? -1 : 0}>
+                  <Layers className="size-5" />
+                </TabButton>
+              </Drawer.Trigger>
+              <TabButton label="Explore" current={section === "explore"} tabIndex={minimized ? -1 : 0} onClick={() => navigate("/explore")}>
+                <Compass className="size-5" />
+              </TabButton>
+              <TabButton
+                label="Signal"
+                current={section === "signal"}
+                tabIndex={minimized ? -1 : 0}
+                data-testid="sidebar-signal-link"
+                onClick={() => navigate("/signal")}
               >
-                <FeedFavicon siteUrl={feed.siteUrl} className="size-6" />
-              </button>
-            );
-          })}
+                <Sparkles className="size-5" />
+              </TabButton>
+              <TabButton label="Settings" current={section === "settings"} tabIndex={minimized ? -1 : 0} onClick={() => goToSettings(navigate)}>
+                <Settings className="size-5" />
+              </TabButton>
+            </div>
+            <button
+              type="button"
+              aria-hidden={!minimized || undefined}
+              tabIndex={minimized ? 0 : -1}
+              aria-label={`${SECTION_LABEL[section]}, show all tabs`}
+              onClick={() => setMinimized(false)}
+              className={cn(
+                "absolute inset-y-0 left-0 flex w-14 items-center justify-center rounded-full text-foreground",
+                "transition-opacity duration-200 motion-reduce:transition-none",
+                !minimized && "pointer-events-none opacity-0",
+              )}
+            >
+              <SectionIcon section={section} />
+            </button>
+          </div>
         </div>
-
-        {/* Fixed shortcuts: Explore and Settings ride the dock instead of
-            hiding behind the drawer chevron — the bottom edge is the
-            cheapest thumb real estate on a phone, and these are the two
-            most-reached non-feed surfaces. Signal/Stats stay in the
-            drawer to keep the strip from crowding out feed favicons. */}
-        <button
-          type="button"
-          aria-label="Explore"
-          onClick={() => navigate("/explore")}
-          className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
-        >
-          <Compass className="size-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Settings"
-          onClick={() => goToSettings(navigate)}
-          className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
-        >
-          <Settings className="size-5" />
-        </button>
-        <Drawer.Trigger asChild>
-          <button
-            type="button"
-            aria-label="Open feed list"
-            className="flex items-center justify-center size-11 shrink-0 rounded-md text-muted-foreground hover:bg-accent/50"
-          >
-            <ChevronUp
-              data-testid="drawer-open-chevron"
-              className={`size-5 transition-transform ${open ? "rotate-180" : ""}`}
-            />
-          </button>
-        </Drawer.Trigger>
-      </div>
+      </nav>
 
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
@@ -194,6 +198,31 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
               // clearance. Padding here would be a visible blank gap.
               className="min-h-0 overflow-y-auto overflow-x-hidden pb-1"
             >
+              {recentFeeds.length > 0 && (
+                <div
+                  data-testid="drawer-recent-feeds"
+                  aria-label="Recent feeds"
+                  className="flex items-center gap-1 overflow-x-auto px-3 pt-1 pb-2"
+                >
+                  {recentFeeds.map((feed) => {
+                    const active = feed.id === selectedFeedId;
+                    return (
+                      <button
+                        key={feed.id}
+                        type="button"
+                        aria-label={feed.title}
+                        aria-pressed={active}
+                        onClick={() => handleSelect(feed.id)}
+                        className={`flex items-center justify-center size-11 shrink-0 rounded-md hover:bg-accent/50 ${
+                          active ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""
+                        }`}
+                      >
+                        <FeedFavicon siteUrl={feed.siteUrl} className="size-6" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div data-testid="drawer-section" className="w-full py-1 px-3">
                 <SidebarBody
                   onFeedSelect={handleSelect}
@@ -250,14 +279,6 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                     <RefreshCw className={`size-5 ${isRefreshingAll ? "animate-spin" : ""}`} />
                   </button>
                 )}
-                <button
-                  type="button"
-                  aria-label="Settings"
-                  onClick={handleSettings}
-                  className={FOOTER_ICON_BUTTON}
-                >
-                  <Settings className="size-5" />
-                </button>
               </div>
             </div>
           </SidebarProvider>
@@ -266,3 +287,30 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     </Drawer.Root>
   );
 }
+
+/**
+ * One tab of the closed bottom bar: icon over a 12 px label, 44 px tall,
+ * sharing the width with its siblings. Forwards the ref so it can be the
+ * drawer's trigger.
+ */
+const TabButton = forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; current: boolean }
+>(function TabButton({ label, current, className, children, ...rest }, ref) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      aria-current={current ? "page" : undefined}
+      className={cn(
+        "flex h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-xs transition-colors",
+        current ? "bg-foreground/10 text-foreground" : "text-muted-foreground",
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+      <span className="leading-none">{label}</span>
+    </button>
+  );
+});
