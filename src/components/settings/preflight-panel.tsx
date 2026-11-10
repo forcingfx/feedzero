@@ -11,8 +11,9 @@
  * the parent (HelpTab) that closes over the real env.
  */
 import { useState } from "react";
-import { CheckCircle2, XCircle, Loader2, Stethoscope } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SettingsGroup } from "@/components/settings/setting-row";
 import type { PreflightReport } from "@/core/diagnostics/self-host-preflight";
 
 const CHECK_LABELS: Record<string, string> = {
@@ -40,16 +41,11 @@ export function PreflightPanel({ runPreflight }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Stethoscope className="size-4 text-muted-foreground" />
-        <p className="text-sm font-medium">Self-host preflight</p>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Run a quick diagnostic against your deployment. Useful when feeds
-        won't load or sync misbehaves — the preflight tells you which
-        layer is wrong.
-      </p>
+    <SettingsGroup
+      title="Self-host preflight"
+      description="Run a quick diagnostic against your deployment. Useful when feeds won't load or sync misbehaves: the preflight tells you which layer is wrong."
+    >
+      <div className="space-y-3 py-3">
       <Button
         type="button"
         variant="outline"
@@ -96,6 +92,7 @@ export function PreflightPanel({ runPreflight }: Props) {
           </ul>
         </div>
       ) : null}
-    </div>
+      </div>
+    </SettingsGroup>
   );
 }

@@ -184,8 +184,10 @@ Rules applied, one commit each (all on `audit/calmer-app`):
    true on the branch (both destructive buttons sit in confirm dialogs);
    now pinned so a red button cannot land on a page.
 
-Not done in round 2, deliberately: the Sync & Data, Subscription and
-Help tabs still use cards (`ImportExportCard`, the Cloud sync card, the
-plan card). Converting them is the same `SettingRow` move but touches
-the sync flows, which deserve their own review. The mobile header
-(feed name, status dot, view options) is unchanged.
+Follow-up (same branch): the Sync & Data, Subscription and Help tabs
+moved onto the same `SettingsGroup` / `SettingRow` layout (Cloud sync,
+Danger zone, Import, Export, Feedback, Need help?, Self-host preflight,
+Deactivate on this device). Plan comparison tiles keep their card shape
+(`data-plan-card`): they are options side by side, not sections. The
+sync flows themselves (dialogs, wizard, fork) are untouched. Still
+unchanged: the mobile header (feed name, status dot, view options).

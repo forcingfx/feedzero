@@ -10,8 +10,8 @@
  *     subscribes to the changelog feed)
  */
 import { useState } from "react";
-import { Keyboard, MessageSquare, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SettingRow, SettingsGroup } from "@/components/settings/setting-row";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { ShortcutGroupsList } from "@/components/layout/shortcut-groups-list";
 import { ContactSupport } from "@/components/settings/contact-support";
@@ -31,35 +31,25 @@ export function HelpTab({ onWhatsNew }: HelpTabProps) {
   const version = getAppVersion();
 
   return (
-    <div className="space-y-4 py-2">
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Keyboard className="size-4 text-muted-foreground" />
-          <p className="text-sm font-medium">Keyboard shortcuts</p>
+    <div className="space-y-8 py-2">
+      <SettingsGroup title="Keyboard shortcuts">
+        <div className="py-3">
+          <ShortcutGroupsList />
         </div>
-        <ShortcutGroupsList />
-      </div>
+      </SettingsGroup>
 
-      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setFeedbackOpen(true)}
-        >
-          <MessageSquare className="mr-2 size-4" />
-          Send feedback
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onWhatsNew}
-        >
-          <Sparkles className="mr-2 size-4" />
-          What&apos;s new
-        </Button>
-      </div>
+      <SettingsGroup title="Feedback">
+        <SettingRow label="Send feedback" description="A short form; it files an issue for us to read.">
+          <Button type="button" variant="outline" size="sm" onClick={() => setFeedbackOpen(true)}>
+            Send feedback
+          </Button>
+        </SettingRow>
+        <SettingRow label="What's new" description="Release notes, as a feed you can follow.">
+          <Button type="button" variant="outline" size="sm" onClick={onWhatsNew}>
+            What&apos;s new
+          </Button>
+        </SettingRow>
+      </SettingsGroup>
 
       <ContactSupport
         token={token}
