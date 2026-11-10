@@ -13,7 +13,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import {
   Settings2,
   RefreshCw,
@@ -302,8 +301,7 @@ function ActionsSection({ feed }: { feed: Feed }) {
     setBusy("refresh");
     try {
       await refreshSingleFeed(feed.id);
-      toast("Feed refreshed");
-    } finally {
+      } finally {
       setBusy(null);
     }
   }
@@ -312,8 +310,7 @@ function ActionsSection({ feed }: { feed: Feed }) {
     setBusy("clear");
     try {
       await reloadSingleFeed(feed.id);
-      toast("Cleared cached articles");
-    } finally {
+      } finally {
       setBusy(null);
     }
   }
