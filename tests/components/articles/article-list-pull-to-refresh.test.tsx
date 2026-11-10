@@ -170,16 +170,21 @@ describe("ArticleList pull-to-refresh", () => {
    * "selected" or moves that highlight between rows (owner report,
    * 2026-11-10). Desktop keeps it: there the list and reader sit side by side.
    */
-  it("shows no persistent selection highlight on mobile", () => {
+  // aria-selected stays the truth on both (screen readers and j/k
+  // navigation read it); only the visual highlight is desktop-only.
+  it("shows no persistent selection highlight on mobile, but keeps aria-selected", () => {
     renderList();
     act(() => useArticleStore.setState({ selectedArticle: article as never }));
-    expect(document.querySelector('[role="option"][aria-selected="true"]')).toBeNull();
+    const row = document.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
+    expect(row).not.toBeNull();
+    expect(row!.className).not.toContain("aria-selected:bg-accent");
   });
 
   it("keeps the selection highlight on desktop", () => {
     vi.mocked(useIsDesktop).mockReturnValue(true);
     renderList();
     act(() => useArticleStore.setState({ selectedArticle: article as never }));
-    expect(document.querySelector('[role="option"][aria-selected="true"]')).not.toBeNull();
+    const row = document.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
+    expect(row!.className).toContain("aria-selected:bg-accent");
   });
 });

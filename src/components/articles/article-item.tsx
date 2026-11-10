@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { cn } from "@/lib/utils";
 import { Star } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
@@ -7,6 +8,8 @@ import type { Article } from "@feedzero/core/types";
 interface ArticleItemProps {
   article: Article;
   isSelected: boolean;
+  /** Draw the selected row's highlight. Off on mobile; aria-selected is set either way. */
+  highlightSelected?: boolean;
   onSelect: (article: Article) => void;
   feedTitle?: string;
   feedSiteUrl?: string;
@@ -29,6 +32,7 @@ function formatDate(timestamp: number): string {
 export const ArticleItem = memo(function ArticleItem({
   article,
   isSelected,
+  highlightSelected = true,
   onSelect,
   feedTitle,
   feedSiteUrl,
@@ -56,7 +60,10 @@ export const ArticleItem = memo(function ArticleItem({
       data-id={article.id}
       onClick={() => onSelect(article)}
       onKeyDown={handleKeyDown}
-      className="pl-2 pr-3.5 py-2 border-b border-border border-l-2 border-l-transparent cursor-pointer hover:bg-accent aria-selected:bg-accent aria-selected:border-l-primary flex gap-3 transition-colors duration-150"
+      className={cn(
+        "pl-2 pr-3.5 py-2 border-b border-border border-l-2 border-l-transparent cursor-pointer hover:bg-accent flex gap-3 transition-colors duration-150",
+        highlightSelected && "aria-selected:bg-accent aria-selected:border-l-primary",
+      )}
     >
       {imageUrl && (
         <img

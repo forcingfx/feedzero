@@ -437,10 +437,12 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                 <SwipeToReadRow article={entry.article} enabled={!isDesktop}>
                   <ArticleItem
                     article={entry.article}
+                    isSelected={entry.article.id === selectedArticle?.id}
                     // Mobile has no split view, so no persistent highlight:
                     // it would flash between rows as the reader opens and
-                    // closes. Desktop shows the row the reader is on.
-                    isSelected={isDesktop && entry.article.id === selectedArticle?.id}
+                    // closes. aria-selected still marks the row for screen
+                    // readers and j/k. Desktop shows the row the reader is on.
+                    highlightSelected={isDesktop}
                     onSelect={handleSelect}
                     feedTitle={itemFeedTitle}
                     feedSiteUrl={itemFeedSiteUrl}
