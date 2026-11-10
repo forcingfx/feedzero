@@ -33,4 +33,14 @@ describe.skipIf(!enabled)("smoke: /api/icon", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/^image\//);
   });
+
+  // Audit 2026-Q4 finding 1: the ?url= path relays only images. An HTML page
+  // must be refused with 415, not buffered and relayed as before. The fixture
+  // is our own landing page, which is always text/html (verified with curl).
+  it("refuses a non-image url with 415", async () => {
+    const res = await fetch(
+      `${BASE}/api/icon?url=${encodeURIComponent("https://feedzero.app/")}`,
+    );
+    expect(res.status).toBe(415);
+  });
 });
