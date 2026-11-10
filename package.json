@@ -105,6 +105,9 @@
   "overrides": {
     "@vercel/cli-config": {
       "zod": "^4.6.6"
+    },
+    "@tailwindcss/typography": {
+      "postcss-selector-parser": "^6.1.6"
     }
   }
 }
