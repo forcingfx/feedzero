@@ -30,6 +30,25 @@ import { UpgradeSplash } from "@/components/features/upgrade-splash.tsx";
 import type { Article, Feed } from "@feedzero/core/types";
 
 /**
+ * Signal's own scroller. Its tabs stay pinned under the glass header, so
+ * on mobile it runs under the glass tab bar only and pads by its height
+ * (the shell's --chrome-bottom; 0 on desktop).
+ */
+const SIGNAL_SCROLLER = "h-full min-h-0 flex-1 overflow-y-auto pb-[var(--chrome-bottom,0px)]";
+
+/** Signal's tabs over its scroller, for the states without a layout of their own. */
+function SignalFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <SignalTabs active="topics" />
+      <div data-testid="signal-scroll" className={SIGNAL_SCROLLER}>
+        {children}
+      </div>
+    </>
+  );
+}
+
+/**
  * Signal — Phase 1.
  *
  * Plain-text ranked list of topics emerging across the user's feeds,
@@ -71,30 +90,27 @@ function MLSignalView() {
 
   if (tierLocked) {
     return (
-      <>
-        <SignalTabs active="topics" />
+      <SignalFrame>
         <UpgradeSplash feature="signal" />
-      </>
+      </SignalFrame>
     );
   }
 
   if (status === "locked") {
     return (
-      <>
-        <SignalTabs active="topics" />
+      <SignalFrame>
         <LockedSplash count={corpusSize} />
-      </>
+      </SignalFrame>
     );
   }
 
   if (status === "error") {
     return (
-      <>
-        <SignalTabs active="topics" />
+      <SignalFrame>
         <div className="mx-auto max-w-3xl p-6">
           <p className="text-destructive">Couldn't generate signal: {error}</p>
         </div>
-      </>
+      </SignalFrame>
     );
   }
 
@@ -106,12 +122,11 @@ function MLSignalView() {
   // visual feedback on the refresh icon."
   if (!report) {
     return (
-      <>
-        <SignalTabs active="topics" />
+      <SignalFrame>
         <div className="mx-auto max-w-3xl p-6 text-muted-foreground">
           Computing signal…
         </div>
-      </>
+      </SignalFrame>
     );
   }
 
@@ -224,7 +239,7 @@ function ReadyView({
   return (
     <>
       <SignalTabs active="topics" />
-      <div ref={containerRef} className="h-full overflow-y-auto">
+      <div ref={containerRef} data-testid="signal-scroll" className={SIGNAL_SCROLLER}>
       <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isPullRefreshing} />
 
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
@@ -456,26 +471,23 @@ function AISignalView() {
 
   if (tierLocked) {
     return (
-      <>
-        <SignalTabs active="topics" />
+      <SignalFrame>
         <UpgradeSplash feature="signal" />
-      </>
+      </SignalFrame>
     );
   }
 
   if (status === "locked") {
     return (
-      <>
-        <SignalTabs active="topics" />
+      <SignalFrame>
         <LockedSplash count={corpusSize} />
-      </>
+      </SignalFrame>
     );
   }
 
   if (status === "no-api-key") {
     return (
-      <>
-        <SignalTabs active="topics" />
+      <SignalFrame>
         <div className="mx-auto max-w-md space-y-4 p-8 text-center">
           <Sparkles className="mx-auto size-10 text-muted-foreground" />
           <p className="text-base font-medium">
@@ -493,14 +505,14 @@ function AISignalView() {
             </Button>
           </div>
         </div>
-      </>
+      </SignalFrame>
     );
   }
 
   return (
     <>
       <SignalTabs active="topics" />
-      <div className="h-full overflow-y-auto">
+      <div data-testid="signal-scroll" className={SIGNAL_SCROLLER}>
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
           <header className="mb-6 flex flex-col gap-1">
             <div className="flex items-center justify-between gap-3">

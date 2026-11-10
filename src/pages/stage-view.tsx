@@ -17,13 +17,32 @@ import { cn } from "@/lib/utils";
  * mobile, inner ResizablePanelGroup on desktop) and does NOT use this
  * wrapper.
  */
-export function StageView({ children }: { children: ReactNode }) {
+export function StageView({
+  children,
+  selfScrolling = false,
+}: {
+  children: ReactNode;
+  /**
+   * The page scrolls inside its own box (Signal: tabs pinned over its own
+   * scroller). On mobile <main> then only clears the glass header and does
+   * not scroll, so there is one scroller; the page pads its own scroller by
+   * --chrome-bottom.
+   */
+  selfScrolling?: boolean;
+}) {
   const isDesktop = useIsDesktop();
   if (isDesktop) {
     return <ScrollArea className="h-full">{children}</ScrollArea>;
   }
   return (
-    <main role="main" className={cn("flex-1 overflow-y-auto", CLEAR_MOBILE_CHROME)}>
+    <main
+      role="main"
+      className={
+        selfScrolling
+          ? "flex flex-1 min-h-0 flex-col overflow-hidden pt-[var(--chrome-top,0px)]"
+          : cn("flex-1 overflow-y-auto", CLEAR_MOBILE_CHROME)
+      }
+    >
       {children}
     </main>
   );
