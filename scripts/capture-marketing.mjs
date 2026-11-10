@@ -481,12 +481,11 @@ async function sceneSync(page) {
   await page.waitForSelector("text=Your secret key");
   const savedCheckbox = page.getByRole("checkbox").first();
   await savedCheckbox.click().catch(() => {});
-  // Flip the persistent SyncStatusBadge into "synced · just now" so
-  // the floating chip in the top-right corner frames the dialog with
-  // the after-state — converting the headline ("Pick up where you
-  // left off, anywhere") from a promise into a visible artifact. The
-  // wizard hasn't been Enable-clicked yet, but the badge shows what
-  // the next click delivers.
+  // Flip sync to "synced" so the Synced chip on the sidebar's Settings
+  // button frames the dialog with the after-state, turning the headline
+  // ("Pick up where you left off, anywhere") from a promise into a
+  // visible artifact. (Audit 2026-Q4 removed the header status badge;
+  // the footer chip is where sync status lives now.)
   await page.evaluate(async () => {
     const mod = await import("/src/stores/sync-store.ts");
     mod.useSyncStore.setState({
@@ -495,10 +494,10 @@ async function sceneSync(page) {
       error: null,
     });
   });
-  await page.waitForSelector(
-    '[data-testid="sync-status-badge"][data-state="synced"]',
-    { timeout: 4000 },
-  );
+  await page
+    .locator('[data-sidebar="footer"]')
+    .getByText("Synced", { exact: true })
+    .waitFor({ timeout: 4000 });
   await page.waitForTimeout(300);
   return shoot(page, "feature-sync.png");
 }
