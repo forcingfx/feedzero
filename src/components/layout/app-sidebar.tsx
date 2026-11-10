@@ -47,7 +47,7 @@ const commandPaletteShortcutLabel = isMac ? "⌘K" : "Ctrl+K";
 function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) {
   if (!isOnline) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
         <span className="rounded-full size-1.5 bg-muted-foreground/50" />
         Offline
       </span>
@@ -55,16 +55,16 @@ function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) 
   }
   if (status === "synced" || status === "syncing") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-        <span className={`rounded-full size-1.5 bg-emerald-500 ${status === "syncing" ? "animate-pulse" : ""}`} />
+      <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success">
+        <span className={`rounded-full size-1.5 bg-success ${status ==="syncing" ? "animate-pulse" : ""}`} />
         {status === "syncing" ? "Syncing" : "Synced"}
       </span>
     );
   }
   if (status === "error") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400">
-        <span className="rounded-full size-1.5 bg-red-500" />
+      <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">
+        <span className="rounded-full size-1.5 bg-destructive" />
         Error
       </span>
     );
@@ -100,7 +100,7 @@ function SidebarFooterMenu() {
           <span className="truncate font-semibold">Settings</span>
           <span className="flex items-center gap-1.5 mt-0.5">
             <SyncBadge status={syncStatus} isOnline={isOnline} />
-            <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">
+            <Kbd className="h-4 text-xs px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">
               {settingsShortcutLabel}
             </Kbd>
           </span>
@@ -108,7 +108,7 @@ function SidebarFooterMenu() {
       ) : (
         <div className="flex flex-1 items-center text-left">
           <span className="flex-1 truncate text-base font-semibold">Settings</span>
-          <Kbd className="h-5 text-[10px] px-1.5 mr-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">
+          <Kbd className="h-5 text-xs px-1.5 mr-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">
             {settingsShortcutLabel}
           </Kbd>
         </div>
@@ -145,14 +145,14 @@ function LocalStorageWarning() {
   }
 
   return (
-    <div className="mx-2 mb-2 rounded-md border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-800 dark:text-amber-200">
+    <div className="mx-2 mb-2 rounded-md border border-warning/30 bg-warning-bg p-3 text-xs text-warning">
       <div className="flex items-start justify-between gap-2">
         <p>
           Your feeds are stored locally. Clearing browser data will delete them.
         </p>
         <button
           onClick={handleDismiss}
-          className="shrink-0 text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200"
+          className="shrink-0 text-warning hover:text-warning"
           aria-label="Dismiss"
         >
           <X className="size-3.5" />
@@ -219,7 +219,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         className="size-8"
                       >
                         <RefreshCw
-                          className={`size-4 ${isRefreshingAll ? "animate-spin" : ""}`}
+                          className={`size-4 ${isRefreshingAll ?"animate-spin" : ""}`}
                         />
                         <span className="sr-only">Refresh</span>
                       </Button>

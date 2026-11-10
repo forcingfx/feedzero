@@ -71,16 +71,16 @@ export function ImportResults({
       <div className="text-center py-4">
         <div className="flex justify-center mb-2">
           {failureCount === 0 && placeholderCount === 0 ? (
-            <div className="flex size-12 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle2 className="size-6 text-green-600" />
+            <div className="flex size-12 items-center justify-center rounded-full bg-success-bg">
+              <CheckCircle2 className="size-6 text-success" />
             </div>
           ) : successCount === 0 && placeholderCount === 0 ? (
             <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10">
               <XCircle className="size-6 text-destructive" />
             </div>
           ) : (
-            <div className="flex size-12 items-center justify-center rounded-full bg-amber-100">
-              <CheckCircle2 className="size-6 text-amber-600" />
+            <div className="flex size-12 items-center justify-center rounded-full bg-warning-bg">
+              <CheckCircle2 className="size-6 text-warning" />
             </div>
           )}
         </div>
@@ -107,7 +107,7 @@ export function ImportResults({
         <Collapsible>
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50">
             <span className="flex items-center gap-2">
-              <CheckCircle2 className="size-4 text-green-600" />
+              <CheckCircle2 className="size-4 text-success" />
               Successful ({successes.length})
             </span>
             <ChevronDown className="size-4" />
@@ -132,7 +132,7 @@ export function ImportResults({
         <Collapsible defaultOpen>
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50">
             <span className="flex items-center gap-2">
-              <Clock className="size-4 text-amber-600" />
+              <Clock className="size-4 text-warning" />
               Queued for retry ({placeholders.length})
             </span>
             <ChevronDown className="size-4" />
@@ -145,7 +145,7 @@ export function ImportResults({
                     {result.url}
                   </p>
                   {result.error && (
-                    <p className="text-amber-700 text-xs">{result.error}</p>
+                    <p className="text-warning text-xs">{result.error}</p>
                   )}
                 </li>
               ))}

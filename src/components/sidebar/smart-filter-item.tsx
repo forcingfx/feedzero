@@ -29,7 +29,7 @@ export function SmartFilterItem({
         onClick={onSelect}
         tooltip={filter.name}
       >
-        <Filter className="size-4 text-violet-500" />
+        <Filter className="size-4 text-primary" />
         <span className="truncate">{filter.name}</span>
       </SidebarMenuButton>
     </SidebarMenuItem>

@@ -75,7 +75,7 @@ export function VaultHeadroomNotice() {
       >
         <div
           className={`h-full rounded-full transition-[width] duration-300 ${
-            alarming ? "bg-amber-500" : "bg-muted-foreground/40"
+ alarming ?"bg-warning" : "bg-muted-foreground/40"
           }`}
           style={{ width: `${Math.max(headroom.percentUsed, 2)}%` }}
         />
@@ -84,10 +84,10 @@ export function VaultHeadroomNotice() {
       {alarming && (
         <div
           role="status"
-          className="space-y-2 rounded-md border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-2.5 text-xs"
+          className="space-y-2 rounded-md border border-warning/30 bg-warning-bg p-2.5 text-xs"
         >
           <div className="flex items-start gap-2">
-            <AlertTriangle className="size-3.5 shrink-0 translate-y-0.5 text-amber-600 dark:text-amber-500" />
+            <AlertTriangle className="size-3.5 shrink-0 translate-y-0.5 text-warning" />
             <p>
               {headroom.level === "full"
                 ? "This vault is too large to sync in one upload, so pushes are failing."

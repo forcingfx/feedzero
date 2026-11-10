@@ -153,7 +153,7 @@ function AnthropicKeyPanel() {
         <KeyRound className="size-4 text-muted-foreground" />
         <p className="text-sm font-medium">Anthropic API key</p>
         {hasKey === true ? (
-          <span className="flex items-baseline gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+          <span className="flex items-baseline gap-1 text-xs text-success">
             <CheckCircle2 className="size-3" />
             saved
           </span>

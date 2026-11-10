@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { cn } from "@/lib/utils.ts";
 import { ChevronRight, GripVertical } from "lucide-react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { useDroppable } from "@dnd-kit/core";
@@ -65,8 +64,10 @@ export function FolderItem({
     if (sortable) sortableHook.setNodeRef(node);
   }
 
+  // The folder's colour is a 3 px bar at the left edge, not a filled row:
+  // a sidebar of saturated bars shouted over the content (audit 2026-Q4).
   const colorStyle = folder.color
-    ? { backgroundColor: folder.color, color: "#ffffff" }
+    ? { boxShadow: `inset 3px 0 0 ${folder.color}` }
     : undefined;
 
   return (
@@ -112,12 +113,7 @@ export function FolderItem({
           </SidebarMenuButton>
           {unreadCount > 0 && (
             <SidebarMenuBadge
-              className={cn(
-                "rounded-lg text-[10px] font-semibold",
-                folder.color
-                  ? "bg-white/20 text-white"
-                  : "bg-primary/10 text-primary",
-              )}
+              className="rounded-lg text-xs font-semibold bg-primary/10 text-primary"
             >
               {formatUnreadBadge(unreadCount)}
             </SidebarMenuBadge>
@@ -126,12 +122,7 @@ export function FolderItem({
             <button
               type="button"
               aria-label="Toggle folder"
-              className={cn(
-                "absolute left-1 top-1 size-6 flex items-center justify-center z-10 transition-colors",
-                folder.color
-                  ? "text-white/70 hover:text-white"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              className="absolute left-1 top-1 size-6 flex items-center justify-center z-10 transition-colors text-muted-foreground hover:text-foreground"
             >
               <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
             </button>

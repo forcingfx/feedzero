@@ -192,8 +192,8 @@ export function ExistingCloudFlow({
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-center py-4">
-              <div className="flex size-16 items-center justify-center rounded-full bg-green-100">
-                <ShieldCheck className="size-8 text-green-600" />
+              <div className="flex size-16 items-center justify-center rounded-full bg-success-bg">
+                <ShieldCheck className="size-8 text-success" />
               </div>
             </div>
             <DialogFooter>

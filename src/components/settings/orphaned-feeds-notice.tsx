@@ -32,14 +32,14 @@ export function OrphanedFeedsNotice() {
     <div
       role="status"
       data-testid="orphaned-feeds-notice"
-      className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30 p-3 flex items-start gap-3"
+      className="rounded-lg border border-warning/30 bg-warning-bg p-3 flex items-start gap-3"
     >
-      <AlertCircle className="size-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
+      <AlertCircle className="size-4 mt-0.5 shrink-0 text-warning" />
       <div className="text-sm space-y-1">
-        <div className="font-medium text-amber-900 dark:text-amber-100">
+        <div className="font-medium text-warning">
           {count} {noun} a folder that isn't on this device
         </div>
-        <div className="text-amber-800/80 dark:text-amber-200/80">
+        <div className="text-warning/80">
           They appear under Unfiled. Refresh to re-sync, or move them
           into a folder from the sidebar context menu. This usually
           self-heals on the next sync push from your other device.

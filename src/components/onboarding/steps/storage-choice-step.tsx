@@ -70,9 +70,9 @@ export function StorageChoiceStep() {
           <div className="flex items-center gap-2">
             <label
               className={`flex flex-1 cursor-pointer flex-col gap-3 rounded-lg border p-4 transition-colors ${
-                selected === "local"
-                  ? "border-amber-300 bg-amber-50/50 ring-1 ring-amber-300"
-                  : "border-border hover:border-amber-200 hover:bg-amber-50/30"
+ selected ==="local"
+                  ? "border-warning/30 bg-warning-bg ring-1 ring-warning"
+                  : "border-border hover:border-warning/30 hover:bg-warning-bg"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -85,7 +85,7 @@ export function StorageChoiceStep() {
                   className="sr-only"
                   aria-label="Local only"
                 />
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-warning-bg text-warning">
                   <Smartphone className="size-5" />
                 </div>
                 <div className="flex-1">
@@ -96,8 +96,8 @@ export function StorageChoiceStep() {
                 </div>
                 <div
                   className={`size-4 shrink-0 rounded-full border-2 ${
-                    selected === "local"
-                      ? "border-amber-500 bg-amber-500"
+ selected ==="local"
+                      ? "border-warning bg-warning"
                       : "border-muted-foreground/30"
                   }`}
                 >
@@ -109,7 +109,7 @@ export function StorageChoiceStep() {
                 </div>
               </div>
               {selected === "local" && (
-                <div className="flex items-start gap-2 rounded-md bg-amber-100/50 p-3 text-xs text-amber-700">
+                <div className="flex items-start gap-2 rounded-md bg-warning-bg p-3 text-xs text-warning">
                   <AlertTriangle className="size-4 shrink-0 mt-0.5" />
                   <span>
                     Your data lives in this browser. Clearing browser data or
@@ -125,9 +125,9 @@ export function StorageChoiceStep() {
           <div className="flex items-center gap-2">
             <label
               className={`flex flex-1 cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors ${
-                selected === "sync"
-                  ? "border-green-300 bg-green-50/50 ring-1 ring-green-300"
-                  : "border-border hover:border-green-200 hover:bg-green-50/30"
+ selected ==="sync"
+                  ? "border-success/30 bg-success-bg ring-1 ring-success"
+                  : "border-border hover:border-success/30 hover:bg-success-bg"
               }`}
             >
               <input
@@ -139,13 +139,13 @@ export function StorageChoiceStep() {
                 className="sr-only"
                 aria-label="Sync across devices"
               />
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-success-bg text-success">
                 <Lock className="size-5" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Sync across devices</span>
-                  <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-green-700">
+                  <span className="rounded bg-success-bg px-1.5 py-0.5 text-xs font-medium uppercase text-success">
                     Secure
                   </span>
                 </div>
@@ -155,8 +155,8 @@ export function StorageChoiceStep() {
               </div>
               <div
                 className={`size-4 shrink-0 rounded-full border-2 ${
-                  selected === "sync"
-                    ? "border-green-500 bg-green-500"
+ selected ==="sync"
+                    ? "border-success bg-success"
                     : "border-muted-foreground/30"
                 }`}
               >
@@ -174,9 +174,9 @@ export function StorageChoiceStep() {
           <div className="flex items-center gap-2">
             <label
               className={`flex flex-1 cursor-pointer flex-col gap-3 rounded-lg border p-4 transition-colors ${
-                selected === "recovery"
-                  ? "border-blue-300 bg-blue-50/50 ring-1 ring-blue-300"
-                  : "border-border hover:border-blue-200 hover:bg-blue-50/30"
+ selected ==="recovery"
+                  ? "border-info/30 bg-info-bg ring-1 ring-info"
+                  : "border-border hover:border-info/30 hover:bg-info-bg"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -189,7 +189,7 @@ export function StorageChoiceStep() {
                   className="sr-only"
                   aria-label="I already have a passphrase"
                 />
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-info-bg text-info">
                   <KeyRound className="size-5" />
                 </div>
                 <div className="flex-1">
@@ -202,8 +202,8 @@ export function StorageChoiceStep() {
                 </div>
                 <div
                   className={`size-4 shrink-0 rounded-full border-2 ${
-                    selected === "recovery"
-                      ? "border-blue-500 bg-blue-500"
+ selected ==="recovery"
+                      ? "border-info bg-info"
                       : "border-muted-foreground/30"
                   }`}
                 >
@@ -215,7 +215,7 @@ export function StorageChoiceStep() {
                 </div>
               </div>
               {selected === "recovery" && (
-                <div className="flex items-start gap-2 rounded-md bg-blue-100/50 p-3 text-xs text-blue-700">
+                <div className="flex items-start gap-2 rounded-md bg-info-bg p-3 text-xs text-info">
                   <Info className="size-4 shrink-0 mt-0.5" />
                   <span>
                     Enter your 4-word secret key to restore your feeds from

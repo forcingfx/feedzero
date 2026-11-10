@@ -103,7 +103,7 @@ export function TierCard({
   secondaryCtaHref,
 }: TierCardProps) {
   const borderClass = featured
-    ? "border-emerald-300 dark:border-emerald-700 shadow-sm"
+    ? "border-success/30  shadow-sm"
     : comingSoon
       ? "border-dashed border-border bg-card/50"
       : "border-border";
@@ -112,7 +112,7 @@ export function TierCard({
     <div className={`rounded-lg border ${borderClass} bg-card p-4 space-y-2`}>
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          {featured && <Sparkles className="size-4 text-emerald-600" />}
+          {featured && <Sparkles className="size-4 text-success" />}
           <h3 className="text-base font-semibold">{name}</h3>
         </div>
         <div className="text-sm text-muted-foreground">

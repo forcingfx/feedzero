@@ -109,7 +109,7 @@ export function FeedFormatChip({ url, onAdd, isAdding }: FeedFormatChipProps) {
               className={cn(
                 "inline-flex items-center rounded-full border px-2 py-0.5 font-medium transition-all duration-300",
                 active &&
-                  "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-[0_0_0_3px_var(--tw-shadow-color)] shadow-emerald-500/10",
+                  "border-success/50 bg-success/10 text-success  shadow-[0_0_0_3px_var(--tw-shadow-color)] shadow-emerald-500/10",
                 !active &&
                   found &&
                   "border-border bg-transparent text-muted-foreground/50",
@@ -135,9 +135,9 @@ export function FeedFormatChip({ url, onAdd, isAdding }: FeedFormatChipProps) {
         )}
         {found && (
           <>
-            <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-500" />
+            <Check className="size-3.5 shrink-0 text-success" />
             <span className="truncate">
-              <span className="font-medium text-emerald-700 dark:text-emerald-400">
+              <span className="font-medium text-success">
                 {formatHeadline(state.format)} feed found
               </span>
               <span className="mx-1.5 text-muted-foreground">·</span>

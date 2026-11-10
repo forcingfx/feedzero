@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -72,22 +72,22 @@ export function FeedItem({
             indicator — a feed that never loaded is more pressing than
             a stale one. */}
         {!isRefreshing && feed.lastError && !feed.lastSuccessfulFetchAt && (
-          <XCircle
-            className="size-3 shrink-0 text-destructive"
+          <AlertTriangle
+            className="size-3 shrink-0 text-warning"
             aria-label={feed.lastError}
             data-testid="failed-feed-indicator"
           />
         )}
         {!isRefreshing && !feed.lastError && isFeedStale(feed) && (
           <AlertTriangle
-            className="size-3 shrink-0 text-amber-500"
+            className="size-3 shrink-0 text-muted-foreground"
             aria-label="This feed hasn't updated in over 14 days"
             data-testid="stale-feed-indicator"
           />
         )}
       </SidebarMenuButton>
       {!isRefreshing && unreadCount > 0 && (
-        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-[10px] font-semibold">
+        <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-xs font-semibold">
           {formatUnreadBadge(unreadCount)}
         </SidebarMenuBadge>
       )}

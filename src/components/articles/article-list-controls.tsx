@@ -133,7 +133,7 @@ function FeedIndicator() {
   if (selectedFeedId === STARRED_FEED_ID) {
     return (
       <Label
-        icon={<Star className="size-4 shrink-0 text-amber-500" />}
+        icon={<Star className="size-4 shrink-0 text-warning" />}
       >
         Starred
       </Label>
@@ -144,7 +144,7 @@ function FeedIndicator() {
     const folder = folders.find((f) => f.id === id);
     return (
       <Label
-        icon={<FolderIcon className="size-4 shrink-0 text-violet-500" />}
+        icon={<FolderIcon className="size-4 shrink-0 text-primary" />}
       >
         {folder?.name ?? "Folder"}
       </Label>
@@ -154,7 +154,7 @@ function FeedIndicator() {
     const id = fromFilterFeedId(selectedFeedId);
     const filter = smartFilters.find((f) => f.id === id);
     return (
-      <Label icon={<Filter className="size-4 shrink-0 text-violet-500" />}>
+      <Label icon={<Filter className="size-4 shrink-0 text-primary" />}>
         {filter?.name ?? "Filter"}
       </Label>
     );

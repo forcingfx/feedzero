@@ -137,7 +137,7 @@ export function SidebarBody({
           ) : briefingsStaleCount > 0 ? (
             <span
               aria-label={`${briefingsStaleCount} briefing(s) have new matching articles`}
-              className="ml-auto size-2 rounded-full bg-amber-500"
+              className="ml-auto size-2 rounded-full bg-warning"
             />
           ) : null}
         </SidebarMenuButton>
@@ -162,7 +162,7 @@ export function SidebarBody({
                 tooltip="Starred"
                 data-testid="sidebar-starred-link"
               >
-                <Star className="size-4 text-amber-500" />
+                <Star className="size-4 text-warning" />
                 <span>Starred</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
