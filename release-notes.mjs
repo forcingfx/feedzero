@@ -32,6 +32,38 @@
  */
 export const releases = [
   {
+    version: "0.18.0",
+    date: "2026-11-10T12:53:04Z",
+    title: "A calmer app, and a reader that fills the phone",
+    subtitle:
+      "One colour palette, one button style and fewer notifications across the app, Settings as plain rows, and on phones a floating glass tab bar and a reader that covers the whole screen.",
+    affects: ["mobile", "reading"],
+    added: [
+      "Added a floating glass tab bar on phones. It shrinks to the current tab while you scroll down and comes back when you scroll up or tap it.",
+      "Added a full-screen reader on phones. Its back, previous and next buttons step aside while you scroll down and return when you scroll up.",
+      "Added a + menu to the sidebar with Add feed, New folder and New filter.",
+    ],
+    changed: [
+      "Changed Settings to rows under headings, and made it open on Reading.",
+      "Moved Mark all read from a floating button into the article list's title bar, and into the view options menu on phones.",
+      "Stopped showing ten routine notifications, such as Feed added and Feed refreshed.",
+      "Made the top bar translucent on phones, so the list scrolls underneath it.",
+      "Matched the browser's own bar to the app's light or dark theme.",
+      "Kept articles you read during a visit in the list until you leave it, when Hide read articles is on.",
+      "Showed the free feed limit in the sidebar only from 80 percent, and moved the note about local storage to Sync & Data.",
+      "Unified colours, button styles and page title sizes, and raised the smallest text to 12 px.",
+      "Shortened the welcome screen to one headline and one action.",
+      "Loaded the swipe-back gesture and the passphrase hashing code only when needed, so the app starts with about 50 kB less JavaScript.",
+      "Limited the feed icon relay to images of up to 2 MB.",
+    ],
+    fixed: [
+      "Fixed the article list jumping when you opened or closed an article on a phone.",
+      "Fixed a clicked article being replaced by the feed's first article on desktop.",
+      "Fixed the scroll bounce at the top and bottom of an article on iPhone.",
+      "Fixed dialog close buttons sitting under the status bar on phones.",
+    ],
+  },
+  {
     version: "0.17.0",
     date: "2026-11-09T21:18:48Z",
     title: "Duplicate stories, full text by default, and lead images",
