@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
 import { App } from "./app.tsx";
 import { ThemeBridge } from "./components/theme-bridge.tsx";
+import { ThemeColorMeta } from "./components/theme-color-meta.tsx";
 import { registerServiceWorker } from "./lib/register-service-worker.ts";
 import "./index.css";
 
@@ -15,6 +16,7 @@ createRoot(document.getElementById("root")!).render(
         next-themes after the DB hydrates (ADR 022 follow-up). */}
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <ThemeBridge />
+      <ThemeColorMeta />
       <App />
     </ThemeProvider>
   </StrictMode>,
