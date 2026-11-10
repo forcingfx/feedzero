@@ -14,11 +14,12 @@ import {
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 import { StageView } from "@/pages/stage-view.tsx";
+import { loadMobileReaderLayer } from "@/components/reader/load-mobile-reader-layer.ts";
 
 // The swipe-back layer carries the `motion` library (about 50 kB gzipped).
 // Desktop never mounts it and a phone needs it only once an article is
 // open, so it loads on demand (audit 2026-Q4, finding 2).
-const MobileReaderLayer = lazy(() => import("@/components/reader/mobile-reader-layer.tsx"));
+const MobileReaderLayer = lazy(loadMobileReaderLayer);
 
 const ExploreCatalog = lazy(() =>
   import("@/components/explore/explore-catalog.tsx").then((m) => ({
@@ -94,6 +95,14 @@ export function FeedsRoute() {
   function userHasChosenArticle(): boolean {
     return Boolean(latestArticleIdRef.current || useArticleStore.getState().selectedArticle);
   }
+
+  // Phones open articles in the lazily loaded reader layer. Warm its chunk
+  // once the list has shown, so the first article does not wait for it.
+  useEffect(() => {
+    if (isDesktop) return;
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200));
+    idle(() => void loadMobileReaderLayer().catch(() => {}));
+  }, [isDesktop]);
 
   // Feed switch: select feed and start loading when feedId changes
   useEffect(() => {
@@ -204,12 +213,11 @@ export function FeedsRoute() {
           <ArticleList onArticleSelect={handleArticleSelect} />
         </main>
 
+        {/* No cover while the chunk loads: the list stays on screen until the
+            reader can slide in. A blank cover here made the first open on a
+            phone flicker (list, blank, list, reader). */}
         {articleId && feedId && (
-          <Suspense
-            fallback={
-              <div className="fixed inset-0 z-40 bg-background" aria-busy="true" />
-            }
-          >
+          <Suspense fallback={null}>
             <MobileReaderLayer onBack={closeReader}>
               <div data-testid="reader-scroll-mobile" className="h-full">
                 <ReaderPanel

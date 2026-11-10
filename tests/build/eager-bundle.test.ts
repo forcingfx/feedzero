@@ -39,8 +39,22 @@ describe("first-load bundle", () => {
   it("the feeds route does not import motion statically; the mobile reader layer is lazy", () => {
     const route = read("src/pages/feeds-route.tsx");
     expect(route).not.toMatch(/from "motion\/react"/);
-    expect(route).toMatch(/lazy\(\s*\(\)\s*=>\s*import\("@\/components\/reader\/mobile-reader-layer\.tsx"\)/);
+    expect(route).not.toMatch(/from "@\/components\/reader\/mobile-reader-layer\.tsx"/);
+    expect(route).toMatch(/lazy\(loadMobileReaderLayer\)/);
+    const loader = read("src/components/reader/load-mobile-reader-layer.ts");
+    expect(loader).toMatch(/import\("\.\/mobile-reader-layer\.tsx"\)/);
     const layer = read("src/components/reader/mobile-reader-layer.tsx");
     expect(layer).toMatch(/from "motion\/react"/);
+  });
+
+  // Owner report, 2026-11-10: the first open on a phone flashed a blank
+  // cover while the chunk downloaded. The route preloads the chunk once the
+  // list shows, and the layer's Suspense has no cover: if the chunk is
+  // still loading, the list stays on screen until the reader can slide in.
+  it("preloads the reader layer on mobile and never covers the list while it loads", () => {
+    const route = read("src/pages/feeds-route.tsx");
+    expect(route).toMatch(/loadMobileReaderLayer\(\)/);
+    const layerBlock = route.slice(route.indexOf("<MobileReaderLayer") - 200, route.indexOf("<MobileReaderLayer"));
+    expect(layerBlock).toMatch(/<Suspense fallback=\{null\}>/);
   });
 });
