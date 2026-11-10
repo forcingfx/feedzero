@@ -93,6 +93,14 @@ describe("UI consistency", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("defines one glass treatment with an opaque fallback for reduced transparency", () => {
+    const css = readFileSync(path.join(root, "src/index.css"), "utf8");
+    const glass = css.match(/\.glass-bar\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(glass).toMatch(/backdrop-filter/);
+    expect(glass).toMatch(/-webkit-backdrop-filter/);
+    expect(css).toMatch(/prefers-reduced-transparency:\s*reduce[\s\S]*?\.glass-bar/);
+  });
+
   it("gives every icon-only button an accessible name", () => {
     const offenders: string[] = [];
     for (const f of files) {

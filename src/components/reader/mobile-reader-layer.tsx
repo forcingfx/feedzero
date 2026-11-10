@@ -77,7 +77,7 @@ export default function MobileReaderLayer({
       ref={layerRef}
       data-testid="reader-layer"
       data-reader-layer
-      className="absolute inset-0 z-20 bg-background will-change-transform"
+      className="fixed inset-0 z-40 bg-background pt-[env(safe-area-inset-top)] will-change-transform"
       style={{ x }}
       drag="x"
       dragListener={false}

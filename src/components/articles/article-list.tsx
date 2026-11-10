@@ -20,6 +20,7 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
 import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indicator.tsx";
 import { ArticleListSkeleton } from "@/components/loading/article-list-skeleton.tsx";
 import { SwipeToReadRow } from "./swipe-to-read-row.tsx";
+import { CLEAR_MOBILE_CHROME, MOBILE_HEADER_PX } from "@/components/layout/mobile-chrome.ts";
 import type { Article } from "@feedzero/core/types";
 
 /**
@@ -78,7 +79,12 @@ function isItemVisible(scrollEl: HTMLElement, articleId: string): boolean {
   if (!itemEl) return false;
   const item = itemEl.getBoundingClientRect();
   const container = scrollEl.getBoundingClientRect();
-  return item.top >= container.top && item.bottom <= container.bottom;
+  // The scroller's padding is the area under the glass bars: a row there
+  // is behind the chrome, not in view.
+  const style = getComputedStyle(scrollEl);
+  const top = container.top + (parseFloat(style.paddingTop) || 0);
+  const bottom = container.bottom - (parseFloat(style.paddingBottom) || 0);
+  return item.top >= top && item.bottom <= bottom;
 }
 
 export function ArticleList({ onArticleSelect }: ArticleListProps) {
@@ -264,9 +270,15 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     [selectArticle, onArticleSelect, duplicatesByLead, expandedSimilar, markAsRead],
   );
 
+  // On mobile the scroller pads its top by the glass header's height, so
+  // the list starts that far down the scroll element (scrollMargin), and
+  // "scroll into view" must land below the header, not under it.
+  const chromeTop = isDesktop ? 0 : MOBILE_HEADER_PX;
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => scrollRef.current,
+    scrollMargin: chromeTop,
+    scrollPaddingStart: chromeTop,
     estimateSize: () => ESTIMATED_ITEM_SIZE,
     overscan: OVERSCAN,
     getItemKey: (index) => {
@@ -314,7 +326,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   // (feeds-page) can rely on ArticleList always owning a scrollable region.
   if (!selectedFeedId) {
     return (
-      <div ref={scrollRef} className="h-full overflow-y-auto">
+      <div ref={scrollRef} className={cn("h-full overflow-y-auto", CLEAR_MOBILE_CHROME)}>
         <div className="p-2 text-muted-foreground text-sm">
           Select a feed to view articles.
         </div>
@@ -334,7 +346,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     // desktop, so the user can't refresh-with-cache-cleared or delete it.
     const showBlank = isLoading && !isRefreshing;
     return (
-      <div ref={scrollRef} className="h-full overflow-y-auto">
+      <div ref={scrollRef} className={cn("h-full overflow-y-auto", CLEAR_MOBILE_CHROME)}>
         <PullToRefreshIndicator
           pullPx={pullPx}
           isRefreshing={isPullRefreshing}
@@ -358,7 +370,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const totalSize = virtualizer.getTotalSize();
 
   return (
-    <div ref={scrollRef} className="h-full overflow-y-auto relative">
+    <div ref={scrollRef} className={cn("h-full overflow-y-auto relative", CLEAR_MOBILE_CHROME)}>
       <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isPullRefreshing} />
       <ArticleListControls
         sortMode={articleSortMode}
@@ -404,7 +416,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                 top: 0,
                 left: 0,
                 width: "100%",
-                transform: `translateY(${virtualItem.start}px)`,
+                transform: `translateY(${virtualItem.start - chromeTop}px)`,
               }}
             >
               {entry.kind === "article" ? (

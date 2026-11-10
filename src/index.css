@@ -265,3 +265,31 @@
     white-space: nowrap;
     border: 0;
 }
+
+/*
+ * Glass: the mobile header and tab bar float over the content, which
+ * shows through blurred. One treatment, defined once. Opaque when the
+ * user asks for less transparency, or when the engine has no backdrop
+ * filter (the bar would otherwise be see-through text on text).
+ */
+@layer components {
+    .glass-bar {
+        background-color: color-mix(in oklab, var(--background) 72%, transparent);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        backdrop-filter: saturate(180%) blur(20px);
+    }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-bar {
+        background-color: var(--background);
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .glass-bar {
+        background-color: var(--background);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}

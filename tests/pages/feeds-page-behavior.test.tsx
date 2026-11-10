@@ -430,16 +430,44 @@ describe("FeedsPage behavior — mobile", () => {
   });
 
   /**
-   * Immersive reader (owner request, 2026-11-10): while an article is
-   * open on mobile the shell's top bar and bottom tab bar are gone. Both
-   * are navigation for the list you left; the reader has its own back
-   * and prev/next controls and the swipe-back gesture.
+   * Immersive reader without the jump (owner report, 2026-11-10): the
+   * first version unmounted the top bar and the tab bar while an article
+   * was open, so the list reflowed by their height on every open and
+   * close and the bars flashed in between. The bars now stay mounted and
+   * the reader covers them as a fixed full-screen layer above them.
    */
-  it("hides the mobile header and the tab bar while an article is open", () => {
+  it("keeps the mobile header and the tab bar mounted while an article is open", () => {
     useArticleStore.setState({ articles: [makeArticle("art-1")] });
     const { container } = renderPage("/feeds/feed-1/articles/art-1");
-    expect(container.querySelector("header")).toBeNull();
-    expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).toBeNull();
+    expect(container.querySelector("header")).not.toBeNull();
+    expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
+  });
+
+  it("the reader is a fixed full-screen layer above the bars, clear of the status bar", async () => {
+    const layer = await openReaderOnMobile();
+    expect(layer.className).toMatch(/\bfixed\b/);
+    expect(layer.className).toMatch(/\binset-0\b/);
+    expect(layer.className).toMatch(/\bz-40\b/);
+    expect(layer.className).toContain("pt-[env(safe-area-inset-top)]");
+  });
+
+  /**
+   * Glass bars (owner request, 2026-11-10): the header and the tab bar
+   * float over the content as translucent blurred overlays; the content
+   * scrolls underneath and clears them through the --chrome-top and
+   * --chrome-bottom variables the shell sets.
+   */
+  it("draws the header and the tab bar as glass overlays over the content", () => {
+    const { container } = renderPage("/feeds/feed-1");
+    const header = container.querySelector("header")!;
+    const strip = container.ownerDocument.querySelector<HTMLElement>("[data-testid='drawer-handle-strip']")!;
+    for (const bar of [header, strip]) {
+      expect(bar.className).toContain("glass-bar");
+      expect(bar.className).toMatch(/\babsolute\b/);
+    }
+    const shell = header.parentElement!;
+    expect(shell.style.getPropertyValue("--chrome-top")).toBe("48px");
+    expect(shell.style.getPropertyValue("--chrome-bottom")).toContain("60px");
   });
 
   it("shows the mobile header and the tab bar on the article list", () => {

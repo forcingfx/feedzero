@@ -20,6 +20,7 @@ import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer.tsx";
+import { MOBILE_CHROME_VARS } from "@/components/layout/mobile-chrome.ts";
 import { MobileHeaderPills } from "@/components/articles/article-list-controls.tsx";
 import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
 
@@ -93,7 +94,7 @@ function useDefaultFeedsRedirect() {
 export function AppLayout() {
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
-  const { feedId, articleId } = useParams();
+  const { feedId } = useParams();
   useKeyboardNav();
   useAutoRefresh();
   useBriefingAutoRefresh();
@@ -106,24 +107,25 @@ export function AppLayout() {
   }
 
   if (!isDesktop) {
-    // Immersive reader: with an article open, the top bar and the tab bar
-    // are navigation for the list the reader left behind. The reader has
-    // its own back / prev / next pills and the swipe-back gesture.
-    const reading = Boolean(articleId);
+    // The header and the tab bar are glass overlays that never unmount:
+    // content scrolls underneath them, and an open article covers them as
+    // a fixed full-screen layer (feeds-route). Unmounting them while
+    // reading reflowed the list on every open and close.
     return (
-      <div className="flex flex-col h-dvh overflow-hidden bg-background">
-        {!reading && (
-          <header className="flex h-12 shrink-0 items-center gap-1 border-b px-3 z-10 bg-background">
-            <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
-            {/* Dot-only status: the verbose "Refreshed X ago · mode" line
-                lives in the drawer footer now; the single view-options
-                control anchors the right corner. */}
-            <SyncStatusBadge compact />
-            <MobileHeaderPills />
-          </header>
-        )}
+      <div
+        className="relative flex flex-col h-dvh overflow-hidden bg-background"
+        style={MOBILE_CHROME_VARS}
+      >
+        <header className="glass-bar absolute inset-x-0 top-0 z-10 flex h-12 items-center gap-1 border-b px-3">
+          <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
+          {/* Dot-only status: the verbose "Refreshed X ago · mode" line
+              lives in the drawer footer now; the single view-options
+              control anchors the right corner. */}
+          <SyncStatusBadge compact />
+          <MobileHeaderPills />
+        </header>
         <Outlet />
-        {!reading && <MobileNavDrawer onFeedSelect={handleFeedSelect} />}
+        <MobileNavDrawer onFeedSelect={handleFeedSelect} />
       </div>
     );
   }

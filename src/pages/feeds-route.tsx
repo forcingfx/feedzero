@@ -189,7 +189,7 @@ export function FeedsRoute() {
         {articleId && feedId && (
           <Suspense
             fallback={
-              <div className="absolute inset-0 z-20 bg-background" aria-busy="true" />
+              <div className="fixed inset-0 z-40 bg-background" aria-busy="true" />
             }
           >
             <MobileReaderLayer onBack={closeReader}>

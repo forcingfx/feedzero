@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { CLEAR_MOBILE_CHROME } from "@/components/layout/mobile-chrome.ts";
+import { cn } from "@/lib/utils";
 
 /**
  * Wraps a stage route (explore, stats, settings) in the right scroll
@@ -8,8 +10,8 @@ import { ScrollArea } from "@/components/ui/scroll-area.tsx";
  *
  *  - Desktop: <ScrollArea> so the stage panel scrolls within the
  *    constant outer ResizablePanelGroup (ADR 013).
- *  - Mobile: <main> with overflow-y-auto so the content sits between
- *    the header and the persistent bottom drawer.
+ *  - Mobile: <main> with overflow-y-auto that runs underneath the glass
+ *    header and tab bar, padded so its content rests clear of them.
  *
  * The feeds route does its own scroll handling (snap container on
  * mobile, inner ResizablePanelGroup on desktop) and does NOT use this
@@ -21,7 +23,7 @@ export function StageView({ children }: { children: ReactNode }) {
     return <ScrollArea className="h-full">{children}</ScrollArea>;
   }
   return (
-    <main role="main" className="flex-1 overflow-y-auto">
+    <main role="main" className={cn("flex-1 overflow-y-auto", CLEAR_MOBILE_CHROME)}>
       {children}
     </main>
   );

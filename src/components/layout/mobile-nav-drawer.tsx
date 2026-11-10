@@ -99,7 +99,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
         //   pl/pr-[max(0.75rem,env(safe-area-inset-left|right))] holds a
         //   visual gutter from the rounded display corners in portrait and
         //   clears the notch/camera cutout in landscape.
-        className="relative flex items-center shrink-0 border-t bg-background pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] h-[calc(60px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]"
+        className="glass-bar absolute inset-x-0 bottom-0 z-10 flex items-center border-t pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] h-[calc(60px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]"
       >
         <div className="absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-muted-foreground/30" />
 

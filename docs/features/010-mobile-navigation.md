@@ -18,8 +18,10 @@ Feature: Mobile navigation
 
   Scenario: The shell gets out of the way while an article is open
     Given the user opens an article on mobile
-    Then the top bar (feed name, status dot, view options) and the bottom
-      tab bar are not rendered; the reader fills the screen
+    Then the reader covers the top bar and the tab bar as a fixed
+      full-screen layer (z-40), padded clear of the status bar
+    And the bars stay mounted underneath, so the list never reflows when
+      an article opens or closes (unmounting them made the list jump)
     And the reader's own pills (back, previous, next) float over the text
     When the user scrolls down past the first 48 px
     Then the pills slide off the bottom edge
@@ -28,6 +30,17 @@ Feature: Mobile navigation
     And the reader's scroller keeps the native rubber band
       (overscroll-y-contain stops the chain to the page without killing
       the bounce; overscroll-y-none had killed it on iPhone)
+
+  Rule: The bars are glass
+
+  Scenario: Content scrolls underneath the header and the tab bar
+    Given the user is on any mobile page
+    Then the header and the tab bar are translucent, blurred overlays
+      (`.glass-bar` in index.css) and content shows through them
+    And every mobile scroller pads by --chrome-top / --chrome-bottom so
+      its first and last rows rest clear of the glass
+    And with "reduce transparency" on, or without backdrop-filter
+      support, the bars are opaque
 
   Rule: Tap goes in, swipe goes out
 
@@ -146,6 +159,7 @@ Gesture ownership map (mobile):
 |------|------|
 | `src/pages/feeds-route.tsx` | Mobile branch renders `<main>` (list) + conditional `<MobileReaderLayer>`; auto-select suppression; empty-stage→list fallback (present→absent transition guard) |
 | `src/pages/feeds-route.tsx` (`MobileReaderLayer`) | Motion drag (`motion/react`): touch-only start via `useDragControls`, direction lock, slide off then `onBack`, spring back on an early release |
+| `src/components/layout/mobile-chrome.ts` | `MOBILE_CHROME_VARS` (the shell's --chrome-top / --chrome-bottom), `CLEAR_MOBILE_CHROME` (scroller padding), `MOBILE_HEADER_PX` (the article list virtualizer's scrollMargin) |
 | `src/hooks/use-scroll-direction.ts` | `useScrollingDown(ref)`: scroll-event only (no touch events), 12 px slop, nothing hides within 48 px of the top |
 | `src/lib/swipe-back.ts` | `shouldCommitSwipeBack()`: speed OR distance decides the release (flick ≥ 400px/s, or ≥ 35% of the width) |
 | `src/index.css` | `touch-action: pan-y pinch-zoom` on `[data-reader-layer]` and its `[data-reader-scroll]` scrollers; `auto` on `<pre>` |

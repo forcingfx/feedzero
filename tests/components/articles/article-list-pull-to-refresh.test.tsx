@@ -157,4 +157,10 @@ describe("ArticleList pull-to-refresh", () => {
 
     expect(refreshFeed).not.toHaveBeenCalled();
   });
+
+  it("clears the glass bars: the scroller pads by the shell's chrome variables", () => {
+    const scroller = renderList();
+    expect(scroller.className).toContain("pt-[var(--chrome-top,0px)]");
+    expect(scroller.className).toContain("pb-[var(--chrome-bottom,0px)]");
+  });
 });
