@@ -6,7 +6,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
-import { ExpandingPill } from "@/components/ui/expanding-pill.tsx";
+import { HeaderAction } from "./header-action.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSettingsTarget } from "./settings-pill.tsx";
 import { useUnreadCount } from "./article-list-controls.tsx";
@@ -37,12 +37,9 @@ export function ViewOptionsPill() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <ExpandingPill
-          icon={<SlidersHorizontal />}
-          label="View options"
-          aria-label="View options"
-          dataTestId="view-options-pill"
-        />
+        <HeaderAction label="View options" data-testid="view-options-pill">
+          <SlidersHorizontal className="size-4" />
+        </HeaderAction>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-40">
         {ARTICLE_SORT_MODES.map((m) => (

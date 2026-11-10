@@ -145,3 +145,49 @@ it has a home elsewhere.
   covers.
 - Removing drag-and-drop (`@dnd-kit`, 15 kB gzipped): it is a feature.
 - Chasing detector A/B counts: housekeeping, not a user's bug.
+
+## Round 2 (2026-11-10): menus, buttons, layouts
+
+The owner asked for a deeper pass: "menus, buttons, layouts all need an
+overhaul for max simplicity." Inventory on the branch after round 1:
+three hover-expanding pills (a pattern unique to the list title bar),
+58 `outline` / 46 `ghost` / 14 `destructive` buttons, 6 dropdown menus,
+22 dialogs, three page-title sizes, a sidebar with a permanent status
+line, a permanent quota line and a storage-warning card, Settings tabs
+built from one card per setting, and a mobile bottom strip that mixes
+recent-feed favicons with Explore, Settings and a chevron.
+
+Rules applied, one commit each (all on `audit/calmer-app`):
+
+1. **One button vocabulary** (`8c356ff`). Icon actions are `ghost` icon
+   buttons with a tooltip, everywhere. `ExpandingPill` is deleted; sort,
+   settings cog, view options and mark-read are `HeaderAction`s. Pinned
+   in `tests/build/ui-consistency.test.ts`.
+2. **Settings are rows, not cards** (`e30167a`). `SettingsGroup` /
+   `SettingRow` / `SegmentedControl` in `setting-row.tsx`; the Reading
+   tab is rows under Appearance, Reading, Feeds, Signal. Per-setting
+   icons gone; rows stack below `sm`. Theme is an inline segmented
+   radiogroup. Pinned in `reading-tab.test.tsx`.
+3. **The sidebar shows status only when it matters** (`9642dca`). Header
+   status line and local-only warning card removed on desktop (the
+   consequence and both remedies now sit in Sync & Data's local-only
+   text); quota line from 80 percent; `SidebarAddMenu` ("+": Add feed,
+   New folder, New filter) replaces the two create rows; the folder
+   input opens at the top of the list from the menu's close hook.
+4. **One page-title size** (`1ef9d35`): every `h1` is `text-xl`.
+5. **A standard mobile bar** (`96270a2`). Feeds / Explore / Signal /
+   Settings tabs, labelled, current one marked; recent feeds become the
+   drawer's first row; the drawer drops its Explore, Signal and footer
+   Settings duplicates. Gesture code untouched. **Needs the owner's
+   phone check** (CLAUDE.md step 8).
+6. **Destructive styling only where it confirms** (`1dbcafd`). Already
+   true on the branch (both destructive buttons sit in confirm dialogs);
+   now pinned so a red button cannot land on a page.
+
+Follow-up (same branch): the Sync & Data, Subscription and Help tabs
+moved onto the same `SettingsGroup` / `SettingRow` layout (Cloud sync,
+Danger zone, Import, Export, Feedback, Need help?, Self-host preflight,
+Deactivate on this device). Plan comparison tiles keep their card shape
+(`data-plan-card`): they are options side by side, not sections. The
+sync flows themselves (dialogs, wizard, fork) are untouched. Still
+unchanged: the mobile header (feed name, status dot, view options).

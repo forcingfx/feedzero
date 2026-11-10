@@ -54,6 +54,7 @@ import { SetupWizard } from "@/components/sync/setup-wizard";
 import { ExistingCloudFlow } from "@/components/sync/existing-cloud-flow";
 import { LostPassphrasePanel } from "@/components/settings/tabs/lost-passphrase-panel";
 import { VaultHeadroomNotice } from "@/components/settings/vault-headroom-notice";
+import { SettingRow, SettingsGroup } from "@/components/settings/setting-row";
 
 type Confirmation = "none" | "delete" | "disable";
 type SubFlow = "none" | "setup" | "existing" | "choose";
@@ -75,7 +76,16 @@ async function probeSyncServer(): Promise<boolean> {
   }
 }
 
-export function DataSyncSection() {
+interface DataSyncSectionProps {
+  /**
+   * Rendered between the Cloud sync group and the Danger zone. The tab
+   * passes Import and Export here so the irreversible action closes the
+   * page; the delete confirmation state stays owned by this section.
+   */
+  children?: React.ReactNode;
+}
+
+export function DataSyncSection({ children }: DataSyncSectionProps = {}) {
   const tier = useLicenseStore((s) => s.tier);
   const status = useSyncStore((s) => s.status);
   const syncError = useSyncStore((s) => s.error);
@@ -179,7 +189,7 @@ export function DataSyncSection() {
     }
     switch (status) {
       case "local-only":
-        return "Your data stays in this browser only.";
+        return "Your data stays in this browser only. Clearing site data deletes it; turn on sync or export an OPML backup to keep a copy.";
       case "synced":
         return "Your data is encrypted and synced across devices.";
       case "syncing":
@@ -192,43 +202,34 @@ export function DataSyncSection() {
   })();
 
   return (
-    <div className="space-y-4">
-      <div
-        className={`relative overflow-hidden rounded-lg border border-border bg-card ${
- gated ?"min-h-[160px]" : ""
-        }`}
-      >
+    <div className="space-y-8">
+      <div className={`relative overflow-hidden rounded-lg ${gated ? "min-h-[160px]" : ""}`}>
         <div
-          className={`p-4 space-y-3 ${
- gated ?"pointer-events-none select-none opacity-60" : ""
-          }`}
+          className={gated ? "pointer-events-none select-none opacity-60" : undefined}
           aria-hidden={gated || undefined}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Cloud className="size-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold">Cloud sync</h3>
+          <SettingsGroup title="Cloud sync">
+            <SettingRow label="Sync across devices" description={statusDescription}>
+              <Switch
+                checked={isOn}
+                disabled={gated || isSyncing}
+                onCheckedChange={handleToggleChange}
+                aria-label="Toggle cloud sync"
+              />
+            </SettingRow>
+            {isOn && !gated && (
+              <div className="space-y-3 py-3">
+                <VaultHeadroomNotice />
+                <LostPassphrasePanel />
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {statusDescription}
-              </p>
-            </div>
-            <Switch
-              checked={isOn}
-              disabled={gated || isSyncing}
-              onCheckedChange={handleToggleChange}
-              aria-label="Toggle cloud sync"
-            />
-          </div>
-
-          {isOn && !gated && <VaultHeadroomNotice />}
-
-          {isOn && !gated && <LostPassphrasePanel />}
+            )}
+          </SettingsGroup>
         </div>
 
         {gated && <SelfHostGateOverlay />}
       </div>
+
+      {children}
 
       <DangerZone
         paid={tier !== "free"}
@@ -338,25 +339,26 @@ interface DangerZoneProps {
 
 function DangerZone({ paid, onDelete }: DangerZoneProps) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-      <h3 className="text-xs font-medium text-destructive uppercase tracking-wider">
-        Danger zone
-      </h3>
-      {paid && (
-        <p className="text-xs text-muted-foreground">
-          Your subscription will stay active after deletion. Cancel it from
-          the Stripe Customer Portal if you no longer need it.
-        </p>
-      )}
-      <Button
-        variant="outline"
-        className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-        onClick={onDelete}
+    <SettingsGroup title="Danger zone">
+      <SettingRow
+        label="Reset this device"
+        description={
+          paid
+            ? "Removes every feed, article and setting from this browser. Your subscription stays active; cancel it from the Stripe Customer Portal if you no longer need it."
+            : "Removes every feed, article and setting from this browser."
+        }
       >
-        <Trash2 className="mr-2 size-4" />
-        Delete all data and reset app
-      </Button>
-    </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={onDelete}
+        >
+          <Trash2 className="mr-2 size-4" />
+          Delete all data and reset app
+        </Button>
+      </SettingRow>
+    </SettingsGroup>
   );
 }
 

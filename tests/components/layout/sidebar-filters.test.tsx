@@ -95,10 +95,6 @@ describe("AppSidebar Filters section", () => {
     useLicenseStore.setState({ tier: "personal", verifying: false });
   });
 
-  it("renders the 'New filter' affordance for Personal-tier users", () => {
-    renderSidebar();
-    expect(screen.getByTestId("sidebar-new-filter")).toBeInTheDocument();
-  });
 
   it("renders one row per existing filter", () => {
     useSmartFilterStore.setState({
@@ -124,37 +120,6 @@ describe("AppSidebar Filters section", () => {
     expect(onFeedSelect).toHaveBeenCalledWith(toFilterFeedId("a"));
   });
 
-  it("clicking 'New filter' opens the editor in create mode (no target)", async () => {
-    renderSidebar();
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId("sidebar-new-filter"));
-
-    const state = useSmartFilterStore.getState();
-    expect(state.editorOpen).toBe(true);
-    expect(state.editorTarget).toBeNull();
-  });
-
-  it("shows the Filters section to free users so the feature is discoverable", () => {
-    // Honor-system open-core: gated features stay visible. Clicking routes
-    // to the upgrade page rather than hiding the section. See the
-    // 'route-to-upgrade' test below for the click behaviour.
-    useLicenseStore.setState({ tier: "free", verifying: false });
-
-    renderSidebar();
-
-    expect(screen.getByTestId("sidebar-new-filter")).toBeInTheDocument();
-  });
-
-  it("clicking 'New filter' as a free user routes to the upgrade page instead of opening the editor", async () => {
-    useLicenseStore.setState({ tier: "free", verifying: false });
-
-    renderSidebar();
-
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId("sidebar-new-filter"));
-
-    // Editor MUST NOT open for gate-locked users — that would let them
-    // build a filter they can never save, an upsell anti-pattern.
-    expect(useSmartFilterStore.getState().editorOpen).toBe(false);
-  });
+  // "New filter" moved into the sidebar "+" menu (audit 2026-Q4 round 2);
+  // its create / gate behaviour is covered in sidebar-add-menu.test.tsx.
 });

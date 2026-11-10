@@ -87,7 +87,7 @@ export function BillingRecover() {
   return (
     <div className="mx-auto max-w-md p-8 space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Recover your license</h1>
+        <h1 className="text-xl font-semibold">Recover your license</h1>
         <p className="text-sm text-muted-foreground">
           Two quick steps to reactivate on this device.
         </p>

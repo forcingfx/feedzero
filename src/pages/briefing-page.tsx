@@ -244,7 +244,7 @@ function BriefingIndex({
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Signal Briefings</h1>
+        <h1 className="text-xl font-semibold">Signal Briefings</h1>
         <Button onClick={onNew}>
           <Plus className="size-4" />
           New briefing
@@ -325,7 +325,7 @@ function BriefingHeader({
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold">{briefing.name}</h1>
+          <h1 className="truncate text-xl font-semibold">{briefing.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{briefing.prompt}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

@@ -137,17 +137,17 @@ describe("SettingsPill", () => {
   it("the label adapts to the context (Feed settings / Folder / Filter)", () => {
     useFeedStore.setState({ selectedFeedId: "f-tech" });
     const { rerender } = render(<SettingsPill />);
-    expect(screen.getByText(/feed settings/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /feed settings/i })).toBeInTheDocument();
 
     useFeedStore.setState({ selectedFeedId: toFolderFeedId("folder-tech") });
     rerender(<SettingsPill />);
-    expect(screen.getByText(/folder settings/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /folder settings/i })).toBeInTheDocument();
 
     useFeedStore.setState({
       selectedFeedId: toFilterFeedId("filter-recent"),
     });
     rerender(<SettingsPill />);
-    expect(screen.getByText(/edit filter/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit filter/i })).toBeInTheDocument();
   });
 
   it("hides on a folder view whose folder no longer exists (defensive)", () => {

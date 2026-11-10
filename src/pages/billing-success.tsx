@@ -90,7 +90,7 @@ export function BillingSuccess() {
 
   return (
     <div className="mx-auto max-w-xl space-y-6 p-8">
-      <h1 className="text-2xl font-semibold">
+      <h1 className="text-xl font-semibold">
         Thanks for subscribing to FeedZero
       </h1>
 

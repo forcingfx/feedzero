@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
-import { ExpandingPill } from "@/components/ui/expanding-pill.tsx";
+import { HeaderAction } from "./header-action.tsx";
 import type { ArticleSortMode } from "@feedzero/core/types";
 import { ARTICLE_SORT_MODES } from "@feedzero/core/types";
 
@@ -22,20 +22,16 @@ interface SortPillProps {
 }
 
 /**
- * Article-list sort selector built on the ExpandingPill primitive.
- * Icon-only on every viewport; expands on hover (desktop), focus
- * (keyboard), or press (mobile tap).
+ * Article-list sort selector: an icon action whose accessible name and
+ * tooltip state the current mode, opening a menu of all modes.
  */
 export function SortPill({ mode, onChange, dataTestId }: SortPillProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <ExpandingPill
-          icon={<ArrowUpDown />}
-          label={SORT_LABELS[mode]}
-          aria-label={`Sort: ${SORT_LABELS[mode]}`}
-          dataTestId={dataTestId}
-        />
+        <HeaderAction label={`Sort: ${SORT_LABELS[mode]}`} data-testid={dataTestId}>
+          <ArrowUpDown className="size-4" />
+        </HeaderAction>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-36">
         {ARTICLE_SORT_MODES.map((m) => (

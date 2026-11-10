@@ -13,6 +13,7 @@
  */
 import { Mail, ExternalLink, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SettingsGroup } from "@/components/settings/setting-row";
 import { maskToken } from "@/lib/format-license";
 
 export const SUPPORT_EMAIL = "support@feedzero.app";
@@ -70,20 +71,18 @@ function buildSupportHref({
 export function ContactSupport(props: ContactSupportProps) {
   const { token } = props;
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      <div>
-        <h3 className="text-sm font-semibold">Need help?</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">
+    <SettingsGroup
+      title="Need help?"
+      description={
+        <>
           We're here:{" "}
-          <a
-            href={`mailto:${SUPPORT_EMAIL}`}
-            className="font-mono underline"
-          >
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-mono underline">
             {SUPPORT_EMAIL}
           </a>
-        </p>
-      </div>
-
+        </>
+      }
+    >
+      <div className="space-y-3 py-3">
       <div className="flex flex-wrap gap-2">
         {token && (
           <Button asChild variant="outline" size="sm">
@@ -103,7 +102,7 @@ export function ContactSupport(props: ContactSupportProps) {
         )}
       </div>
 
-      <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+      <p className="text-xs text-muted-foreground">
         Stuck?{" "}
         <a
           href={buildSupportHref(props)}
@@ -113,6 +112,7 @@ export function ContactSupport(props: ContactSupportProps) {
           Contact support
         </a>
       </p>
-    </div>
+      </div>
+    </SettingsGroup>
   );
 }

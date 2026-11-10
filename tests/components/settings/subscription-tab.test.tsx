@@ -75,6 +75,13 @@ describe("<SubscriptionTab>", () => {
   });
 
   describe("free tier", () => {
+    it("draws no card chrome around sections (audit 2026-Q4 round 2)", () => {
+      const { container } = renderTab();
+      // Plan tiles ([data-plan-card]) are a comparison grid, not sections.
+      const sections = [...container.querySelectorAll(".bg-card")].filter((el) => !el.closest("[data-plan-card]"));
+      expect(sections).toEqual([]);
+    });
+
     it("shows the Free tier badge", () => {
       renderTab();
       expect(screen.getAllByText(/^Free$/).length).toBeGreaterThan(0);
@@ -129,6 +136,14 @@ describe("<SubscriptionTab>", () => {
     beforeEach(() => {
       setLicenseToken(makeToken("personal"));
       useLicenseStore.setState({ tier: "personal", verifying: false });
+    });
+
+
+    it("draws no card chrome around sections (audit 2026-Q4 round 2)", () => {
+      const { container } = renderTab();
+      // Plan tiles ([data-plan-card]) are a comparison grid, not sections.
+      const sections = [...container.querySelectorAll(".bg-card")].filter((el) => !el.closest("[data-plan-card]"));
+      expect(sections).toEqual([]);
     });
 
     it("shows the paid tier label from the matrix", () => {

@@ -27,11 +27,11 @@ interface SidebarBodyProps {
    * (e.g. close the mobile drawer or the offcanvas sidebar). */
   onBeforeNavigate?: () => void;
   /**
-   * Suppress the inline "New folder" affordance at the bottom of the
-   * feed list. The mobile drawer sets this so it can render its own
-   * always-reachable copy in the pinned footer.
+   * Set by the mobile drawer. The drawer has no "+" header menu yet, so it
+   * keeps the inline "New filter" row, and it renders its own "New folder"
+   * input in the pinned footer instead of the desktop list's creator.
    */
-  hideNewFolderInput?: boolean;
+  inDrawer?: boolean;
 }
 
 /**
@@ -43,7 +43,7 @@ interface SidebarBodyProps {
 export function SidebarBody({
   onFeedSelect,
   onBeforeNavigate,
-  hideNewFolderInput,
+  inDrawer = false,
 }: SidebarBodyProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -168,6 +168,7 @@ export function SidebarBody({
             </SidebarMenuItem>
           )}
           <SidebarSeparator className="mx-0 my-1" />
+          {inDrawer && (
           <SidebarMenuItem key="filters-header">
             <SidebarMenuButton
               onClick={handleCreateFilter}
@@ -183,6 +184,7 @@ export function SidebarBody({
               <span>New filter</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          )}
           {smartFilters.map((filter) => (
             <SmartFilterItem
               key={filter.id}
@@ -192,10 +194,7 @@ export function SidebarBody({
             />
           ))}
           <SidebarSeparator className="mx-0 my-1" />
-          <SidebarFeedList
-            onFeedSelect={onFeedSelect}
-            hideNewFolderInput={hideNewFolderInput}
-          />
+          <SidebarFeedList onFeedSelect={onFeedSelect} showFolderCreator={!inDrawer} />
         </>
       )}
     </SidebarMenu>

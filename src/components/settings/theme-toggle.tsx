@@ -12,8 +12,8 @@
  * companion `<ThemeBridge>` mounted at the app root applies the value in
  * the other direction (vault → next-themes) after a cross-device pull.
  *
- * Stylistically a radio group rather than a single toggle so the
- * "system" option is reachable (a binary toggle can't represent it).
+ * A radio group rather than a single toggle so the "system" option is
+ * reachable; drawn like the other segmented controls on the page.
  */
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -55,7 +55,7 @@ export function ThemeToggle() {
     <div
       role="radiogroup"
       aria-label="Theme"
-      className="grid grid-cols-3 gap-2"
+      className="flex rounded-md border border-border overflow-hidden w-fit"
     >
       {OPTIONS.map(({ value, label, Icon }) => {
         const selected = current === value;
@@ -68,13 +68,13 @@ export function ThemeToggle() {
             aria-label={label}
             onClick={() => handleSelect(value)}
             className={
-              "flex flex-col items-center gap-1 rounded-md border p-3 text-xs transition-colors " +
+              "flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors " +
               (selected
-                ? "border-ring bg-accent text-accent-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-accent/50")
+                ? "bg-foreground text-background font-medium"
+                : "text-muted-foreground hover:text-foreground")
             }
           >
-            <Icon className="size-4" />
+            <Icon className="size-3.5" />
             <span>{label}</span>
           </button>
         );

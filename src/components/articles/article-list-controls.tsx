@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/tooltip.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
+import { HeaderAction } from "./header-action.tsx";
 import { SortPill } from "./sort-pill.tsx";
 import { SettingsPill } from "./settings-pill.tsx";
 import { ViewOptionsPill } from "./view-options-pill.tsx";
@@ -40,11 +41,8 @@ interface ArticleListControlsProps {
 
 /**
  * Sticky title bar at the top of the article-list panel. Shows the
- * current feed indicator on the left and the floating control pills
- * (cog + sort) on the right. Pills are icon-only at rest and expand
- * on hover / focus / tap; the flex layout keeps them from
- * overlapping when one expands (the rightmost stays anchored at the
- * right edge, the leftmost shifts).
+ * current feed indicator on the left and the icon actions (mark read,
+ * settings, sort) on the right, all ghost icon buttons with tooltips.
  *
  * Hidden on mobile — the global header in `app-layout.tsx` carries
  * the breadcrumb + pills there, so there's nothing left to show here.
@@ -222,15 +220,8 @@ function MarkAllReadButton() {
   if (unread === 0) return null;
   const label = `Mark ${unread} read`;
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label={label}
-      title={label}
-      data-testid="mark-all-read"
-      onClick={() => void markAllReadWithUndo()}
-    >
+    <HeaderAction label={label} data-testid="mark-all-read" onClick={() => void markAllReadWithUndo()}>
       <CheckCheck className="size-4" />
-    </Button>
+    </HeaderAction>
   );
 }

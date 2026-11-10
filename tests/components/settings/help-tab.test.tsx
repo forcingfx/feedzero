@@ -53,4 +53,9 @@ describe("<HelpTab>", () => {
     render(<HelpTab onWhatsNew={() => {}} />);
     expect(screen.getByTestId("app-version")).toHaveTextContent(/9\.9\.9/);
   });
+  it("draws no card chrome around sections (audit 2026-Q4 round 2: rows under headings)", () => {
+    const { container } = render(<HelpTab onWhatsNew={() => {}} />);
+    expect(container.querySelectorAll(".bg-card").length).toBe(0);
+  });
+
 });

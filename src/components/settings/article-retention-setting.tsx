@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { History } from "lucide-react";
+import { SettingRow } from "./setting-row";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,20 +72,14 @@ export function ArticleRetentionSetting() {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <History className="size-4 text-muted-foreground" />
-        <label htmlFor="article-retention" className="text-sm font-medium">
-          Keep articles
-        </label>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Older articles are deleted on every device, which keeps your vault
-        small. Starred articles are always kept.
-      </p>
+    <SettingRow
+      label="Keep articles"
+      htmlFor="article-retention"
+      description="Older articles are deleted on every device, which keeps your vault small. Starred articles are always kept."
+    >
       <select
         id="article-retention"
-        className="h-9 rounded-md border bg-background px-2 text-sm"
+        className="h-8 rounded-md border bg-background px-2 text-sm"
         value={String(current)}
         onChange={(e) => void choose(parseRetention(e.target.value))}
       >
@@ -121,6 +115,6 @@ export function ArticleRetentionSetting() {
           </AlertDialogContent>
         )}
       </AlertDialog>
-    </div>
+    </SettingRow>
   );
 }

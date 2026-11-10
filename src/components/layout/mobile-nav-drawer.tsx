@@ -198,7 +198,7 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                 <SidebarBody
                   onFeedSelect={handleSelect}
                   onBeforeNavigate={() => setOpen(false)}
-                  hideNewFolderInput
+                  inDrawer
                 />
               </div>
             </div>
