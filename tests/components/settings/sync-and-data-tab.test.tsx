@@ -63,4 +63,12 @@ describe("<SyncAndDataTab>", () => {
     expect(container.querySelectorAll(".bg-card").length).toBe(0);
   });
 
+  it("puts Danger zone last, after Import and Export (the irreversible action closes the page)", () => {
+    renderTab();
+    const danger = screen.getByRole("heading", { name: /danger zone/i });
+    const exportHeading = screen.getByRole("heading", { name: /^Export$/i });
+    // DOCUMENT_POSITION_FOLLOWING (4): danger comes after export in the DOM.
+    expect(exportHeading.compareDocumentPosition(danger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
 });

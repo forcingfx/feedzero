@@ -1,5 +1,5 @@
 /**
- * Sync & Data tab — sync controls, import/export, danger zone.
+ * Sync & Data tab: Cloud sync, then import/export, then the danger zone.
  *
  * Brings every "data lifecycle" concern into one place:
  *   - Cloud sync toggle (gated by license tier on hosted; by /api/sync
@@ -17,22 +17,22 @@ import { SettingsGroup } from "@/components/settings/setting-row";
 
 export function SyncAndDataTab() {
   return (
-    <div className="space-y-8 py-2">
-      <DataSyncSection />
+    <div className="py-2">
+      <DataSyncSection>
+        {/* Only renders when feed.folderId references a missing folder.
+            Invisible on the common path; surfaces during half-applied
+            sync states so users aren't confused by "missing" feeds. */}
+        <OrphanedFeedsNotice />
 
-      {/* Only renders when feed.folderId references a missing folder.
-          Invisible on the common path; surfaces during half-applied
-          sync states so users aren't confused by "missing" feeds. */}
-      <OrphanedFeedsNotice />
-
-      <div className="grid gap-8 md:grid-cols-2">
-        <ImportExportCard title="Import">
-          <ImportView onClose={() => undefined} />
-        </ImportExportCard>
-        <ImportExportCard title="Export">
-          <ExportView />
-        </ImportExportCard>
-      </div>
+        <div className="grid gap-8 md:grid-cols-2">
+          <ImportExportCard title="Import">
+            <ImportView onClose={() => undefined} />
+          </ImportExportCard>
+          <ImportExportCard title="Export">
+            <ExportView />
+          </ImportExportCard>
+        </div>
+      </DataSyncSection>
     </div>
   );
 }

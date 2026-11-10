@@ -76,7 +76,16 @@ async function probeSyncServer(): Promise<boolean> {
   }
 }
 
-export function DataSyncSection() {
+interface DataSyncSectionProps {
+  /**
+   * Rendered between the Cloud sync group and the Danger zone. The tab
+   * passes Import and Export here so the irreversible action closes the
+   * page; the delete confirmation state stays owned by this section.
+   */
+  children?: React.ReactNode;
+}
+
+export function DataSyncSection({ children }: DataSyncSectionProps = {}) {
   const tier = useLicenseStore((s) => s.tier);
   const status = useSyncStore((s) => s.status);
   const syncError = useSyncStore((s) => s.error);
@@ -219,6 +228,8 @@ export function DataSyncSection() {
 
         {gated && <SelfHostGateOverlay />}
       </div>
+
+      {children}
 
       <DangerZone
         paid={tier !== "free"}
