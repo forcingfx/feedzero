@@ -460,14 +460,14 @@ describe("FeedsPage behavior — mobile", () => {
   it("draws the header and the tab bar as glass overlays over the content", () => {
     const { container } = renderPage("/feeds/feed-1");
     const header = container.querySelector("header")!;
-    const strip = container.ownerDocument.querySelector<HTMLElement>("[data-testid='drawer-handle-strip']")!;
-    for (const bar of [header, strip]) {
-      expect(bar.className).toContain("glass-bar");
-      expect(bar.className).toMatch(/\babsolute\b/);
-    }
+    expect(header.className).toContain("glass-bar");
+    expect(header.className).toMatch(/\babsolute\b/);
+    // The tab bar is a floating liquid-glass capsule (see mobile-nav-drawer tests).
+    const capsule = container.ownerDocument.querySelector<HTMLElement>("[data-testid='tab-capsule']")!;
+    expect(capsule.className).toContain("liquid-glass");
     const shell = header.parentElement!;
     expect(shell.style.getPropertyValue("--chrome-top")).toBe("48px");
-    expect(shell.style.getPropertyValue("--chrome-bottom")).toContain("60px");
+    expect(shell.style.getPropertyValue("--chrome-bottom")).toContain("72px");
   });
 
   it("shows the mobile header and the tab bar on the article list", () => {

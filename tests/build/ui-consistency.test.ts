@@ -101,6 +101,15 @@ describe("UI consistency", () => {
     expect(css).toMatch(/prefers-reduced-transparency:\s*reduce[\s\S]*?\.glass-bar/);
   });
 
+  it("defines the liquid-glass capsule with a specular rim and the same opaque fallbacks", () => {
+    const css = readFileSync(path.join(root, "src/index.css"), "utf8");
+    const glass = css.match(/\.liquid-glass\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(glass).toMatch(/backdrop-filter/);
+    expect(glass).toMatch(/-webkit-backdrop-filter/);
+    expect(glass).toMatch(/inset 0 1px 0/); // the lit top edge
+    expect(css).toMatch(/prefers-reduced-transparency:\s*reduce[\s\S]*?\.liquid-glass/);
+  });
+
   it("gives every icon-only button an accessible name", () => {
     const offenders: string[] = [];
     for (const f of files) {

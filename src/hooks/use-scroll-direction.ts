@@ -1,9 +1,9 @@
 import { useEffect, useState, type RefObject } from "react";
 
 /** Scroll distance before a direction counts; smaller moves are finger jitter. */
-const SLOP_PX = 12;
+export const SLOP_PX = 12;
 /** Nothing hides this close to the top: the user is still orienting. */
-const TOP_ZONE_PX = 48;
+export const TOP_ZONE_PX = 48;
 
 /**
  * Whether a scroller is moving down (true) or up / at rest (false).
@@ -32,4 +32,41 @@ export function useScrollingDown(ref: RefObject<HTMLElement | null>): boolean {
   }, [ref]);
 
   return down;
+}
+
+/** Scrolling in these surfaces never minimizes the tab bar. */
+const MINIMIZE_IGNORES = "[data-reader-layer], [data-vaul-drawer], [role='dialog']";
+
+/**
+ * Whether the tab bar is minimized, per Apple's HIG for iOS tab bars: it
+ * minimizes while content scrolls down and comes back when content
+ * scrolls up or the minimized tab is tapped (the returned setter).
+ *
+ * Listens for `scroll` in the capture phase on the document, so any page's
+ * scroller drives it without plumbing; scroll events do not bubble, but
+ * they do pass through capture. Scroll events only, never touch events
+ * (CLAUDE.md, Gesture work). Resets to expanded whenever `resetKey`
+ * changes, so a new section always shows its tabs.
+ */
+export function useMinimizeOnScroll(resetKey: string): [boolean, (minimized: boolean) => void] {
+  const [minimized, setMinimized] = useState(false);
+
+  useEffect(() => setMinimized(false), [resetKey]);
+
+  useEffect(() => {
+    const lastTop = new WeakMap<Element, number>();
+    function onScroll(event: Event) {
+      const el = event.target;
+      if (!(el instanceof HTMLElement) || el.closest(MINIMIZE_IGNORES)) return;
+      const top = el.scrollTop;
+      const delta = top - (lastTop.get(el) ?? 0);
+      if (Math.abs(delta) < SLOP_PX) return;
+      lastTop.set(el, top);
+      setMinimized(delta > 0 && top > TOP_ZONE_PX);
+    }
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener("scroll", onScroll, { capture: true });
+  }, []);
+
+  return [minimized, setMinimized];
 }

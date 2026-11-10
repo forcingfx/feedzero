@@ -11,6 +11,23 @@ import { NewFolderForm } from "@/components/sidebar/new-folder-input.tsx";
 import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
+import { useMinimizeOnScroll } from "@/hooks/use-scroll-direction.ts";
+import { cn } from "@/lib/utils";
+
+type Section = "feeds" | "explore" | "signal" | "settings";
+
+const SECTION_LABEL: Record<Section, string> = {
+  feeds: "Feeds",
+  explore: "Explore",
+  signal: "Signal",
+  settings: "Settings",
+};
+
+/** The icon the minimized tab bar shows: the current section's tab. */
+function SectionIcon({ section }: { section: Section }) {
+  const Icon = { feeds: Layers, explore: Compass, signal: Sparkles, settings: Settings }[section];
+  return <Icon className="size-5" />;
+}
 
 interface MobileNavDrawerProps {
   onFeedSelect: (feedId: string) => void;
@@ -72,13 +89,14 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
 
   // Which tab is current. Feeds covers every route that is not one of the
   // other three sections (the list, a folder, a filter, an article).
-  const section: "feeds" | "explore" | "signal" | "settings" = pathname.startsWith("/explore")
+  const section: Section = pathname.startsWith("/explore")
     ? "explore"
     : pathname.startsWith("/signal")
       ? "signal"
       : pathname.startsWith("/settings")
         ? "settings"
         : "feeds";
+  const [minimized, setMinimized] = useMinimizeOnScroll(section);
 
   return (
     // No `snapPoints` here: with a single snap point and an inline height,
@@ -89,43 +107,74 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
     // mode keeps vaul's standard "scroll until top, then drag to dismiss"
     // pattern, which is exactly what we want.
     <Drawer.Root open={open} onOpenChange={setOpen}>
-      <div
+      {/* Liquid-glass tab bar (Apple HIG, Tab bars, iOS): a capsule that
+          floats above content, minimizes to the current tab at the
+          bottom-left while content scrolls down, and comes back when that
+          tab is tapped or content scrolls up. The strip itself lets taps
+          through, so content beside the minimized capsule stays usable;
+          an upward swipe on the capsule still opens the feed list. */}
+      <nav
         data-testid="drawer-handle-strip"
+        data-minimized={minimized}
+        aria-label="Sections"
         onTouchStart={handleStripTouchStart}
         onTouchMove={handleStripTouchMove}
-        // iOS safe-area clearance:
-        //   pb-[env(safe-area-inset-bottom)] + matching h-[calc()] keeps the
-        //   60px dock content area above the home indicator.
-        //   pl/pr-[max(0.75rem,env(safe-area-inset-left|right))] holds a
-        //   visual gutter from the rounded display corners in portrait and
-        //   clears the notch/camera cutout in landscape.
-        className="glass-bar absolute inset-x-0 bottom-0 z-10 flex items-center border-t pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] h-[calc(60px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
       >
-        <div className="absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-muted-foreground/30" />
-
-        {/* Four tabs, the standard phone bottom bar: Feeds opens the drawer,
-            the other three navigate. Every tab is labelled and the current
-            section is marked (audit 2026-Q4, round 2, rule 5). */}
-        <Drawer.Trigger asChild>
-          <TabButton label="Feeds" aria-label="Feeds, open feed list" current={section === "feeds"}>
-            <Layers className="size-5" />
-          </TabButton>
-        </Drawer.Trigger>
-        <TabButton label="Explore" current={section === "explore"} onClick={() => navigate("/explore")}>
-          <Compass className="size-5" />
-        </TabButton>
-        <TabButton
-          label="Signal"
-          current={section === "signal"}
-          data-testid="sidebar-signal-link"
-          onClick={() => navigate("/signal")}
-        >
-          <Sparkles className="size-5" />
-        </TabButton>
-        <TabButton label="Settings" current={section === "settings"} onClick={() => goToSettings(navigate)}>
-          <Settings className="size-5" />
-        </TabButton>
-      </div>
+        <div className="relative h-14">
+          <div
+            data-testid="tab-capsule"
+            className={cn(
+              "liquid-glass pointer-events-auto absolute bottom-0 left-0 h-14 overflow-hidden rounded-full",
+              "transition-[width] duration-300 ease-out motion-reduce:transition-none",
+              minimized ? "w-14" : "w-full",
+            )}
+          >
+            <div
+              aria-hidden={minimized || undefined}
+              className={cn(
+                "absolute inset-0 flex items-center gap-1 px-1.5 transition-opacity duration-200 motion-reduce:transition-none",
+                minimized && "pointer-events-none opacity-0",
+              )}
+            >
+              <Drawer.Trigger asChild>
+                <TabButton label="Feeds" aria-label="Feeds, open feed list" current={section === "feeds"} tabIndex={minimized ? -1 : 0}>
+                  <Layers className="size-5" />
+                </TabButton>
+              </Drawer.Trigger>
+              <TabButton label="Explore" current={section === "explore"} tabIndex={minimized ? -1 : 0} onClick={() => navigate("/explore")}>
+                <Compass className="size-5" />
+              </TabButton>
+              <TabButton
+                label="Signal"
+                current={section === "signal"}
+                tabIndex={minimized ? -1 : 0}
+                data-testid="sidebar-signal-link"
+                onClick={() => navigate("/signal")}
+              >
+                <Sparkles className="size-5" />
+              </TabButton>
+              <TabButton label="Settings" current={section === "settings"} tabIndex={minimized ? -1 : 0} onClick={() => goToSettings(navigate)}>
+                <Settings className="size-5" />
+              </TabButton>
+            </div>
+            <button
+              type="button"
+              aria-hidden={!minimized || undefined}
+              tabIndex={minimized ? 0 : -1}
+              aria-label={`${SECTION_LABEL[section]}, show all tabs`}
+              onClick={() => setMinimized(false)}
+              className={cn(
+                "absolute inset-y-0 left-0 flex w-14 items-center justify-center rounded-full text-foreground",
+                "transition-opacity duration-200 motion-reduce:transition-none",
+                !minimized && "pointer-events-none opacity-0",
+              )}
+            >
+              <SectionIcon section={section} />
+            </button>
+          </div>
+        </div>
+      </nav>
 
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
@@ -253,9 +302,11 @@ const TabButton = forwardRef<
       ref={ref}
       type="button"
       aria-current={current ? "page" : undefined}
-      className={`flex h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-md text-xs ${
-        current ? "text-foreground" : "text-muted-foreground hover:bg-accent/50"
-      } ${className ?? ""}`}
+      className={cn(
+        "flex h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-xs transition-colors",
+        current ? "bg-foreground/10 text-foreground" : "text-muted-foreground",
+        className,
+      )}
       {...rest}
     >
       {children}

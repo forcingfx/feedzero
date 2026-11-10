@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer.tsx";
@@ -520,6 +520,82 @@ describe("MobileNavDrawer", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("drawer-content")).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Liquid-glass tab bar (owner request, 2026-11-10; Apple HIG, Tab bars,
+   * iOS): the bar floats above content as a glass capsule, minimizes to
+   * the current tab at the bottom-left while content scrolls down, and
+   * leaves the minimized state when that tab is tapped or content scrolls
+   * back up. Scrolling inside the reader or the open drawer is ignored.
+   */
+  describe("liquid-glass capsule", () => {
+    function renderWithPage() {
+      useFeedStore.setState({ feeds: [makeFeed("f1", "Feed 1")] });
+      return render(
+        <MemoryRouter initialEntries={["/feeds"]}>
+          <Routes>
+            <Route
+              path="*"
+              element={
+                <>
+                  <div data-testid="page-scroller" style={{ overflowY: "auto" }} />
+                  <div data-reader-layer><div data-testid="reader-scroller" /></div>
+                  <MobileNavDrawer onFeedSelect={vi.fn()} />
+                  <LocationProbe />
+                </>
+              }
+            />
+          </Routes>
+        </MemoryRouter>,
+      );
+    }
+    function scroll(el: HTMLElement, top: number) {
+      Object.defineProperty(el, "scrollTop", { value: top, configurable: true, writable: true });
+      fireEvent.scroll(el);
+    }
+    const strip = () => screen.getByTestId("drawer-handle-strip");
+
+    it("floats as a glass capsule and leaves the rest of the strip to the content", () => {
+      renderWithPage();
+      expect(strip().className).toContain("pointer-events-none");
+      const capsule = screen.getByTestId("tab-capsule");
+      expect(capsule.className).toContain("liquid-glass");
+      expect(capsule.className).toContain("rounded-full");
+      expect(capsule.className).toContain("pointer-events-auto");
+    });
+
+    it("minimizes to the current tab when the page scrolls down", () => {
+      renderWithPage();
+      scroll(screen.getByTestId("page-scroller"), 300);
+      expect(strip()).toHaveAttribute("data-minimized", "true");
+      const buttons = within(strip()).getAllByRole("button");
+      expect(buttons).toHaveLength(1);
+      expect(buttons[0]).toHaveAccessibleName(/feeds/i);
+    });
+
+    it("tapping the minimized tab brings the full bar back", async () => {
+      const user = userEvent.setup();
+      renderWithPage();
+      scroll(screen.getByTestId("page-scroller"), 300);
+      await user.click(within(strip()).getByRole("button", { name: /feeds/i }));
+      expect(strip()).toHaveAttribute("data-minimized", "false");
+      expect(within(strip()).getAllByRole("button")).toHaveLength(4);
+    });
+
+    it("scrolling back up brings the full bar back", () => {
+      renderWithPage();
+      const page = screen.getByTestId("page-scroller");
+      scroll(page, 300);
+      scroll(page, 250);
+      expect(strip()).toHaveAttribute("data-minimized", "false");
+    });
+
+    it("ignores scrolling inside the reader", () => {
+      renderWithPage();
+      scroll(screen.getByTestId("reader-scroller"), 300);
+      expect(strip()).toHaveAttribute("data-minimized", "false");
     });
   });
 });

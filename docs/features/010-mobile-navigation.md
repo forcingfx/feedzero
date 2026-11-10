@@ -35,12 +35,26 @@ Feature: Mobile navigation
 
   Scenario: Content scrolls underneath the header and the tab bar
     Given the user is on any mobile page
-    Then the header and the tab bar are translucent, blurred overlays
-      (`.glass-bar` in index.css) and content shows through them
+    Then the header is a translucent, blurred bar (`.glass-bar`)
+    And the tab bar is a floating liquid-glass capsule (`.liquid-glass`),
+      inset 16 px from the sides and 8 px above the home indicator
     And every mobile scroller pads by --chrome-top / --chrome-bottom so
       its first and last rows rest clear of the glass
     And with "reduce transparency" on, or without backdrop-filter
-      support, the bars are opaque
+      support, both are opaque
+
+  Rule: The tab bar minimizes while you scroll (Apple HIG, Tab bars, iOS)
+
+  Scenario: Scrolling down recedes the capsule to the current tab
+    Given the tab bar is expanded
+    When any page scroller moves down past its first 48 px
+    Then the capsule shrinks to a circle at the bottom-left showing only
+      the current section's icon (the feed-list icon on the list)
+    And taps beside the circle reach the content underneath
+    When the user taps the circle, or scrolls back up
+    Then the full capsule returns
+    And moving to another section always shows the full capsule
+    And scrolling inside the reader or the open drawer never minimizes it
 
   Rule: Tap goes in, swipe goes out
 
@@ -164,7 +178,7 @@ Gesture ownership map (mobile):
 | `src/lib/swipe-back.ts` | `shouldCommitSwipeBack()`: speed OR distance decides the release (flick ≥ 400px/s, or ≥ 35% of the width) |
 | `src/index.css` | `touch-action: pan-y pinch-zoom` on `[data-reader-layer]` and its `[data-reader-scroll]` scrollers; `auto` on `<pre>` |
 | `src/hooks/use-media-query.ts` | `useIsDesktop()` hook for responsive breakpoint detection |
-| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = four-tab bar (Feeds opens the drawer; Explore, Signal, Settings navigate); open state = recent-feeds row + content-sized feed list (capped at 85dvh) + one-row footer: status line, then icon-only Auto-organize / New folder / Refresh all |
+| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = floating liquid-glass capsule with four tabs, minimized on scroll (`useMinimizeOnScroll`, capture-phase `scroll` listener, ignores the reader and the drawer); was a four-tab bar (Feeds opens the drawer; Explore, Signal, Settings navigate); open state = recent-feeds row + content-sized feed list (capped at 85dvh) + one-row footer: status line, then icon-only Auto-organize / New folder / Refresh all |
 | `src/lib/recent-feeds.ts` | `recordRecentFeed()` + `MOBILE_DOCK_FEED_CAP` (and `stableDockFeeds()`, now unused by the drawer) |
 | `src/stores/feed-store.ts` | Tracks `recentFeedIds` (device-local, persisted) — recorded in `selectFeed`, pruned in `removeFeed` |
 
