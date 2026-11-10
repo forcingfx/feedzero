@@ -60,7 +60,9 @@ Feature: Reading appearance
     Given "Hide read articles" is on
     When I open an unread article and it is auto-marked read
     Then it stays in the list while I am reading it
-    And it leaves the list once I move to another article
+    And it stays when I open the next article, so no row moves
+    And every article read during this visit leaves the list when I
+      switch to another view and come back
 
   Scenario: A genuinely empty feed is not "caught up"
     Given "Hide read articles" is on
@@ -132,10 +134,16 @@ Feature: Reading appearance
   rendered headings at 60rem and prose at 45rem. The cost is that
   ArticleContent can no longer be dropped into an unconstrained parent.
 
-- **The open article is exempt from the unread filter.** Selecting an
-  article auto-marks it read, so a plain `!read` filter would delete the
-  row under the reader mid-sentence. It leaves once you move on, which is
-  the behaviour NetNewsWire and Vienna settled on.
+- **Articles read during a visit are exempt from the unread filter.**
+  Selecting an article auto-marks it read, so a plain `!read` filter would
+  delete the row under the reader mid-sentence. The first rule kept only
+  the open article, so opening the next one removed the previous row and
+  shifted the list while the mobile reader was still sliding in (owner
+  report, 2026-11-10). Every article opened in a view now stays until the
+  view changes (`useKeptReadThisVisit` in `article-list.tsx`).
+- **Mobile shows no persistent selection highlight.** The list there is
+  not a split view; a highlight only flashed between rows as the reader
+  opened and closed. Desktop keeps it.
 
 - **Caught-up is its own empty state.** `EmptyArticleList` offers Refresh
   and can surface a fetch error. Reaching the end of your unread items is

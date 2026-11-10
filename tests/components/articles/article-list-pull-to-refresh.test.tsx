@@ -163,4 +163,23 @@ describe("ArticleList pull-to-refresh", () => {
     expect(scroller.className).toContain("pt-[var(--chrome-top,0px)]");
     expect(scroller.className).toContain("pb-[var(--chrome-bottom,0px)]");
   });
+
+  /**
+   * Mobile has no split view: the list never shows a persistent selection
+   * highlight, so opening and closing the reader never paints a row as
+   * "selected" or moves that highlight between rows (owner report,
+   * 2026-11-10). Desktop keeps it: there the list and reader sit side by side.
+   */
+  it("shows no persistent selection highlight on mobile", () => {
+    renderList();
+    act(() => useArticleStore.setState({ selectedArticle: article as never }));
+    expect(document.querySelector('[role="option"][aria-selected="true"]')).toBeNull();
+  });
+
+  it("keeps the selection highlight on desktop", () => {
+    vi.mocked(useIsDesktop).mockReturnValue(true);
+    renderList();
+    act(() => useArticleStore.setState({ selectedArticle: article as never }));
+    expect(document.querySelector('[role="option"][aria-selected="true"]')).not.toBeNull();
+  });
 });

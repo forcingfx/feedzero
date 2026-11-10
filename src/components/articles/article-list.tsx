@@ -87,6 +87,18 @@ function isItemVisible(scrollEl: HTMLElement, articleId: string): boolean {
   return item.top >= top && item.bottom <= bottom;
 }
 
+/**
+ * Ids of the articles opened during the current visit to a view. The set
+ * resets when the view changes, so read rows kept by Hide read leave on
+ * the next visit rather than mid-reading.
+ */
+function useKeptReadThisVisit(viewId: string | null, openedId: string | undefined): ReadonlySet<string> {
+  const kept = useRef<{ view: string | null; ids: Set<string> }>({ view: viewId, ids: new Set() });
+  if (kept.current.view !== viewId) kept.current = { view: viewId, ids: new Set() };
+  if (openedId) kept.current.ids.add(openedId);
+  return kept.current.ids;
+}
+
 export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const folders = useFeedStore((s) => s.folders);
@@ -162,15 +174,17 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     });
   }, []);
 
-  // Unread-only mode. The article you're reading is exempt: selecting an
-  // article auto-marks it read, so filtering purely on `read` would yank
-  // the current row out from under the reader mid-sentence. It drops out
-  // once you move on, which is the point of the mode.
+  // Unread-only mode. Every article opened during this visit to the view
+  // stays listed until you leave the view: opening an article marks it
+  // read, and dropping it then (or when you open the next one) shifted
+  // every row under the reader as it slid in (owner report, 2026-11-10).
+  // The read rows go on the next visit, which is the point of the mode.
   const selectedArticleId = selectedArticle?.id;
+  const keptRead = useKeptReadThisVisit(selectedFeedId, selectedArticleId);
   const visibleArticles = useMemo(() => {
     if (!hideReadArticles) return articles;
-    return articles.filter((a) => !a.read || a.id === selectedArticleId);
-  }, [articles, hideReadArticles, selectedArticleId]);
+    return articles.filter((a) => !a.read || keptRead.has(a.id));
+  }, [articles, hideReadArticles, keptRead, selectedArticleId]);
 
   // Walk the sorted articles through groupArticles(), then flatten each
   // group into a sequence the virtualizer can iterate as uniform rows.
@@ -423,7 +437,10 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                 <SwipeToReadRow article={entry.article} enabled={!isDesktop}>
                   <ArticleItem
                     article={entry.article}
-                    isSelected={entry.article.id === selectedArticle?.id}
+                    // Mobile has no split view, so no persistent highlight:
+                    // it would flash between rows as the reader opens and
+                    // closes. Desktop shows the row the reader is on.
+                    isSelected={isDesktop && entry.article.id === selectedArticle?.id}
                     onSelect={handleSelect}
                     feedTitle={itemFeedTitle}
                     feedSiteUrl={itemFeedSiteUrl}
