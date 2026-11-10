@@ -32,6 +32,15 @@
  */
 export const releases = [
   {
+    version: "0.18.1",
+    date: "2026-11-10T15:00:07Z",
+    title: "Smoother first article on phones",
+    subtitle: "The first article opened on a phone no longer flickers.",
+    fixed: [
+      "Fixed the first article you opened on a phone flickering between the list, a blank screen and the reader. The reader now loads in the background once the list shows.",
+    ],
+  },
+  {
     version: "0.18.0",
     date: "2026-11-10T12:53:04Z",
     title: "A calmer app, and a reader that fills the phone",
