@@ -11,13 +11,12 @@ import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
-import { isSelfHosted } from "@/core/features/self-hosted";
 import type { SettingsTab } from "@/lib/go-to-settings";
 
 const VALID_TABS: readonly SettingsTab[] = [
-  "subscription",
-  "sync-and-data",
   "reading",
+  "sync-and-data",
+  "subscription",
   "help",
 ];
 
@@ -36,9 +35,9 @@ function isSettingsTab(value: string | null): value is SettingsTab {
 }
 
 function defaultTab(): SettingsTab {
-  // Self-hosters never see the Subscription tab, so default them to the
-  // first tab they actually have.
-  return isSelfHosted() ? "sync-and-data" : "subscription";
+  // Reading is what people open Settings to change; the price list is
+  // one tab away (audit 2026-Q4). Same default for self-hosters.
+  return "reading";
 }
 
 export function SettingsPage() {

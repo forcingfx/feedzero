@@ -48,17 +48,19 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
         onValueChange={(v) => v && onTabChange(v as SettingsTab)}
         className="justify-start flex-wrap"
       >
+        {/* Reading first: it is what people open Settings to change.
+            Subscription sits after the data controls (audit 2026-Q4). */}
+        <ToggleGroupItem value="reading" aria-label="Reading">
+          Reading
+        </ToggleGroupItem>
+        <ToggleGroupItem value="sync-and-data" aria-label="Sync and data">
+          Sync &amp; Data
+        </ToggleGroupItem>
         {showSubscription && (
           <ToggleGroupItem value="subscription" aria-label="Subscription">
             Subscription
           </ToggleGroupItem>
         )}
-        <ToggleGroupItem value="sync-and-data" aria-label="Sync and data">
-          Sync &amp; Data
-        </ToggleGroupItem>
-        <ToggleGroupItem value="reading" aria-label="Reading">
-          Reading
-        </ToggleGroupItem>
         <ToggleGroupItem value="help" aria-label="Help">
           Help
         </ToggleGroupItem>

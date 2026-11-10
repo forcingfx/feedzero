@@ -53,6 +53,11 @@ describe("ExploreCatalog", () => {
     resetStore();
   });
 
+  it("tells people arriving from another reader where importing happens (audit 2026-Q4)", () => {
+    renderCatalog();
+    expect(screen.getByText(/Pocket, Omnivore, TT-RSS or any OPML/i)).toBeInTheDocument();
+  });
+
   it("renders all category names", () => {
     renderCatalog();
 
