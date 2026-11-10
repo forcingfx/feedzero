@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, act } from "@testing-library/react";
+import { render, act, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { lazy, Suspense } from "react";
 import { useNavigate } from "react-router";
 import { AppLayout } from "@/pages/app-layout.tsx";
+import * as db from "@/core/storage/db.ts";
 import { FeedsRoute } from "@/pages/feeds-route.tsx";
 import { StageView } from "@/pages/stage-view.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -595,7 +596,7 @@ describe("FeedsPage layout — mobile", () => {
     }
   });
 
-  it("mobile reader overlay delegates to ReaderPanel (no overflow-y-auto on the wrapper)", () => {
+  it("mobile reader overlay delegates to ReaderPanel (no overflow-y-auto on the wrapper)", async () => {
     // ReaderPanel owns its own scroll container and nav bar. The overlay
     // wrapper is a geometry layer only — it must not double-scroll. It
     // mounts only while an article is open (reader-as-overlay model).
@@ -614,9 +615,18 @@ describe("FeedsPage layout — mobile", () => {
     };
     useFeedStore.setState({ feeds: [defaultFeed], selectedFeedId: "f1" });
     useArticleStore.setState({ articles: [article], selectedArticle: article });
+    // Keep the article present through loadArticles: the vanished-article
+    // guard otherwise navigates back before the lazy layer has loaded.
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [article] });
     const { container } = renderPage("/feeds/f1/articles/a1");
+    // The reader layer is a lazy chunk (audit 2026-Q4, finding 2).
+    await waitFor(
+      () => {
+        expect(container.querySelector('[data-testid="reader-scroll-mobile"]')).not.toBeNull();
+      },
+      { timeout: 5000 },
+    );
     const reader = container.querySelector('[data-testid="reader-scroll-mobile"]');
-    expect(reader).not.toBeNull();
     expect((reader as HTMLElement).className).not.toContain("overflow-y-auto");
   });
 });

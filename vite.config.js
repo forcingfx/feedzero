@@ -490,6 +490,21 @@ export default defineConfig({
           if (id.includes("/node_modules/@dnd-kit/")) {
             return "vendor-dnd";
           }
+          // Swipe-back gesture library, used only by the mobile reader
+          // layer, which is itself lazy. Its own chunk keeps it out of the
+          // eager vendor bucket (audit 2026-Q4, finding 2).
+          if (
+            id.includes("/node_modules/motion/") ||
+            id.includes("/node_modules/motion-dom/") ||
+            id.includes("/node_modules/framer-motion/")
+          ) {
+            return "vendor-motion";
+          }
+          // Argon2 WASM, imported lazily by argon2.ts. Without its own
+          // chunk the catch-all below hoisted it into the eager bucket.
+          if (id.includes("/node_modules/hash-wasm/")) {
+            return "vendor-argon2";
+          }
           // Everything else falls into the default vendor bucket so we
           // don't fragment into dozens of tiny chunks.
           return "vendor";
