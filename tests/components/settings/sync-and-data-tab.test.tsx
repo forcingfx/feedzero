@@ -58,4 +58,9 @@ describe("<SyncAndDataTab>", () => {
       screen.getByRole("button", { name: /delete all data and reset app/i }),
     ).toBeInTheDocument();
   });
+  it("draws no card chrome around sections (audit 2026-Q4 round 2: rows under headings)", () => {
+    const { container } = renderTab();
+    expect(container.querySelectorAll(".bg-card").length).toBe(0);
+  });
+
 });

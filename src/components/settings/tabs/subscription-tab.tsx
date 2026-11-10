@@ -53,6 +53,7 @@ import { tierLabel as tierLabelFor } from "@/core/features/tier-matrix";
 import { PAID_PLAN } from "@/core/features/pricing";
 import type { Tier } from "@/core/features/tier-matrix";
 import { ActivateLicenseDialog } from "@/components/settings/activate-license-dialog";
+import { SettingRow, SettingsGroup } from "@/components/settings/setting-row";
 import { openPortal } from "@/lib/open-portal";
 import { maskToken } from "@/lib/format-license";
 import { goToSettings } from "@/lib/go-to-settings";
@@ -103,9 +104,9 @@ function FreeView() {
         </span>
       </div>
 
-      {/* One card, one line of price. The full comparison opens on request
+      {/* One line of price. The full comparison opens on request
           instead of filling the tab (audit 2026-Q4, finding 5). */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div className="space-y-3">
         <p className="text-sm">
           Supporter adds unlimited feeds, Signal, smart filters, auto-organize
           and offline prefetch. {PAID_PLAN.display}, {PAID_PLAN.trialDays} days
@@ -203,8 +204,8 @@ function PaidView({ tier }: PaidViewProps) {
   const priceLabel = PAID_PLAN.display;
 
   return (
-    <div className="space-y-4 py-2">
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <div className="space-y-8 py-2">
+      <div className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-success-bg text-success border-success/30">
             <Sparkles className="size-3" />
@@ -301,25 +302,17 @@ function PaidView({ tier }: PaidViewProps) {
         )}
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-        <h3 className="text-sm font-semibold">Deactivate on this device</h3>
-        <p className="text-xs text-muted-foreground">
-          Removes the license token from this browser only. Your
-          subscription stays active, your cloud vault is preserved, and
-          your local feeds + articles are untouched — but paid features
-          (sync, auto-organize, unlimited feeds) lock to the free tier
-          on this device until you reactivate.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setDeactivateOpen(true)}
+      <SettingsGroup title="Deactivate on this device">
+        <SettingRow
+          label="Remove the license from this browser"
+          description="Your subscription stays active, your cloud vault is preserved, and your local feeds and articles are untouched. Paid features lock to the free tier on this device until you reactivate."
         >
-          <LogOut className="mr-2 size-4" />
-          Deactivate FeedZero {planLabel} on this device
-        </Button>
-      </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setDeactivateOpen(true)}>
+            <LogOut className="mr-2 size-4" />
+            Deactivate FeedZero {planLabel} on this device
+          </Button>
+        </SettingRow>
+      </SettingsGroup>
 
       <AlternativePlans />
 

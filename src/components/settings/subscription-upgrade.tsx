@@ -109,7 +109,7 @@ export function TierCard({
       : "border-border";
 
   return (
-    <div className={`rounded-lg border ${borderClass} bg-card p-4 space-y-2`}>
+    <div data-plan-card className={`rounded-lg border ${borderClass} bg-card p-4 space-y-2`}>
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           {featured && <Sparkles className="size-4 text-success" />}

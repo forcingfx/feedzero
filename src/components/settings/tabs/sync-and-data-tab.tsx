@@ -13,10 +13,11 @@ import { DataSyncSection } from "@/components/settings/data-sync-section";
 import { ImportView } from "@/components/settings/import-view";
 import { ExportView } from "@/components/settings/export-view";
 import { OrphanedFeedsNotice } from "@/components/settings/orphaned-feeds-notice";
+import { SettingsGroup } from "@/components/settings/setting-row";
 
 export function SyncAndDataTab() {
   return (
-    <div className="space-y-4 py-2">
+    <div className="space-y-8 py-2">
       <DataSyncSection />
 
       {/* Only renders when feed.folderId references a missing folder.
@@ -24,7 +25,7 @@ export function SyncAndDataTab() {
           sync states so users aren't confused by "missing" feeds. */}
       <OrphanedFeedsNotice />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-2">
         <ImportExportCard title="Import">
           <ImportView onClose={() => undefined} />
         </ImportExportCard>
@@ -44,9 +45,8 @@ function ImportExportCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-card p-4 space-y-3">
-      <h3 className="text-sm font-semibold">{title}</h3>
-      {children}
-    </div>
+    <SettingsGroup title={title} className="min-w-0">
+      <div className="py-3">{children}</div>
+    </SettingsGroup>
   );
 }
