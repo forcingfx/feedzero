@@ -3,12 +3,26 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-11-10T12:53:04Z</updated>
+  <updated>2026-11-10T15:00:07Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.18.1</id>
+    <title>v0.18.1: Smoother first article on phones</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-11-10T15:00:07Z</published>
+    <updated>2026-11-10T15:00:07Z</updated>
+    <summary>The first article opened on a phone no longer flickers.</summary>
+    <content type="html"><![CDATA[<p>The first article opened on a phone no longer flickers.</p>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed the first article you opened on a phone flickering between the list, a blank screen and the reader. The reader now loads in the background once the list shows.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.18.0</id>
     <title>v0.18.0: A calmer app, and a reader that fills the phone</title>
