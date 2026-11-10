@@ -14,6 +14,21 @@ This replaced two earlier models: the original drill-down-with-back-buttons, and
 ```gherkin
 Feature: Mobile navigation
 
+  Rule: Reading is immersive
+
+  Scenario: The shell gets out of the way while an article is open
+    Given the user opens an article on mobile
+    Then the top bar (feed name, status dot, view options) and the bottom
+      tab bar are not rendered; the reader fills the screen
+    And the reader's own pills (back, previous, next) float over the text
+    When the user scrolls down past the first 48 px
+    Then the pills slide off the bottom edge
+    When the user scrolls up by any amount
+    Then the pills return
+    And the reader's scroller keeps the native rubber band
+      (overscroll-y-contain stops the chain to the page without killing
+      the bounce; overscroll-y-none had killed it on iPhone)
+
   Rule: Tap goes in, swipe goes out
 
   Scenario: Tap opens the reader overlay
@@ -131,6 +146,7 @@ Gesture ownership map (mobile):
 |------|------|
 | `src/pages/feeds-route.tsx` | Mobile branch renders `<main>` (list) + conditional `<MobileReaderLayer>`; auto-select suppression; empty-stage→list fallback (present→absent transition guard) |
 | `src/pages/feeds-route.tsx` (`MobileReaderLayer`) | Motion drag (`motion/react`): touch-only start via `useDragControls`, direction lock, slide off then `onBack`, spring back on an early release |
+| `src/hooks/use-scroll-direction.ts` | `useScrollingDown(ref)`: scroll-event only (no touch events), 12 px slop, nothing hides within 48 px of the top |
 | `src/lib/swipe-back.ts` | `shouldCommitSwipeBack()`: speed OR distance decides the release (flick ≥ 400px/s, or ≥ 35% of the width) |
 | `src/index.css` | `touch-action: pan-y pinch-zoom` on `[data-reader-layer]` and its `[data-reader-scroll]` scrollers; `auto` on `<pre>` |
 | `src/hooks/use-media-query.ts` | `useIsDesktop()` hook for responsive breakpoint detection |

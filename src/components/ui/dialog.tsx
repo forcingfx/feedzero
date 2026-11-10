@@ -68,8 +68,11 @@ function DialogContent({
           // sized the dialog correctly via max-h:100dvh, the bottom buttons
           // (Back / Enable sync etc.) still slid behind the keyboard.
           // `translate-y-[-50%]` shifts the dialog up by half its own
-          // height so its center sits on the 50dvh anchor.
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50dvh] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
+          // height so its center sits on the anchor. The anchor and the
+          // max height both account for the safe-area insets: the dialog
+          // is fixed, so the body's safe-area padding never reaches it,
+          // and a tall dialog's close button sat under the status bar.
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[calc(50dvh+(env(safe-area-inset-top)-env(safe-area-inset-bottom))/2)] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
           // Mobile keyboard handling. `100dvh` is the dynamic viewport
           // height — it shrinks when the iOS Safari soft keyboard opens
           // (iOS 15.4+, Chrome 108+, Firefox 101+). Combined with the
@@ -78,7 +81,7 @@ function DialogContent({
           // line. `overflow-y-auto` guarantees focused inputs can still
           // scroll into view on older browsers that don't shrink dvh.
           // See tests/components/ui/dialog-mobile-keyboard.test.tsx.
-          "max-h-[calc(100dvh-2rem)] overflow-y-auto",
+          "max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto",
           className,
         )}
         {...props}

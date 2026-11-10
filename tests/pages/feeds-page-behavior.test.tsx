@@ -429,11 +429,23 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
-  it("shows 'Articles' fallback in header when articleId present but no feed in store", () => {
+  /**
+   * Immersive reader (owner request, 2026-11-10): while an article is
+   * open on mobile the shell's top bar and bottom tab bar are gone. Both
+   * are navigation for the list you left; the reader has its own back
+   * and prev/next controls and the swipe-back gesture.
+   */
+  it("hides the mobile header and the tab bar while an article is open", () => {
     useArticleStore.setState({ articles: [makeArticle("art-1")] });
-    renderPage("/feeds/feed-1/articles/art-1");
-    // With breadcrumbs, mobile header shows fallback "Articles" when feed isn't in store
-    expect(screen.getByText("Articles")).toBeInTheDocument();
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+    expect(container.querySelector("header")).toBeNull();
+    expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).toBeNull();
+  });
+
+  it("shows the mobile header and the tab bar on the article list", () => {
+    const { container } = renderPage("/feeds/feed-1");
+    expect(container.querySelector("header")).not.toBeNull();
+    expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
   });
 
   it("navigates back to the article list when the viewed article's stage goes empty (mobile)", async () => {

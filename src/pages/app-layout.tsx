@@ -93,7 +93,7 @@ function useDefaultFeedsRedirect() {
 export function AppLayout() {
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
-  const { feedId } = useParams();
+  const { feedId, articleId } = useParams();
   useKeyboardNav();
   useAutoRefresh();
   useBriefingAutoRefresh();
@@ -106,18 +106,24 @@ export function AppLayout() {
   }
 
   if (!isDesktop) {
+    // Immersive reader: with an article open, the top bar and the tab bar
+    // are navigation for the list the reader left behind. The reader has
+    // its own back / prev / next pills and the swipe-back gesture.
+    const reading = Boolean(articleId);
     return (
       <div className="flex flex-col h-dvh overflow-hidden bg-background">
-        <header className="flex h-12 shrink-0 items-center gap-1 border-b px-3 z-10 bg-background">
-          <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
-          {/* Dot-only status: the verbose "Refreshed X ago · mode" line
-              lives in the drawer footer now; the single view-options
-              control anchors the right corner. */}
-          <SyncStatusBadge compact />
-          <MobileHeaderPills />
-        </header>
+        {!reading && (
+          <header className="flex h-12 shrink-0 items-center gap-1 border-b px-3 z-10 bg-background">
+            <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
+            {/* Dot-only status: the verbose "Refreshed X ago · mode" line
+                lives in the drawer footer now; the single view-options
+                control anchors the right corner. */}
+            <SyncStatusBadge compact />
+            <MobileHeaderPills />
+          </header>
+        )}
         <Outlet />
-        <MobileNavDrawer onFeedSelect={handleFeedSelect} />
+        {!reading && <MobileNavDrawer onFeedSelect={handleFeedSelect} />}
       </div>
     );
   }
