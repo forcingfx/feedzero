@@ -191,3 +191,11 @@ Deactivate on this device). Plan comparison tiles keep their card shape
 (`data-plan-card`): they are options side by side, not sections. The
 sync flows themselves (dialogs, wizard, fork) are untouched. Still
 unchanged: the mobile header (feed name, status dot, view options).
+
+Owner report after round 2: in dark mode the browser chrome flipped
+between light and dark when the feed drawer opened. Cause: index.html
+ships a static `<meta name="theme-color" content="#ffffff">`, so the
+chrome was light in dark mode and the drawer's overlay darkening the
+page edge made the browser repaint it dark. Fix: `ThemeColorMeta`
+(mounted beside `ThemeBridge`) keeps the meta at the app's own
+background colour per resolved theme.
