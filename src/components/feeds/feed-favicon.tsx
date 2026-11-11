@@ -7,6 +7,7 @@ import {
   recordFaviconSuccess,
   subscribeFaviconCache,
 } from "@/core/favicon/favicon-cache.ts";
+import { proxiedImageUrl } from "@/core/proxy/proxy-article-images.ts";
 
 interface FeedFaviconProps {
   siteUrl: string;
@@ -86,7 +87,7 @@ export function FeedFavicon({
   const strategy = STRATEGIES[pathIndex];
   const faviconUrl =
     strategy.type === "path"
-      ? `/api/icon?url=${encodeURIComponent(origin + strategy.path)}`
+      ? proxiedImageUrl(origin + strategy.path, "icon")
       : strategy.buildUrl(origin);
 
   return (

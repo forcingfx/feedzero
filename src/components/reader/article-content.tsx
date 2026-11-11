@@ -1,23 +1,31 @@
 import { useMemo } from "react";
 import DOMPurify from "dompurify";
+import { proxyArticleImages } from "@/core/proxy/proxy-article-images.ts";
 
 interface ArticleContentProps {
   html: string;
+  /** The article's own URL; relative image paths resolve against it. */
+  articleUrl?: string;
 }
 
 /**
  * Renders pre-sanitized HTML content. DOMPurify is applied as a safety net
- * even though core modules already sanitize — defense in depth.
+ * even though core modules already sanitize — defense in depth. Images are
+ * routed through FeedZero's proxy first, so opening an article never sends
+ * the reader's IP address to the publisher's image host (ADR 034).
  *
  * Sets no max-width of its own: the reading measure belongs to the
  * `<article>` column in ReaderPanel, which applies the user's `readerWidth`
  * preference. A second measure here would clamp the prose back to the
  * default while the headings widened.
  */
-export function ArticleContent({ html }: ArticleContentProps) {
+export function ArticleContent({ html, articleUrl }: ArticleContentProps) {
   const clean = useMemo(
-    () => DOMPurify.sanitize(html, { ADD_ATTR: ["target"] }),
-    [html],
+    () =>
+      DOMPurify.sanitize(proxyArticleImages(html, articleUrl), {
+        ADD_ATTR: ["target"],
+      }),
+    [html, articleUrl],
   );
 
   return (

@@ -2,10 +2,20 @@
  * Pure functions for computing which content view modes are available.
  */
 
+/**
+ * Parse `html` into an inert document's body. Never use
+ * `document.createElement(...).innerHTML` for article HTML: an element
+ * owned by the live document starts fetching its `<img src>` the moment
+ * it is parsed, attached or not, which hands the reader's IP address to
+ * the publisher's image host (ADR 034). DOMParser documents load nothing.
+ */
+function parseInert(html: string): HTMLElement {
+  return new DOMParser().parseFromString(html || "", "text/html").body;
+}
+
 export function stripHtml(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html || "";
-  return (div.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const body = parseInert(html);
+  return (body.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 export function textsSimilar(a: string, b: string): boolean {
@@ -47,9 +57,7 @@ const VISIBLE_MEDIA_SELECTOR =
 function hasVisibleBlurbContent(html: string): boolean {
   if (!html) return false;
   if (stripHtml(html).length > 0) return true;
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return div.querySelector(VISIBLE_MEDIA_SELECTOR) !== null;
+  return parseInert(html).querySelector(VISIBLE_MEDIA_SELECTOR) !== null;
 }
 
 /**

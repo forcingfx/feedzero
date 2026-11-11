@@ -115,6 +115,17 @@ Feature: Content view toggle
     And no network request is made
 ```
 
+### Images in the article body (ADR 034)
+
+Both views load body images through FeedZero's server, not from the
+publisher. `ArticleContent` rewrites every remote `<img src>` to
+`/api/icon?url=…&mode=article` before rendering, resolving relative
+paths against the article's URL. `srcset` and `<picture>` sources are
+dropped so nothing loads directly. Images above 4 MiB, and images on
+hosts that refuse server fetches, show as broken. The view-mode checks
+in `src/lib/content-modes.ts` parse HTML with `DOMParser`, which loads
+no images.
+
 ## Architecture
 
 ### Flow

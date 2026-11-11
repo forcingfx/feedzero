@@ -3,17 +3,12 @@
 // esbuild entry point and overwrites it in place at build time. Committing
 // that build output detaches the endpoint from src/ permanently, and handler
 // changes silently stop deploying.
-import { handleFaviconRequest } from "../src/core/favicon/favicon-handler";
-import { handleProxyRequest } from "../src/core/proxy/proxy-handler";
+import { handleIconRequest } from "../src/core/proxy/icon-route";
 
-// One function serves two request shapes (Vercel's 12-function Hobby cap):
-// ?domain=<host> resolves the site's favicon; anything else proxies a known
-// image URL. server.ts and vite.config.js apply the same dispatch —
-// tests/api/icon-wrapper.test.ts holds this entry point to it.
+// One function serves every /api/icon request shape (favicon, thumbnail,
+// article image) to stay within Vercel's function cap. server.ts and
+// vite.config.js call the same dispatcher; tests/api/icon-wrapper.test.ts
+// holds this entry point to it.
 export async function GET(req: Request): Promise<Response> {
-  const url = new URL(req.url);
-  if (url.searchParams.get("domain")) {
-    return handleFaviconRequest(req);
-  }
-  return handleProxyRequest(req, "image/x-icon");
+  return handleIconRequest(req);
 }

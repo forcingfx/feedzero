@@ -4,6 +4,7 @@ import { Star } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import type { Article } from "@feedzero/core/types";
+import { proxiedImageUrl } from "@/core/proxy/proxy-article-images.ts";
 
 interface ArticleItemProps {
   article: Article;
@@ -68,7 +69,7 @@ export const ArticleItem = memo(function ArticleItem({
       {imageUrl && (
         <img
           data-testid="article-image"
-          src={`/api/icon?url=${encodeURIComponent(imageUrl)}`}
+          src={proxiedImageUrl(imageUrl, "icon")}
           alt=""
           loading="lazy"
           decoding="async"

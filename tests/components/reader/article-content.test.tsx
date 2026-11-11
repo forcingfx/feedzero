@@ -16,6 +16,31 @@ describe("ArticleContent", () => {
     expect(container.textContent).toContain("Safe");
   });
 
+  it("loads body images through FeedZero's proxy, not from the publisher", () => {
+    // Privacy: a direct <img> request hands the reader's IP address to the
+    // publisher's image host. The body must only reference our own origin.
+    const { container } = render(
+      <ArticleContent
+        html='<p><img src="/img/hero.jpg" alt="Hero"></p>'
+        articleUrl="https://news.example.com/story"
+      />,
+    );
+    const img = container.querySelector("img")!;
+    const src = new URL(img.getAttribute("src")!, "https://my.feedzero.app");
+    expect(src.origin).toBe("https://my.feedzero.app");
+    expect(src.pathname).toBe("/api/icon");
+    expect(src.searchParams.get("url")).toBe("https://news.example.com/img/hero.jpg");
+    expect(src.searchParams.get("mode")).toBe("article");
+    expect(img.getAttribute("alt")).toBe("Hero");
+  });
+
+  it("never renders a srcset that would bypass the proxy", () => {
+    const { container } = render(
+      <ArticleContent html='<img src="https://cdn.example.com/a.jpg" srcset="https://cdn.example.com/a2.jpg 2x">' />,
+    );
+    expect(container.querySelector("img")!.hasAttribute("srcset")).toBe(false);
+  });
+
   it("preserves target attribute on links", () => {
     const { container } = render(
       <ArticleContent html='<a href="https://example.com" target="_blank">Link</a>' />,
