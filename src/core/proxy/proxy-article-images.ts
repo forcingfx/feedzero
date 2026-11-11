@@ -10,8 +10,15 @@
  * the same treatment. See ADR 034.
  */
 
-/** Which cap the proxy applies: list thumbnails keep the small one. */
-export type ProxiedImagePurpose = "thumbnail" | "article";
+/**
+ * Query value of `mode` that marks an article-body image request. Lives
+ * here, not in icon-route.ts, so the client bundle never imports the
+ * server handlers to learn it.
+ */
+export const ARTICLE_IMAGE_MODE = "article";
+
+/** Which cap the proxy applies: favicons and list thumbnails keep the small one. */
+export type ProxiedImagePurpose = "icon" | "article";
 
 /** Build the same-origin proxy URL for a remote image. */
 export function proxiedImageUrl(
@@ -19,7 +26,7 @@ export function proxiedImageUrl(
   purpose: ProxiedImagePurpose,
 ): string {
   const base = `/api/icon?url=${encodeURIComponent(imageUrl)}`;
-  return purpose === "article" ? `${base}&mode=article` : base;
+  return purpose === "article" ? `${base}&mode=${ARTICLE_IMAGE_MODE}` : base;
 }
 
 /**

@@ -1,9 +1,7 @@
 import { handleFaviconRequest } from "../favicon/favicon-handler.ts";
 import { handleProxyRequest } from "./proxy-handler.ts";
 import type { FeedCache } from "./feed-cache.ts";
-
-/** Query value of `mode` that marks an article-body image request. */
-export const ARTICLE_IMAGE_MODE = "article";
+import { ARTICLE_IMAGE_MODE } from "./proxy-article-images.ts";
 
 /**
  * Largest article-body image the proxy relays: 4 MiB. Body images are

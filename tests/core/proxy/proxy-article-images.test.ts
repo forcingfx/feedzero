@@ -39,8 +39,8 @@ describe("proxiedImageUrl", () => {
     expect(url.searchParams.get("mode")).toBe("article");
   });
 
-  it("omits the mode for list thumbnails, which keep the small favicon cap", () => {
-    expect(proxiedImageUrl("https://cdn.example.com/t.jpg", "thumbnail")).toBe(
+  it("omits the mode for favicons and list thumbnails, which keep the small cap", () => {
+    expect(proxiedImageUrl("https://cdn.example.com/t.jpg", "icon")).toBe(
       `/api/icon?url=${encodeURIComponent("https://cdn.example.com/t.jpg")}`,
     );
   });
