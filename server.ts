@@ -5,7 +5,7 @@ import { handleFeedbackRequest } from "./src/core/feedback/feedback-handler";
 import { handleBriefingRequest } from "./src/core/briefings/briefing-proxy-handler";
 import { handleSyncRequest } from "./src/core/sync/sync-handler";
 import { handleSyncStatsRequest } from "./src/core/sync/sync-stats-handler";
-import { handleFaviconRequest } from "./src/core/favicon/favicon-handler";
+import { handleIconRequest } from "./src/core/proxy/icon-route";
 import { handleCatalogRequest } from "./src/core/catalog/catalog-handler";
 import { handleHealthRequest } from "./src/core/health/health-handler";
 import { handleStripeWebhook } from "./src/core/stripe/webhook-handler";
@@ -220,17 +220,9 @@ export function createApp(
       routeKind: "page",
     }),
   );
-  // /api/icon dispatches on query-param shape so we stay under Vercel's
-  // 12-function Hobby cap: ?domain=… → resolve the site's favicon;
-  // anything else → proxy a known image URL with SSRF guards. The Vercel
-  // wrapper at api/icon.ts applies the same dispatch.
-  app.get("/api/icon", (c) => {
-    const url = new URL(c.req.url);
-    if (url.searchParams.get("domain")) {
-      return handleFaviconRequest(c.req.raw);
-    }
-    return handleProxyRequest(c.req.raw, "image/x-icon", { cache: feedCache });
-  });
+  // /api/icon dispatches on query-param shape (favicon, thumbnail, article
+  // image) in one shared function; vite.config.js and api/icon.ts call it too.
+  app.get("/api/icon", (c) => handleIconRequest(c.req.raw, { cache: feedCache }));
   // Cloud sync is a Free-tier feature — the handler runs without licenseAuth.
   // The `licenseAuth` option is still exported by sync-handler.ts for any
   // future gate that needs it; this wiring layer simply never sets it.

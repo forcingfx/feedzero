@@ -60,4 +60,24 @@ describe("api/icon.ts wrapper dispatch", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/^image\//);
   });
+
+  it("relays a 3 MB article-body image for ?mode=article (larger cap than thumbnails)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(new Uint8Array(3 * 1024 * 1024), {
+          status: 200,
+          headers: { "content-type": "image/jpeg" },
+        }),
+      ),
+    );
+    const res = await GET(
+      new Request(
+        "https://my.feedzero.app/api/icon?url=https%3A%2F%2Fexample.com%2Fhero.jpg&mode=article",
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+  });
 });

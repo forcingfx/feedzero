@@ -84,23 +84,16 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
-      // /api/icon dispatches on query-param shape so we stay under
-      // Vercel's 12-function Hobby cap: ?domain=… → resolve the site's
-      // favicon; anything else → proxy a known image URL with SSRF
-      // guards. server.ts and api/icon.ts apply the same dispatch.
+      // /api/icon dispatches on query-param shape (favicon, thumbnail,
+      // article image) in one shared function; server.ts and api/icon.ts
+      // call it too.
       server.middlewares.use("/api/icon", async (req, res) => {
         const webReq = await toWebRequest(req);
-        const url = new URL(webReq.url);
-        if (url.searchParams.get("domain")) {
-          const { handleFaviconRequest } = await import(
-            "./src/core/favicon/favicon-handler.ts"
-          );
-          const webRes = await handleFaviconRequest(webReq);
-          await sendWebResponse(webRes, res);
-          return;
-        }
-        const handler = await ensureProxyHandler();
-        const webRes = await handler(webReq, "image/x-icon", { cache: feedCache });
+        await ensureProxyHandler(); // ensures feedCache exists
+        const { handleIconRequest } = await import(
+          "./src/core/proxy/icon-route.ts"
+        );
+        const webRes = await handleIconRequest(webReq, { cache: feedCache });
         await sendWebResponse(webRes, res);
       });
 

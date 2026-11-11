@@ -96,6 +96,26 @@ describe("ReaderPanel", () => {
     });
   });
 
+  describe("article images", () => {
+    it("loads a relative body image through the proxy, resolved against the article's own URL", () => {
+      // Privacy (ADR 034): the publisher's image host must see FeedZero's
+      // server, not the reader. A relative path only makes sense against
+      // the article's URL, so the panel must hand that URL down.
+      useArticleStore.setState({
+        selectedArticle: mockArticle({
+          content: '<p>Body</p><img src="/media/chart.png" alt="Chart">',
+        }),
+        articles: [],
+        isLoading: false,
+      });
+      render(<ReaderPanel />);
+      const src = screen.getByAltText("Chart").getAttribute("src")!;
+      const url = new URL(src, "https://my.feedzero.app");
+      expect(url.pathname).toBe("/api/icon");
+      expect(url.searchParams.get("url")).toBe("https://example.com/media/chart.png");
+    });
+  });
+
   describe("reading measure + text size", () => {
     it("centers the article column at the existing max measure", () => {
       useArticleStore.setState({

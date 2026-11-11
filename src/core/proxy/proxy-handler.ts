@@ -13,8 +13,12 @@ import { newTraceId } from "../../../packages/core/src/utils/trace-id";
  */
 export const SUPPORTED_METHODS: readonly string[] = ["GET", "POST"];
 
-/** Largest image the icon route relays; favicons and list thumbnails are far smaller. */
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+/**
+ * Default largest image the icon route relays; favicons and list
+ * thumbnails are far smaller. Article-body images pass a larger
+ * `maxImageBytes` (see icon-route.ts).
+ */
+export const DEFAULT_MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
 /**
  * Per-client rate-limit hook. Caller injects a `limiter` and a
@@ -58,6 +62,11 @@ export interface ProxyOptions {
    * by WAFs on article URLs). Defaults to `feed` for back-compat.
    */
   routeKind?: ProxyRouteKind;
+  /**
+   * Image mode only: the largest image body to relay, in bytes.
+   * Defaults to DEFAULT_MAX_IMAGE_BYTES.
+   */
+  maxImageBytes?: number;
 }
 
 /**
@@ -154,19 +163,20 @@ export async function handleProxyRequest(
     // ask for one, so a feed could otherwise point rows at a non-image or
     // a multi-megabyte file and have the function buffer all of it.
     const imageOnly = /^image\//i.test(defaultContentType);
+    const maxImageBytes = options?.maxImageBytes ?? DEFAULT_MAX_IMAGE_BYTES;
     const upstreamOk = response.status >= 200 && response.status < 300;
     if (imageOnly && upstreamOk) {
       if (!/^image\//i.test(contentType)) {
         return new Response("Not an image", { status: 415 });
       }
       const declared = Number(response.headers.get("content-length"));
-      if (declared > MAX_IMAGE_BYTES) {
+      if (declared > maxImageBytes) {
         return new Response("Image too large", { status: 413 });
       }
     }
 
     const body = await response.arrayBuffer();
-    if (imageOnly && upstreamOk && body.byteLength > MAX_IMAGE_BYTES) {
+    if (imageOnly && upstreamOk && body.byteLength > maxImageBytes) {
       return new Response("Image too large", { status: 413 });
     }
 

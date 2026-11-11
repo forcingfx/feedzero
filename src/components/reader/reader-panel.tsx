@@ -496,7 +496,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           <>
             {/* The feed's text is all we hold for a gated article; the prompt
                 explains why there is no more, it must not replace it. */}
-            <ArticleContent html={getFeedContent()} />
+            <ArticleContent html={getFeedContent()} articleUrl={article.link} />
             <PaywallPrompt
               publisher={paywallMap[article.link].publisher}
               articleUrl={article.link}
@@ -508,7 +508,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
             />
           </>
         ) : (
-          <ArticleContent html={getContent()} />
+          <ArticleContent html={getContent()} articleUrl={article.link} />
         )}
       </article>
     </div>
