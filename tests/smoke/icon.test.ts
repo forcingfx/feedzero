@@ -43,4 +43,29 @@ describe.skipIf(!enabled)("smoke: /api/icon", () => {
     );
     expect(res.status).toBe(415);
   });
+
+  // ADR 034: article-body images ride the same function with ?mode=article.
+  // The deployed wrapper must dispatch that shape too, or every image in
+  // every opened article breaks while unit tests stay green. Fixture: the
+  // landing page's own screenshot (image/png, ~230 KB, verified with curl).
+  it("proxies an article-body image for ?mode=article, cacheable", async () => {
+    const target = encodeURIComponent("https://www.feedzero.app/screenshot.png");
+    const res = await fetch(`${BASE}/api/icon?url=${target}&mode=article`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/^image\//);
+    expect(res.headers.get("cache-control")).toMatch(/max-age=86400/);
+    expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(10_000);
+  });
+
+  it("still refuses a non-image url in article mode with 415", async () => {
+    const target = encodeURIComponent("https://feedzero.app/");
+    const res = await fetch(`${BASE}/api/icon?url=${target}&mode=article`);
+    expect(res.status).toBe(415);
+  });
+
+  it("blocks an internal address in article mode with 403 (SSRF guard)", async () => {
+    const target = encodeURIComponent("http://169.254.169.254/latest/meta-data/");
+    const res = await fetch(`${BASE}/api/icon?url=${target}&mode=article`);
+    expect(res.status).toBe(403);
+  });
 });
