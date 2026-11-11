@@ -18,6 +18,8 @@ File-level index of FeedZero's modules, stores, components, routes, hooks, styli
 - **src/core/crypto/passphrase-generator.ts** — EFF large wordlist, 4 words, ~51.7 bits.
 - **src/core/proxy/validate-url.ts** — SSRF-safe URL validation. Returns `Result<URL>`.
 - **src/core/proxy/proxy-handler.ts** — Shared proxy logic for serverless functions.
+- **src/core/proxy/icon-route.ts** — `handleIconRequest(req, { cache })`: the one `/api/icon` dispatcher for all three entry points (`?domain=` favicon, `?url=` thumbnail at 2 MB, `?url=&mode=article` body image at `ARTICLE_IMAGE_MAX_BYTES` = 4 MiB). ADR 034.
+- **src/core/proxy/proxy-article-images.ts** — `proxiedImageUrl(url, "icon" | "article")` builds every `/api/icon` image URL; `proxyArticleImages(html, articleUrl)` rewrites body images to it at render time (ArticleContent). ADR 034.
 - **src/core/extractor/extractor.ts** — `extract(html, url)` + `needsExtraction(article)`. Swap impl by changing the import.
 - **src/core/extractor/{defuddle-extractor,cleanup,markdown}.ts** — Defuddle impl; HTML cleanup; markdown→HTML via marked + DOMPurify.
 - **src/core/extractor/adapters/** — `SiteAdapter` interface, `AdapterRegistry` (O(1) domain lookup). `github-adapter` extracts README; `default-adapter` uses Defuddle.

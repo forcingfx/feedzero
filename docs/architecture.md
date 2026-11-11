@@ -334,6 +334,7 @@ Schema migrations are handled by Dexie's `version().stores()` API.
 | Passphrase theft from localStorage | Raw passphrase never persisted — only derived JWK key material stored. Stolen keys cannot be used to recover the passphrase or access the vault from a different device. |
 | Feed URL logging by proxy | Proxy uses POST with JSON body; URLs never appear in query strings, access logs, or CDN logs |
 | User IP leaked via favicons | Favicons proxied through the CORS proxy, not loaded directly from publisher servers |
+| User IP leaked via article images | Every remote `<img>` in an article body is rewritten at render time to `/api/icon?mode=article`, so the publisher sees the server. `srcset` and `<picture>` sources are dropped; article HTML is only ever parsed inertly (`DOMParser`), never through live-document `innerHTML`. See ADR 034. |
 | Timing analysis of sync patterns | 0-30s random jitter added after debounce; vault payloads padded to power-of-2 bucket sizes |
 | IndexedDB metadata leakage | Index fields (url, feedId, guid) are HMAC-SHA256 hashed — deterministic for queries but non-reversible |
 | User-Agent fingerprinting via proxy | Fixed `User-Agent: FeedZero/1.0` on feed-fetch proxy requests; article-page fetches (`/api/page`) use a fixed browser UA so the FeedZero identifier doesn't get blocked by WAFs and silently break extraction. Both UAs are constants — no per-user fingerprint. |
@@ -359,6 +360,7 @@ Complete list of all network requests FeedZero makes:
 | `POST /api/feed` | Adding feed, refreshing feed | `{ "url": "..." }` in body | Feed XML/JSON |
 | `POST /api/page` | "Extract full text" button | `{ "url": "..." }` in body | Page HTML |
 | `POST /api/feed` (favicon) | Displaying feed favicon | `{ "url": "https://example.com/favicon.ico" }` | Icon image |
+| `GET /api/icon?url=<image>&mode=article` | Opening an article with images | Image URL in the query string | Image, up to 4 MiB (ADR 034) |
 | `HEAD /api/sync?vaultId=<id>` | Checking if cloud vault exists | Vault ID | 200/404 status |
 | `GET /api/sync?vaultId=<id>` | Pulling cloud data | Vault ID | Encrypted blob |
 | `PUT /api/sync?vaultId=<id>` | Pushing local data to cloud | Vault ID, encrypted blob (padded to power-of-2 size) | Success/error |
@@ -472,6 +474,7 @@ All claims in this document can be verified by reading the source code:
 | Vault size headroom (device-local) | `src/core/sync/vault-headroom.ts`, `src/components/settings/vault-headroom-notice.tsx` |
 | Offline-copy release | `src/core/storage/release-offline-content.ts` (ADR 032) |
 | Anonymous size sampling | `packages/core/src/utils/log-event.ts` (ADR 032) |
+| Article image proxying | `src/core/proxy/proxy-article-images.ts` (render-time rewrite), `src/core/proxy/icon-route.ts` (dispatch and caps), `src/lib/content-modes.ts` (inert parsing) |
 | Normalized User-Agent | `src/core/proxy/proxy-handler.ts` |
 | Sync handler | `src/core/sync/sync-handler.ts`, `api/sync.ts` |
 | IndexedDB schema | `src/core/storage/db.ts` |
