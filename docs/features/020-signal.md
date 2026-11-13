@@ -187,7 +187,10 @@ Feature: Signal — cross-feed topic surface
   `self-hosted-bypass`, so today — before the paid tier launches —
   every user reaches the feature; the gate only bites once
   `VITE_PAID_TIER_VISIBLE=1`. The sidebar entry stays visible
-  regardless (discoverability).
+  regardless (discoverability). To exercise the unlocked path by hand
+  without a checkout, mint a Supporter token with
+  `scripts/mint-test-license.ts` (see
+  [docs/operations/license-support.md](../operations/license-support.md#minting-a-test-license)).
 - **Entities only, by capitalization consensus.** A topic must name
   something — a proper noun ("OpenAI") or compound noun ("Iran War") — not a
   bare common noun ("tariffs"). Without an ML POS tagger, capitalization is
