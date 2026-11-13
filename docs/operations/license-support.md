@@ -142,6 +142,26 @@ Instead:
 3. If they want to resubscribe, point them at `/?subscribe=personal-yearly`.
 4. If they're disputing the cancellation (genuinely think they didn't cancel), check Stripe events for the customer — most cancellations are user-initiated; Stripe's audit trail says when and how.
 
+## Minting a test license
+
+To test Supporter-only features (Signal, Signal Briefings, smart filters, rules, unlimited feeds) by hand on a build where the paid tier is live, mint a sentinel token instead of running a checkout. The token carries the customer id `test-license[-label]`, never a Stripe `cus_*` id, and writes nothing to license storage, so `find-license.ts` can never mistake it for a customer.
+
+```bash
+# Against production (my.feedzero.app): sign with the production key
+vercel env pull .env.production --environment=production
+npx tsx scripts/mint-test-license.ts --label signal-qa     # --days defaults to 30
+rm .env.production
+
+# Against a local dev server: any shared secret works, VITE_PAID_TIER_VISIBLE=1 arms the gates
+export LICENSE_SIGNING_KEY=any-string-of-32-or-more-characters
+npx tsx scripts/mint-test-license.ts
+VITE_PAID_TIER_VISIBLE=1 npm run dev
+```
+
+In the app, open Settings → Subscription → "Activate existing license" and paste the token. The tier badge reads Supporter and `/signal` renders the engine instead of the upgrade splash.
+
+A token verifies only against a deployment that uses the same `LICENSE_SIGNING_KEY`. To revoke a leaked test token, add the printed `keyId` to the revocation list; a 30-day lifetime keeps the blast radius small when nobody does. The CI smoke token (`scripts/mint-smoke-license.ts`, 5 years, sentinel `smoke-license`) is minted through the same library.
+
 ## Security expectations
 
 - **The signing key is the keys to the kingdom.** Anyone with `LICENSE_SIGNING_KEY` can mint tokens at any tier for any customer. Keep `.env.production` on operator machines only, delete after each session, never commit, never paste to chat or any web tool.
@@ -168,6 +188,10 @@ A future PR will add outbound email infrastructure (Resend or equivalent) and by
 | Path | Purpose |
 |---|---|
 | `scripts/find-license.ts` | The operator CLI (I/O shell). |
+| `scripts/mint-test-license.ts` | Operator CLI: mint a short-lived Supporter test token (I/O shell). |
+| `scripts/mint-smoke-license.ts` | Operator CLI: mint the 5-year CI smoke token (I/O shell). |
+| `scripts/lib/load-env-file.ts` | Shared `.env.production` loader for the operator CLIs. |
+| `src/core/license/mint-sentinel-license.ts` | Pure library: build, validate and sign a sentinel license; parse the test CLI's argv. |
 | `src/core/license/admin-find-license.ts` | Pure library functions: lookup-by-email, lookup-by-customer, reissue. |
 | `src/core/stripe/find-customer-by-email.ts` | Stripe customer lookup helper (shared with `recover-handler.ts`). |
 | `src/core/license/issuer.ts` | `LicenseIssuerImpl` — does the mint-and-persist. |

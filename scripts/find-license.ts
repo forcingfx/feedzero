@@ -36,7 +36,6 @@
  * src/core/license/admin-find-license.ts (testable in isolation).
  */
 
-import { readFileSync, existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import {
   findLicenseByEmail,
@@ -48,6 +47,7 @@ import type { CustomersClient } from "../src/core/stripe/find-customer-by-email"
 import { LicenseIssuerImpl } from "../src/core/license/issuer";
 import type { LicenseRecord } from "../src/core/license/storage";
 import { err, ok, type Result } from "../packages/core/src/utils/result";
+import { applyEnvFileIfPresent } from "./lib/load-env-file";
 
 // The project's `process` global is narrowed to env+argv at the type
 // level (see src/core/sync/adapters/env.d.ts) to keep shippable code
@@ -99,27 +99,6 @@ function parseCliArgs(argv: string[]): Result<CliArgs> {
   return ok({ email, customer, reissue });
 }
 
-function loadEnvFile(path: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const rawLine of readFileSync(path, "utf8").split("\n")) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq < 0) continue;
-    const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
-    if (
-      value.length >= 2 &&
-      value.startsWith('"') &&
-      value.endsWith('"')
-    ) {
-      value = value.slice(1, -1);
-    }
-    out[key] = value;
-  }
-  return out;
-}
-
 function formatRecord(r: LicenseRecord): string {
   const issued = new Date(r.issuedAtSec * 1000).toISOString().slice(0, 10);
   const expires = new Date(r.expirySec * 1000).toISOString().slice(0, 10);
@@ -159,12 +138,7 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  if (existsSync(".env.production")) {
-    const env = loadEnvFile(".env.production");
-    for (const [k, v] of Object.entries(env)) {
-      if (!process.env[k]) process.env[k] = v;
-    }
-  }
+  applyEnvFileIfPresent(".env.production", process.env);
 
   const required = [
     "LICENSE_SIGNING_KEY",

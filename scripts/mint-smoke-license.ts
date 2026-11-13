@@ -28,46 +28,19 @@
  * To revoke a leaked smoke token: add its keyId to the revocation list
  * via your existing license storage tooling; the smoke can no longer
  * authenticate. Generate a fresh one with this script.
+ *
+ * For a short-lived Supporter token to test gated features by hand, use
+ * scripts/mint-test-license.ts instead. Both are shells over
+ * src/core/license/mint-sentinel-license.ts.
  */
 
-import { readFileSync, existsSync } from "node:fs";
-import { signLicense } from "../src/core/license/sign";
+import {
+  mintSentinelLicense,
+  SMOKE_LICENSE_SENTINEL,
+} from "../src/core/license/mint-sentinel-license";
+import { applyEnvFileIfPresent } from "./lib/load-env-file";
 
-/**
- * Parse a `.env`-style file into key/value pairs. Handles double-quoted
- * values (the format Vercel CLI writes) so values containing shell
- * metacharacters survive without being mangled by `source` / `sed`.
- * Strips a single layer of surrounding `"..."` if present; leaves
- * unquoted values as-is.
- */
-function loadEnvFile(path: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const rawLine of readFileSync(path, "utf8").split("\n")) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq < 0) continue;
-    const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
-    if (
-      value.length >= 2 &&
-      value.startsWith('"') &&
-      value.endsWith('"')
-    ) {
-      value = value.slice(1, -1);
-    }
-    out[key] = value;
-  }
-  return out;
-}
-
-// Auto-load .env.production if it exists. Avoids brittle shell sourcing.
-const ENV_FILE = ".env.production";
-if (existsSync(ENV_FILE) && !process.env.LICENSE_SIGNING_KEY) {
-  for (const [k, v] of Object.entries(loadEnvFile(ENV_FILE))) {
-    if (!(k in process.env)) process.env[k] = v;
-  }
-}
+applyEnvFileIfPresent(".env.production", process.env);
 
 const SIGNING_KEY = process.env.LICENSE_SIGNING_KEY;
 if (!SIGNING_KEY) {
@@ -82,37 +55,28 @@ if (!SIGNING_KEY) {
 
 const FIVE_YEARS_SEC = 5 * 365 * 24 * 3600;
 
-function randomHex(byteLength: number): string {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-const nowSec = Math.floor(Date.now() / 1000);
-
-const token = await signLicense(
+const minted = await mintSentinelLicense(
   {
+    sentinel: SMOKE_LICENSE_SENTINEL,
+    // Pre-repricing wire tier; `normalizeTier` maps it onto the paid tier.
+    // Kept so a rotated smoke token looks exactly like the one CI holds.
     tier: "pro",
-    // Sentinel customerId — distinct from any real "cus_*" Stripe id so
-    // it's grep-able in logs and obviously not a real customer.
-    customerId: "smoke-license",
-    keyId: randomHex(16),
-    issuedAtSec: nowSec,
-    expirySec: nowSec + FIVE_YEARS_SEC,
+    ttlSec: FIVE_YEARS_SEC,
+    nowSec: Math.floor(Date.now() / 1000),
   },
   { secret: SIGNING_KEY },
 );
-
-const expiryDate = new Date((nowSec + FIVE_YEARS_SEC) * 1000)
-  .toISOString()
-  .slice(0, 10);
+if (!minted.ok) {
+  console.error(`[mint-smoke-license] ${minted.error}`);
+  process.exit(1);
+}
 
 console.log("");
 console.log("=== Smoke license token (copy this to GitHub Actions secret) ===");
 console.log("");
-console.log(token);
+console.log(minted.value.token);
 console.log("");
-console.log(`Expires: ${expiryDate}`);
+console.log(`Expires: ${minted.value.expiresOn}`);
 console.log(
   "Add as: https://github.com/forcingfx/feedzero/settings/secrets/actions",
 );
