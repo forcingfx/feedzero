@@ -40,7 +40,7 @@ File-level index of FeedZero's modules, stores, components, routes, hooks, styli
 Stores call core modules directly; components subscribe to slices.
 
 - **app-store** — DB init, global error, onboarding. `initialize(passphrase)`, `checkOnboardingStatus()`, `initializeReturningUser()` (detect mode, open DB, optionally pull sync).
-- **feed-store** — `feeds[]`, `selectedFeedId`, CRUD. `refreshAll()` pulls the sync vault first so other-device feeds materialize.
+- **feed-store** — `feeds[]`, `selectedFeedId`, CRUD. `refreshAll()` pulls the sync vault first so other-device feeds materialize. `folderOpenState` (sidebar folder collapse) is restored from device-local `localStorage` at startup.
 - **article-store** — `articles[]`, `selectedArticle`, `loadArticles`, `selectArticle` (auto-marks read).
 - **extraction-store** — `cache` (link → HTML), `viewMode`, `fetchExtracted(url)`.
 - **onboarding-store** — State machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery`). Modes: `local` (skips confirm) vs `sync` (requires confirm).
