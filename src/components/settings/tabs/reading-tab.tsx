@@ -20,6 +20,7 @@ import type {
 } from "@feedzero/core/types";
 import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog";
 import { ThemeToggle } from "../theme-toggle";
+import { ReadingPreview } from "../reading-preview";
 import { RulesAuditPanel } from "./rules-audit-panel";
 import { SignalSection } from "../signal-section";
 import { ArticleRetentionSetting } from "../article-retention-setting";
@@ -74,14 +75,6 @@ export function ReadingTab() {
             onChange={(value) => void updatePreferences({ readerTextSize: value })}
           />
         </SettingRow>
-        <SettingRow label="List size" description="Text size and row spacing in the article list.">
-          <SegmentedControl
-            label="List size"
-            options={LIST_SIZES}
-            value={prefs.listTextSize ?? "medium"}
-            onChange={(value) => void updatePreferences({ listTextSize: value })}
-          />
-        </SettingRow>
         <SettingRow label="Reading width" description="How wide the article column gets.">
           <SegmentedControl
             label="Reading width"
@@ -96,6 +89,19 @@ export function ReadingTab() {
             options={LINE_HEIGHTS}
             value={prefs.readerLineHeight ?? "normal"}
             onChange={(value) => void updatePreferences({ readerLineHeight: value })}
+          />
+        </SettingRow>
+        <ReadingPreview
+          textSize={prefs.readerTextSize ?? "medium"}
+          width={prefs.readerWidth ?? "medium"}
+          lineHeight={prefs.readerLineHeight ?? "normal"}
+        />
+        <SettingRow label="List size" description="Text size and row spacing in the article list.">
+          <SegmentedControl
+            label="List size"
+            options={LIST_SIZES}
+            value={prefs.listTextSize ?? "medium"}
+            onChange={(value) => void updatePreferences({ listTextSize: value })}
           />
         </SettingRow>
       </SettingsGroup>

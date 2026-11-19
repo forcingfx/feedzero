@@ -69,6 +69,18 @@ triage. Two more synced preferences and a reworked row:
 Phone sizing of the reader chrome and the feed drawer from the same
 report is recorded in `010-mobile-navigation.md`.
 
+### Update 2026-11-19 (article text preview)
+
+Settings → Reading shows a live **Preview** of article text under the
+Text size, Reading width and Line spacing controls, so a reader sees the
+effect without leaving settings. It is accurate by construction:
+`readerColumnClass()` in `src/components/reader/reader-typography.ts` is
+the one class builder for both the reader's column and the preview
+(`src/components/settings/reading-preview.tsx`), and the sample goes
+through the reader's `ArticleContent`. The preview column is capped by
+the settings pane, so a reading width wider than the pane shows as the
+pane's full width. The sample's link is inert.
+
 ## Behaviour
 
 ```gherkin
@@ -146,7 +158,9 @@ Feature: Reading appearance
 |------|------|
 | `packages/core/src/types/index.ts` | `ReaderWidth`, `readerWidth`, `ReaderLineHeight`, `readerLineHeight`, `hideReadArticles`, `showArticleFeedIcons` and their defaults |
 | `src/components/settings/tabs/reading-tab.tsx` | The four controls; `SegmentedPreference` backs the two segmented ones |
-| `src/components/reader/reader-panel.tsx` | `READER_WIDTH_CLASS`; sole owner of the reading measure |
+| `src/components/reader/reader-typography.ts` | `readerColumnClass()`: text size, measure and line spacing of the reading column; sole owner of the reading measure |
+| `src/components/reader/reader-panel.tsx` | Applies `readerColumnClass()` to the `<article>` column |
+| `src/components/settings/reading-preview.tsx` | Live sample in settings, styled by the same builder |
 | `src/components/reader/article-content.tsx` | Carries no measure of its own |
 | `src/components/articles/article-list.tsx` | `visibleArticles` filter, `CaughtUpArticleList`, favicon and preview gating, `LIST_TEXT_SIZE_CLASS` |
 | `src/components/articles/article-item.tsx` | The row: title, preview, one-line source row, all sized in `em` |

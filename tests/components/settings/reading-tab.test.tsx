@@ -288,6 +288,76 @@ describe("<ReadingTab>", () => {
     });
   });
 
+  describe("article text preview (owner request 2026-11)", () => {
+    beforeEach(async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      const { DEFAULT_PREFERENCES } = await import("@feedzero/core/types");
+      usePreferencesStore.setState({ preferences: { ...DEFAULT_PREFERENCES } });
+    });
+
+    // The preview is only worth having if it cannot drift from the
+    // reader, so it is asserted against the reader's own class builder.
+    it("shows sample article text styled by the reader's own classes", async () => {
+      const { readerColumnClass } = await import(
+        "@/components/reader/reader-typography.ts"
+      );
+      renderTab();
+
+      const preview = screen.getByRole("region", { name: /preview/i });
+      expect(within(preview).getByRole("heading")).toBeInTheDocument();
+      expect(within(preview).getAllByText(/\w+/).length).toBeGreaterThan(1);
+      const column = within(preview).getByTestId("reading-preview-column");
+      for (const cls of readerColumnClass({
+        textSize: "medium",
+        width: "medium",
+        lineHeight: "normal",
+      }).split(" ").filter(Boolean)) {
+        expect(column.className).toContain(cls);
+      }
+    });
+
+    it("follows text size, line spacing and reading width as they change", () => {
+      renderTab();
+      const column = screen.getByTestId("reading-preview-column");
+
+      fireEvent.click(
+        within(screen.getByRole("group", { name: /text size/i })).getByRole("button", {
+          name: /^extra large$/i,
+        }),
+      );
+      expect(column.className).toContain("text-xl");
+
+      fireEvent.click(
+        within(screen.getByRole("group", { name: /line spacing/i })).getByRole("button", {
+          name: /^relaxed$/i,
+        }),
+      );
+      expect(column.className).toContain("leading-loose");
+
+      fireEvent.click(
+        within(screen.getByRole("group", { name: /reading width/i })).getByRole("button", {
+          name: /^narrow$/i,
+        }),
+      );
+      expect(column.className).toContain("max-w-150");
+    });
+
+    it("renders the sample through the reader's ArticleContent, links and quotes included", () => {
+      renderTab();
+      const preview = screen.getByRole("region", { name: /preview/i });
+      expect(preview.querySelector("blockquote")).not.toBeNull();
+      expect(preview.querySelector("a")).not.toBeNull();
+    });
+
+    it("keeps the sample link from navigating away from settings", () => {
+      renderTab();
+      const link = screen.getByRole("region", { name: /preview/i }).querySelector("a")!;
+      expect(link.getAttribute("href")).toBe("#");
+      // fireEvent returns false when the click's default was prevented.
+      expect(fireEvent.click(link)).toBe(false);
+    });
+  });
+
   it("renders a Group floods toggle reflecting useAppStore state", () => {
     useAppStore.setState({ groupArticleFloods: true });
     renderTab();

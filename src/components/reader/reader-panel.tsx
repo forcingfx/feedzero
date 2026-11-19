@@ -14,42 +14,7 @@ import { shareArticle } from "@/lib/share-article.ts";
 import { noteFullTextRequest } from "@/lib/suggest-always-full-text.ts";
 import { TAP_TARGET_EXPAND, TAP_TARGET_EXPAND_Y } from "@/lib/tap-target.ts";
 import { usePreferencesStore } from "@/stores/preferences-store.ts";
-import type { ReaderLineHeight, ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
-
-/**
- * Body scale per readerTextSize preference. Headings keep their absolute
- * sizes from ArticleContent — the preference tunes reading comfort of
- * body copy, not the whole hierarchy.
- */
-const TEXT_SIZE_CLASS: Record<ReaderTextSize, string> = {
-  small: "text-sm",
-  medium: "",
-  large: "text-lg",
-  "x-large": "text-xl",
-};
-
-/**
- * Reading measure per readerWidth preference. "medium" is the historical
- * 45rem column. This is the ONLY place the measure is set — ArticleContent
- * deliberately carries no max-width of its own, so headings and prose can
- * never end up at two different widths.
- */
-const READER_WIDTH_CLASS: Record<ReaderWidth, string> = {
-  narrow: "max-w-150",
-  medium: "max-w-180",
-  wide: "max-w-240",
-  full: "max-w-none",
-};
-
-/**
- * Line spacing per readerLineHeight preference. Like the measure, it is
- * set only on the column: ArticleContent carries no leading of its own.
- */
-const LINE_HEIGHT_CLASS: Record<ReaderLineHeight, string> = {
-  compact: "leading-normal",
-  normal: "leading-relaxed",
-  relaxed: "leading-loose",
-};
+import { READER_TITLE_CLASS, readerColumnClass } from "./reader-typography.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
@@ -350,14 +315,16 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           with dead space on the right. */}
       <article
         className={cn(
-          "p-4 px-6 mx-auto",
-          READER_WIDTH_CLASS[readerWidth],
-          TEXT_SIZE_CLASS[readerTextSize],
-          LINE_HEIGHT_CLASS[readerLineHeight],
+          "p-4 px-6",
+          readerColumnClass({
+            textSize: readerTextSize,
+            width: readerWidth,
+            lineHeight: readerLineHeight,
+          }),
         )}
       >
         <header className="mb-3">
-          <h2 className="text-2xl font-semibold tracking-tight mb-2 break-words">
+          <h2 className={READER_TITLE_CLASS}>
             {article.link ? (
               <a
                 href={article.link}
