@@ -193,7 +193,7 @@ interface FeedStore {
   setFeedSortMode: (mode: FeedSortMode) => void;
   reorderFeeds: (orderedIds: string[]) => void;
   reorderFolders: (orderedIds: string[]) => void;
-  /** Per-folder collapse state. Missing key means "open" (the default). */
+  /** Per-folder collapse state, kept across reloads on this device. Missing key means "open" (the default). */
   folderOpenState: Record<string, boolean>;
   setFolderOpen: (folderId: string, open: boolean) => void;
   toggleFolderOpen: (folderId: string) => void;
@@ -261,9 +261,26 @@ function readSortMode(): FeedSortMode {
 function readJsonArray(key: string): string[] {
   try {
     const v = localStorage.getItem(key);
-    if (v) return JSON.parse(v) as string[];
+    const parsed: unknown = v ? JSON.parse(v) : [];
+    if (Array.isArray(parsed)) return parsed as string[];
   } catch { /* ignore */ }
   return [];
+}
+
+/** Rebuild the open-state map from the collapsed folder ids saved on this device. */
+function readFolderOpenState(): Record<string, boolean> {
+  const collapsedIds = readJsonArray(LOCAL_STORAGE.COLLAPSED_FOLDER_IDS);
+  return Object.fromEntries(collapsedIds.map((id) => [id, false]));
+}
+
+function persistFolderOpenState(state: Record<string, boolean>): void {
+  const collapsedIds = Object.keys(state).filter((id) => state[id] === false);
+  try {
+    localStorage.setItem(
+      LOCAL_STORAGE.COLLAPSED_FOLDER_IDS,
+      JSON.stringify(collapsedIds),
+    );
+  } catch { /* localStorage unavailable */ }
 }
 
 function sortFoldersByName(folders: Folder[]): Folder[] {
@@ -512,7 +529,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   feedCustomOrder: readJsonArray(LOCAL_STORAGE.FEED_CUSTOM_ORDER),
   folderCustomOrder: readJsonArray(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER),
   recentFeedIds: readJsonArray(LOCAL_STORAGE.RECENT_FEED_IDS),
-  folderOpenState: {},
+  folderOpenState: readFolderOpenState(),
   feedsLoaded: false,
   rulesEditorFeedId: null,
   openRulesEditor: (feedId) => set({ rulesEditorFeedId: feedId }),
@@ -833,6 +850,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
     await dbRemoveFolder(folderId);
     await Promise.all([reloadFeeds(set), reloadFolders(set)]);
+    const { [folderId]: _deleted, ...folderOpenState } = get().folderOpenState;
+    set({ folderOpenState });
+    persistFolderOpenState(folderOpenState);
     schedulePush();
   },
 
@@ -859,17 +879,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     persistPreferences({ folderCustomOrder: orderedIds });
   },
 
-  setFolderOpen: (folderId, open) =>
-    set((s) => ({ folderOpenState: { ...s.folderOpenState, [folderId]: open } })),
+  setFolderOpen: (folderId, open) => {
+    const folderOpenState = { ...get().folderOpenState, [folderId]: open };
+    set({ folderOpenState });
+    persistFolderOpenState(folderOpenState);
+  },
 
-  toggleFolderOpen: (folderId) =>
-    set((s) => {
-      const current = s.folderOpenState[folderId];
-      // undefined is treated as open (matches the previous useState(true)
-      // default in FolderItem), so the first toggle closes the folder.
-      const next = current === undefined ? false : !current;
-      return { folderOpenState: { ...s.folderOpenState, [folderId]: next } };
-    }),
+  toggleFolderOpen: (folderId) => {
+    // undefined is treated as open (matches the FolderItem default), so
+    // the first toggle closes the folder.
+    const isOpen = get().folderOpenState[folderId] ?? true;
+    get().setFolderOpen(folderId, !isOpen);
+  },
 
   /**
    * Bulk-apply an auto-organize plan: for each entry with feeds, create a

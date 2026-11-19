@@ -168,6 +168,11 @@ export const LOCAL_STORAGE = {
    *  is per-device and never syncs); drives the mobile drawer quick-switch
    *  dock. */
   RECENT_FEED_IDS: "feedzero:recent-feed-ids",
+  /** Ids of the sidebar folders the user has collapsed. Device-local,
+   *  like the list width: a phone and a desktop reasonably keep different
+   *  folders shut. Only collapsed ids are stored, so an absent folder is
+   *  open. */
+  COLLAPSED_FOLDER_IDS: "feedzero:collapsed-folder-ids",
   /** Set when a local change has been persisted but its debounced cloud
    *  push hasn't fired yet. Survives a tab reload (which drops the
    *  in-memory debounce timer) so the next pull() can flush the change to

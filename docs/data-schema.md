@@ -142,6 +142,19 @@ On subsequent app loads, `openWithKeys()` imports JWKs directly — no passphras
 
 Recovery still requires the original passphrase (re-derives all keys).
 
+### Collapsed folders (localStorage)
+
+`localStorage["feedzero:collapsed-folder-ids"]` holds a JSON array of the
+ids of the sidebar folders the user has collapsed, so they are still
+collapsed after a reload. It is device-local and never synced, like the
+sidebar width: a phone and a desktop reasonably keep different folders
+shut, and syncing it would cost a vault push per chevron tap. Only
+collapsed ids are stored, so a folder that is absent is open; deleting a
+folder drops its id. The ids are random and carry no folder names.
+`feed-store.ts` reads the key at startup and writes it from
+`setFolderOpen`. Covered by `tests/stores/feed-store-folder-open.test.ts`
+and `tests/e2e/folder-collapse-persistence.spec.ts`.
+
 #### Payload Size Padding
 
 The sync push payload is padded to the nearest power-of-2 bucket size (64KB, 128KB, ..., up to 4MB max) using a random `_pad` field. This prevents an observer from inferring subscription count or activity from transfer sizes.
