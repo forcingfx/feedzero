@@ -27,6 +27,37 @@ Scenario: App-wide full text, one folder kept on feed text
   Then it opens in Full text
 ```
 
+### Suggesting full text for a feed (2026-11-19)
+
+A reader who keeps tapping "Full text" on one feed wants that feed to
+open in full text, but the setting that does it sits in the feed's
+settings dialog. So the second article of a feed they ask full text for
+by hand brings a toast: "Always open <feed> in full text?" with an
+**Always** action that turns on the feed's "Prefer full text".
+
+```gherkin
+Scenario: Offering the feed-wide setting
+  Given a feed that opens in feed text
+  When I tap "Full text" on one article, then on another from the same feed
+  Then I am asked whether to always open that feed in full text
+  And choosing "Always" makes its next article open in full text untouched
+
+Scenario: Not nagging
+  Given I was asked about a feed and ignored it
+  Then I am not asked about that feed again
+```
+
+`src/lib/suggest-always-full-text.ts` owns the rules: only a tap counts
+(the automatic switch for full-text feeds does not), flipping one article
+back and forth counts once, a feed that already opens in full text (its
+own setting, its folder's, or the app default) is never counted, and the
+offer is made once per feed whether accepted or ignored. Counts live in
+`localStorage["feedzero:full-text-requests"]`, device-local and keyed by
+feed id; nothing leaves the browser. Covered by
+`tests/lib/suggest-always-full-text.test.ts`,
+`tests/components/reader/reader-panel-full-text-suggestion.test.tsx` and
+`tests/e2e/full-text-suggestion.spec.ts`.
+
 ## Behaviour
 
 ```gherkin

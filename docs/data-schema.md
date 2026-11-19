@@ -155,6 +155,14 @@ folder drops its id. The ids are random and carry no folder names.
 `setFolderOpen`. Covered by `tests/stores/feed-store-folder-open.test.ts`
 and `tests/e2e/folder-collapse-persistence.spec.ts`.
 
+### Full text requests (localStorage)
+
+`localStorage["feedzero:full-text-requests"]` maps a feed id to the
+number of articles the reader has asked full text for by hand, or to
+`"asked"` once the app has offered to make full text that feed's default
+(feature 006). Device-local and never synced. An entry for a deleted
+feed is inert.
+
 #### Payload Size Padding
 
 The sync push payload is padded to the nearest power-of-2 bucket size (64KB, 128KB, ..., up to 4MB max) using a random `_pad` field. This prevents an observer from inferring subscription count or activity from transfer sizes.

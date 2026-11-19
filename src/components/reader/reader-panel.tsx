@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { shareArticle } from "@/lib/share-article.ts";
+import { noteFullTextRequest } from "@/lib/suggest-always-full-text.ts";
 import { TAP_TARGET_EXPAND, TAP_TARGET_EXPAND_Y } from "@/lib/tap-target.ts";
 import { usePreferencesStore } from "@/stores/preferences-store.ts";
 import type { ReaderLineHeight, ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
@@ -311,6 +312,9 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   function handleModeChange(mode: ViewMode) {
     if (mode === "extracted") {
       switchToExtracted(article?.link);
+      // Only a tap lands here; the automatic switch for full-text feeds
+      // calls switchToExtracted directly and is never counted.
+      if (article) noteFullTextRequest(article);
     } else {
       setViewMode("feed");
     }
