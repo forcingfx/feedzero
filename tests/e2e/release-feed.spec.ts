@@ -41,14 +41,14 @@ test.describe("Release notes auto-subscribe", () => {
       });
     });
 
+    const autoSubscribe = page.waitForResponse("**/api/feed*", { timeout: 15000 });
     await page.goto("/feeds");
 
-    // Wait for auto-subscribe to complete. The feed name appears in the
-    // breadcrumb on both desktop and mobile once the feed-store selects it,
-    // even before the sidebar is opened on mobile.
-    await expect(
-      page.locator("text=FeedZero Release Notes"),
-    ).toBeVisible({ timeout: 15000 });
+    // Wait for the auto-subscribe request itself. This used to wait for
+    // the feed's name in the phone's header breadcrumb; the header bar is
+    // gone, and with a single feed the app sits on Explore, which names
+    // no feed. The sidebar assertion below is the user-visible outcome.
+    await autoSubscribe;
 
     // On mobile the feed list is a vaul drawer. This used to click the
     // legacy [data-sidebar="trigger"], which no longer exists, so the

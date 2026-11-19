@@ -4,7 +4,7 @@
  * and the cog + sort pills on the right. Hidden on mobile — the
  * global header in app-layout carries the breadcrumb + pills there.
  *
- * MobileHeaderPills is the bare pills-only wrapper mounted in the
+ * MobileViewPill is the bare pills-only wrapper mounted in the
  * mobile global header.
  */
 
@@ -14,7 +14,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import {
   ArticleListControls,
-  MobileHeaderPills,
+  MobileViewPill,
 } from "@/components/articles/article-list-controls.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -61,8 +61,9 @@ const { useIsMobileSpy } = vi.hoisted(() => ({
   useIsMobileSpy: vi.fn(() => false),
 }));
 
-vi.mock("@/hooks/use-mobile.ts", () => ({
-  useIsMobile: () => useIsMobileSpy(),
+// The controls switch on the shell's desktop breakpoint.
+vi.mock("@/hooks/use-media-query.ts", () => ({
+  useIsDesktop: () => !useIsMobileSpy(),
 }));
 
 function feed(id: string, title: string): Feed {
@@ -121,11 +122,16 @@ describe("ArticleListControls (desktop title bar)", () => {
     expect(screen.getByLabelText(/sort/i)).toBeInTheDocument();
   });
 
-  it("hides entirely on mobile (returns null)", () => {
+  it("on a phone it is the list's title, not a bar of actions", () => {
+    // The actions live in the floating view pill there; this spot names
+    // the view and its unread count, and scrolls away with the rows.
     useIsMobileSpy.mockReturnValue(true);
     useFeedStore.setState({ selectedFeedId: "f-tech" });
     renderControls();
     expect(screen.queryByTestId("article-list-controls")).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Tech Crunchies" })).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-list-title")).toHaveTextContent(/unread|All read/);
+    expect(screen.queryByTestId("settings-pill")).toBeNull();
   });
 
   it("shows the feed title on a single feed view", () => {
@@ -166,7 +172,7 @@ describe("ArticleListControls (desktop title bar)", () => {
   });
 });
 
-describe("MobileHeaderPills", () => {
+describe("MobileViewPill", () => {
   beforeEach(() => {
     useFeedStore.setState({
       feeds: [feed("f-tech", "Tech Crunchies")],
@@ -185,10 +191,10 @@ describe("MobileHeaderPills", () => {
     // sort + contextual settings consolidate into one menu.
     render(
       <MemoryRouter>
-        <MobileHeaderPills />
+        <MobileViewPill />
       </MemoryRouter>,
     );
-    const wrapper = screen.getByTestId("mobile-header-pills");
+    const wrapper = screen.getByTestId("mobile-view-pill");
     expect(wrapper.className).not.toMatch(/sticky/);
     expect(screen.getByTestId("view-options-pill")).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-refresh")).toBeNull();
@@ -199,7 +205,7 @@ describe("MobileHeaderPills", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <MobileHeaderPills />
+        <MobileViewPill />
       </MemoryRouter>,
     );
 
@@ -213,7 +219,7 @@ describe("MobileHeaderPills", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <MobileHeaderPills />
+        <MobileViewPill />
       </MemoryRouter>,
     );
 
@@ -228,7 +234,7 @@ describe("MobileHeaderPills", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <MobileHeaderPills />
+        <MobileViewPill />
       </MemoryRouter>,
     );
 

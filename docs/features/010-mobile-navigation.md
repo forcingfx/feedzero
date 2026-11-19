@@ -33,9 +33,14 @@ Feature: Mobile navigation
 
   Rule: The bars are glass
 
-  Scenario: Content scrolls underneath the header and the tab bar
+  Scenario: Content scrolls underneath the floating chrome
     Given the user is on any mobile page
-    Then the header is a translucent, blurred bar (`.glass-bar`)
+    Then there is no header bar
+    And on a feed list the view options sit in a floating glass pill at
+      the top right, and the list is titled with the view's name and
+      unread count, which scroll away with the rows
+    And sync status is a thin bar under the status bar: blue while
+      working, green as it lands, then gone
     And the tab bar is a floating liquid-glass capsule (`.liquid-glass`),
       inset 16 px from the sides and 8 px above the home indicator
     And every mobile scroller pads by --chrome-top / --chrome-bottom so
@@ -261,6 +266,33 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
   `src/lib/feed-list-path.ts`. Tests:
   `tests/components/layout/mobile-nav-drawer.test.tsx`,
   `tests/e2e/feeds-tab.spec.ts`.
+
+- **No header bar on a phone** (owner request, 2026-11-19). The pinned
+  48px bar held a breadcrumb, a status dot and one menu button. The
+  breadcrumb also went stale: back on the list it still named the last
+  article read. The bar is gone and each of its three jobs moved:
+  - *Naming the view*: the article list titles itself (`MobileListTitle`
+    in `article-list-controls.tsx`): the view's name large, its unread
+    count under it, scrolling away with the rows. Its height is fixed
+    (`MOBILE_LIST_TITLE_PX`) because the list's virtualizer positions
+    rows below it.
+  - *View options*: one floating `liquid-glass` pill at the top right
+    (`MobileViewPill`), shown only on feed routes, holding sort, mark
+    read and the feed / folder / filter settings.
+  - *Sync status*: `MobileSyncIndicator`, a 2px bar under the status bar.
+    Blue and moving while feeds refresh or the vault syncs, green for
+    1.2s as the work lands, then gone. A chip says "Synced" ("Up to date"
+    on a local-only account) only after a refresh; background vault
+    pushes, which follow every star and read mark, get the bar alone. An
+    error holds the bar red with a "Sync error" chip until it recovers.
+    The full "Refreshed X ago" line is still in the drawer footer.
+  `--chrome-top` is now the status bar's safe area only. The article
+  list's controls switch on the shell's `lg` breakpoint; they used a
+  separate 768px check, which left tablets with both layouts' chrome.
+- **Closing the reader clears the selection on a phone.** The list is a
+  destination of its own there, so with the reader closed nothing is
+  selected (`feeds-route.tsx`). The selection used to linger, which is
+  what the stale breadcrumb was showing.
 
 ## Limitations
 

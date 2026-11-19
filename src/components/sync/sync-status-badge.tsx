@@ -52,17 +52,11 @@ const TICK_INTERVAL_MS = 30 * 1000;
 type DisplayState = "local-only" | "syncing" | "synced" | "error";
 
 interface SyncStatusBadgeProps {
-  /**
-   * Dot-only rendering for the mobile header: the color carries the
-   * state, the full text stays in the accessible label, and the
-   * verbose "Refreshed X ago · mode" line lives in the drawer footer.
-   */
-  compact?: boolean;
   /** Optional click hook (e.g. close the drawer before navigating). */
   onClick?: () => void;
 }
 
-export function SyncStatusBadge({ compact = false, onClick }: SyncStatusBadgeProps = {}) {
+export function SyncStatusBadge({ onClick }: SyncStatusBadgeProps = {}) {
   const status = useSyncStore((s) => s.status);
   const lastRefreshAllAt = useFeedStore((s) => s.lastRefreshAllAt);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
@@ -131,7 +125,7 @@ export function SyncStatusBadge({ compact = false, onClick }: SyncStatusBadgePro
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full text-xs font-medium",
         "hover:text-foreground transition-colors",
-        compact ? "p-2" : "px-2.5 py-1",
+        "px-2.5 py-1",
         tone,
       )}
     >
@@ -140,14 +134,10 @@ export function SyncStatusBadge({ compact = false, onClick }: SyncStatusBadgePro
       ) : (
         <span
           aria-hidden
-          className={cn(
-            "rounded-full",
-            compact ? "size-2" : "size-1.5",
-            dotColor,
-          )}
+          className={cn("size-1.5 rounded-full", dotColor)}
         />
       )}
-      {!compact && <span className="leading-none">{label}</span>}
+      <span className="leading-none">{label}</span>
     </Link>
   );
 }

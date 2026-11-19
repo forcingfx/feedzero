@@ -35,7 +35,7 @@ async function setupFeedMobile(page: import("@playwright/test").Page) {
 test.describe("Layout and scroll", () => {
   // Note: the desktop layout has no page-level pinned header — the only
   // <header> is the reader's article meta block, which scrolls inside the
-  // reader panel. The mobile equivalent does pin a page header and is
+  // reader panel. The mobile layout pins only a floating view pill and is
   // tested in the "Layout — mobile" describe below.
 
   test("no document-level scroll", async ({ feedPage: page }) => {
@@ -275,7 +275,7 @@ test.describe("Layout — mobile", () => {
     });
   });
 
-  test("header stays visible when scrolling article list", async ({
+  test("the view pill stays put and the title scrolls away with the list", async ({
     feedPage: page,
   }) => {
     await setupFeedMobile(page);
@@ -301,10 +301,13 @@ test.describe("Layout — mobile", () => {
       if (scrollContainer) scrollContainer.scrollTop = 1000;
     });
 
-    // Header should still be visible at the top
-    const header = page.locator("header").first();
-    const headerBox = await header.boundingBox();
-    expect(headerBox).toBeTruthy();
-    expect(headerBox!.y).toBeLessThanOrEqual(5);
+    // There is no header bar: the floating view pill is the only pinned
+    // control, and the list's title is content that scrolls with the rows.
+    const pillBox = await page.getByTestId("mobile-view-pill").boundingBox();
+    expect(pillBox).toBeTruthy();
+    expect(pillBox!.y).toBeGreaterThanOrEqual(0);
+    expect(pillBox!.y).toBeLessThanOrEqual(24);
+    await expect(page.locator("header")).toHaveCount(0);
+    await expect(page.getByTestId("mobile-list-title")).not.toBeInViewport();
   });
 });

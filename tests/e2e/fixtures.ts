@@ -128,8 +128,11 @@ export async function openFeedDrawer(page: Page): Promise<boolean> {
     );
 
   await feedsTab.click();
-  if (!(await drawerOpened(1500))) {
-    await feedsTab.click();
+  if (!(await drawerOpened(3000))) {
+    // If the drawer is in fact on its way up, its overlay now covers the
+    // tab and this second tap cannot land; that is fine, so do not wait
+    // long for it or fail on it.
+    await feedsTab.click({ timeout: 2000 }).catch(() => {});
     await drawerOpened(10000);
   }
   // vaul slides the drawer up; clicking mid-animation resolves buttons
