@@ -89,21 +89,24 @@ describe("FeedFavicon", () => {
     expect(img.classList.contains("hidden")).toBe(false);
   });
 
-  it("has visible border on loaded favicon for contrast against white backgrounds", () => {
+  // Pin: the icon fills its box with no ring and no inset. A 1px ring
+  // plus 1px of white padding read as a white frame around every icon on
+  // a dark list (user report 2026-11). The trade-off: a white-on-
+  // transparent icon is faint in light mode, as it is in any browser tab.
+  it("draws the icon edge to edge, with no ring or inset", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
     const img = container.querySelector("img")!;
-    fireEvent.load(img);
-    expect(img.className).toContain("ring-1");
+    expect(img.className).not.toContain("ring-1");
+    expect(img.className).not.toContain("p-px");
   });
 
-  // Some favicons are dark-on-transparent (TechCrunch, GitHub octocat dark variants).
-  // Without a backing, they blend into the dark theme background. Default variant
-  // must get a white pill in dark mode so any icon stays visible.
+  // Some favicons are dark-on-transparent (GitHub's octocat). Without a
+  // backing they vanish into the dark theme, so the white stays, but only
+  // behind the icon's own transparent pixels.
   it("paints a white backing in dark mode so dark favicons stay visible", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
     const img = container.querySelector("img")!;
     expect(img.className).toContain("dark:bg-white");
-    expect(img.className).toContain("dark:p-px");
   });
 
   it("avatar variant keeps its always-on white backing (unaffected by dark-mode default)", () => {

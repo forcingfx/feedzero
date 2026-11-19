@@ -12,6 +12,7 @@ import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { usePreferencesStore } from "@/stores/preferences-store";
 import type {
+  ListTextSize,
   OpenArticlesIn,
   ReaderLineHeight,
   ReaderTextSize,
@@ -30,6 +31,8 @@ const TEXT_SIZES: { value: ReaderTextSize; label: string }[] = [
   { value: "large", label: "Large" },
   { value: "x-large", label: "Extra large" },
 ];
+
+const LIST_SIZES: { value: ListTextSize; label: string }[] = TEXT_SIZES;
 
 const READER_WIDTHS: { value: ReaderWidth; label: string }[] = [
   { value: "narrow", label: "Narrow" },
@@ -69,6 +72,14 @@ export function ReadingTab() {
             options={TEXT_SIZES}
             value={prefs.readerTextSize ?? "medium"}
             onChange={(value) => void updatePreferences({ readerTextSize: value })}
+          />
+        </SettingRow>
+        <SettingRow label="List size" description="Text size and row spacing in the article list.">
+          <SegmentedControl
+            label="List size"
+            options={LIST_SIZES}
+            value={prefs.listTextSize ?? "medium"}
+            onChange={(value) => void updatePreferences({ listTextSize: value })}
           />
         </SettingRow>
         <SettingRow label="Reading width" description="How wide the article column gets.">
@@ -113,12 +124,22 @@ export function ReadingTab() {
         </SettingRow>
         <SettingRow
           label="Show feed icons"
-          description="Source favicons on article rows in All items and folder views."
+          description="Source favicons before the feed name on article rows in All items and folder views."
         >
           <Switch
             aria-label="Show feed icons"
             checked={prefs.showArticleFeedIcons ?? true}
             onCheckedChange={(v) => void updatePreferences({ showArticleFeedIcons: !!v })}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Show article preview"
+          description="Up to two lines of each article's opening text under its title in the list."
+        >
+          <Switch
+            aria-label="Show article preview"
+            checked={prefs.showArticlePreview ?? true}
+            onCheckedChange={(v) => void updatePreferences({ showArticlePreview: !!v })}
           />
         </SettingRow>
         <SettingRow

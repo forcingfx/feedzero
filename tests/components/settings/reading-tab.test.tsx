@@ -246,6 +246,48 @@ describe("<ReadingTab>", () => {
     });
   });
 
+  describe("list appearance (user report 2026-11)", () => {
+    it("offers a list size control defaulting to Medium", () => {
+      renderTab();
+      const group = screen.getByRole("group", { name: /list size/i });
+      expect(
+        within(group).getByRole("button", { name: /^medium$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("selecting a Large list persists the preference", async () => {
+      const { usePreferencesStore } = await import(
+        "@/stores/preferences-store.ts"
+      );
+      renderTab();
+      const group = screen.getByRole("group", { name: /list size/i });
+
+      fireEvent.click(within(group).getByRole("button", { name: /^large$/i }));
+
+      expect(usePreferencesStore.getState().preferences.listTextSize).toBe("large");
+    });
+
+    it("shows article previews by default", () => {
+      renderTab();
+      expect(
+        screen.getByRole("switch", { name: /show article preview/i }),
+      ).toBeChecked();
+    });
+
+    it("turning previews off persists the preference", async () => {
+      const { usePreferencesStore } = await import(
+        "@/stores/preferences-store.ts"
+      );
+      renderTab();
+
+      fireEvent.click(screen.getByRole("switch", { name: /show article preview/i }));
+
+      expect(
+        usePreferencesStore.getState().preferences.showArticlePreview,
+      ).toBe(false);
+    });
+  });
+
   it("renders a Group floods toggle reflecting useAppStore state", () => {
     useAppStore.setState({ groupArticleFloods: true });
     renderTab();
