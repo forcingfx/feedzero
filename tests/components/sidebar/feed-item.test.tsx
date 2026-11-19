@@ -212,3 +212,35 @@ describe("FeedItem", () => {
     expect(screen.queryByTestId("failed-feed-indicator")).toBeNull();
   });
 });
+
+/**
+ * Structural pins for the phone feed list (user report 2026-11: "the
+ * feeds are close together"). The drawer is the only place these rows
+ * render below the desktop breakpoint, so `max-lg:` sizes it alone.
+ */
+describe("FeedItem sizing", () => {
+  beforeEach(() => {
+    useArticleStore.setState({ articlesByFeedId: {}, articles: [] });
+    useFeedStore.setState({ feeds: [mockFeed], folders: [], selectedFeedId: null });
+  });
+
+  it("the row is 44px tall with body text on a phone", () => {
+    renderFeedItem();
+    const row = screen.getByRole("button", { name: /Example Feed/ });
+    expect(row.className).toContain("max-lg:h-11");
+    expect(row.className).toContain("max-lg:text-base");
+  });
+
+  it("a row with an unread badge reserves room so a long title cannot run under it", () => {
+    useArticleStore.setState({
+      articlesByFeedId: { f1: [articleFixture("a1", false)] } as never,
+    });
+    renderFeedItem();
+    expect(screen.getByRole("button", { name: /Example Feed/ }).className).toContain("pr-11");
+  });
+
+  it("a row without a badge keeps its full width", () => {
+    renderFeedItem();
+    expect(screen.getByRole("button", { name: /Example Feed/ }).className).not.toContain("pr-11");
+  });
+});

@@ -244,10 +244,10 @@ export function SidebarFeedList({
               <button
                 data-testid="sort-toggle"
                 type="button"
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs max-lg:h-11 max-lg:gap-1.5 max-lg:px-3 max-lg:text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 aria-label={`Sort: ${SORT_LABELS[feedSortMode]}`}
               >
-                <ArrowUpDown className="size-3" />
+                <ArrowUpDown className="size-3 max-lg:size-4" />
                 <span>{SORT_LABELS[feedSortMode]}</span>
               </button>
             </DropdownMenuTrigger>

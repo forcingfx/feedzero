@@ -497,7 +497,9 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-8 text-sm",
+        // max-lg: below the desktop breakpoint the menu only renders in the
+        // phone's feed drawer, where a row is a 44px thumb target.
+        default: "h-8 text-sm max-lg:h-11 max-lg:text-base max-lg:gap-3",
         sm: "h-7 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
       },
@@ -579,7 +581,7 @@ function SidebarMenuAction({
         // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 md:after:hidden",
         "peer-data-[size=sm]/menu-button:top-1",
-        "peer-data-[size=default]/menu-button:top-1.5",
+        "peer-data-[size=default]/menu-button:top-1.5 max-lg:peer-data-[size=default]/menu-button:top-3",
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         // `showOnHover` hides the action on desktop (opacity-0) and reveals
@@ -612,7 +614,7 @@ function SidebarMenuBadge({
         "text-sidebar-foreground pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums select-none",
         "peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground",
         "peer-data-[size=sm]/menu-button:top-1",
-        "peer-data-[size=default]/menu-button:top-1.5",
+        "peer-data-[size=default]/menu-button:top-1.5 max-lg:peer-data-[size=default]/menu-button:top-3",
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         className,

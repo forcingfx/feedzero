@@ -15,6 +15,7 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
 } from "@/components/ui/sidebar.tsx";
+import { cn } from "@/lib/utils";
 import type { Folder } from "@feedzero/core/types";
 
 interface FolderItemProps {
@@ -106,7 +107,7 @@ export function FolderItem({
           <SidebarMenuButton
             isActive={isSelected}
             onClick={onSelect}
-            className="font-semibold pl-7"
+            className={cn("font-semibold pl-7 max-lg:pl-11", unreadCount > 0 && "pr-11")}
             style={colorStyle}
           >
             <span className="truncate">{folder.name}</span>
@@ -122,9 +123,9 @@ export function FolderItem({
             <button
               type="button"
               aria-label="Toggle folder"
-              className="absolute left-1 top-1 size-6 flex items-center justify-center z-10 transition-colors text-muted-foreground hover:text-foreground"
+              className="absolute left-1 top-1 size-6 max-lg:left-0 max-lg:top-0 max-lg:size-11 flex items-center justify-center z-10 transition-colors text-muted-foreground hover:text-foreground"
             >
-              <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
+              <ChevronRight className="size-3.5 max-lg:size-5 transition-transform group-data-[state=open]/folder:rotate-90" />
             </button>
           </Collapsible.Trigger>
         </div>

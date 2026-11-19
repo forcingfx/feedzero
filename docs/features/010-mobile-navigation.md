@@ -229,6 +229,21 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
 
 - **Closed strip is a standard tab bar (audit 2026-Q4, round 2)** — Earlier versions showed the selected feed's name, then a favicon dock with two shortcuts and a chevron. Both put unlabelled targets where phones put a labelled tab bar. The strip is now Feeds / Explore / Signal / Settings, each labelled, the current one marked; the recent-feed favicons moved to the first row of the open drawer. Recency (`recentFeedIds`) stays device-local and never syncs.
 
+- **Phone chrome is sized for thumbs and for reading, not only for hit
+  area** (user report, 2026-11-19, Pixel 7). Controls already had 44px
+  invisible tap targets, but they *looked* tiny next to the article
+  text, which follows the text size setting. Below the `lg` breakpoint:
+  the reader's source line is 14px on one truncating line; the Feed /
+  Full text control, share and star are 36px (past 44px with the
+  tap-target expansion); the previous / next bar is 44px capsules in the
+  tab bar's `liquid-glass`, so both bottom bars read as one system; feed
+  and folder rows in the drawer are 44px with 16px text, the folder
+  chevron is a 44px target, and the sort toggle and auto-organize wand
+  are 44px. A row with an unread badge reserves room for it, so a long
+  feed title truncates before the count instead of running under it.
+  All of it is `max-lg:` classes, so desktop is unchanged. No gesture
+  changed, so the ownership map above stands.
+
 ## Limitations
 
 - Browser back/forward buttons may not trigger `handleBack()` — they navigate directly via the router. The `skipAutoSelectRef` logic only applies to the in-app Back button.

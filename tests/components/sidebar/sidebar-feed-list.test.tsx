@@ -289,6 +289,21 @@ describe("SidebarFeedList", () => {
       useFeedStore.setState({ feedSortMode: "name", feedCustomOrder: [], folderCustomOrder: [] });
     });
 
+    it("the sort toggle is a 44px target with readable text on a phone", () => {
+      // User report 2026-11: "the buttons at the top and bottom are tiny".
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Alpha")],
+        folders: [],
+        selectedFeedId: null,
+      });
+
+      renderList();
+
+      const toggle = screen.getByTestId("sort-toggle");
+      expect(toggle.className).toContain("max-lg:h-11");
+      expect(toggle.className).toContain("max-lg:text-sm");
+    });
+
     it("renders a sort toggle button", () => {
       useFeedStore.setState({
         feeds: [mockFeed("f1", "Alpha"), mockFeed("f2", "Beta")],

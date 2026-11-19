@@ -33,7 +33,7 @@ test.describe("Content viewing", () => {
     await setupFeed(page);
 
     // Auto-selected first article — content should be visible
-    await expect(page.getByText("Short description only.")).toBeVisible({
+    await expect(page.getByTestId("article-content-area").getByText("Short description only.")).toBeVisible({
       timeout: 10000,
     });
   });
@@ -79,7 +79,7 @@ test.describe("Content viewing", () => {
     // the sidebar feed button labelled "Test Feed" (substring match would
     // resolve to two elements and Playwright fails strict-mode).
     await page.getByRole("button", { name: "Feed", exact: true }).click();
-    await expect(page.getByText("Short description only.")).toBeVisible({
+    await expect(page.getByTestId("article-content-area").getByText("Short description only.")).toBeVisible({
       timeout: 5000,
     });
 
@@ -135,7 +135,7 @@ test.describe("Content viewing", () => {
     await expect(fullTextToggle).toBeDisabled({ timeout: 10000 });
 
     // Feed content should still be visible despite extraction failure
-    await expect(page.getByText("Short description only.")).toBeVisible({
+    await expect(page.getByTestId("article-content-area").getByText("Short description only.")).toBeVisible({
       timeout: 5000,
     });
   });

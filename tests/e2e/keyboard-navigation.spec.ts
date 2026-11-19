@@ -40,7 +40,7 @@ test.describe("Keyboard navigation", () => {
 
     // Reader should show the second article content
     await expect(
-      page.getByText("Brief summary of the second article"),
+      page.getByTestId("article-content-area").getByText("Brief summary of the second article"),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -55,7 +55,7 @@ test.describe("Keyboard navigation", () => {
     // Press j to go to second article
     await page.keyboard.press("j");
     await expect(
-      page.getByText("Brief summary of the second article"),
+      page.getByTestId("article-content-area").getByText("Brief summary of the second article"),
     ).toBeVisible({ timeout: 10000 });
 
     // Press k to go back to first article

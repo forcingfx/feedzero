@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -1148,5 +1148,89 @@ describe("ReaderPanel", () => {
         .articlesByFeedId.f1.find((a) => a.id === "a1");
       expect(updated?.starred).toBe(true);
     });
+  });
+});
+
+/**
+ * Structural pins for the phone reader's chrome (user report 2026-11:
+ * "the sub-line with the feed and date, the button for feed/full text,
+ * sharing, star are so small. Same for the bar at the bottom"). happy-dom
+ * computes no styles, so these assert the classes that carry the sizes;
+ * `max-lg:` matches the JS desktop breakpoint, leaving desktop as it was.
+ */
+describe("ReaderPanel phone chrome sizing", () => {
+  const next = { ...mockArticle(), id: "a2", title: "Next Article" };
+  const prev = { ...mockArticle(), id: "a0", title: "Prev Article" };
+
+  beforeEach(() => {
+    mockIsDesktop = false;
+    useFeedStore.setState({
+      feeds: [
+        {
+          id: "f1",
+          url: "https://example.com/feed",
+          title: "SPIN - Music News, Album Reviews, Concert Photos, MP3s, Videos and More",
+          description: "",
+          siteUrl: "https://example.com",
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
+      selectedFeedId: "f1",
+    });
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+  });
+
+  afterEach(() => {
+    mockIsDesktop = true;
+  });
+
+  it("the source line is body-small text on a phone", () => {
+    render(<ReaderPanel />);
+    expect(screen.getByTestId("article-meta-line").className).toContain("max-lg:text-sm");
+  });
+
+  it("a long feed name truncates on one line and keeps its favicon beside it", () => {
+    render(<ReaderPanel />);
+    const meta = screen.getByTestId("article-meta-line");
+    expect(meta.className).not.toContain("flex-wrap");
+    const name = within(meta).getByText(/SPIN - Music News/);
+    expect(name.className).toContain("truncate");
+  });
+
+  it("the Feed / Full text control is body-small text and 36px tall on a phone", () => {
+    render(<ReaderPanel />);
+    const feedSegment = screen.getByRole("button", { name: "Feed" });
+    expect(feedSegment.parentElement!.className).toContain("max-lg:text-sm");
+    expect(feedSegment.className).toContain("max-lg:h-9");
+  });
+
+  it("star and share grow to 36px on a phone", () => {
+    render(<ReaderPanel />);
+    for (const name of [/star article/i, /share article/i]) {
+      const btn = screen.getByRole("button", { name });
+      expect(btn.className).toContain("max-lg:size-9");
+    }
+  });
+
+  it("the previous / next bar is 44px tall and shares the tab bar's glass", () => {
+    render(<ReaderPanel nextArticle={next} prevArticle={prev} onNavigate={vi.fn()} onBack={vi.fn()} />);
+    for (const id of ["back-pill", "prev-pill", "next-pill"]) {
+      const pill = screen.getByTestId(id);
+      expect(pill.className).toContain("h-11");
+      expect(pill.className).toContain("liquid-glass");
+    }
+    expect(screen.getByTestId("back-pill").className).toContain("w-11");
+  });
+
+  it("the back button names itself for screen readers", () => {
+    render(<ReaderPanel nextArticle={next} onNavigate={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Back to list" })).toBe(
+      screen.getByTestId("back-pill"),
+    );
   });
 });

@@ -38,7 +38,7 @@ test.describe("Article navigation", () => {
 
     // Reader should show the article content
     await expect(
-      page.getByText("Brief summary of the second article"),
+      page.getByTestId("article-content-area").getByText("Brief summary of the second article"),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -88,7 +88,7 @@ test.describe("Article navigation", () => {
     });
 
     // First article content should be visible in reader
-    await expect(page.getByText("Short description only.")).toBeVisible({
+    await expect(page.getByTestId("article-content-area").getByText("Short description only.")).toBeVisible({
       timeout: 10000,
     });
   });
@@ -153,7 +153,7 @@ test.describe("Article navigation — mobile", () => {
 
     // Tap an article to open the reader
     await page.locator('[role="option"]').first().click();
-    await expect(page.getByText("Short description only.")).toBeVisible({
+    await expect(page.getByTestId("article-content-area").getByText("Short description only.")).toBeVisible({
       timeout: 10000,
     });
     await expect(page.locator('[data-testid="back-pill"]')).toBeVisible();

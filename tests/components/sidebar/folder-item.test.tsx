@@ -378,3 +378,14 @@ describe("FolderItem", () => {
     expect(folderMenuItem!.contains(feedMenuItem)).toBe(false);
   });
 });
+
+describe("FolderItem sizing", () => {
+  it("the collapse chevron is a 44px target on a phone", () => {
+    // Pin: 24px was enough for a pointer, not for a thumb next to the
+    // folder name, which does something else (opens the folder's feed).
+    renderFolder();
+    expect(screen.getByRole("button", { name: "Toggle folder" }).className).toContain(
+      "max-lg:size-11",
+    );
+  });
+});
