@@ -77,9 +77,18 @@ effect without leaving settings. It is accurate by construction:
 `readerColumnClass()` in `src/components/reader/reader-typography.ts` is
 the one class builder for both the reader's column and the preview
 (`src/components/settings/reading-preview.tsx`), and the sample goes
-through the reader's `ArticleContent`. The preview column is capped by
-the settings pane, so a reading width wider than the pane shows as the
-pane's full width. The sample's link is inert.
+through the reader's `ArticleContent`.
+
+Text size and line spacing are shown at real size. **Reading width is
+drawn to scale**, not at its real measure (fix, 2026-11-19): the settings
+pane is about 700px wide, so the reader's measures (600 / 720 / 960px /
+none) mostly overflowed it and three of the four options looked the same,
+which read as a setting that did nothing. The preview column now takes a
+share of the pane (50 / 60 / 80 / 100%, the measures against a 1200px
+reader) and the preview's header states the real measure. Below the `lg`
+breakpoint the header says instead that an article fills the screen at
+every width, which is what the reader does there. The sample's link is
+inert.
 
 ## Behaviour
 
