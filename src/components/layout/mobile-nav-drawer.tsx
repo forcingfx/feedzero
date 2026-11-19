@@ -12,6 +12,7 @@ import { AutoOrganizePill } from "@/components/folders/auto-organize-pill.tsx";
 import { goToSettings } from "@/lib/go-to-settings.ts";
 import { SyncStatusBadge } from "@/components/sync/sync-status-badge.tsx";
 import { useMinimizeOnScroll } from "@/hooks/use-scroll-direction.ts";
+import { DEFAULT_FEED_LIST_PATH, feedListPath } from "@/lib/feed-list-path.ts";
 import { cn } from "@/lib/utils";
 
 type Section = "feeds" | "explore" | "signal" | "settings";
@@ -97,6 +98,34 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
         ? "settings"
         : "feeds";
   const [minimized, setMinimized] = useMinimizeOnScroll(section);
+  const onFeeds = section === "feeds";
+  // With no feeds there is no list to go back to, so the tab keeps its
+  // one-tap route to the drawer from wherever the user is.
+  const feedsTabOpensDrawer = onFeeds || feeds.length === 0;
+
+  // The feed list last seen, so the Feeds tab can return to it from
+  // another section. Kept for the visit only: this component never
+  // unmounts while the app is open, and a fresh load has nothing to
+  // return to but the default view.
+  const lastFeedListPathRef = useRef(DEFAULT_FEED_LIST_PATH);
+  useEffect(() => {
+    const listPath = feedListPath(pathname);
+    if (listPath && listPath !== "/feeds") lastFeedListPathRef.current = listPath;
+  }, [pathname]);
+
+  /**
+   * A tab first takes you to its section; tapping the tab you are already
+   * on does its second job. For Feeds that second job is the feed list
+   * drawer, so from Explore, Signal or Settings it takes two taps.
+   * The bare /feeds route is skipped as a destination: it redirects.
+   */
+  function handleFeedsTab() {
+    if (feedsTabOpensDrawer) {
+      setOpen(true);
+      return;
+    }
+    navigate(lastFeedListPathRef.current);
+  }
 
   return (
     // No `snapPoints` here: with a single snap point and an inline height,
@@ -137,11 +166,19 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
                 minimized && "pointer-events-none opacity-0",
               )}
             >
-              <Drawer.Trigger asChild>
-                <TabButton label="Feeds" aria-label="Feeds, open feed list" current={section === "feeds"} tabIndex={minimized ? -1 : 0}>
-                  <Layers className="size-5" />
-                </TabButton>
-              </Drawer.Trigger>
+              <TabButton
+                label="Feeds"
+                // The name says what this tap does: from another section
+                // it is plain navigation, on Feeds it opens the list.
+                aria-label={feedsTabOpensDrawer ? "Feeds, open feed list" : "Feeds"}
+                aria-haspopup={feedsTabOpensDrawer ? "dialog" : undefined}
+                aria-expanded={feedsTabOpensDrawer ? open : undefined}
+                current={onFeeds}
+                tabIndex={minimized ? -1 : 0}
+                onClick={handleFeedsTab}
+              >
+                <Layers className="size-5" />
+              </TabButton>
               <TabButton label="Explore" current={section === "explore"} tabIndex={minimized ? -1 : 0} onClick={() => navigate("/explore")}>
                 <Compass className="size-5" />
               </TabButton>

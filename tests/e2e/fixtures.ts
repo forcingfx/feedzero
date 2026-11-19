@@ -103,6 +103,42 @@ export async function addFeedViaUI(page: Page, url: string) {
 }
 
 /**
+ * Open the phone's feed list drawer. Returns false on a layout without
+ * the tab bar (desktop), so callers can fall through.
+ *
+ * The Feeds tab opens the drawer only when Feeds is the current section;
+ * from Explore, Signal or Settings its first tap goes back to the feed
+ * list (feature 010). So this taps once to get there when needed, then
+ * taps the tab again.
+ */
+export async function openFeedDrawer(page: Page): Promise<boolean> {
+  const tabs = page.getByTestId("drawer-handle-strip");
+  if (!(await tabs.isVisible({ timeout: 1000 }).catch(() => false))) return false;
+
+  // Tap, then look for the drawer, and tap again only if the first tap
+  // was spent on getting back to the feed list. Checking which state the
+  // tab is in before tapping races with the app's own navigation (adding
+  // a feed moves from Explore to that feed a moment later).
+  const feedsTab = tabs.getByRole("button", { name: /^Feeds/ });
+  const openDrawer = page.locator('[data-testid="drawer-content"][data-state="open"]');
+  const drawerOpened = (timeout: number) =>
+    openDrawer.waitFor({ state: "visible", timeout }).then(
+      () => true,
+      () => false,
+    );
+
+  await feedsTab.click();
+  if (!(await drawerOpened(1500))) {
+    await feedsTab.click();
+    await drawerOpened(10000);
+  }
+  // vaul slides the drawer up; clicking mid-animation resolves buttons
+  // while they are still off-viewport.
+  await page.waitForTimeout(350);
+  return true;
+}
+
+/**
  * Selects a feed in the sidebar. On mobile the feed list lives in the
  * bottom drawer, so open that first.
  *
@@ -116,20 +152,7 @@ export async function selectFeedInSidebar(page: Page, feedName: string) {
     hasText: feedName,
   });
   if (!(await feedButton.isVisible({ timeout: 1000 }).catch(() => false))) {
-    const drawerTrigger = page.getByRole("button", {
-      name: /open feed list/i,
-    });
-    if (await drawerTrigger.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await drawerTrigger.click();
-      // vaul slides the drawer up; clicking mid-animation resolves the
-      // feed button while it is still off-viewport. Wait for the panel
-      // to land before reaching into it.
-      await page
-        .locator('[data-testid="drawer-content"][data-state="open"]')
-        .waitFor({ state: "visible", timeout: 10000 })
-        .catch(() => {});
-      await page.waitForTimeout(350);
-    } else {
+    if (!(await openFeedDrawer(page))) {
       const legacyTrigger = page.locator('[data-sidebar="trigger"]');
       if (await legacyTrigger.isVisible({ timeout: 1000 }).catch(() => false)) {
         await legacyTrigger.click();
@@ -156,18 +179,7 @@ export async function openSidebar(page: Page) {
     return;
   }
 
-  const drawerTrigger = page.getByRole("button", { name: /open feed list/i });
-  if (await drawerTrigger.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await drawerTrigger.click();
-    // vaul slides the drawer up; clicking mid-animation resolves buttons
-    // while they are still off-viewport.
-    await page
-      .locator('[data-testid="drawer-content"][data-state="open"]')
-      .waitFor({ state: "visible", timeout: 10000 })
-      .catch(() => {});
-    await page.waitForTimeout(350);
-    return;
-  }
+  if (await openFeedDrawer(page)) return;
 
   const legacyTrigger = page.locator('[data-sidebar="trigger"]');
   if (await legacyTrigger.isVisible({ timeout: 1000 }).catch(() => false)) {

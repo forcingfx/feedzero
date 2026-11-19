@@ -178,7 +178,7 @@ Gesture ownership map (mobile):
 | `src/lib/swipe-back.ts` | `shouldCommitSwipeBack()`: speed OR distance decides the release (flick ≥ 400px/s, or ≥ 35% of the width) |
 | `src/index.css` | `touch-action: pan-y pinch-zoom` on `[data-reader-layer]` and its `[data-reader-scroll]` scrollers; `auto` on `<pre>` |
 | `src/hooks/use-media-query.ts` | `useIsDesktop()` hook for responsive breakpoint detection |
-| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = floating liquid-glass capsule with four tabs, minimized on scroll (`useMinimizeOnScroll`, capture-phase `scroll` listener, ignores the reader and the drawer); was a four-tab bar (Feeds opens the drawer; Explore, Signal, Settings navigate); open state = recent-feeds row + content-sized feed list (capped at 85dvh) + one-row footer: status line, then icon-only Auto-organize / New folder / Refresh all |
+| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = floating liquid-glass capsule with four tabs, minimized on scroll (`useMinimizeOnScroll`, capture-phase `scroll` listener, ignores the reader and the drawer); was a four-tab bar (Feeds returns to the last feed list, or opens the drawer when already on Feeds; Explore, Signal, Settings navigate); open state = recent-feeds row + content-sized feed list (capped at 85dvh) + one-row footer: status line, then icon-only Auto-organize / New folder / Refresh all |
 | `src/lib/recent-feeds.ts` | `recordRecentFeed()` + `MOBILE_DOCK_FEED_CAP` (and `stableDockFeeds()`, now unused by the drawer) |
 | `src/stores/feed-store.ts` | Tracks `recentFeedIds` (device-local, persisted) — recorded in `selectFeed`, pruned in `removeFeed` |
 
@@ -243,6 +243,24 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
   feed title truncates before the count instead of running under it.
   All of it is `max-lg:` classes, so desktop is unchanged. No gesture
   changed, so the ownership map above stands.
+
+- **The Feeds tab goes to Feeds first, and opens the drawer second**
+  (owner request, 2026-11-19). The tab used to open the feed list drawer
+  from anywhere, so from Settings there was no one-tap way back to what
+  you were reading: you had to open the drawer and pick the feed again.
+  Now, from Explore, Signal or Settings, a tap returns to the feed list
+  last seen this visit (the list, not an article that was open in it;
+  All items when none was seen). When Feeds is already the current tab,
+  a tap opens the drawer, so the drawer is two taps from another section
+  and one tap from Feeds. The accessible name follows: "Feeds" when the
+  tap navigates, "Feeds, open feed list" when it opens the drawer. With
+  no feeds at all there is no list to return to, so the tab opens the
+  drawer from anywhere, as before. The upward swipe on the bar still
+  opens the drawer from any section; no gesture changed. Logic:
+  `handleFeedsTab` in `mobile-nav-drawer.tsx` and
+  `src/lib/feed-list-path.ts`. Tests:
+  `tests/components/layout/mobile-nav-drawer.test.tsx`,
+  `tests/e2e/feeds-tab.spec.ts`.
 
 ## Limitations
 

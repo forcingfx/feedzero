@@ -1,4 +1,4 @@
-import { test, expect, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
+import { test, expect, addFeedViaUI, selectFeedInSidebar, openFeedDrawer } from "./fixtures";
 import { SAMPLE_RSS, mockFeedEndpoint } from "./feed-fixtures";
 
 /** Scoped selector for an article in the list. */
@@ -249,7 +249,7 @@ test.describe("Layout — mobile", () => {
     const drawerContent = page.getByTestId("drawer-content");
     await expect(drawerContent).toBeHidden();
 
-    await page.getByRole("button", { name: /open feed list/i }).click();
+    await openFeedDrawer(page);
 
     await expect(drawerContent).toBeVisible({ timeout: 5000 });
     await expect(drawerContent.getByRole("button", { name: "New folder" })).toBeVisible();
@@ -260,7 +260,7 @@ test.describe("Layout — mobile", () => {
   }) => {
     await setupFeedMobile(page);
 
-    await page.getByRole("button", { name: /open feed list/i }).click();
+    await openFeedDrawer(page);
     const drawerContent = page.getByTestId("drawer-content");
     await expect(drawerContent).toBeVisible({ timeout: 5000 });
 
