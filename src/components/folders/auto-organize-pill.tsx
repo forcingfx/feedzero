@@ -82,9 +82,9 @@ export function AutoOrganizePill() {
             data-testid="auto-organize-trigger"
             type="button"
             aria-label="Auto-organize feeds"
-            className="rounded p-1 text-primary hover:bg-primary/10 transition-colors"
+            className="flex items-center justify-center rounded p-1 max-lg:size-11 text-primary hover:bg-primary/10 transition-colors"
           >
-            <Wand2 className="size-3.5" />
+            <Wand2 className="size-3.5 max-lg:size-5" />
           </button>
         </PopoverTrigger>
         <PopoverContent

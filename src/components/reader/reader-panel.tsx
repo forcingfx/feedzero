@@ -11,44 +11,10 @@ import {
 } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { shareArticle } from "@/lib/share-article.ts";
+import { noteFullTextRequest } from "@/lib/suggest-always-full-text.ts";
 import { TAP_TARGET_EXPAND, TAP_TARGET_EXPAND_Y } from "@/lib/tap-target.ts";
 import { usePreferencesStore } from "@/stores/preferences-store.ts";
-import type { ReaderLineHeight, ReaderTextSize, ReaderWidth } from "@feedzero/core/types";
-
-/**
- * Body scale per readerTextSize preference. Headings keep their absolute
- * sizes from ArticleContent — the preference tunes reading comfort of
- * body copy, not the whole hierarchy.
- */
-const TEXT_SIZE_CLASS: Record<ReaderTextSize, string> = {
-  small: "text-sm",
-  medium: "",
-  large: "text-lg",
-  "x-large": "text-xl",
-};
-
-/**
- * Reading measure per readerWidth preference. "medium" is the historical
- * 45rem column. This is the ONLY place the measure is set — ArticleContent
- * deliberately carries no max-width of its own, so headings and prose can
- * never end up at two different widths.
- */
-const READER_WIDTH_CLASS: Record<ReaderWidth, string> = {
-  narrow: "max-w-150",
-  medium: "max-w-180",
-  wide: "max-w-240",
-  full: "max-w-none",
-};
-
-/**
- * Line spacing per readerLineHeight preference. Like the measure, it is
- * set only on the column: ArticleContent carries no leading of its own.
- */
-const LINE_HEIGHT_CLASS: Record<ReaderLineHeight, string> = {
-  compact: "leading-normal",
-  normal: "leading-relaxed",
-  relaxed: "leading-loose",
-};
+import { READER_TITLE_CLASS, readerColumnClass } from "./reader-typography.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
@@ -97,7 +63,26 @@ interface ReaderPanelProps {
 }
 
 /** Bottom padding so the last paragraph clears the floating pills. */
-const READER_PILLS_CLEARANCE = "pb-[calc(4rem+env(safe-area-inset-bottom))]";
+const READER_PILLS_CLEARANCE = "pb-[calc(4.75rem+env(safe-area-inset-bottom))]";
+
+/**
+ * One capsule of the phone's previous / next bar: 44px tall, in the same
+ * liquid glass as the list view's tab bar, so the two bottom bars read as
+ * one system. The glass class carries the blur (backdrop-blur) itself.
+ */
+const NAV_PILL =
+  "liquid-glass backdrop-blur-xl flex h-11 items-center rounded-full text-sm font-medium text-foreground hover:bg-transparent";
+
+/**
+ * Sizes for the reader's action row. Desktop keeps the compact 28px
+ * controls; a phone gets 36px ones, which the invisible tap-target
+ * expansion takes past 44px.
+ */
+const SEGMENT_SIZE =
+  "inline-flex items-center px-3 py-1 max-lg:h-9 max-lg:px-4 transition-colors";
+const ROUND_ACTION =
+  "inline-flex items-center justify-center h-7 w-7 max-lg:size-9 rounded-full border border-border transition-colors";
+const ROUND_ACTION_ICON = "size-3.5 max-lg:size-[1.125rem]";
 
 export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: ReaderPanelProps = {}) {
   const isDesktop = useIsDesktop();
@@ -197,36 +182,34 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
         {onBack && (
           <Button
             data-testid="back-pill"
-            variant="outline"
-            size="sm"
-            className="shrink-0 rounded-full h-8 px-3 gap-1 bg-background/95 backdrop-blur-sm shadow-md"
+            variant="ghost"
+            aria-label="Back to list"
+            className={cn(NAV_PILL, "w-11 shrink-0 px-0")}
             onClick={onBack}
           >
-            <ChevronLeft className="size-3.5 shrink-0" />
+            <ChevronLeft className="size-5 shrink-0" />
           </Button>
         )}
         {prevArticle && (
           <Button
             data-testid="prev-pill"
-            variant="outline"
-            size="sm"
-            className="flex-1 min-w-0 flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm"
+            variant="ghost"
+            className={cn(NAV_PILL, "flex-1 min-w-0 justify-start gap-1 px-3")}
             onClick={() => onNavigate(prevArticle)}
           >
-            <ChevronLeft className="size-3.5 shrink-0" />
+            <ChevronLeft className="size-4 shrink-0" />
             <span className="truncate">{decodeEntities(prevArticle.title)}</span>
           </Button>
         )}
         {nextArticle && (
           <Button
             data-testid="next-pill"
-            variant="outline"
-            size="sm"
-            className="flex-1 min-w-0 flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm"
+            variant="ghost"
+            className={cn(NAV_PILL, "flex-1 min-w-0 justify-end gap-1 px-3")}
             onClick={() => onNavigate(nextArticle)}
           >
             <span className="truncate">{decodeEntities(nextArticle.title)}</span>
-            <ChevronRight className="size-3.5 shrink-0" />
+            <ChevronRight className="size-4 shrink-0" />
           </Button>
         )}
       </div>
@@ -294,6 +277,9 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
   function handleModeChange(mode: ViewMode) {
     if (mode === "extracted") {
       switchToExtracted(article?.link);
+      // Only a tap lands here; the automatic switch for full-text feeds
+      // calls switchToExtracted directly and is never counted.
+      if (article) noteFullTextRequest(article);
     } else {
       setViewMode("feed");
     }
@@ -329,14 +315,16 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           with dead space on the right. */}
       <article
         className={cn(
-          "p-4 px-6 mx-auto",
-          READER_WIDTH_CLASS[readerWidth],
-          TEXT_SIZE_CLASS[readerTextSize],
-          LINE_HEIGHT_CLASS[readerLineHeight],
+          "p-4 px-6",
+          readerColumnClass({
+            textSize: readerTextSize,
+            width: readerWidth,
+            lineHeight: readerLineHeight,
+          }),
         )}
       >
         <header className="mb-3">
-          <h2 className="text-2xl font-semibold tracking-tight mb-2 break-words">
+          <h2 className={READER_TITLE_CLASS}>
             {article.link ? (
               <a
                 href={article.link}
@@ -353,16 +341,16 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
 
           <div
             data-testid="article-meta-line"
-            className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs tracking-wide text-muted-foreground"
+            className="flex min-w-0 items-center gap-x-2 text-xs max-lg:text-sm tracking-wide text-muted-foreground"
           >
             {feed && (
               <>
-                <FeedFavicon siteUrl={feed.siteUrl} className="size-3.5" />
-                <span className="font-medium text-foreground/70">{feed.title}</span>
-                <span>&bull;</span>
+                <FeedFavicon siteUrl={feed.siteUrl} className="size-3.5 max-lg:size-4" />
+                <span className="truncate font-medium text-foreground/70">{feed.title}</span>
+                <span aria-hidden="true">&bull;</span>
               </>
             )}
-            {formatDate(article.publishedAt)}
+            <span className="shrink-0">{formatDate(article.publishedAt)}</span>
             {article.link && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -371,9 +359,13 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                     href={article.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    aria-label="Open original"
+                    className={cn(
+                      "inline-flex shrink-0 items-center text-muted-foreground/60 hover:text-muted-foreground transition-colors",
+                      TAP_TARGET_EXPAND,
+                    )}
                   >
-                    <ExternalLink className="size-3" />
+                    <ExternalLink className="size-3 max-lg:size-4" />
                   </a>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
@@ -392,11 +384,11 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           data-testid="reader-action-row"
           className="flex items-center gap-2 mb-3"
         >
-          <div className="flex rounded-full border border-border text-xs overflow-hidden">
+          <div className="flex rounded-full border border-border text-xs max-lg:text-sm overflow-hidden">
             <button
               onClick={() => handleModeChange("feed")}
               className={cn(
-                "px-3 py-1 transition-colors",
+                SEGMENT_SIZE,
                 TAP_TARGET_EXPAND_Y,
                 viewMode === "feed"
                   ? "bg-foreground text-background font-medium"
@@ -418,7 +410,8 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                         : undefined
                   }
                   className={cn(
-                    "inline-flex items-center gap-1 px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    "inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed",
+                    SEGMENT_SIZE,
                     TAP_TARGET_EXPAND_Y,
                     viewMode === "extracted"
                       ? "bg-foreground text-background font-medium"
@@ -445,11 +438,12 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                   onClick={() => void shareArticle(article)}
                   aria-label="Share article"
                   className={cn(
-                    "inline-flex items-center justify-center h-7 w-7 rounded-full border border-border text-muted-foreground/70 hover:text-foreground hover:bg-accent transition-colors",
+                    ROUND_ACTION,
+                    "text-muted-foreground/70 hover:text-foreground hover:bg-accent",
                     TAP_TARGET_EXPAND,
                   )}
                 >
-                  <Share2 className="size-3.5" />
+                  <Share2 className={ROUND_ACTION_ICON} />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Share</TooltipContent>
@@ -464,7 +458,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
                 aria-label={article.starred ? "Remove star" : "Star article"}
                 aria-pressed={Boolean(article.starred)}
                 className={cn(
-                  "inline-flex items-center justify-center h-7 w-7 rounded-full border border-border transition-colors",
+                  ROUND_ACTION,
                   TAP_TARGET_EXPAND,
                   article.starred
                     ? "text-warning hover:text-warning hover:bg-warning/10"
@@ -473,7 +467,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
               >
                 <Star
                   className={cn(
-                    "size-3.5",
+                    ROUND_ACTION_ICON,
                     article.starred && "fill-current",
                   )}
                 />

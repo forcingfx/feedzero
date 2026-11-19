@@ -65,9 +65,12 @@ const articles = [
   },
 ];
 
-function renderAggregated(showArticleFeedIcons: boolean) {
+function renderAggregated(
+  showArticleFeedIcons: boolean,
+  overrides: Partial<typeof DEFAULT_PREFERENCES> = {},
+) {
   usePreferencesStore.setState({
-    preferences: { ...DEFAULT_PREFERENCES, showArticleFeedIcons },
+    preferences: { ...DEFAULT_PREFERENCES, showArticleFeedIcons, ...overrides },
   });
   useFeedStore.setState({
     feeds: [feed],
@@ -96,20 +99,46 @@ describe("ArticleList — feed icons", () => {
 
   it("shows the source favicon in an aggregated view by default", () => {
     const { container } = renderAggregated(true);
-    expect(screen.getByTestId("article-item-side")).toBeInTheDocument();
-    expect(container.querySelector("img")).not.toBeNull();
+    expect(
+      screen.getByTestId("article-item-meta").contains(container.querySelector("img")),
+    ).toBe(true);
   });
 
-  it("drops the favicon — and its whole column — when the preference is off", () => {
+  it("drops the favicon when the preference is off", () => {
     const { container } = renderAggregated(false);
     expect(container.querySelector("img")).toBeNull();
-    // An empty side column would keep stealing gap from the title, which
-    // defeats the point of asking for a tighter row.
-    expect(screen.queryByTestId("article-item-side")).toBeNull();
   });
 
   it("keeps the feed name when the icon is hidden", () => {
     renderAggregated(false);
     expect(screen.getByText(/Feed 1/)).toBeInTheDocument();
+  });
+
+  describe("preview lines and list size", () => {
+    it("shows each article's opening text by default", () => {
+      renderAggregated(true);
+      expect(screen.getByTestId("article-item-preview")).toHaveTextContent("summary");
+    });
+
+    it("shows no preview when the preference is off", () => {
+      renderAggregated(true, { showArticlePreview: false });
+      expect(screen.queryByTestId("article-item-preview")).toBeNull();
+    });
+
+    it("marks the list with the chosen size so rows scale together", () => {
+      renderAggregated(true, { listTextSize: "large" });
+      expect(screen.getByRole("listbox", { name: "Articles" })).toHaveAttribute(
+        "data-list-size",
+        "large",
+      );
+    });
+
+    it("uses the medium size when the preference was never set", () => {
+      renderAggregated(true, { listTextSize: undefined });
+      expect(screen.getByRole("listbox", { name: "Articles" })).toHaveAttribute(
+        "data-list-size",
+        "medium",
+      );
+    });
   });
 });

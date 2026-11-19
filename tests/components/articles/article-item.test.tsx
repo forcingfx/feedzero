@@ -69,7 +69,7 @@ describe("ArticleItem", () => {
     });
 
     it("renders feed title before author", () => {
-      const { container } = render(
+      render(
         <ArticleItem
           article={mockArticle()}
           isSelected={false}
@@ -78,8 +78,9 @@ describe("ArticleItem", () => {
         />,
       );
 
-      const metaLine = container.querySelector(".text-xs");
-      expect(metaLine?.textContent).toMatch(/Tech News.*Author Name/);
+      expect(screen.getByTestId("article-item-meta").textContent).toMatch(
+        /Tech News.*Author Name/,
+      );
     });
   });
 
@@ -229,13 +230,11 @@ describe("ArticleItem", () => {
     });
   });
 
-  describe("star + favicon alignment (mobile-friendly)", () => {
+  describe("star and favicon placement", () => {
     it("renders the starred indicator in a dedicated side column, not inline in the title", () => {
-      // The old layout dropped the Star inline after the title with
-      // `align-text-bottom`, which looked floor-aligned on multi-line
-      // titles and disappeared into the wrap. The side column gives it
-      // a deterministic anchor (top-right) and unblocks the favicon
-      // moving to the bottom-right.
+      // Inline after the title, the star looked floor-aligned on
+      // multi-line titles and disappeared into the wrap. The side column
+      // gives it a fixed anchor at the top right.
       const { container } = render(
         <ArticleItem
           article={mockArticle({ starred: true })}
@@ -255,34 +254,9 @@ describe("ArticleItem", () => {
       expect(side!.contains(star)).toBe(true);
     });
 
-    it("when both starred and a favicon source are present, the favicon sits below the star", () => {
-      // Star takes the prime top-right slot; favicon moves to bottom-right
-      // when both render in the same side column.
-      const { container } = render(
-        <ArticleItem
-          article={mockArticle({ starred: true })}
-          isSelected={false}
-          onSelect={() => {}}
-          feedTitle="Tech News"
-          feedSiteUrl="https://example.com"
-        />,
-      );
-
-      const side = container.querySelector(
-        '[data-testid="article-item-side"]',
-      )!;
-      const star = screen.getByTestId("article-star-indicator");
-      const favicon = container.querySelector("img")!;
-      expect(side.contains(star)).toBe(true);
-      expect(side.contains(favicon)).toBe(true);
-
-      // Star precedes favicon in DOM order (top before bottom under the
-      // column's vertical layout).
-      const cmp = star.compareDocumentPosition(favicon);
-      expect(cmp & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    });
-
-    it("renders the favicon in the side column even when the article is not starred", () => {
+    it("puts the favicon directly before the feed name, as the reader does", () => {
+      // User report 2026-11: the list had the icon in a right-hand column
+      // while the reader led the source line with it.
       const { container } = render(
         <ArticleItem
           article={mockArticle()}
@@ -293,11 +267,114 @@ describe("ArticleItem", () => {
         />,
       );
 
-      const side = container.querySelector(
-        '[data-testid="article-item-side"]',
-      )!;
+      const meta = screen.getByTestId("article-item-meta");
       const favicon = container.querySelector("img")!;
-      expect(side.contains(favicon)).toBe(true);
+      const feedName = screen.getByText("Tech News");
+      expect(meta.contains(favicon)).toBe(true);
+      const cmp = favicon.compareDocumentPosition(feedName);
+      expect(cmp & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("keeps no side column for a favicon alone", () => {
+      render(
+        <ArticleItem
+          article={mockArticle()}
+          isSelected={false}
+          onSelect={() => {}}
+          feedTitle="Tech News"
+          feedSiteUrl="https://example.com"
+        />,
+      );
+
+      expect(screen.queryByTestId("article-item-side")).toBeNull();
+    });
+  });
+
+  describe("meta line", () => {
+    it("omits an author that only repeats the feed name", () => {
+      // YouTube feeds set every item's author to the channel name, which
+      // read "mellow \u2022 mellow" in the list.
+      render(
+        <ArticleItem
+          article={mockArticle({ author: "Tech News" })}
+          isSelected={false}
+          onSelect={() => {}}
+          feedTitle="Tech News"
+        />,
+      );
+
+      expect(screen.getAllByText(/Tech News/)).toHaveLength(1);
+    });
+
+    it("shows how long ago the article was published, with the full date on the element", () => {
+      const publishedAt = Date.now() - 7 * 60 * 1000;
+      render(
+        <ArticleItem
+          article={mockArticle({ publishedAt })}
+          isSelected={false}
+          onSelect={() => {}}
+        />,
+      );
+
+      const time = screen.getByText("7m ago");
+      expect(time.tagName).toBe("TIME");
+      expect(time.getAttribute("datetime")).toBe(new Date(publishedAt).toISOString());
+      expect(time.getAttribute("title")).toMatch(/\d{4}/);
+    });
+  });
+
+  describe("preview lines", () => {
+    it("shows the article's opening text when asked to", () => {
+      render(
+        <ArticleItem
+          article={mockArticle({ summary: "<p>Opening lines of the story.</p>" })}
+          isSelected={false}
+          onSelect={() => {}}
+          showPreview
+        />,
+      );
+
+      expect(screen.getByTestId("article-item-preview")).toHaveTextContent(
+        "Opening lines of the story.",
+      );
+    });
+
+    it("clamps the preview to two lines", () => {
+      render(
+        <ArticleItem
+          article={mockArticle({ summary: "Opening lines." })}
+          isSelected={false}
+          onSelect={() => {}}
+          showPreview
+        />,
+      );
+
+      expect(screen.getByTestId("article-item-preview").className).toContain("line-clamp-2");
+    });
+
+    it("shows no preview unless asked to", () => {
+      render(
+        <ArticleItem
+          article={mockArticle({ summary: "Opening lines." })}
+          isSelected={false}
+          onSelect={() => {}}
+        />,
+      );
+
+      expect(screen.queryByTestId("article-item-preview")).toBeNull();
+    });
+
+    it("renders no empty preview for an article without text", () => {
+      render(
+        <ArticleItem
+          article={mockArticle({ summary: "", content: "" })}
+          isSelected={false}
+          onSelect={() => {}}
+          showPreview
+        />,
+      );
+
+      expect(screen.queryByTestId("article-item-preview")).toBeNull();
     });
   });
 

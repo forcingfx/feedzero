@@ -21,7 +21,7 @@ import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indi
 import { ArticleListSkeleton } from "@/components/loading/article-list-skeleton.tsx";
 import { SwipeToReadRow } from "./swipe-to-read-row.tsx";
 import { CLEAR_MOBILE_CHROME, MOBILE_HEADER_PX } from "@/components/layout/mobile-chrome.ts";
-import type { Article } from "@feedzero/core/types";
+import type { Article, ListTextSize } from "@feedzero/core/types";
 
 /**
  * Flat list-entry shape: every row the virtualizer renders is either a
@@ -52,11 +52,22 @@ interface ArticleListProps {
 
 /**
  * Fallback height used before a row has been measured. Tuned to the current
- * ArticleItem layout (title + single metadata row + vertical padding). The
+ * ArticleItem layout (title, two preview lines, metadata row, padding). The
  * virtualizer re-measures on mount, so accuracy only matters to avoid an
  * initial scrollbar jump.
  */
-const ESTIMATED_ITEM_SIZE = 72;
+const ESTIMATED_ITEM_SIZE = 96;
+
+/**
+ * Font size of the list per listTextSize preference. Rows size their
+ * text, icons and padding in `em`, so this one class scales a whole row.
+ */
+const LIST_TEXT_SIZE_CLASS: Record<ListTextSize, string> = {
+  small: "text-sm",
+  medium: "text-base",
+  large: "text-lg",
+  "x-large": "text-xl",
+};
 
 /**
  * Rows rendered above and below the visible viewport. Large enough that
@@ -117,6 +128,12 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   );
   const showArticleFeedIcons = usePreferencesStore(
     (s) => s.preferences.showArticleFeedIcons ?? true,
+  );
+  const showArticlePreview = usePreferencesStore(
+    (s) => s.preferences.showArticlePreview ?? true,
+  );
+  const listTextSize = usePreferencesStore(
+    (s) => s.preferences.listTextSize ?? "medium",
   );
   const showArticleImages = usePreferencesStore(
     (s) => s.preferences.showArticleImages ?? false,
@@ -393,7 +410,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       <ul
         role="listbox"
         aria-label="Articles"
-        className="list-none m-0 p-0 relative"
+        data-list-size={listTextSize}
+        className={cn("list-none m-0 p-0 relative", LIST_TEXT_SIZE_CLASS[listTextSize])}
         style={{ height: totalSize }}
       >
         {virtualItems.map((virtualItem) => {
@@ -412,10 +430,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           // disambiguator.
           const summaryFeedTitle = feedId ? feedsById[feedId]?.title : undefined;
           const itemFeedTitle = isAggregatedView ? summaryFeedTitle : undefined;
-          // Withholding the site URL is how "no icon" is expressed: an
-          // ArticleItem with no source to render also drops the side
-          // column, so the row tightens instead of keeping an empty
-          // gutter.
+          // Withholding the site URL is how "no icon" is expressed.
           const itemFeedSiteUrl =
             isAggregatedView && showArticleFeedIcons
               ? (feedId ? feedsById[feedId]?.siteUrl : undefined)
@@ -446,6 +461,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                     onSelect={handleSelect}
                     feedTitle={itemFeedTitle}
                     feedSiteUrl={itemFeedSiteUrl}
+                    showPreview={showArticlePreview}
                     imageUrl={showArticleImages ? entry.article.imageUrl : undefined}
                   />
                 </SwipeToReadRow>

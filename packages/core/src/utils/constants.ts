@@ -173,6 +173,10 @@ export const LOCAL_STORAGE = {
    *  folders shut. Only collapsed ids are stored, so an absent folder is
    *  open. */
   COLLAPSED_FOLDER_IDS: "feedzero:collapsed-folder-ids",
+  /** Per feed id: how many articles the reader asked full text for by
+   *  hand, or "asked" once the app has offered to make full text that
+   *  feed's default. Device-local; the offer is made once per feed. */
+  FULL_TEXT_REQUESTS: "feedzero:full-text-requests",
   /** Set when a local change has been persisted but its debounced cloud
    *  push hasn't fired yet. Survives a tab reload (which drops the
    *  in-memory debounce timer) so the next pull() can flush the change to

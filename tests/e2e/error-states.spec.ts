@@ -64,7 +64,7 @@ test.describe("Error states", () => {
     await expect(fullTextToggle).toBeDisabled({ timeout: 10000 });
 
     // Feed content should still be visible despite extraction failure
-    await expect(page.getByText("Short description only.")).toBeVisible({
+    await expect(page.getByTestId("article-content-area").getByText("Short description only.")).toBeVisible({
       timeout: 5000,
     });
   });

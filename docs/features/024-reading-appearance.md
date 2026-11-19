@@ -40,6 +40,47 @@ image is a request that tells the image host what the reader is looking
 at; the setting's copy says so. The list passes `imageUrl` to the row only
 when the preference is on, so a disabled setting renders no `<img>` at all.
 
+### Update 2026-11-19 (list appearance, user report)
+
+A reader moving from Inoreader found the phone list cramped and hard to
+triage. Two more synced preferences and a reworked row:
+
+- **Show article preview** (`showArticlePreview`, on by default): up to
+  two lines of the article's opening text under the title.
+  `src/lib/article-list-preview.ts` takes the summary, else the body,
+  else the fetched full text, strips it to plain text, clips it, and
+  returns nothing when it only repeats the title. It is on by default
+  because the text is already in the vault: unlike article images it
+  makes no request.
+- **List size** (`listTextSize`, Small to Extra large, default Medium):
+  one font-size class on the list. Rows size their text, icons and
+  padding in `em`, so a row scales as a whole. It is separate from the
+  reader's text size because large article text with a dense list is a
+  common pairing.
+- **Source row**: the favicon now leads the feed name, as in the reader,
+  where it used to sit in a right-hand column. The row is one line: feed
+  name and author truncate, the time never does. An author that repeats
+  the feed name (every YouTube feed) is omitted. The time is relative
+  ("7m ago") with the full date in the `<time>` element's `title`.
+- **Favicons** lost their ring and inset, which read as a white frame
+  on a dark list. The white backing in dark mode stays, behind
+  transparent pixels only, so dark-on-transparent icons remain visible.
+
+Phone sizing of the reader chrome and the feed drawer from the same
+report is recorded in `010-mobile-navigation.md`.
+
+### Update 2026-11-19 (article text preview)
+
+Settings → Reading shows a live **Preview** of article text under the
+Text size, Reading width and Line spacing controls, so a reader sees the
+effect without leaving settings. It is accurate by construction:
+`readerColumnClass()` in `src/components/reader/reader-typography.ts` is
+the one class builder for both the reader's column and the preview
+(`src/components/settings/reading-preview.tsx`), and the sample goes
+through the reader's `ArticleContent`. The preview column is capped by
+the settings pane, so a reading width wider than the pane shows as the
+pane's full width. The sample's link is inert.
+
 ## Behaviour
 
 ```gherkin
@@ -75,6 +116,16 @@ Feature: Reading appearance
     Then article rows drop the favicon and the column that held it
     And each row still names its source feed
 
+  Scenario: Triage from the list
+    Given "Show article preview" is on
+    Then each row shows up to two lines of the article's opening text
+    And a row whose article has no text shows none
+
+  Scenario: Choosing the list size
+    When I choose "Large" under Settings → Reading → List size
+    Then row titles, previews, source rows and spacing grow together
+    And the reader's text size is unchanged
+
   Scenario: Reclaiming the feed list's width
     Given I am on desktop
     When I press "[" or click the toggle in the article-list title bar
@@ -107,9 +158,13 @@ Feature: Reading appearance
 |------|------|
 | `packages/core/src/types/index.ts` | `ReaderWidth`, `readerWidth`, `ReaderLineHeight`, `readerLineHeight`, `hideReadArticles`, `showArticleFeedIcons` and their defaults |
 | `src/components/settings/tabs/reading-tab.tsx` | The four controls; `SegmentedPreference` backs the two segmented ones |
-| `src/components/reader/reader-panel.tsx` | `READER_WIDTH_CLASS`; sole owner of the reading measure |
+| `src/components/reader/reader-typography.ts` | `readerColumnClass()`: text size, measure and line spacing of the reading column; sole owner of the reading measure |
+| `src/components/reader/reader-panel.tsx` | Applies `readerColumnClass()` to the `<article>` column |
+| `src/components/settings/reading-preview.tsx` | Live sample in settings, styled by the same builder |
 | `src/components/reader/article-content.tsx` | Carries no measure of its own |
-| `src/components/articles/article-list.tsx` | `visibleArticles` filter, `CaughtUpArticleList`, favicon gating |
+| `src/components/articles/article-list.tsx` | `visibleArticles` filter, `CaughtUpArticleList`, favicon and preview gating, `LIST_TEXT_SIZE_CLASS` |
+| `src/components/articles/article-item.tsx` | The row: title, preview, one-line source row, all sized in `em` |
+| `src/lib/article-list-preview.ts` | Plain-text preview for a row |
 | `src/pages/app-layout.tsx` | Collapsible sidebar panel, cookie restore, width reconciliation |
 | `src/components/articles/article-list-controls.tsx` | `SidebarCollapseButton` |
 | `src/components/ui/sidebar.tsx` | `useOptionalSidebar`, exported `SIDEBAR_COOKIE_NAME` |
@@ -123,7 +178,9 @@ Feature: Reading appearance
 | `tests/components/reader/reader-panel.test.tsx` | Width classes; no competing measure inside the column |
 | `tests/components/reader/article-content.test.tsx` | Pins that the body sets no measure of its own |
 | `tests/components/articles/article-list-hide-read.test.tsx` | Filtering, the open-article exemption, caught-up vs empty |
-| `tests/components/articles/article-list-feed-icons.test.tsx` | Icon and side-column removal; feed name survives |
+| `tests/components/articles/article-list-feed-icons.test.tsx` | Icon gating; feed name survives; preview gating; list size marker |
+| `tests/components/articles/article-item.test.tsx` | Favicon before the feed name, repeated author dropped, relative time, preview |
+| `tests/lib/article-list-preview.test.ts` | Source order, plain text, clipping, title repeats |
 | `tests/components/layout/sidebar-collapse.test.tsx` | A11y-tree removal, both toggle paths, cookie restore |
 | `tests/e2e/sidebar-collapse.spec.ts` | The reclaimed pixels, across a reload, restoring the dragged width |
 

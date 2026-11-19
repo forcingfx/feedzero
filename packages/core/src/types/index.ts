@@ -216,6 +216,9 @@ export const ARTICLE_SORT_MODES: readonly ArticleSortMode[] = [
 /** Reader body text scale. "medium" is the historical default. */
 export type ReaderTextSize = "small" | "medium" | "large" | "x-large";
 
+/** Article list scale; the same steps as the reader's text size. */
+export type ListTextSize = ReaderTextSize;
+
 /**
  * Reading measure (max column width) in the reader panel. "medium" is the
  * historical ~45rem measure; "narrow" tightens it for dense screens and
@@ -277,6 +280,19 @@ export interface UserPreferences {
    */
   showArticleFeedIcons?: boolean;
   /**
+   * Whether article rows show up to two lines of the article's opening
+   * text. The text is already stored, so this costs no request. Optional
+   * for the same back-compat reason as the fields above; `undefined`
+   * reads as true.
+   */
+  showArticlePreview?: boolean;
+  /**
+   * Scale of the article list: row text and spacing grow together.
+   * Separate from `readerTextSize` because large article text and a
+   * dense list are a common pairing. `undefined` reads as "medium".
+   */
+  listTextSize?: ListTextSize;
+  /**
    * Article retention period. Optional so rows synced from older clients
    * still parse; `undefined` reads as the 30-day default, which is how an
    * existing vault starts being purged on upgrade.
@@ -303,6 +319,8 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   showArticleImages: false,
   hideReadArticles: false,
   showArticleFeedIcons: true,
+  showArticlePreview: true,
+  listTextSize: "medium",
   articleRetention: DEFAULT_ARTICLE_RETENTION,
 };
 

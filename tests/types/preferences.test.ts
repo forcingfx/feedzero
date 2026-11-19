@@ -24,6 +24,10 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       showArticleImages: false,
       hideReadArticles: false,
       showArticleFeedIcons: true,
+      // On: the text is already in the vault, so a preview costs no
+      // request, and it is what lets a reader triage from the list.
+      showArticlePreview: true,
+      listTextSize: "medium",
       // 30 days, not "never": bounds vault size by default (owner's call,
       // 2026-10-04). Existing vaults are purged at this default on upgrade.
       articleRetention: 30,

@@ -40,6 +40,7 @@ export function FeedItem({
   const unreadCount = useArticleStore((s) => selectUnreadCount(s, feed.id));
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
   const isRefreshing = refreshingFeedIds.has(feed.id);
+  const showsUnreadBadge = !isRefreshing && unreadCount > 0;
 
   // Both hooks are always called (hooks must not be conditional).
   // Only one is active at a time: disabled=true keeps the hook from registering.
@@ -58,11 +59,17 @@ export function FeedItem({
     <SidebarMenuItem
       ref={dragRef}
       style={{ opacity: isDragging ? 0.4 : 1, ...sortStyle }}
-      className={inFolder ? "pl-4" : ""}
+      className={inFolder ? "pl-4 max-lg:pl-6" : ""}
       {...dragListeners}
     >
-      <SidebarMenuButton isActive={isSelected} onClick={onSelect}>
-        <FeedFavicon siteUrl={feed.siteUrl} />
+      <SidebarMenuButton
+        isActive={isSelected}
+        onClick={onSelect}
+        // Room for the badge, so a long title truncates before it
+        // instead of running underneath.
+        className={showsUnreadBadge ? "pr-11" : undefined}
+      >
+        <FeedFavicon siteUrl={feed.siteUrl} className="size-4 max-lg:size-5" />
         <span className="truncate">{feed.title}</span>
         {isRefreshing && (
           <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
@@ -86,7 +93,7 @@ export function FeedItem({
           />
         )}
       </SidebarMenuButton>
-      {!isRefreshing && unreadCount > 0 && (
+      {showsUnreadBadge && (
         <SidebarMenuBadge className="rounded-lg bg-primary/10 text-primary text-xs font-semibold">
           {formatUnreadBadge(unreadCount)}
         </SidebarMenuBadge>
