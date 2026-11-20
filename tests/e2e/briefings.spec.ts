@@ -45,11 +45,11 @@ test.describe("Signal Briefings — sidebar + free-tier upgrade splash", () => {
   test("Settings → Briefings tab renders the API key field + model picker", async ({
     feedPage: page,
   }) => {
-    // The API key + model picker live in Settings → Reading
-    // (SignalSection); the standalone "briefings" tab was folded away
-    // by ADR 016. The key/model panels only render in AI mode — the
+    // The API key + model picker live in Signal's own settings dialog
+    // (SignalSection), opened here by its URL. They were in Settings →
+    // Reading until that tab was split up. The key/model panels only render in AI mode — the
     // local frequency engine needs no key — so flip the mode first.
-    await page.goto("/settings?tab=reading");
+    await page.goto("/signal?settings=open");
     await page.getByRole("radio", { name: /^AI/i }).click();
     await expect(
       page.getByText(/Anthropic API key/i).first(),
@@ -70,11 +70,11 @@ test.describe("Signal Briefings — sidebar + free-tier upgrade splash", () => {
   test("Saving an Anthropic key updates the 'saved' badge", async ({
     feedPage: page,
   }) => {
-    // The API key + model picker live in Settings → Reading
-    // (SignalSection); the standalone "briefings" tab was folded away
-    // by ADR 016. The key/model panels only render in AI mode — the
+    // The API key + model picker live in Signal's own settings dialog
+    // (SignalSection), opened here by its URL. They were in Settings →
+    // Reading until that tab was split up. The key/model panels only render in AI mode — the
     // local frequency engine needs no key — so flip the mode first.
-    await page.goto("/settings?tab=reading");
+    await page.goto("/signal?settings=open");
     await page.getByRole("radio", { name: /^AI/i }).click();
     await page
       .getByText(/Anthropic API key/i)
@@ -93,11 +93,11 @@ test.describe("Signal Briefings — sidebar + free-tier upgrade splash", () => {
   test("Switching the model preference updates the radio selection", async ({
     feedPage: page,
   }) => {
-    // The API key + model picker live in Settings → Reading
-    // (SignalSection); the standalone "briefings" tab was folded away
-    // by ADR 016. The key/model panels only render in AI mode — the
+    // The API key + model picker live in Signal's own settings dialog
+    // (SignalSection), opened here by its URL. They were in Settings →
+    // Reading until that tab was split up. The key/model panels only render in AI mode — the
     // local frequency engine needs no key — so flip the mode first.
-    await page.goto("/settings?tab=reading");
+    await page.goto("/signal?settings=open");
     await page.getByRole("radio", { name: /^AI/i }).click();
     await page
       .getByText(/Preferred model/i)

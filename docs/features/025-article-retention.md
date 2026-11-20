@@ -5,7 +5,7 @@ Implemented
 
 ## Summary
 
-Articles published longer ago than the user's retention period are deleted, read or unread, unless they are starred. The default is 30 days; Settings → Reading → Keep articles offers 7 days, 14 days, 30 days, 90 days, 1 year and Forever. The setting syncs with the vault, and so does its effect: a purge on one device reaches the others on their next pull. Retention is what keeps a vault bounded; without it, a feed nobody reads grows the vault forever.
+Articles published longer ago than the user's retention period are deleted, read or unread, unless they are starred. The default is 30 days; Settings → Library → Keep articles offers 7 days, 14 days, 30 days, 90 days, 1 year and Forever. The setting syncs with the vault, and so does its effect: a purge on one device reaches the others on their next pull. Retention is what keeps a vault bounded; without it, a feed nobody reads grows the vault forever.
 
 ## Behaviour
 

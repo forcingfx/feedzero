@@ -9,7 +9,7 @@
  *
  *   - `hidden`   : (legacy) when true, the in-page mode toggle was hidden.
  *                  The Signal page no longer renders that toggle (it now
- *                  lives in Settings → Reading → Signal), so this field
+ *                  lives in the Signal page's settings dialog), so this field
  *                  is inert in current UI. The hook is kept exported only
  *                  so any external caller still imports cleanly; the value
  *                  just defaults to false and accepts writes for migration

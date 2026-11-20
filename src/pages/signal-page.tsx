@@ -18,6 +18,10 @@ import { Button } from "@/components/ui/button.tsx";
 import { StoryRow } from "@/components/signal/story-row.tsx";
 import { SignalTabs } from "@/components/signal/signal-tabs.tsx";
 import { SignalModeBadge } from "@/components/signal/signal-mode-badge.tsx";
+import {
+  SignalSettingsDialog,
+  useSignalSettingsOpen,
+} from "@/components/signal/signal-settings-dialog.tsx";
 import { useSignalMode } from "@/lib/signal-mode-preference.ts";
 import { BriefingGeneratingSkeleton } from "@/components/briefings/briefing-generating-skeleton.tsx";
 import { formatRelative } from "@/lib/format-relative.ts";
@@ -60,8 +64,15 @@ function SignalFrame({ children }: { children: React.ReactNode }) {
  */
 export function SignalPage() {
   const [mode] = useSignalMode();
-  if (mode === "ai") return <AISignalView />;
-  return <MLSignalView />;
+  return (
+    <>
+      {mode === "ai" ? <AISignalView /> : <MLSignalView />}
+      {/* Mounted here, not by the mode badge: the badge is missing from
+          some states (the locked splash), and the settings must open in
+          every one of them. */}
+      <SignalSettingsDialog />
+    </>
+  );
 }
 
 function MLSignalView() {
@@ -141,6 +152,7 @@ function MLSignalView() {
 
 function LockedSplash({ count }: { count: number }) {
   const navigate = useNavigate();
+  const [, setSettingsOpen] = useSignalSettingsOpen();
   const remaining = Math.max(0, SIGNAL_CORPUS_GATE - count);
   const pct = Math.min(100, Math.round((count / SIGNAL_CORPUS_GATE) * 100));
   return (
@@ -196,6 +208,14 @@ function LockedSplash({ count }: { count: number }) {
         >
           <FileUp className="size-4" />
           Import OPML
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full text-muted-foreground"
+          onClick={() => setSettingsOpen(true)}
+        >
+          Signal settings
         </Button>
       </div>
     </div>
@@ -447,6 +467,7 @@ function indexArticles(byFeed: Record<string, Article[]>): Map<string, Article> 
 // ── AI mode ─────────────────────────────────────────────────────────────
 
 function AISignalView() {
+  const [, setSettingsOpen] = useSignalSettingsOpen();
   const status = useAISignalStore((s) => s.status);
   const report = useAISignalStore((s) => s.report);
   const corpusSize = useAISignalStore((s) => s.corpusSize);
@@ -454,7 +475,6 @@ function AISignalView() {
   const loadingStartedAt = useAISignalStore((s) => s.loadingStartedAt);
   const loadReport = useAISignalStore((s) => s.loadReport);
   const gate = useFeatureGate("signal");
-  const navigate = useNavigate();
 
   const totalArticles = useArticleStore(
     (s) => Object.values(s.articlesByFeedId).reduce((n, list) => n + list.length, 0),
@@ -495,14 +515,12 @@ function AISignalView() {
           </p>
           <p className="text-sm text-muted-foreground">
             AI Signal calls Anthropic with your own key. Paste one in
-            Settings → Reading → Signal — the key is encrypted at rest
+            Signal settings. The key is encrypted at rest
             in your vault and only sent to <code>api.anthropic.com</code>{" "}
             when you click Refresh.
           </p>
           <div className="flex justify-center">
-            <Button onClick={() => goToSettings(navigate, "reading")}>
-              Open Settings
-            </Button>
+            <Button onClick={() => setSettingsOpen(true)}>Open Signal settings</Button>
           </div>
         </div>
       </SignalFrame>

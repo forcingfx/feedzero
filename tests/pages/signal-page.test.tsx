@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { SignalPage } from "@/pages/signal-page.tsx";
@@ -7,6 +7,7 @@ import { useSignalStore, SIGNAL_REPORT_CACHE_KEY } from "@/stores/signal-store.t
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useLicenseStore } from "@/stores/license-store.ts";
+import { useSignalModeStore } from "@/lib/signal-mode-preference";
 import { isSelfHosted } from "@/core/features/self-hosted.ts";
 import { isPaidTierActive } from "@/core/features/paid-tier-active.ts";
 import { SIGNAL_CORPUS_GATE, SIGNAL_REPORT_SCHEMA_VERSION } from "@/core/signal/types.ts";
@@ -165,6 +166,7 @@ describe("SignalPage", () => {
     localStorage.clear();
     mockViewport(false); // mobile by default
     useSignalStore.setState({ status: "idle", report: null, corpusSize: 0, error: null });
+    useSignalModeStore.setState({ mode: "ml", hidden: false, nightly: false });
     useFeedStore.setState({ feeds: [] });
     useArticleStore.setState({ articlesByFeedId: {} });
     useLicenseStore.setState({ tier: "free", verifying: false });
@@ -193,6 +195,37 @@ describe("SignalPage", () => {
     expect(screen.getByRole("button", { name: /Add feeds/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Browse the catalog/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Import OPML/i })).toBeInTheDocument();
+  });
+
+  // The locked splash has no mode badge. Signal's settings used to be
+  // reachable from Settings whatever state this page was in; they still
+  // must be, for someone who wants to add an API key before the gate.
+  it("opens Signal's settings from the locked splash", async () => {
+    const articlesByFeedId: Record<string, Article[]> = { f1: [] };
+    for (let i = 0; i < 10; i++) articlesByFeedId.f1.push(makeArticle(`a-${i}`, "f1", `t ${i}`, 0));
+    useFeedStore.setState({ feeds: [makeFeed("f1")] });
+    useArticleStore.setState({ articlesByFeedId });
+    renderAt();
+    await waitFor(() => expect(useSignalStore.getState().status).toBe("locked"));
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Signal settings" }));
+
+    expect(await screen.findByRole("dialog", { name: /signal settings/i })).toBeInTheDocument();
+  });
+
+  // The key field moved with the rest of Signal's settings. This screen
+  // used to send people to Settings → Reading, which no longer has it.
+  it("AI mode without a key offers Signal's settings, where the key is entered", async () => {
+    seedReadyCorpus();
+    useSignalModeStore.setState({ mode: "ai", hidden: false, nightly: false });
+    renderAt();
+
+    const open = await screen.findByRole("button", { name: "Open Signal settings" });
+    expect(screen.queryByText(/Settings → Reading/)).toBeNull();
+    await userEvent.setup().click(open);
+
+    const dialog = await screen.findByRole("dialog", { name: /signal settings/i });
+    expect(within(dialog).getAllByText(/Anthropic API key/i).length).toBeGreaterThan(0);
   });
 
   it("renders the empty-but-unlocked message with an Add feeds recovery action", async () => {

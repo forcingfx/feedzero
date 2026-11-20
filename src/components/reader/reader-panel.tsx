@@ -38,6 +38,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
 import { ArticleContent } from "./article-content.tsx";
+import { ReaderTypeMenu } from "./reader-type-menu.tsx";
 import { PaywallPrompt } from "./paywall-prompt.tsx";
 import { cn } from "@/lib/utils.ts";
 
@@ -477,6 +478,13 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
               {article.starred ? "Unstar" : "Star"} <Kbd className="ml-1">s</Kbd>
             </TooltipContent>
           </Tooltip>
+          <ReaderTypeMenu
+            triggerClassName={cn(
+              ROUND_ACTION,
+              TAP_TARGET_EXPAND,
+              "text-muted-foreground/70 hover:text-foreground hover:bg-accent",
+            )}
+          />
         </div>
 
         {viewMode === "extracted" && extractionStatus === "extracting" ? (

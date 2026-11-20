@@ -5,28 +5,15 @@
  * Signal page. One tab used to hold all of it, about 17 controls.
  */
 import { usePreferencesStore } from "@/stores/preferences-store";
-import type { OpenArticlesIn, ReaderLineHeight, ReaderWidth } from "@feedzero/core/types";
+import type { OpenArticlesIn } from "@feedzero/core/types";
 import { ThemeToggle } from "../theme-toggle";
 import { ReadingPreview } from "../reading-preview";
 import { SegmentedControl, SettingRow, SettingsGroup, SizeStepper } from "../setting-row";
-import { SIZE_STEPS } from "../size-steps";
-
-export const READER_WIDTHS: { value: ReaderWidth; label: string }[] = [
-  { value: "narrow", label: "Narrow" },
-  { value: "medium", label: "Medium" },
-  { value: "wide", label: "Wide" },
-  { value: "full", label: "Full" },
-];
+import { LINE_HEIGHTS, READER_WIDTHS, SIZE_STEPS } from "../size-steps";
 
 const OPEN_ARTICLES_IN: { value: OpenArticlesIn; label: string }[] = [
   { value: "feed", label: "Feed text" },
   { value: "full-text", label: "Full text" },
-];
-
-export const LINE_HEIGHTS: { value: ReaderLineHeight; label: string }[] = [
-  { value: "compact", label: "Compact" },
-  { value: "normal", label: "Normal" },
-  { value: "relaxed", label: "Relaxed" },
 ];
 
 export function ReadingTab() {

@@ -3,7 +3,7 @@ import { skipOnboarding, addFeedViaUI, selectFeedInSidebar } from "./fixtures";
 import { mockFeedEndpoint } from "./feed-fixtures";
 
 /**
- * Article retention, end to end: Settings → Reading → Keep articles.
+ * Article retention, end to end: Settings → Library → Keep articles.
  * Shortening the period asks first with a count, then deletes the
  * expired articles from the list. Starred articles are covered by the
  * unit and integration suites; this proves the user journey.
@@ -21,7 +21,7 @@ const AGED_RSS =
 
 async function openReadingSettings(page: import("@playwright/test").Page) {
   await page.goto("/settings");
-  await page.getByRole("radio", { name: "Reading" }).click();
+  await page.getByRole("radio", { name: "Library" }).click();
   return page.getByRole("combobox", { name: /keep articles/i });
 }
 

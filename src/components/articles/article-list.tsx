@@ -542,7 +542,7 @@ function CaughtUpArticleList() {
       <CheckCheck className="size-6 text-muted-foreground" />
       <p className="text-sm text-muted-foreground">You&apos;re all caught up.</p>
       <p className="text-xs text-muted-foreground max-w-xs">
-        Read articles are hidden. Turn that off in Settings &rarr; Reading.
+        Read articles are hidden. Turn that off in Settings &rarr; List.
       </p>
     </div>
   );

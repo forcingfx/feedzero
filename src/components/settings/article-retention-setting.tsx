@@ -46,7 +46,7 @@ interface PendingShortening {
 }
 
 /**
- * Settings → Reading → Keep articles.
+ * Settings → Library → Keep articles.
  *
  * Shortening the period deletes articles immediately, on every device
  * the vault syncs to, and cannot be undone, so it asks first and says

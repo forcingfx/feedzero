@@ -7,6 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { HeaderAction } from "./header-action.tsx";
+import { ListDisplayMenuItems } from "./list-display-menu-items.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useSettingsTarget } from "./settings-pill.tsx";
 import { useUnreadCount } from "./article-list-controls.tsx";
@@ -56,6 +57,7 @@ export function ViewOptionsPill() {
             {SORT_LABELS[m]}
           </DropdownMenuItem>
         ))}
+        <ListDisplayMenuItems />
         {unread > 0 && (
           <>
             <DropdownMenuSeparator />

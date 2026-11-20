@@ -9,6 +9,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { SignalModeBadge } from "@/components/signal/signal-mode-badge.tsx";
+import { SignalSettingsDialog } from "@/components/signal/signal-settings-dialog.tsx";
 import { useSignalModeStore } from "@/lib/signal-mode-preference";
 
 function LocationProbe() {
@@ -20,6 +21,7 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <SignalModeBadge />
+      <SignalSettingsDialog />
       <LocationProbe />
     </MemoryRouter>,
   );

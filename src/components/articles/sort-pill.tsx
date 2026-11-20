@@ -6,6 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { HeaderAction } from "./header-action.tsx";
+import { ListDisplayMenuItems } from "./list-display-menu-items.tsx";
 import type { ArticleSortMode } from "@feedzero/core/types";
 import { ARTICLE_SORT_MODES } from "@feedzero/core/types";
 
@@ -23,7 +24,8 @@ interface SortPillProps {
 
 /**
  * Article-list sort selector: an icon action whose accessible name and
- * tooltip state the current mode, opening a menu of all modes.
+ * tooltip state the current mode, opening a menu of all modes, followed
+ * by the list's Display options.
  */
 export function SortPill({ mode, onChange, dataTestId }: SortPillProps) {
   return (
@@ -44,6 +46,7 @@ export function SortPill({ mode, onChange, dataTestId }: SortPillProps) {
             {SORT_LABELS[m]}
           </DropdownMenuItem>
         ))}
+        <ListDisplayMenuItems />
       </DropdownMenuContent>
     </DropdownMenu>
   );
