@@ -124,6 +124,9 @@ describe("<SettingsPage>", () => {
     const strip = screen.getAllByRole("radio")[0]!.parentElement!;
     expect(strip.className).toContain("overflow-x-auto");
     expect(strip.className).not.toContain("flex-wrap");
+    // Without this the strip takes its content's width and the page
+    // scrolls sideways instead of the strip (bug, 2026-11-20).
+    expect(strip.className).not.toMatch(/\bw-fit\b/);
   });
 
   it("does not render a Briefings tab (its settings live on the Signal page)", () => {

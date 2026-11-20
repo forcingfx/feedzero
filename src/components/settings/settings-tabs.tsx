@@ -44,12 +44,15 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
     <div className="space-y-4">
       {/* One row that scrolls sideways: six tabs do not fit a phone, and
           wrapping them into a block pushed the settings down the page.
-          The negative margin lets the row scroll to the screen edge. */}
+          The negative margin lets the row scroll to the screen edge.
+          `w-auto` is what makes it scroll at all: ToggleGroup is `w-fit`
+          by default, so the row grew to its content's width and pushed
+          the whole page sideways instead (bug, 2026-11-20). */}
       <ToggleGroup
         type="single"
         value={activeTab}
         onValueChange={(v) => v && onTabChange(v as SettingsTab)}
-        className="-mx-4 justify-start overflow-x-auto px-4 [scrollbar-width:none] [&>*]:shrink-0"
+        className="-mx-4 w-auto justify-start overflow-x-auto px-4 [scrollbar-width:none] [&>*]:shrink-0"
       >
         {/* Reading, List and Library first: they are what people open
             Settings to change. Subscription sits after the data controls
