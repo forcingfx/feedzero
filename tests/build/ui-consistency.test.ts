@@ -122,4 +122,21 @@ describe("UI consistency", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  // Owner rule 2026-11-20: settings copy names the thing the user can
+  // change. A heading like "What the list includes" describes the screen
+  // instead; "Filtering and grouping" names the controls under it.
+  it("uses no 'what ...' phrasing in settings titles, labels or descriptions", () => {
+    const settingsFiles = files.filter((f) => f.includes("components/settings/"));
+    expect(settingsFiles.length).toBeGreaterThan(5);
+    const offenders: string[] = [];
+    for (const f of settingsFiles) {
+      const re = /\b(?:title|label|description|aria-label)="([^"]*)"/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(read(f)))) {
+        if (/\bwhat\b|\bwhat's\b/i.test(m[1])) offenders.push(`${f}: ${m[1]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });

@@ -402,4 +402,48 @@ describe("ArticleItem", () => {
       expect(screen.queryByTestId("article-image")).toBeNull();
     });
   });
+
+  // Owner request 2026-11-20: a setting to put the image on the right.
+  describe("image position", () => {
+    const withImage = (position?: "left" | "right") =>
+      render(
+        <ArticleItem
+          article={mockArticle()}
+          isSelected={false}
+          onSelect={() => {}}
+          imageUrl="https://example.com/lead.jpg"
+          imagePosition={position}
+        />,
+      );
+
+    it("puts the image before the text by default", () => {
+      withImage();
+      const image = screen.getByTestId("article-image");
+      const title = screen.getByText("Test Article");
+      expect(image.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("puts the image after the text when set to the right", () => {
+      withImage("right");
+      const image = screen.getByTestId("article-image");
+      const title = screen.getByText("Test Article");
+      expect(image.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    });
+
+    it("keeps the star outside the image when both sit on the right", () => {
+      render(
+        <ArticleItem
+          article={mockArticle({ starred: true })}
+          isSelected={false}
+          onSelect={() => {}}
+          imageUrl="https://example.com/lead.jpg"
+          imagePosition="right"
+        />,
+      );
+      const image = screen.getByTestId("article-image");
+      const star = screen.getByTestId("article-star-indicator");
+      // Text, then star, then image: the image is the row's last element.
+      expect(star.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
 });

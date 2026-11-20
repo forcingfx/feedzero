@@ -45,7 +45,7 @@ describe("<HelpTab>", () => {
   it("What's new button calls the onWhatsNew callback", () => {
     const onWhatsNew = vi.fn();
     render(<HelpTab onWhatsNew={onWhatsNew} />);
-    fireEvent.click(screen.getByRole("button", { name: /what's new/i }));
+    fireEvent.click(screen.getByRole("button", { name: /release notes/i }));
     expect(onWhatsNew).toHaveBeenCalledTimes(1);
   });
 

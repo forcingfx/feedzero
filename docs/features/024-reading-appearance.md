@@ -86,9 +86,9 @@ none) mostly overflowed it and three of the four options looked the same,
 which read as a setting that did nothing. The preview column now takes a
 share of the pane (50 / 60 / 80 / 100%, the measures against a 1200px
 reader) and the preview's header states the real measure. Below the `lg`
-breakpoint the header says instead that an article fills the screen at
-every width, which is what the reader does there. The sample's link is
-inert.
+breakpoint the column does not change, which is what the reader does
+there; the setting's own description says it is desktop only. The
+sample's link is inert.
 
 ### Update 2026-11-20 (device text size, settings redesign)
 
@@ -140,6 +140,27 @@ effect shows:
 
 Size controls are steppers (`SizeStepper`): one step down, the step's
 name as a live status, one step up.
+
+### Update 2026-11-20 (image position, returning to Settings, copy)
+
+- **Image position** (`articleImagePosition`, Left by default, synced):
+  Settings → List → Image position puts each row's lead image on the left
+  or the right. On the right it is the row's last element, after the
+  star. It only shows when Show article images is on.
+- **Returning to Settings** reopens the screen the user left: the tab
+  (`sessionStorage["feedzero:settings-last-tab"]`) and that tab's scroll
+  offset (in memory), via `src/lib/settings-return-point.ts`. The tab bar
+  and the sidebar link both go to a bare `/settings`, which used to mean
+  Reading at the top every time. A link that names a tab still wins, and
+  switching tabs by hand starts the new tab at the top.
+- **Reading width says where it applies.** Its description reads
+  "Desktop only: on a phone the article always uses the full screen."
+  The sentence the preview showed on phones is gone.
+- **Copy rule: no "what ..." phrasing in settings.** A title, label or
+  description names the thing the user can change ("Filtering and
+  grouping", "Row layout", "Release notes"), not a description of the
+  screen ("What the list includes"). Enforced by
+  `tests/build/ui-consistency.test.ts`.
 
 ## Behaviour
 

@@ -53,6 +53,7 @@ function renderAt(path: string) {
 describe("<SettingsPage>", () => {
   beforeEach(() => {
     useLicenseStore.setState({ tier: "free", verifying: false });
+    sessionStorage.clear();
     vi.unstubAllEnvs();
   });
 
@@ -144,6 +145,49 @@ describe("<SettingsPage>", () => {
   it("does not render a Recovery tab anymore (license recovery moved into Subscription)", () => {
     renderAt("/settings");
     expect(screen.queryByLabelText(/^recovery$/i)).toBeNull();
+  });
+
+  /**
+   * Owner request 2026-11-20: "When navigating away from settings and
+   * back I should be on the same screen as when I left." The tab bar's
+   * Settings button and the sidebar link both go to a bare /settings, so
+   * without this every return landed on Reading.
+   */
+  describe("returning to Settings", () => {
+    it("reopens on the tab that was open when the user left", () => {
+      const first = renderAt("/settings");
+      fireEvent.click(screen.getByLabelText(/^library$/i));
+      expect(screen.getByTestId("library-tab")).toBeInTheDocument();
+      first.unmount();
+
+      renderAt("/settings");
+
+      expect(screen.getByTestId("library-tab")).toBeInTheDocument();
+      expect(screen.getByTestId("probe-path")).toHaveTextContent("/settings?tab=library");
+    });
+
+    it("remembers a tab opened by link as well as by tap", () => {
+      renderAt("/settings?tab=list").unmount();
+      renderAt("/settings");
+      expect(screen.getByTestId("list-tab")).toBeInTheDocument();
+    });
+
+    it("a link that names a tab still wins over the remembered one", () => {
+      renderAt("/settings?tab=list").unmount();
+      renderAt("/settings?tab=help");
+      expect(screen.getByTestId("help-tab")).toBeInTheDocument();
+    });
+
+    it("opens on Reading when nothing was remembered", () => {
+      renderAt("/settings");
+      expect(screen.getByTestId("reading-tab")).toBeInTheDocument();
+    });
+
+    it("ignores a remembered tab that no longer exists", () => {
+      sessionStorage.setItem("feedzero:settings-last-tab", "briefings");
+      renderAt("/settings");
+      expect(screen.getByTestId("reading-tab")).toBeInTheDocument();
+    });
   });
 
   it("clicking a tab keeps unrelated query params", () => {

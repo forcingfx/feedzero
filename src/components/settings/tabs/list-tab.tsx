@@ -1,12 +1,19 @@
 /**
- * Settings → List: what the article list shows, with a live sample row.
+ * Settings → List: row layout, and filtering and grouping, with a live
+ * sample row.
  */
 import { Switch } from "@/components/ui/switch";
 import { useAppStore } from "@/stores/app-store";
 import { usePreferencesStore } from "@/stores/preferences-store";
 import { ListPreview } from "../list-preview";
-import { SettingRow, SettingsGroup, SizeStepper } from "../setting-row";
+import { SegmentedControl, SettingRow, SettingsGroup, SizeStepper } from "../setting-row";
+import type { ArticleImagePosition } from "@feedzero/core/types";
 import { SIZE_STEPS } from "../size-steps";
+
+const IMAGE_POSITIONS: { value: ArticleImagePosition; label: string }[] = [
+  { value: "left", label: "Left" },
+  { value: "right", label: "Right" },
+];
 
 export function ListTab() {
   const groupArticleFloods = useAppStore((s) => s.groupArticleFloods);
@@ -16,7 +23,7 @@ export function ListTab() {
 
   return (
     <div data-testid="list-tab" className="space-y-8 py-2">
-      <SettingsGroup title="Rows">
+      <SettingsGroup title="Row layout">
         <SettingRow
           label="List size"
           description="Row text and spacing, relative to your device's text size."
@@ -55,7 +62,7 @@ export function ListTab() {
         />
         <SettingRow
           label="Show article images"
-          description="Each article's lead image in the list. Images load through FeedZero's proxy, but each is still a request to that article's image host, so it learns what you are reading."
+          description="Each article's lead image in the list. Images load through FeedZero's proxy, but each is still a request to that article's image host, which can then see the articles in your list."
         >
           <Switch
             aria-label="Show article images"
@@ -63,9 +70,20 @@ export function ListTab() {
             onCheckedChange={(v) => void updatePreferences({ showArticleImages: !!v })}
           />
         </SettingRow>
+        <SettingRow
+          label="Image position"
+          description="Put article images on the left or the right of each row."
+        >
+          <SegmentedControl
+            label="Image position"
+            options={IMAGE_POSITIONS}
+            value={prefs.articleImagePosition ?? "left"}
+            onChange={(value) => void updatePreferences({ articleImagePosition: value })}
+          />
+        </SettingRow>
       </SettingsGroup>
 
-      <SettingsGroup title="What the list includes">
+      <SettingsGroup title="Filtering and grouping">
         <SettingRow
           label="Hide read articles"
           description="Show only unread items. The article you have open stays until you move on."

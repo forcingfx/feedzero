@@ -44,9 +44,9 @@ export function HelpTab({ onWhatsNew }: HelpTabProps) {
             Send feedback
           </Button>
         </SettingRow>
-        <SettingRow label="What's new" description="Release notes, as a feed you can follow.">
+        <SettingRow label="Release notes" description="Each release's changes, as a feed you can follow.">
           <Button type="button" variant="outline" size="sm" onClick={onWhatsNew}>
-            What&apos;s new
+            Release notes
           </Button>
         </SettingRow>
       </SettingsGroup>

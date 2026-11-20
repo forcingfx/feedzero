@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils.ts";
  * pane is about 700px wide, so three of the four overflowed it and looked
  * the same. The shares are the measures against a 1200px reader, so the
  * steps between options keep their true proportions. Desktop only: on a
- * narrower screen the article fills the width whatever is chosen, and the
- * preview shows exactly that.
+ * narrower screen the article fills the width whatever is chosen, so the
+ * preview does too, and the setting's own description says so.
  */
 const PREVIEW_WIDTH_SCALE: Record<ReaderWidth, string> = {
   narrow: "lg:max-w-[50%]",
@@ -67,9 +67,6 @@ export function ReadingPreview({ textSize, width, lineHeight }: ReaderTypography
         <span>Preview</span>
         <span data-testid="reading-preview-width" className="max-lg:hidden">
           {describeWidth(width)}
-        </span>
-        <span data-testid="reading-preview-narrow-note" className="lg:hidden">
-          An article fills this screen at every reading width.
         </span>
       </p>
       <div className="max-h-80 overflow-y-auto p-4 px-6">

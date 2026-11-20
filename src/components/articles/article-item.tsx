@@ -5,7 +5,7 @@ import { decodeEntities } from "@/lib/decode-entities.ts";
 import { formatRelative } from "@/lib/format-relative.ts";
 import { articleListPreview } from "@/lib/article-list-preview.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
-import type { Article } from "@feedzero/core/types";
+import type { Article, ArticleImagePosition } from "@feedzero/core/types";
 
 interface ArticleItemProps {
   article: Article;
@@ -20,6 +20,8 @@ interface ArticleItemProps {
   imageUrl?: string;
   /** Show up to two lines of the article's opening text under the title. */
   showPreview?: boolean;
+  /** Which side of the row the lead image sits on. */
+  imagePosition?: ArticleImagePosition;
 }
 
 function formatFullDate(timestamp: number): string {
@@ -50,6 +52,7 @@ export const ArticleItem = memo(function ArticleItem({
   feedSiteUrl,
   imageUrl,
   showPreview = false,
+  imagePosition = "left",
 }: ArticleItemProps) {
   const preview = useMemo(
     () => (showPreview ? articleListPreview(article) : ""),
@@ -69,6 +72,22 @@ export const ArticleItem = memo(function ArticleItem({
     }
   }
 
+  const leadImage = imageUrl ? (
+    <img
+      data-testid="article-image"
+      src={`/api/icon?url=${encodeURIComponent(imageUrl)}`}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      className="size-[3.5em] max-lg:size-[4.5em] shrink-0 rounded-md object-cover bg-muted"
+      onError={(e) => {
+        // A dead or non-image URL leaves no broken-image box behind.
+        e.currentTarget.style.display = "none";
+      }}
+    />
+  ) : null;
+
   return (
     <li
       role="option"
@@ -82,21 +101,7 @@ export const ArticleItem = memo(function ArticleItem({
         highlightSelected && "aria-selected:bg-accent aria-selected:border-l-primary",
       )}
     >
-      {imageUrl && (
-        <img
-          data-testid="article-image"
-          src={`/api/icon?url=${encodeURIComponent(imageUrl)}`}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          className="size-[3.5em] max-lg:size-[4.5em] shrink-0 rounded-md object-cover bg-muted"
-          onError={(e) => {
-            // A dead or non-image URL leaves no broken-image box behind.
-            e.currentTarget.style.display = "none";
-          }}
-        />
-      )}
+      {imagePosition === "left" && leadImage}
       <div className="min-w-0 flex-1 flex gap-2 items-start">
         <span
           className={`rounded-full size-1.5 shrink-0 mt-[0.55em] transition-colors duration-500 ${
@@ -155,6 +160,7 @@ export const ArticleItem = memo(function ArticleItem({
           />
         </div>
       )}
+      {imagePosition === "right" && leadImage}
     </li>
   );
 });

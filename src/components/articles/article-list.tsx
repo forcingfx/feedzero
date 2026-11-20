@@ -126,6 +126,9 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const listTextSize = usePreferencesStore(
     (s) => s.preferences.listTextSize ?? "medium",
   );
+  const articleImagePosition = usePreferencesStore(
+    (s) => s.preferences.articleImagePosition ?? "left",
+  );
   const showArticleImages = usePreferencesStore(
     (s) => s.preferences.showArticleImages ?? false,
   );
@@ -452,6 +455,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                     feedSiteUrl={itemFeedSiteUrl}
                     showPreview={showArticlePreview}
                     imageUrl={showArticleImages ? entry.article.imageUrl : undefined}
+                    imagePosition={articleImagePosition}
                   />
                 </SwipeToReadRow>
               ) : entry.kind === "summary" ? (

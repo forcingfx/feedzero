@@ -38,3 +38,44 @@ test.describe("Settings on a phone", () => {
     await expect(page).toHaveURL(/tab=help/);
   });
 });
+
+/**
+ * Leaving Settings and coming back lands on the same screen: the same
+ * tab, scrolled to the same place (owner request, 2026-11-20). Scroll
+ * needs real layout, so it is checked here.
+ */
+test.describe("Returning to Settings", () => {
+  test("reopens the tab and the scroll position the user left", async ({ feedPage: page }) => {
+    const isPhone = (page.viewportSize()?.width ?? 1280) < 1024;
+    await page.goto("/settings");
+    await page.getByRole("radio", { name: "List" }).click();
+    await expect(page.getByTestId("list-tab")).toBeVisible();
+
+    const scrollTop = () =>
+      page.evaluate(() => {
+        const page = document.querySelector('[data-testid="list-tab"]')!;
+        return page.closest<HTMLElement>("[data-radix-scroll-area-viewport], main")!.scrollTop;
+      });
+    await page.getByRole("switch", { name: "Group article floods" }).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+    const leftAt = await scrollTop();
+    test.skip(leftAt === 0, "The List tab fits this viewport without scrolling");
+
+    // Away and back the way a person does it: through the app's own nav.
+    if (isPhone) {
+      const tabs = page.getByTestId("drawer-handle-strip");
+      await tabs.getByRole("button", { name: /^Explore|show all tabs/ }).first().click();
+      if (!/\/explore/.test(page.url())) await tabs.getByRole("button", { name: "Explore" }).click();
+      await page.waitForURL(/\/explore/);
+      await tabs.getByRole("button", { name: "Settings" }).click();
+    } else {
+      await page.getByRole("button", { name: /explore/i }).first().click();
+      await page.waitForURL(/\/explore/);
+      await page.getByRole("button", { name: /^settings$/i }).first().click();
+    }
+
+    await expect(page).toHaveURL(/tab=list/);
+    await expect(page.getByTestId("list-tab")).toBeVisible();
+    await expect.poll(scrollTop).toBe(leftAt);
+  });
+});
