@@ -15,6 +15,8 @@ export type SettingsTab =
   | "subscription"
   | "sync-and-data"
   | "reading"
+  | "list"
+  | "library"
   | "help";
 
 export function goToSettings(

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { SettingsPage } from "@/pages/settings-page";
 import { useLicenseStore } from "@/stores/license-store";
 
@@ -20,6 +20,12 @@ vi.mock("@/components/settings/tabs/sync-and-data-tab", () => ({
 vi.mock("@/components/settings/tabs/reading-tab", () => ({
   ReadingTab: () => <div data-testid="reading-tab" />,
 }));
+vi.mock("@/components/settings/tabs/list-tab", () => ({
+  ListTab: () => <div data-testid="list-tab" />,
+}));
+vi.mock("@/components/settings/tabs/library-tab", () => ({
+  LibraryTab: () => <div data-testid="library-tab" />,
+}));
 vi.mock("@/components/settings/tabs/help-tab", () => ({
   HelpTab: () => <div data-testid="help-tab" />,
 }));
@@ -27,10 +33,19 @@ vi.mock("@/hooks/use-whats-new", () => ({
   useWhatsNew: () => () => Promise.resolve(),
 }));
 
+function LocationProbe() {
+  const { pathname, search } = useLocation();
+  return <div data-testid="probe-path">{pathname + search}</div>;
+}
+
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <SettingsPage />
+      <Routes>
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="*" element={null} />
+      </Routes>
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
@@ -91,20 +106,36 @@ describe("<SettingsPage>", () => {
     expect(screen.getByLabelText(/^help$/i)).toBeInTheDocument();
   });
 
-  it("orders the tabs Reading, Sync & Data, Subscription, Help", () => {
+  it("orders the tabs Reading, List, Library, Sync & Data, Subscription, Help", () => {
     renderAt("/settings");
     const names = screen.getAllByRole("radio").map((el) => el.getAttribute("aria-label"));
-    expect(names).toEqual(["Reading", "Sync and data", "Subscription", "Help"]);
+    expect(names).toEqual(["Reading", "List", "Library", "Sync and data", "Subscription", "Help"]);
   });
 
-  it("does not render a Briefings tab (folded into Reading → Signal section)", () => {
+  it("opens the List and Library tabs from ?tab=", () => {
+    renderAt("/settings?tab=list");
+    expect(screen.getByTestId("list-tab")).toBeInTheDocument();
+  });
+
+  // Six tabs do not fit a phone's width. They scroll sideways in one row
+  // instead of wrapping into a block that pushes the settings down.
+  it("keeps the tabs on one scrollable row", () => {
+    renderAt("/settings");
+    const strip = screen.getAllByRole("radio")[0]!.parentElement!;
+    expect(strip.className).toContain("overflow-x-auto");
+    expect(strip.className).not.toContain("flex-wrap");
+  });
+
+  it("does not render a Briefings tab (its settings live on the Signal page)", () => {
     renderAt("/settings");
     expect(screen.queryByLabelText(/^briefings$/i)).toBeNull();
   });
 
-  it("redirects legacy ?tab=briefings to the Reading tab", () => {
+  it("sends legacy ?tab=briefings to Signal's own settings, which left the Reading tab", async () => {
     renderAt("/settings?tab=briefings");
-    expect(screen.getByTestId("reading-tab")).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("probe-path")).toHaveTextContent("/signal?settings=open");
+    });
   });
 
   it("does not render a Recovery tab anymore (license recovery moved into Subscription)", () => {

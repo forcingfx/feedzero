@@ -338,15 +338,16 @@ describe("SignalPage", () => {
       expect(badge.textContent?.toLowerCase()).toContain("local");
     });
 
-    it("clicking the mode badge navigates to Settings → Reading", async () => {
+    it("clicking the mode badge opens Signal's settings on this page", async () => {
       seedReadyCorpus();
       renderAt();
       await waitFor(() => expect(useSignalStore.getState().status).toBe("ready"));
       const user = userEvent.setup();
       await user.click(screen.getByTestId("signal-mode-badge"));
+      expect(await screen.findByRole("dialog", { name: /signal settings/i })).toBeInTheDocument();
       const probe = screen.getByTestId("location");
-      expect(probe.textContent).toContain("/settings");
-      expect(probe.textContent).toContain("tab=reading");
+      expect(probe.textContent).toContain("/signal");
+      expect(probe.textContent).not.toContain("/settings");
     });
 
     it("the in-page Local/AI toggle has been removed from the header", async () => {

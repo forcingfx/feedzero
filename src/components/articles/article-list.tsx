@@ -21,7 +21,8 @@ import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indi
 import { ArticleListSkeleton } from "@/components/loading/article-list-skeleton.tsx";
 import { SwipeToReadRow } from "./swipe-to-read-row.tsx";
 import { CLEAR_MOBILE_CHROME, MOBILE_LIST_TITLE_PX } from "@/components/layout/mobile-chrome.ts";
-import type { Article, ListTextSize } from "@feedzero/core/types";
+import type { Article } from "@feedzero/core/types";
+import { LIST_TEXT_SIZE_CLASS } from "./list-text-size.ts";
 
 /**
  * Flat list-entry shape: every row the virtualizer renders is either a
@@ -58,17 +59,6 @@ interface ArticleListProps {
  */
 const ESTIMATED_ITEM_SIZE = 96;
 
-/**
- * Font size of the list per listTextSize preference: steps from the
- * device's own text size (`.reading-size-*` in index.css). Rows size
- * their text, icons and padding in `em`, so this one class scales a row.
- */
-const LIST_TEXT_SIZE_CLASS: Record<ListTextSize, string> = {
-  small: "reading-size-small",
-  medium: "reading-size-medium",
-  large: "reading-size-large",
-  "x-large": "reading-size-x-large",
-};
 
 /**
  * Rows rendered above and below the visible viewport. Large enough that

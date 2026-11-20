@@ -110,3 +110,67 @@ export function SegmentedControl<T extends string>({
     </div>
   );
 }
+
+/**
+ * Stepper for an ordered scale (text sizes): one step down, the current
+ * step's name, one step up. Used where the choices are deviations from a
+ * default, which a row of four absolute buttons misrepresents, and it is
+ * a third of the width on a phone. The step's name is a live `status`, so
+ * a screen reader hears the new size after each press.
+ */
+export function SizeStepper<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  className,
+}: {
+  label: string;
+  /** Smallest first. */
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  const index = Math.max(0, options.findIndex((option) => option.value === value));
+  const noun = label.toLowerCase();
+  const step = (by: -1 | 1) => {
+    const next = options[index + by];
+    if (next) onChange(next.value);
+  };
+  const buttonClass =
+    "flex size-9 items-center justify-center font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-35 disabled:hover:bg-transparent";
+
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={cn("flex w-fit items-center overflow-hidden rounded-md border border-border", className)}
+    >
+      <button
+        type="button"
+        aria-label={`Decrease ${noun}`}
+        disabled={index === 0}
+        onClick={() => step(-1)}
+        className={cn(buttonClass, "text-xs")}
+      >
+        A
+      </button>
+      <span
+        role="status"
+        className="min-w-20 border-x border-border px-2 text-center text-xs text-muted-foreground"
+      >
+        {options[index]?.label}
+      </span>
+      <button
+        type="button"
+        aria-label={`Increase ${noun}`}
+        disabled={index === options.length - 1}
+        onClick={() => step(1)}
+        className={cn(buttonClass, "text-base")}
+      >
+        A
+      </button>
+    </div>
+  );
+}
