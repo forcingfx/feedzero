@@ -59,14 +59,15 @@ interface ArticleListProps {
 const ESTIMATED_ITEM_SIZE = 96;
 
 /**
- * Font size of the list per listTextSize preference. Rows size their
- * text, icons and padding in `em`, so this one class scales a whole row.
+ * Font size of the list per listTextSize preference: steps from the
+ * device's own text size (`.reading-size-*` in index.css). Rows size
+ * their text, icons and padding in `em`, so this one class scales a row.
  */
 const LIST_TEXT_SIZE_CLASS: Record<ListTextSize, string> = {
-  small: "text-sm",
-  medium: "text-base",
-  large: "text-lg",
-  "x-large": "text-xl",
+  small: "reading-size-small",
+  medium: "reading-size-medium",
+  large: "reading-size-large",
+  "x-large": "reading-size-x-large",
 };
 
 /**

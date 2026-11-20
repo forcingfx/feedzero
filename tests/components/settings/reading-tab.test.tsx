@@ -323,7 +323,7 @@ describe("<ReadingTab>", () => {
           name: /^extra large$/i,
         }),
       );
-      expect(column.className).toContain("text-xl");
+      expect(column.className).toContain("reading-size-x-large");
 
       fireEvent.click(
         within(screen.getByRole("group", { name: /line spacing/i })).getByRole("button", {

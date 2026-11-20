@@ -163,7 +163,14 @@
 
     html {
         font-family: var(--font-sans);
-        font-size: 14px;
+        /* Everything is sized in rem from here, so this one line makes
+           the whole app follow the device's text size. The scale is
+           measured and set by src/lib/system-text-scale.ts; 14px is the
+           denser size menus and controls use at the default setting. */
+        font-size: calc(14px * var(--system-text-scale, 1));
+        /* Reading text (article body, list rows) starts from the
+           device's full size instead: 16px at the default setting. */
+        --reading-base: calc(16px * var(--system-text-scale, 1));
         line-height: 1.5;
         /* Prevent iOS landscape orientation from auto-bumping font sizes
            and breaking the carefully-tuned text scale. */
@@ -222,8 +229,8 @@
 }
 
 /* iOS Safari auto-zooms a focused form control when its computed font-size
-   is below 16px. Our html font-size is 14px (so Tailwind's text-base = 1rem
-   = 14px), which trips the heuristic on every input. Pinning a literal 16px
+   is below 16px. Our html font-size is 14px at the default text scale (so
+   Tailwind's text-base = 1rem = 14px), which trips the heuristic on every input. Pinning a literal 16px
    on touch viewports stops the zoom without touching the desktop text scale.
 
    This rule sits OUTSIDE @layer base on purpose: Tailwind utilities live in
@@ -324,6 +331,19 @@
         -webkit-backdrop-filter: none;
         backdrop-filter: none;
     }
+}
+
+/*
+ * Reading sizes: the list's and the reader's size preference, as steps
+ * from --reading-base (the device's own text size). "medium" is the
+ * device's size unchanged; the others are relative to it, so a person who
+ * raised their system text size and also picks "large" gets both.
+ */
+@layer components {
+    .reading-size-small { font-size: calc(var(--reading-base) * 0.875); }
+    .reading-size-medium { font-size: calc(var(--reading-base) * 1); }
+    .reading-size-large { font-size: calc(var(--reading-base) * 1.125); }
+    .reading-size-x-large { font-size: calc(var(--reading-base) * 1.25); }
 }
 
 /*

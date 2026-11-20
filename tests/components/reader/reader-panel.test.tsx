@@ -203,9 +203,9 @@ describe("ReaderPanel", () => {
     );
 
     it.each([
-      ["small", "text-sm"],
-      ["large", "text-lg"],
-      ["x-large", "text-xl"],
+      ["small", "reading-size-small"],
+      ["large", "reading-size-large"],
+      ["x-large", "reading-size-x-large"],
     ] as const)(
       "applies the persisted %s reader text size",
       async (size, expectedClass) => {
