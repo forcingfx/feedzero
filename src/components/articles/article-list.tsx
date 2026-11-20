@@ -20,7 +20,7 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh.ts";
 import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indicator.tsx";
 import { ArticleListSkeleton } from "@/components/loading/article-list-skeleton.tsx";
 import { SwipeToReadRow } from "./swipe-to-read-row.tsx";
-import { CLEAR_MOBILE_CHROME, MOBILE_HEADER_PX } from "@/components/layout/mobile-chrome.ts";
+import { CLEAR_MOBILE_CHROME, MOBILE_LIST_TITLE_PX } from "@/components/layout/mobile-chrome.ts";
 import type { Article, ListTextSize } from "@feedzero/core/types";
 
 /**
@@ -301,15 +301,13 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     [selectArticle, onArticleSelect, duplicatesByLead, expandedSimilar, markAsRead],
   );
 
-  // On mobile the scroller pads its top by the glass header's height, so
-  // the list starts that far down the scroll element (scrollMargin), and
-  // "scroll into view" must land below the header, not under it.
-  const chromeTop = isDesktop ? 0 : MOBILE_HEADER_PX;
+  // On a phone the title block sits above the rows inside the scroller,
+  // so the list starts that far down the scroll element (scrollMargin).
+  const listOffset = isDesktop ? 0 : MOBILE_LIST_TITLE_PX;
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => scrollRef.current,
-    scrollMargin: chromeTop,
-    scrollPaddingStart: chromeTop,
+    scrollMargin: listOffset,
     estimateSize: () => ESTIMATED_ITEM_SIZE,
     overscan: OVERSCAN,
     getItemKey: (index) => {
@@ -445,7 +443,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                 top: 0,
                 left: 0,
                 width: "100%",
-                transform: `translateY(${virtualItem.start - chromeTop}px)`,
+                transform: `translateY(${virtualItem.start - listOffset}px)`,
               }}
             >
               {entry.kind === "article" ? (

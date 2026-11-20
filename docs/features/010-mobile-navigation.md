@@ -33,9 +33,14 @@ Feature: Mobile navigation
 
   Rule: The bars are glass
 
-  Scenario: Content scrolls underneath the header and the tab bar
+  Scenario: Content scrolls underneath the floating chrome
     Given the user is on any mobile page
-    Then the header is a translucent, blurred bar (`.glass-bar`)
+    Then there is no header bar
+    And on a feed list the view options sit in a floating glass pill at
+      the top right, and the list is titled with the view's name and
+      unread count, which scroll away with the rows
+    And sync status is a thin bar under the status bar: blue while
+      working, green as it lands, then gone
     And the tab bar is a floating liquid-glass capsule (`.liquid-glass`),
       inset 16 px from the sides and 8 px above the home indicator
     And every mobile scroller pads by --chrome-top / --chrome-bottom so
@@ -178,7 +183,7 @@ Gesture ownership map (mobile):
 | `src/lib/swipe-back.ts` | `shouldCommitSwipeBack()`: speed OR distance decides the release (flick ≥ 400px/s, or ≥ 35% of the width) |
 | `src/index.css` | `touch-action: pan-y pinch-zoom` on `[data-reader-layer]` and its `[data-reader-scroll]` scrollers; `auto` on `<pre>` |
 | `src/hooks/use-media-query.ts` | `useIsDesktop()` hook for responsive breakpoint detection |
-| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = floating liquid-glass capsule with four tabs, minimized on scroll (`useMinimizeOnScroll`, capture-phase `scroll` listener, ignores the reader and the drawer); was a four-tab bar (Feeds opens the drawer; Explore, Signal, Settings navigate); open state = recent-feeds row + content-sized feed list (capped at 85dvh) + one-row footer: status line, then icon-only Auto-organize / New folder / Refresh all |
+| `src/components/layout/mobile-nav-drawer.tsx` | Bottom drawer. Closed state = floating liquid-glass capsule with four tabs, minimized on scroll (`useMinimizeOnScroll`, capture-phase `scroll` listener, ignores the reader and the drawer); was a four-tab bar (Feeds returns to the last feed list, or opens the drawer when already on Feeds; Explore, Signal, Settings navigate); open state = recent-feeds row + content-sized feed list (capped at 85dvh) + one-row footer: status line, then icon-only Auto-organize / New folder / Refresh all |
 | `src/lib/recent-feeds.ts` | `recordRecentFeed()` + `MOBILE_DOCK_FEED_CAP` (and `stableDockFeeds()`, now unused by the drawer) |
 | `src/stores/feed-store.ts` | Tracks `recentFeedIds` (device-local, persisted) — recorded in `selectFeed`, pruned in `removeFeed` |
 
@@ -243,6 +248,54 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
   feed title truncates before the count instead of running under it.
   All of it is `max-lg:` classes, so desktop is unchanged. No gesture
   changed, so the ownership map above stands.
+
+- **The Feeds tab goes to Feeds first, and opens the drawer second**
+  (owner request, 2026-11-19). The tab used to open the feed list drawer
+  from anywhere, so from Settings there was no one-tap way back to what
+  you were reading: you had to open the drawer and pick the feed again.
+  Now, from Explore, Signal or Settings, a tap returns to the feed list
+  last seen this visit (the list, not an article that was open in it;
+  All items when none was seen). When Feeds is already the current tab,
+  a tap opens the drawer, so the drawer is two taps from another section
+  and one tap from Feeds. The accessible name follows: "Feeds" when the
+  tap navigates, "Feeds, open feed list" when it opens the drawer. With
+  no feeds at all there is no list to return to, so the tab opens the
+  drawer from anywhere, as before. The upward swipe on the bar still
+  opens the drawer from any section; no gesture changed. Logic:
+  `handleFeedsTab` in `mobile-nav-drawer.tsx` and
+  `src/lib/feed-list-path.ts`. Tests:
+  `tests/components/layout/mobile-nav-drawer.test.tsx`,
+  `tests/e2e/feeds-tab.spec.ts`.
+
+- **No header bar on a phone** (owner request, 2026-11-19). The pinned
+  48px bar held a breadcrumb, a status dot and one menu button. The
+  breadcrumb also went stale: back on the list it still named the last
+  article read. The bar is gone and each of its three jobs moved:
+  - *Naming the view*: the article list titles itself (`MobileListTitle`
+    in `article-list-controls.tsx`): the view's name large, its unread
+    count under it, scrolling away with the rows. Its height is fixed
+    (`MOBILE_LIST_TITLE_PX`) because the list's virtualizer positions
+    rows below it.
+  - *View options*: one floating `liquid-glass` pill at the top right
+    (`MobileViewPill`), shown only on feed routes, holding sort, mark
+    read and the feed / folder / filter settings.
+  - *Sync status*: `MobileSyncIndicator`, a 2px bar under the status bar.
+    Blue and moving while feeds refresh or the vault syncs, green for
+    1.2s as the work lands, then eased out over 300ms (fade, and the chip
+    lifts away) instead of vanishing. The chip carries a checkmark that
+    draws itself as it settles. Reduced motion gets a still bar, a
+    checkmark that is simply there, and a plain fade. A chip says "Synced" ("Up to date"
+    on a local-only account) only after a refresh; background vault
+    pushes, which follow every star and read mark, get the bar alone. An
+    error holds the bar red with a "Sync error" chip until it recovers.
+    The full "Refreshed X ago" line is still in the drawer footer.
+  `--chrome-top` is now the status bar's safe area only. The article
+  list's controls switch on the shell's `lg` breakpoint; they used a
+  separate 768px check, which left tablets with both layouts' chrome.
+- **Closing the reader clears the selection on a phone.** The list is a
+  destination of its own there, so with the reader closed nothing is
+  selected (`feeds-route.tsx`). The selection used to linger, which is
+  what the stale breadcrumb was showing.
 
 ## Limitations
 

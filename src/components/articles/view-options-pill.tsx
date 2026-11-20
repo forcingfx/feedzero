@@ -21,7 +21,7 @@ const SORT_LABELS: Record<ArticleSortMode, string> = {
 };
 
 /**
- * The mobile header's single control: one menu holding everything that
+ * The phone's single view control, inside the floating glass pill: one menu holding everything that
  * configures the current view — sort order plus the contextual
  * feed/folder/filter settings entry. Replaces the previous row of
  * three same-looking pills whose scopes silently differed (refresh
@@ -37,8 +37,12 @@ export function ViewOptionsPill() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <HeaderAction label="View options" data-testid="view-options-pill">
-          <SlidersHorizontal className="size-4" />
+        <HeaderAction
+          label="View options"
+          data-testid="view-options-pill"
+          className="size-11 rounded-full text-foreground"
+        >
+          <SlidersHorizontal className="size-5" />
         </HeaderAction>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-40">

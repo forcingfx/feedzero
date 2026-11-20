@@ -298,7 +298,7 @@ describe("<ReadingTab>", () => {
     // The preview is only worth having if it cannot drift from the
     // reader, so it is asserted against the reader's own class builder.
     it("shows sample article text styled by the reader's own classes", async () => {
-      const { readerColumnClass } = await import(
+      const { readerTextClass } = await import(
         "@/components/reader/reader-typography.ts"
       );
       renderTab();
@@ -307,16 +307,14 @@ describe("<ReadingTab>", () => {
       expect(within(preview).getByRole("heading")).toBeInTheDocument();
       expect(within(preview).getAllByText(/\w+/).length).toBeGreaterThan(1);
       const column = within(preview).getByTestId("reading-preview-column");
-      for (const cls of readerColumnClass({
-        textSize: "medium",
-        width: "medium",
-        lineHeight: "normal",
-      }).split(" ").filter(Boolean)) {
+      for (const cls of readerTextClass({ textSize: "medium", lineHeight: "normal" })
+        .split(" ")
+        .filter(Boolean)) {
         expect(column.className).toContain(cls);
       }
     });
 
-    it("follows text size, line spacing and reading width as they change", () => {
+    it("follows text size and line spacing as they change", () => {
       renderTab();
       const column = screen.getByTestId("reading-preview-column");
 
@@ -334,12 +332,57 @@ describe("<ReadingTab>", () => {
       );
       expect(column.className).toContain("leading-loose");
 
+    });
+
+    // Bug report 2026-11-19: "The width setting doesn't do anything, at
+    // least in the preview." The pane is about 700px wide, so the
+    // reader's real measures (600 / 720 / 960px / none) all but one
+    // exceeded it and looked identical. Pin: the preview draws the width
+    // to scale, as a share of the pane, so every option moves the column.
+    it("gives each reading width a visibly different column", () => {
+      renderTab();
+      const column = screen.getByTestId("reading-preview-column");
+      const widthGroup = screen.getByRole("group", { name: /reading width/i });
+      const seen = new Set<string>();
+
+      for (const name of [/^narrow$/i, /^medium$/i, /^wide$/i, /^full$/i]) {
+        fireEvent.click(within(widthGroup).getByRole("button", { name }));
+        const scale = column.className.match(/lg:max-w-\S+/)?.[0];
+        expect(scale).toBeDefined();
+        seen.add(scale!);
+      }
+
+      expect(seen.size).toBe(4);
+    });
+
+    it("does not apply the reader's real measure, which the pane would swallow", () => {
+      renderTab();
+      const column = screen.getByTestId("reading-preview-column");
+      expect(column.className).not.toMatch(/(^|\s)max-w-(150|180|240)\b/);
+    });
+
+    it("says how wide the chosen column really is", () => {
+      renderTab();
+      const preview = screen.getByRole("region", { name: /preview/i });
+      expect(within(preview).getByTestId("reading-preview-width")).toHaveTextContent(
+        /720px.*to scale/i,
+      );
+
       fireEvent.click(
         within(screen.getByRole("group", { name: /reading width/i })).getByRole("button", {
           name: /^narrow$/i,
         }),
       );
-      expect(column.className).toContain("max-w-150");
+      expect(within(preview).getByTestId("reading-preview-width")).toHaveTextContent(/600px/);
+    });
+
+    it("tells phone readers the width cannot change anything on their screen", () => {
+      renderTab();
+      const note = screen.getByTestId("reading-preview-narrow-note");
+      expect(note).toHaveTextContent(/fills this screen/i);
+      // Shown only below the desktop breakpoint, where it is true.
+      expect(note.className).toContain("lg:hidden");
+      expect(screen.getByTestId("reading-preview-width").className).toContain("max-lg:hidden");
     });
 
     it("renders the sample through the reader's ArticleContent, links and quotes included", () => {

@@ -122,7 +122,7 @@ Feature: Smart filters
 | `src/stores/smart-filter-store.ts` | **new** — CRUD store + editor open/close state |
 | `src/stores/article-store.ts` | `deriveVisibleArticles` + `loadArticles` route filter ids through the evaluator |
 | `src/components/layout/sidebar-body.tsx` | Filters section (gated on `useFeatureGate("filters")`) |
-| `src/components/layout/header-breadcrumbs.tsx` | `resolveVirtualFeed` handles filter:&lt;id&gt; |
+| `src/components/articles/article-list-controls.tsx` | `useViewLabel` handles filter:&lt;id&gt; |
 | `src/components/layout/mobile-nav-drawer.tsx` | Drawer handle label for filter virtual feeds |
 | `src/components/sidebar/smart-filter-item.tsx` | **new** — sidebar row + edit/duplicate/delete menu |
 | `src/components/smart-filters/smart-filter-editor-dialog.tsx` | **new** — editor dialog driven by the store |

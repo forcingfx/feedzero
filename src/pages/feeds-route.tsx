@@ -147,6 +147,16 @@ export function FeedsRoute() {
     }
   }, [feedId, articleId, articles, isLoadingArticles, selectArticle, navigate, isDesktop]);
 
+  // Phone: with the reader closed nothing is selected. The list is a
+  // destination of its own there, and a selection left behind kept the
+  // last article "current" for anything reading the store. Forgetting the
+  // synced id lets the same article be opened again from the URL.
+  useEffect(() => {
+    if (isDesktop || articleId) return;
+    lastSyncedArticleIdRef.current = undefined;
+    selectArticle(null);
+  }, [isDesktop, articleId, selectArticle]);
+
   // Reset skip flag when user navigates to an article
   useEffect(() => {
     if (articleId) {

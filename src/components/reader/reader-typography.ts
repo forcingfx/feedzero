@@ -45,18 +45,32 @@ const LINE_HEIGHT_CLASS: Record<ReaderLineHeight, string> = {
 /** Classes of the article title, above the body in the reading column. */
 export const READER_TITLE_CLASS = "text-2xl font-semibold tracking-tight mb-2 break-words";
 
+/**
+ * The same measures in pixels, for surfaces that describe a width in
+ * words. `null` is "no limit". A test holds this to READER_WIDTH_CLASS.
+ */
+export const READER_WIDTH_PX: Record<ReaderWidth, number | null> = {
+  narrow: 600,
+  medium: 720,
+  wide: 960,
+  full: null,
+};
+
 export interface ReaderTypography {
   textSize: ReaderTextSize;
   width: ReaderWidth;
   lineHeight: ReaderLineHeight;
 }
 
+/** Text size and line spacing of article text, without a measure. */
+export function readerTextClass({
+  textSize,
+  lineHeight,
+}: Pick<ReaderTypography, "textSize" | "lineHeight">): string {
+  return cn(TEXT_SIZE_CLASS[textSize], LINE_HEIGHT_CLASS[lineHeight]);
+}
+
 /** Classes for the centred reading column under the given preferences. */
 export function readerColumnClass({ textSize, width, lineHeight }: ReaderTypography): string {
-  return cn(
-    "mx-auto",
-    READER_WIDTH_CLASS[width],
-    TEXT_SIZE_CLASS[textSize],
-    LINE_HEIGHT_CLASS[lineHeight],
-  );
+  return cn("mx-auto", READER_WIDTH_CLASS[width], readerTextClass({ textSize, lineHeight }));
 }

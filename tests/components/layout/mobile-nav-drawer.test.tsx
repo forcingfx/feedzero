@@ -38,9 +38,11 @@ const makeFeed = (id: string, title: string) => ({
   updatedAt: Date.now(),
 });
 
-function renderDrawer(props: Partial<{ onFeedSelect: (id: string) => void }> = {}) {
+function renderDrawer(
+  props: Partial<{ onFeedSelect: (id: string) => void; initialPath: string }> = {},
+) {
   return render(
-    <MemoryRouter initialEntries={["/feeds"]}>
+    <MemoryRouter initialEntries={[props.initialPath ?? "/feeds"]}>
       <Routes>
         <Route
           path="*"
@@ -132,6 +134,98 @@ describe("MobileNavDrawer", () => {
       renderDrawer();
       await user.click(screen.getByRole("button", { name: /open feed list/i }));
       await waitFor(() => expect(screen.getByTestId("drawer-content")).toBeInTheDocument());
+    });
+
+    // Owner request 2026-11-19: "Tapping 'feeds' should just take you to
+    // the feed list you last saw. Tapping it twice opens the drawer." The
+    // standard tab-bar contract: a tab first takes you to its section,
+    // and tapping the tab you are already on does its second job.
+    describe("Feeds tab from another section", () => {
+      it("returns to the feed list last seen, without opening the drawer", async () => {
+        const user = userEvent.setup();
+        useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
+        renderDrawer({ initialPath: "/feeds/f1" });
+        const strip = screen.getByTestId("drawer-handle-strip");
+
+        await user.click(within(strip).getByRole("button", { name: /explore/i }));
+        expect(screen.getByTestId("probe-path")).toHaveTextContent("/explore");
+
+        await user.click(within(strip).getByRole("button", { name: /^feeds/i }));
+
+        expect(screen.getByTestId("probe-path")).toHaveTextContent("/feeds/f1");
+        expect(screen.queryByTestId("drawer-content")).toBeNull();
+      });
+
+      it("a second tap, now on Feeds, opens the drawer", async () => {
+        const user = userEvent.setup();
+        useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
+        renderDrawer({ initialPath: "/feeds/f1" });
+        const strip = screen.getByTestId("drawer-handle-strip");
+        await user.click(within(strip).getByRole("button", { name: /settings/i }));
+
+        await user.click(within(strip).getByRole("button", { name: /^feeds/i }));
+        await user.click(within(strip).getByRole("button", { name: /^feeds/i }));
+
+        await waitFor(() => expect(screen.getByTestId("drawer-content")).toBeInTheDocument());
+        expect(screen.getByTestId("probe-path")).toHaveTextContent("/feeds/f1");
+      });
+
+      it("returns to the list, not to the article that was open in it", async () => {
+        const user = userEvent.setup();
+        useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
+        renderDrawer({ initialPath: "/feeds/f1/articles/a9" });
+        const strip = screen.getByTestId("drawer-handle-strip");
+        await user.click(within(strip).getByRole("button", { name: /signal/i }));
+
+        await user.click(within(strip).getByRole("button", { name: /^feeds/i }));
+
+        expect(screen.getByTestId("probe-path").textContent).toBe("/feeds/f1");
+      });
+
+      it("goes to All items when no list was seen this visit", async () => {
+        // Not the bare /feeds route: with a single feed that route
+        // redirects to Explore, and the tab would seem to do nothing.
+        const user = userEvent.setup();
+        useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
+        renderDrawer({ initialPath: "/settings" });
+
+        await user.click(
+          within(screen.getByTestId("drawer-handle-strip")).getByRole("button", { name: /^feeds/i }),
+        );
+
+        expect(screen.getByTestId("probe-path").textContent).toBe("/feeds/all");
+        expect(screen.queryByTestId("drawer-content")).toBeNull();
+      });
+
+      it("opens the drawer at once when there are no feeds to go back to", async () => {
+        // A new account lives on Explore; with no feed list to return to,
+        // the drawer (New folder, refresh) must stay one tap away.
+        const user = userEvent.setup();
+        useFeedStore.setState({ feeds: [] });
+        renderDrawer({ initialPath: "/explore" });
+
+        await user.click(
+          within(screen.getByTestId("drawer-handle-strip")).getByRole("button", {
+            name: "Feeds, open feed list",
+          }),
+        );
+
+        await waitFor(() => expect(screen.getByTestId("drawer-content")).toBeInTheDocument());
+        expect(screen.getByTestId("probe-path").textContent).toBe("/explore");
+      });
+
+      it("names what a tap will do in each state", async () => {
+        const user = userEvent.setup();
+        useFeedStore.setState({ feeds: [makeFeed("f1", "Hacker News")] });
+        renderDrawer({ initialPath: "/feeds/f1" });
+        const strip = screen.getByTestId("drawer-handle-strip");
+        expect(within(strip).getByRole("button", { name: "Feeds, open feed list" })).toBeInTheDocument();
+
+        await user.click(within(strip).getByRole("button", { name: /explore/i }));
+
+        expect(within(strip).getByRole("button", { name: "Feeds" })).toBeInTheDocument();
+        expect(within(strip).queryByRole("button", { name: /open feed list/i })).toBeNull();
+      });
     });
 
     it("marks the current section with aria-current", () => {

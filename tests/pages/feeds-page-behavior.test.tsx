@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { installVirtualizerShims, restoreVirtualizerShims } from "../helpers/virtualizer-shims.ts";
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from "react-router";
@@ -94,10 +94,13 @@ function makeArticle(id: string, feedId = "feed-1"): Article {
 
 let currentUrl = "";
 let currentSearch = "";
+/** The router's navigate, captured so a test can move like the back button does. */
+let navigateTo: (to: string) => void = () => {};
 
 /** Captures the current URL on each render. */
 function LocationCapture() {
   const loc = useLocation();
+  navigateTo = useNavigate();
   currentUrl = loc.pathname;
   currentSearch = loc.search;
   return null;
@@ -477,23 +480,80 @@ describe("FeedsPage behavior — mobile", () => {
     });
   });
 
-  it("shows 'Articles' in header when feedId is present", () => {
+  /**
+   * No header bar on a phone (owner request, 2026-11-19). The bar spent a
+   * row on a breadcrumb that went stale (it kept naming the last article
+   * read) and on a status dot. The list now titles itself, one floating
+   * glass pill holds the view's options, and sync status is a thin bar.
+   */
+  it("has no header bar; the list is titled with the view's name", async () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    const { container } = renderPage("/feeds/feed-1");
+    expect(container.querySelector("header")).toBeNull();
+    expect(await screen.findByRole("heading", { level: 1, name: "Feed feed-1" })).toBeInTheDocument();
+  });
+
+  it("the view options float in a glass pill at the top right of the feed list", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     renderPage("/feeds/feed-1");
-    expect(screen.getByText("Articles")).toBeInTheDocument();
+    const pill = screen.getByTestId("mobile-view-pill");
+    expect(pill.className).toContain("liquid-glass");
+    expect(pill.className).toMatch(/\babsolute\b/);
+    expect(pill.className).toContain("top-[calc(env(safe-area-inset-top)+0.5rem)]");
+    expect(within(pill).getByTestId("view-options-pill")).toBeInTheDocument();
+  });
+
+  it("shows no view-options pill outside the feed list", () => {
+    renderPage("/explore");
+    expect(screen.queryByTestId("mobile-view-pill")).toBeNull();
   });
 
   /**
    * Immersive reader without the jump (owner report, 2026-11-10): the
-   * first version unmounted the top bar and the tab bar while an article
-   * was open, so the list reflowed by their height on every open and
-   * close and the bars flashed in between. The bars now stay mounted and
-   * the reader covers them as a fixed full-screen layer above them.
+   * chrome stays mounted while an article is open and the reader covers
+   * it as a fixed full-screen layer, so the list never reflows.
    */
-  it("keeps the mobile header and the tab bar mounted while an article is open", () => {
+  it("keeps the pill and the tab bar mounted while an article is open", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({ articles: [makeArticle("art-1")] });
     const { container } = renderPage("/feeds/feed-1/articles/art-1");
-    expect(container.querySelector("header")).not.toBeNull();
+    expect(screen.getByTestId("mobile-view-pill")).toBeInTheDocument();
     expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
+  });
+
+  /**
+   * Owner report 2026-11-19: back on the list, the app still treated the
+   * last article as selected ("feels like something is selected in the
+   * system that shouldn't be"). On a phone the list is a destination of
+   * its own: nothing is selected until a row is tapped.
+   */
+  it("clears the selected article when the reader closes", async () => {
+    await openReaderOnMobile();
+    expect(useArticleStore.getState().selectedArticle?.id).toBe("art-1");
+
+    act(() => {
+      navigateTo("/feeds/feed-1");
+    });
+
+    await vi.waitFor(() => {
+      expect(useArticleStore.getState().selectedArticle).toBeNull();
+    });
+  });
+
+  it("reopening the same article after closing it selects it again", async () => {
+    await openReaderOnMobile();
+    act(() => {
+      navigateTo("/feeds/feed-1");
+    });
+    await vi.waitFor(() => expect(useArticleStore.getState().selectedArticle).toBeNull());
+
+    act(() => {
+      navigateTo("/feeds/feed-1/articles/art-1");
+    });
+
+    await vi.waitFor(() => {
+      expect(useArticleStore.getState().selectedArticle?.id).toBe("art-1");
+    });
   });
 
   it("the reader is a fixed full-screen layer above the bars, clear of the status bar", async () => {
@@ -505,27 +565,23 @@ describe("FeedsPage behavior — mobile", () => {
   });
 
   /**
-   * Glass bars (owner request, 2026-11-10): the header and the tab bar
-   * float over the content as translucent blurred overlays; the content
-   * scrolls underneath and clears them through the --chrome-top and
-   * --chrome-bottom variables the shell sets.
+   * Glass chrome (owner request, 2026-11-10): the tab bar floats over the
+   * content, which scrolls underneath and clears it through the
+   * --chrome-top and --chrome-bottom variables the shell sets. With the
+   * header gone, the top clearance is the status bar's safe area only.
    */
-  it("draws the header and the tab bar as glass overlays over the content", () => {
+  it("publishes the chrome clearances: safe area on top, the tab bar below", () => {
     const { container } = renderPage("/feeds/feed-1");
-    const header = container.querySelector("header")!;
-    expect(header.className).toContain("glass-bar");
-    expect(header.className).toMatch(/\babsolute\b/);
-    // The tab bar is a floating liquid-glass capsule (see mobile-nav-drawer tests).
     const capsule = container.ownerDocument.querySelector<HTMLElement>("[data-testid='tab-capsule']")!;
     expect(capsule.className).toContain("liquid-glass");
-    const shell = header.parentElement!;
-    expect(shell.style.getPropertyValue("--chrome-top")).toBe("48px");
+    const shell = container.ownerDocument.querySelector<HTMLElement>("[data-testid='mobile-shell']")!;
+    expect(shell.style.getPropertyValue("--chrome-top")).toBe("env(safe-area-inset-top)");
     expect(shell.style.getPropertyValue("--chrome-bottom")).toContain("72px");
   });
 
-  it("shows the mobile header and the tab bar on the article list", () => {
+  it("mounts the sync indicator and the tab bar on the article list", () => {
     const { container } = renderPage("/feeds/feed-1");
-    expect(container.querySelector("header")).not.toBeNull();
+    expect(screen.getByTestId("mobile-sync-indicator")).toBeInTheDocument();
     expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
   });
 
@@ -904,33 +960,9 @@ describe("FeedsPage behavior — mobile", () => {
     expect(layer.hasAttribute("data-reader-layer")).toBe(true);
   });
 
-  it("mobile header: dot-only status indicator, view options pinned to the right corner", () => {
-    // "Refreshed X ago · local" moved into the drawer footer; the header
-    // keeps a compact color dot and puts the single view-options control
-    // in the right corner (user feedback on PR #237).
-    useFeedStore.setState({
-      feeds: [makeFeed("feed-1")],
-      lastRefreshAllAt: Date.now() - 5 * 60 * 1000,
-    });
-    const { container } = renderPage("/feeds/feed-1");
-    const header = container.querySelector("header")!;
-
-    expect(header.textContent).not.toMatch(/refreshed/i);
-    expect(
-      header.querySelector("[data-testid='sync-status-badge']"),
-    ).not.toBeNull();
-    const pills = header.querySelector("[data-testid='mobile-header-pills']");
-    expect(pills).not.toBeNull();
-    expect(header.lastElementChild).toBe(pills);
-  });
-
-  it("mobile header does not have a sidebar trigger (replaced by bottom drawer)", () => {
+  it("has no sidebar trigger on mobile (replaced by the bottom drawer)", () => {
     const { container } = renderPage("/feeds");
-
-    const header = container.querySelector("header");
-    expect(header).not.toBeNull();
-    const trigger = header!.querySelector("[data-sidebar='trigger']");
-    expect(trigger).toBeNull();
+    expect(container.querySelector("[data-sidebar='trigger']")).toBeNull();
   });
 
   it("mobile nav drawer handle strip is present on mobile", () => {

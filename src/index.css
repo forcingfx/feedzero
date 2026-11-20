@@ -325,3 +325,68 @@
         backdrop-filter: none;
     }
 }
+
+/*
+ * Phone sync bar (mobile-sync-indicator.tsx): a short segment sweeping
+ * across while work is in flight; the chip easing in with a checkmark
+ * that draws itself; and both easing out (300ms, DISMISS_MS in the
+ * component) instead of vanishing. With reduced motion the bar is a still
+ * line, the checkmark is simply there, and the exit is a plain fade.
+ */
+@keyframes sync-bar-slide {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(350%); }
+}
+@keyframes sync-chip-in {
+    from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes sync-chip-out {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(-6px) scale(0.96); }
+}
+@keyframes sync-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+@keyframes sync-check-draw {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+}
+@layer components {
+    .sync-bar-slide {
+        width: 30%;
+        animation: sync-bar-slide 1.1s ease-in-out infinite;
+    }
+    .sync-bar-out {
+        animation: sync-fade-out 300ms ease-out forwards;
+    }
+    .sync-chip-in {
+        animation: sync-chip-in 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .sync-chip-out {
+        animation: sync-chip-out 300ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+    }
+    .sync-check-draw {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        /* Starts as the chip settles, so the tick is seen being drawn. */
+        animation: sync-check-draw 320ms ease-out 140ms forwards;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sync-bar-slide {
+        width: 100%;
+        animation: none;
+    }
+    .sync-chip-in {
+        animation: none;
+    }
+    .sync-chip-out {
+        animation: sync-fade-out 300ms linear forwards;
+    }
+    .sync-check-draw {
+        stroke-dashoffset: 0;
+        animation: none;
+    }
+}

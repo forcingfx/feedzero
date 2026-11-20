@@ -106,7 +106,7 @@ Feature: Starred articles with background prefetch
 | `src/components/articles/article-item.tsx` | Inline star indicator on list rows |
 | `src/components/reader/reader-panel.tsx` | Star button in the reader header |
 | `src/components/layout/sidebar-body.tsx` | "Starred" sidebar entry (visible once first star exists) |
-| `src/components/layout/header-breadcrumbs.tsx` | Breadcrumb labels for STARRED + ALL virtual feeds |
+| `src/components/articles/article-list-controls.tsx` | `useViewLabel`: view names for STARRED + ALL virtual feeds |
 | `src/components/layout/mobile-nav-drawer.tsx` | Mobile drawer handle label honours STARRED_FEED_ID |
 | `src/hooks/use-keyboard-nav.ts` | `s` keyboard binding |
 | `src/core/features/feature-gates.ts` | `"offline-prefetch"` Personal-tier shipped entry |
