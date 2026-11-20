@@ -75,6 +75,57 @@ describe("MobileSyncIndicator", () => {
     expect(screen.queryByTestId("mobile-sync-chip")).toBeNull();
   });
 
+  // Owner request 2026-11-20: a small animated checkmark on "done", and a
+  // dismissal that eases out instead of vanishing.
+  it("draws a checkmark beside the outcome", () => {
+    useSyncStore.setState({ status: "synced" });
+    render(<MobileSyncIndicator />);
+    act(() => useFeedStore.setState({ isRefreshingAll: true }));
+    act(() => useFeedStore.setState({ isRefreshingAll: false }));
+
+    const check = screen.getByTestId("mobile-sync-check");
+    expect(check).toHaveAttribute("aria-hidden", "true");
+    expect(check.querySelector("path")!.getAttribute("class")).toContain("sync-check-draw");
+    // The chip's text is still the whole accessible message.
+    expect(screen.getByTestId("mobile-sync-chip")).toHaveTextContent(/^Synced$/);
+  });
+
+  it("eases the bar and the chip out before removing them", () => {
+    useSyncStore.setState({ status: "synced" });
+    render(<MobileSyncIndicator />);
+    act(() => useFeedStore.setState({ isRefreshingAll: true }));
+    act(() => useFeedStore.setState({ isRefreshingAll: false }));
+
+    act(() => vi.advanceTimersByTime(1200));
+
+    expect(bar()).toHaveAttribute("data-state", "leaving");
+    expect(screen.getByTestId("mobile-sync-chip").className).toContain("sync-chip-out");
+    expect(screen.getByTestId("mobile-sync-fill").className).toContain("sync-bar-out");
+
+    act(() => vi.advanceTimersByTime(300));
+
+    expect(bar()).toHaveAttribute("data-state", "idle");
+    expect(screen.queryByTestId("mobile-sync-chip")).toBeNull();
+  });
+
+  it("new work arriving mid-dismissal takes over at once", () => {
+    render(<MobileSyncIndicator />);
+    act(() => useFeedStore.setState({ isRefreshingAll: true }));
+    act(() => useFeedStore.setState({ isRefreshingAll: false }));
+    act(() => vi.advanceTimersByTime(1250));
+
+    act(() => useFeedStore.setState({ isRefreshingAll: true }));
+
+    expect(bar()).toHaveAttribute("data-state", "active");
+    expect(screen.queryByTestId("mobile-sync-chip")).toBeNull();
+  });
+
+  it("an error chip carries no checkmark", () => {
+    render(<MobileSyncIndicator />);
+    act(() => useSyncStore.setState({ status: "error" }));
+    expect(screen.queryByTestId("mobile-sync-check")).toBeNull();
+  });
+
   it("says 'Up to date' on a local-only account, which has nothing to sync", () => {
     render(<MobileSyncIndicator />);
     act(() => useFeedStore.setState({ isRefreshingAll: true }));

@@ -281,7 +281,10 @@ Test guards (Tier 2 structural): `tests/index-html-viewport.test.ts` (PWA meta t
     read and the feed / folder / filter settings.
   - *Sync status*: `MobileSyncIndicator`, a 2px bar under the status bar.
     Blue and moving while feeds refresh or the vault syncs, green for
-    1.2s as the work lands, then gone. A chip says "Synced" ("Up to date"
+    1.2s as the work lands, then eased out over 300ms (fade, and the chip
+    lifts away) instead of vanishing. The chip carries a checkmark that
+    draws itself as it settles. Reduced motion gets a still bar, a
+    checkmark that is simply there, and a plain fade. A chip says "Synced" ("Up to date"
     on a local-only account) only after a refresh; background vault
     pushes, which follow every star and read mark, get the bar alone. An
     error holds the bar red with a "Sync error" chip until it recovers.
