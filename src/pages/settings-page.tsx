@@ -8,13 +8,15 @@
  * matches `<StatsPage>` so the two stage destinations feel like a set.
  */
 import { useEffect } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import type { SettingsTab } from "@/lib/go-to-settings";
 
 const VALID_TABS: readonly SettingsTab[] = [
   "reading",
+  "list",
+  "library",
   "sync-and-data",
   "subscription",
   "help",
@@ -27,8 +29,14 @@ const VALID_TABS: readonly SettingsTab[] = [
 const LEGACY_TAB_REDIRECTS: Record<string, SettingsTab> = {
   recovery: "subscription",
   data: "sync-and-data",
-  briefings: "reading",
 };
+
+/**
+ * `?tab=briefings` once opened the Signal settings inside the Reading
+ * tab. Those settings now live on the Signal page, so the old link goes
+ * there instead of to a tab that no longer holds them.
+ */
+const SIGNAL_SETTINGS_PATH = "/signal?settings=open";
 
 function isSettingsTab(value: string | null): value is SettingsTab {
   return value !== null && (VALID_TABS as readonly string[]).includes(value);
@@ -45,6 +53,12 @@ export function SettingsPage() {
   const raw = searchParams.get("tab");
   const legacy = raw ? LEGACY_TAB_REDIRECTS[raw] : undefined;
   const activeTab: SettingsTab = legacy ?? (isSettingsTab(raw) ? raw : defaultTab());
+
+  const navigate = useNavigate();
+  const wantsSignalSettings = raw === "briefings";
+  useEffect(() => {
+    if (wantsSignalSettings) navigate(SIGNAL_SETTINGS_PATH, { replace: true });
+  }, [wantsSignalSettings, navigate]);
 
   useEffect(() => {
     if (!legacy) return;

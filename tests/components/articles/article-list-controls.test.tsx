@@ -18,6 +18,8 @@ import {
 } from "@/components/articles/article-list-controls.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
+import { usePreferencesStore } from "@/stores/preferences-store.ts";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 import { useSmartFilterStore } from "@/stores/smart-filter-store.ts";
 import {
   ALL_FEEDS_ID,
@@ -213,6 +215,73 @@ describe("MobileViewPill", () => {
     await user.click(await screen.findByText(/oldest first/i));
 
     expect(useArticleStore.getState().articleSortMode).toBe("oldest");
+  });
+
+  /**
+   * Display options in the list's own menu (owner request, 2026-11-20):
+   * adjust the list while looking at it, without a trip to Settings.
+   * The items keep the menu open, so the effect is visible behind it.
+   */
+  describe("Display section", () => {
+    beforeEach(() => {
+      usePreferencesStore.setState({ preferences: { ...DEFAULT_PREFERENCES } });
+    });
+
+    async function openPillMenu() {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <MobileViewPill />
+        </MemoryRouter>,
+      );
+      await user.click(screen.getByTestId("view-options-pill"));
+      return user;
+    }
+
+    it("steps the list size up and down from the menu, which stays open", async () => {
+      const user = await openPillMenu();
+
+      await user.click(await screen.findByRole("menuitem", { name: /larger rows/i }));
+      expect(usePreferencesStore.getState().preferences.listTextSize).toBe("large");
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("menuitem", { name: /smaller rows/i }));
+      await user.click(screen.getByRole("menuitem", { name: /smaller rows/i }));
+      expect(usePreferencesStore.getState().preferences.listTextSize).toBe("small");
+    });
+
+    it("disables a step that has nowhere left to go", async () => {
+      usePreferencesStore.setState({
+        preferences: { ...DEFAULT_PREFERENCES, listTextSize: "x-large" },
+      });
+      await openPillMenu();
+      expect(await screen.findByRole("menuitem", { name: /larger rows/i })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
+
+    it("toggles article previews and images", async () => {
+      const user = await openPillMenu();
+
+      const previews = await screen.findByRole("menuitemcheckbox", { name: /article previews/i });
+      expect(previews).toHaveAttribute("aria-checked", "true");
+      await user.click(previews);
+      expect(usePreferencesStore.getState().preferences.showArticlePreview).toBe(false);
+
+      const images = screen.getByRole("menuitemcheckbox", { name: /article images/i });
+      expect(images).toHaveAttribute("aria-checked", "false");
+      await user.click(images);
+      expect(usePreferencesStore.getState().preferences.showArticleImages).toBe(true);
+    });
+
+    it("the desktop sort menu carries the same Display section", async () => {
+      const user = userEvent.setup();
+      renderControls();
+      await user.click(screen.getByLabelText(/sort/i));
+      expect(await screen.findByRole("menuitem", { name: /larger rows/i })).toBeInTheDocument();
+      expect(screen.getByRole("menuitemcheckbox", { name: /article previews/i })).toBeInTheDocument();
+    });
   });
 
   it("menu offers Feed settings on a feed view and opens the dialog", async () => {

@@ -29,7 +29,7 @@ which asserts the computed font size and line height.
 
 ### Update 2026-11-10 (issue #340)
 
-**Show article images** (Settings → Reading, off by default) puts each
+**Show article images** (Settings → List, off by default) puts each
 article's lead image at the left of its row. The parser picks the image
 per item (`src/core/parser/item-image.ts`: media:thumbnail, then an image
 media:content, then an image enclosure, then the first `<img>` in the
@@ -90,6 +90,57 @@ breakpoint the header says instead that an article fills the screen at
 every width, which is what the reader does there. The sample's link is
 inert.
 
+### Update 2026-11-20 (device text size, settings redesign)
+
+**Sizes follow the device.** The root font size was a fixed 14px, so the
+app ignored the device's text size. `src/lib/system-text-scale.ts` now
+measures the device's size against its platform default and publishes
+the ratio as `--system-text-scale`: `font-size: medium` for the browser's
+default font size, and `font: -apple-system-body` for Dynamic Type on
+iPhone and iPad (not on a Mac, where that keyword is 13px). It runs
+before first render and again when the app returns to the foreground,
+clamped to 0.75x to 2x. `index.css` multiplies two bases by it:
+
+| Base | At the default setting | Used by |
+| --- | --- | --- |
+| root `font-size` | 14px | menus, controls, everything in `rem` |
+| `--reading-base` | 16px | article body and list rows |
+
+`readerTextSize` and `listTextSize` are steps from `--reading-base`
+(`.reading-size-small / medium / large / x-large` at 0.875 / 1 / 1.125 /
+1.25), so "medium" is the device's own size and the others are relative
+to it. The stored values did not change; the controls now name them
+Smaller / Default / Larger / Largest (`SIZE_STEPS`). At the default
+setting, article body and list rows went from 14px to 16px.
+
+How Android Chrome and Firefox expose the system font scale to the two
+probes has not been verified on real devices.
+
+**Settings were split.** The Reading tab held about 17 controls. Now:
+
+| Tab | Holds |
+| --- | --- |
+| Reading | theme; article text size, line spacing, width, live preview; open articles in |
+| List | list size, preview lines, feed icons, a live sample row (`ListPreview`), article images; hide read, group floods |
+| Library | keep articles, auto-organize, rules |
+
+Signal's settings moved to the Signal page (`SignalSettingsDialog`,
+opened by the mode badge, the locked splash and the missing-key screen;
+open state is `?settings=open`). `/settings?tab=briefings` redirects
+there. The tab strip scrolls sideways in one row.
+
+**Adjust in place.** The same preferences are reachable where their
+effect shows:
+- the reader's **Aa** menu (`ReaderTypeMenu`): text size, line spacing,
+  and width on desktop only, since a phone's article fills the screen;
+- the list's menu (`ListDisplayMenuItems`, in the phone's view pill and
+  the desktop sort menu): larger / smaller rows, article previews,
+  article images. The items keep the menu open so the list can be
+  watched changing behind it.
+
+Size controls are steppers (`SizeStepper`): one step down, the step's
+name as a live status, one step up.
+
 ## Behaviour
 
 ```gherkin
@@ -131,7 +182,7 @@ Feature: Reading appearance
     And a row whose article has no text shows none
 
   Scenario: Choosing the list size
-    When I choose "Large" under Settings → Reading → List size
+    When I step "List size" up to Larger under Settings → List
     Then row titles, previews, source rows and spacing grow together
     And the reader's text size is unchanged
 

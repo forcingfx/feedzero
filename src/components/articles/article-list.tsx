@@ -21,7 +21,8 @@ import { PullToRefreshIndicator } from "@/components/layout/pull-to-refresh-indi
 import { ArticleListSkeleton } from "@/components/loading/article-list-skeleton.tsx";
 import { SwipeToReadRow } from "./swipe-to-read-row.tsx";
 import { CLEAR_MOBILE_CHROME, MOBILE_LIST_TITLE_PX } from "@/components/layout/mobile-chrome.ts";
-import type { Article, ListTextSize } from "@feedzero/core/types";
+import type { Article } from "@feedzero/core/types";
+import { LIST_TEXT_SIZE_CLASS } from "./list-text-size.ts";
 
 /**
  * Flat list-entry shape: every row the virtualizer renders is either a
@@ -58,16 +59,6 @@ interface ArticleListProps {
  */
 const ESTIMATED_ITEM_SIZE = 96;
 
-/**
- * Font size of the list per listTextSize preference. Rows size their
- * text, icons and padding in `em`, so this one class scales a whole row.
- */
-const LIST_TEXT_SIZE_CLASS: Record<ListTextSize, string> = {
-  small: "text-sm",
-  medium: "text-base",
-  large: "text-lg",
-  "x-large": "text-xl",
-};
 
 /**
  * Rows rendered above and below the visible viewport. Large enough that
@@ -551,7 +542,7 @@ function CaughtUpArticleList() {
       <CheckCheck className="size-6 text-muted-foreground" />
       <p className="text-sm text-muted-foreground">You&apos;re all caught up.</p>
       <p className="text-xs text-muted-foreground max-w-xs">
-        Read articles are hidden. Turn that off in Settings &rarr; Reading.
+        Read articles are hidden. Turn that off in Settings &rarr; List.
       </p>
     </div>
   );

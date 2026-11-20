@@ -1,5 +1,5 @@
 /**
- * Settings → Reading → Signal section.
+ * Signal settings, shown in the Signal page's settings dialog.
  *
  * Signal is FeedZero's umbrella brand for cross-feed intelligence
  * (the local /signal Topics view, the AI overview, saved briefings).

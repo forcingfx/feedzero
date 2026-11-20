@@ -8,15 +8,16 @@ import { cn } from "@/lib/utils.ts";
  */
 
 /**
- * Body scale per readerTextSize preference. Headings keep their absolute
- * sizes from ArticleContent — the preference tunes reading comfort of
- * body copy, not the whole hierarchy.
+ * Body size per readerTextSize preference: steps from the device's own
+ * text size (`.reading-size-*` in index.css), so "medium" is the device's
+ * size and the rest are relative to it. Headings keep their sizes from
+ * ArticleContent; the preference tunes body copy, not the hierarchy.
  */
 const TEXT_SIZE_CLASS: Record<ReaderTextSize, string> = {
-  small: "text-sm",
-  medium: "",
-  large: "text-lg",
-  "x-large": "text-xl",
+  small: "reading-size-small",
+  medium: "reading-size-medium",
+  large: "reading-size-large",
+  "x-large": "reading-size-x-large",
 };
 
 /**

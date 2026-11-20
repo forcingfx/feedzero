@@ -14,8 +14,13 @@ import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ReadingTab } from "@/components/settings/tabs/reading-tab";
+import { ListTab } from "@/components/settings/tabs/list-tab";
+import { LibraryTab } from "@/components/settings/tabs/library-tab";
+import { SignalSection } from "@/components/settings/signal-section";
 import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
+import { usePreferencesStore } from "@/stores/preferences-store";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 import {
   useSignalModeStore,
   useSignalMode,
@@ -24,10 +29,10 @@ import {
 
 /** ReadingTab embeds RulesAuditPanel, which uses useFeatureGate →
  *  useNavigate, so the component tree needs router context. */
-function renderTab() {
+function renderTab(Tab: React.ComponentType = ReadingTab) {
   return render(
     <MemoryRouter>
-      <ReadingTab />
+      <Tab />
     </MemoryRouter>,
   );
 }
@@ -45,43 +50,54 @@ describe("<ReadingTab>", () => {
     // Reset the signal-mode store to defaults between tests so writes
     // from prior tests don't bleed across files.
     useSignalModeStore.setState({ mode: "ml", hidden: false, nightly: false });
+    // Preferences are a module-level store: without this a size stepped
+    // in one test is the starting point of the next.
+    usePreferencesStore.setState({ preferences: { ...DEFAULT_PREFERENCES } });
   });
 
   it("offers the article retention period", () => {
-    renderTab();
+    renderTab(LibraryTab);
     expect(screen.getByRole("combobox", { name: /keep articles/i })).toBeInTheDocument();
   });
 
+  // Sizes are steps from the device's own text size (owner request,
+  // 2026-11-20), so the control is a stepper around "Default" and not a
+  // row of absolute sizes.
   describe("text size", () => {
-    it("renders a three-way text size control defaulting to Medium", () => {
+    it("is a stepper that starts at Default, the device's own size", () => {
       renderTab();
-      const group = screen.getByRole("group", { name: /text size/i });
-      expect(
-        within(group).getByRole("button", { name: /^medium$/i }),
-      ).toHaveAttribute("aria-pressed", "true");
-      expect(
-        within(group).getByRole("button", { name: /^small$/i }),
-      ).toBeInTheDocument();
-      expect(
-        within(group).getByRole("button", { name: /^large$/i }),
-      ).toBeInTheDocument();
+      const group = screen.getByRole("group", { name: /^text size$/i });
+      expect(within(group).getByRole("status")).toHaveTextContent("Default");
+      expect(within(group).getByRole("button", { name: "Decrease text size" })).toBeEnabled();
+      expect(within(group).getByRole("button", { name: "Increase text size" })).toBeEnabled();
     });
 
-    it("selecting Large persists the preference", async () => {
-      const { usePreferencesStore } = await import(
-        "@/stores/preferences-store.ts"
-      );
+    it("stepping up persists the next size and names it", async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
       renderTab();
-      const group = screen.getByRole("group", { name: /text size/i });
+      const group = screen.getByRole("group", { name: /^text size$/i });
 
-      fireEvent.click(within(group).getByRole("button", { name: /^large$/i }));
+      fireEvent.click(within(group).getByRole("button", { name: "Increase text size" }));
 
-      expect(
-        usePreferencesStore.getState().preferences.readerTextSize,
-      ).toBe("large");
-      expect(
-        within(group).getByRole("button", { name: /^large$/i }),
-      ).toHaveAttribute("aria-pressed", "true");
+      expect(usePreferencesStore.getState().preferences.readerTextSize).toBe("large");
+      expect(within(group).getByRole("status")).toHaveTextContent("Larger");
+    });
+
+    it("stepping down from Default reaches Smaller, where the stepper stops", async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      renderTab();
+      const group = screen.getByRole("group", { name: /^text size$/i });
+
+      fireEvent.click(within(group).getByRole("button", { name: "Decrease text size" }));
+
+      expect(usePreferencesStore.getState().preferences.readerTextSize).toBe("small");
+      expect(within(group).getByRole("status")).toHaveTextContent("Smaller");
+      expect(within(group).getByRole("button", { name: "Decrease text size" })).toBeDisabled();
+    });
+
+    it("says the sizes are relative to the device's text size", () => {
+      renderTab();
+      expect(screen.getByText(/relative to your device's text size/i)).toBeInTheDocument();
     });
   });
 
@@ -119,14 +135,18 @@ describe("<ReadingTab>", () => {
   });
 
   describe("issue #341: larger text, full width, line height", () => {
-    it("offers an Extra large text size and persists it", async () => {
+    it("reaches the largest text size in two steps and stops there", async () => {
       const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
       renderTab();
-      const group = screen.getByRole("group", { name: /text size/i });
+      const group = screen.getByRole("group", { name: /^text size$/i });
+      const increase = within(group).getByRole("button", { name: "Increase text size" });
 
-      fireEvent.click(within(group).getByRole("button", { name: /^extra large$/i }));
+      fireEvent.click(increase);
+      fireEvent.click(increase);
 
       expect(usePreferencesStore.getState().preferences.readerTextSize).toBe("x-large");
+      expect(within(group).getByRole("status")).toHaveTextContent("Largest");
+      expect(increase).toBeDisabled();
     });
 
     it("offers a Full reading width and persists it", async () => {
@@ -184,7 +204,7 @@ describe("<ReadingTab>", () => {
 
   describe("issue #340: show article images", () => {
     it("is off by default and names the privacy trade-off", () => {
-      renderTab();
+      renderTab(ListTab);
       expect(screen.getByRole("switch", { name: /show article images/i })).toHaveAttribute(
         "aria-checked",
         "false",
@@ -194,7 +214,7 @@ describe("<ReadingTab>", () => {
 
     it("flipping it on persists the preference", async () => {
       const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
-      renderTab();
+      renderTab(ListTab);
       await userEvent.click(screen.getByRole("switch", { name: /show article images/i }));
       expect(usePreferencesStore.getState().preferences.showArticleImages).toBe(true);
     });
@@ -202,7 +222,7 @@ describe("<ReadingTab>", () => {
 
   describe("hide read articles", () => {
     it("is off by default", () => {
-      renderTab();
+      renderTab(ListTab);
       expect(
         screen.getByRole("switch", { name: /hide read articles/i }),
       ).not.toBeChecked();
@@ -212,7 +232,7 @@ describe("<ReadingTab>", () => {
       const { usePreferencesStore } = await import(
         "@/stores/preferences-store.ts"
       );
-      renderTab();
+      renderTab(ListTab);
 
       fireEvent.click(
         screen.getByRole("switch", { name: /hide read articles/i }),
@@ -226,7 +246,7 @@ describe("<ReadingTab>", () => {
 
   describe("feed icons in the list", () => {
     it("is on by default", () => {
-      renderTab();
+      renderTab(ListTab);
       expect(
         screen.getByRole("switch", { name: /show feed icons/i }),
       ).toBeChecked();
@@ -236,7 +256,7 @@ describe("<ReadingTab>", () => {
       const { usePreferencesStore } = await import(
         "@/stores/preferences-store.ts"
       );
-      renderTab();
+      renderTab(ListTab);
 
       fireEvent.click(screen.getByRole("switch", { name: /show feed icons/i }));
 
@@ -247,28 +267,57 @@ describe("<ReadingTab>", () => {
   });
 
   describe("list appearance (user report 2026-11)", () => {
-    it("offers a list size control defaulting to Medium", () => {
-      renderTab();
-      const group = screen.getByRole("group", { name: /list size/i });
-      expect(
-        within(group).getByRole("button", { name: /^medium$/i }),
-      ).toHaveAttribute("aria-pressed", "true");
+    it("offers a list size stepper starting at Default", () => {
+      renderTab(ListTab);
+      const group = screen.getByRole("group", { name: /^list size$/i });
+      expect(within(group).getByRole("status")).toHaveTextContent("Default");
     });
 
-    it("selecting a Large list persists the preference", async () => {
+    it("stepping the list size up persists the preference", async () => {
       const { usePreferencesStore } = await import(
         "@/stores/preferences-store.ts"
       );
-      renderTab();
-      const group = screen.getByRole("group", { name: /list size/i });
+      renderTab(ListTab);
+      const group = screen.getByRole("group", { name: /^list size$/i });
 
-      fireEvent.click(within(group).getByRole("button", { name: /^large$/i }));
+      fireEvent.click(within(group).getByRole("button", { name: "Increase list size" }));
 
       expect(usePreferencesStore.getState().preferences.listTextSize).toBe("large");
     });
 
+    // The list's toggles are hard to judge blind, so the tab shows a
+    // sample row built from the real row component.
+    it("shows a sample row that follows the list's settings", async () => {
+      const { usePreferencesStore } = await import("@/stores/preferences-store.ts");
+      renderTab(ListTab);
+      const preview = screen.getByRole("region", { name: /preview/i });
+      expect(within(preview).getByTestId("article-item-preview")).toBeInTheDocument();
+      expect(within(preview).getByRole("listbox").className).toContain("reading-size-medium");
+
+      fireEvent.click(screen.getByRole("switch", { name: /show article preview/i }));
+      fireEvent.click(
+        within(screen.getByRole("group", { name: /^list size$/i })).getByRole("button", {
+          name: "Increase list size",
+        }),
+      );
+
+      expect(within(preview).queryByTestId("article-item-preview")).toBeNull();
+      expect(within(preview).getByRole("listbox").className).toContain("reading-size-large");
+      expect(usePreferencesStore.getState().preferences.showArticlePreview).toBe(false);
+    });
+
+    it("the sample row drops its favicon with the feed icons setting", () => {
+      renderTab(ListTab);
+      const preview = screen.getByRole("region", { name: /preview/i });
+      expect(preview.querySelector("svg, img")).not.toBeNull();
+
+      fireEvent.click(screen.getByRole("switch", { name: /show feed icons/i }));
+
+      expect(within(preview).getByTestId("article-item-meta").querySelector("svg, img")).toBeNull();
+    });
+
     it("shows article previews by default", () => {
-      renderTab();
+      renderTab(ListTab);
       expect(
         screen.getByRole("switch", { name: /show article preview/i }),
       ).toBeChecked();
@@ -278,7 +327,7 @@ describe("<ReadingTab>", () => {
       const { usePreferencesStore } = await import(
         "@/stores/preferences-store.ts"
       );
-      renderTab();
+      renderTab(ListTab);
 
       fireEvent.click(screen.getByRole("switch", { name: /show article preview/i }));
 
@@ -319,11 +368,11 @@ describe("<ReadingTab>", () => {
       const column = screen.getByTestId("reading-preview-column");
 
       fireEvent.click(
-        within(screen.getByRole("group", { name: /text size/i })).getByRole("button", {
-          name: /^extra large$/i,
+        within(screen.getByRole("group", { name: /^text size$/i })).getByRole("button", {
+          name: "Increase text size",
         }),
       );
-      expect(column.className).toContain("text-xl");
+      expect(column.className).toContain("reading-size-large");
 
       fireEvent.click(
         within(screen.getByRole("group", { name: /line spacing/i })).getByRole("button", {
@@ -403,19 +452,19 @@ describe("<ReadingTab>", () => {
 
   it("renders a Group floods toggle reflecting useAppStore state", () => {
     useAppStore.setState({ groupArticleFloods: true });
-    renderTab();
+    renderTab(ListTab);
     const toggle = screen.getByRole("switch", { name: /group article floods/i });
     expect(toggle).toBeChecked();
   });
 
   it("clicking the Group floods toggle flips useAppStore", () => {
-    renderTab();
+    renderTab(ListTab);
     fireEvent.click(screen.getByRole("switch", { name: /group article floods/i }));
     expect(useAppStore.getState().groupArticleFloods).toBe(true);
   });
 
   it("Auto-organize button is hidden when there are no feeds (nothing to organize)", () => {
-    renderTab();
+    renderTab(LibraryTab);
     expect(
       screen.queryByRole("button", { name: /auto-organize/i }),
     ).toBeNull();
@@ -435,7 +484,7 @@ describe("<ReadingTab>", () => {
         },
       ] as never,
     });
-    renderTab();
+    renderTab(LibraryTab);
     expect(
       screen.getByRole("button", { name: /auto-organize/i }),
     ).toBeInTheDocument();
@@ -455,7 +504,7 @@ describe("<ReadingTab>", () => {
         },
       ] as never,
     });
-    renderTab();
+    renderTab(LibraryTab);
     fireEvent.click(screen.getByRole("button", { name: /auto-organize/i }));
     expect(screen.getByTestId("auto-organize-dialog-open")).toBeInTheDocument();
   });
@@ -469,12 +518,12 @@ describe("<ReadingTab>", () => {
    */
   describe("Signal section", () => {
     it("renders the Signal section header", () => {
-      renderTab();
+      renderTab(SignalSection);
       expect(screen.getByRole("heading", { name: /^signal$/i })).toBeInTheDocument();
     });
 
     it("renders the mode toggle with Local and AI options", () => {
-      renderTab();
+      renderTab(SignalSection);
       expect(
         screen.getByRole("radio", { name: /^local$/i }),
       ).toBeInTheDocument();
@@ -484,7 +533,7 @@ describe("<ReadingTab>", () => {
     });
 
     it("hides the API key / model / nightly controls while mode is Local", () => {
-      renderTab();
+      renderTab(SignalSection);
       // Save button is unique to the AnthropicKeyPanel.
       expect(screen.queryByRole("button", { name: /^save$/i })).toBeNull();
       // Briefing-model radios live in the ModelPanel.
@@ -498,7 +547,7 @@ describe("<ReadingTab>", () => {
 
     it("shows the API key / model / nightly controls after switching to AI", async () => {
       const user = userEvent.setup();
-      renderTab();
+      renderTab(SignalSection);
       await user.click(screen.getByRole("radio", { name: /^ai$/i }));
       expect(
         screen.getByRole("button", { name: /^save$/i }),
@@ -514,7 +563,7 @@ describe("<ReadingTab>", () => {
 
     it("clicking the AI radio updates the signal-mode store", async () => {
       const user = userEvent.setup();
-      renderTab();
+      renderTab(SignalSection);
       await user.click(screen.getByRole("radio", { name: /^ai$/i }));
       // Using getState() on a Zustand store is fine — state is the
       // store's observable output (CLAUDE.md store-tests rule).
@@ -525,7 +574,7 @@ describe("<ReadingTab>", () => {
       const user = userEvent.setup();
       // Pre-set AI mode so the nightly switch is visible.
       act(() => useSignalModeStore.setState({ mode: "ai" }));
-      renderTab();
+      renderTab(SignalSection);
       await user.click(
         screen.getByRole("switch", { name: /refresh signal nightly/i }),
       );
@@ -541,11 +590,30 @@ describe("<ReadingTab>", () => {
    * equal announcements and took three screens on a phone.
    */
   describe("layout: rows under headings", () => {
-    it("groups the rows under Appearance, Reading, Feeds and Signal headings", () => {
+    // The single Reading tab had grown to about 17 controls. It is now
+    // three tabs by where a setting's effect shows, and Signal's settings
+    // live on the Signal page.
+    it("Reading holds the theme and the article's settings, and nothing else", () => {
       renderTab();
-      for (const name of [/^appearance$/i, /^reading$/i, /^feeds$/i, /^signal$/i]) {
+      for (const name of [/^appearance$/i, /^article$/i]) {
         expect(screen.getByRole("heading", { name })).toBeInTheDocument();
       }
+      expect(screen.queryByRole("heading", { name: /^signal$/i })).toBeNull();
+      expect(screen.queryByRole("switch", { name: /show article images/i })).toBeNull();
+      expect(screen.queryByRole("combobox", { name: /keep articles/i })).toBeNull();
+    });
+
+    it("List holds what the article list shows", () => {
+      renderTab(ListTab);
+      for (const name of [/show article preview/i, /show article images/i, /show feed icons/i, /hide read articles/i, /group article floods/i]) {
+        expect(screen.getByRole("switch", { name })).toBeInTheDocument();
+      }
+    });
+
+    it("Library holds retention, organising and rules", () => {
+      renderTab(LibraryTab);
+      expect(screen.getByRole("combobox", { name: /keep articles/i })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /^library$/i })).toBeInTheDocument();
     });
 
     it("draws no card chrome around individual settings", () => {

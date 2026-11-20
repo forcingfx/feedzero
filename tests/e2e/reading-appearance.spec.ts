@@ -35,7 +35,10 @@ test("larger text, full width and relaxed spacing reach the reader", async ({
   const articleUrl = page.url();
 
   await page.goto("/settings?tab=reading");
-  await choose(page, /text size/i, /^extra large$/i);
+  // Text size is a stepper around the device's size: two steps up is the largest.
+  const increase = page.getByRole("button", { name: "Increase text size" });
+  await increase.click();
+  await increase.click();
   await choose(page, /reading width/i, /^full$/i);
   await choose(page, /line spacing/i, /^relaxed$/i);
   await page.screenshot({ path: testInfo.outputPath("reading-settings.png"), fullPage: true });
