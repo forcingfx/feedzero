@@ -536,8 +536,7 @@ function DisableSyncFork({
           <DialogTitle className="text-center">Turn off cloud sync?</DialogTitle>
           <DialogDescription className="text-center">
             Sync will stop on this device. Your local feeds and articles
-            stay here. Choose what to do with the encrypted store on the
-            server.
+            stay here. Keep or delete the encrypted store on the server.
           </DialogDescription>
         </DialogHeader>
 

@@ -22,6 +22,7 @@ describe("UserPreferences type + DEFAULT_PREFERENCES", () => {
       openArticlesIn: "feed",
       // Off: every row's image is a request to a third-party host (#340).
       showArticleImages: false,
+      articleImagePosition: "left",
       hideReadArticles: false,
       showArticleFeedIcons: true,
       // On: the text is already in the vault, so a preview costs no

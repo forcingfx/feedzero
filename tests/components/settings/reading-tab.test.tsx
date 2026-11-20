@@ -220,6 +220,18 @@ describe("<ReadingTab>", () => {
     });
   });
 
+  describe("image position (owner request 2026-11-20)", () => {
+    it("defaults to the left and can be moved to the right", () => {
+      renderTab(ListTab);
+      const group = screen.getByRole("group", { name: /image position/i });
+      expect(within(group).getByRole("button", { name: "Left" })).toHaveAttribute("aria-pressed", "true");
+
+      fireEvent.click(within(group).getByRole("button", { name: "Right" }));
+
+      expect(usePreferencesStore.getState().preferences.articleImagePosition).toBe("right");
+    });
+  });
+
   describe("hide read articles", () => {
     it("is off by default", () => {
       renderTab(ListTab);
@@ -425,13 +437,14 @@ describe("<ReadingTab>", () => {
       expect(within(preview).getByTestId("reading-preview-width")).toHaveTextContent(/600px/);
     });
 
-    it("tells phone readers the width cannot change anything on their screen", () => {
+    // Owner request 2026-11-20: no sentence about this screen in the
+    // preview; the width setting itself says where it applies.
+    it("says on the setting that reading width applies on desktop only", () => {
       renderTab();
-      const note = screen.getByTestId("reading-preview-narrow-note");
-      expect(note).toHaveTextContent(/fills this screen/i);
-      // Shown only below the desktop breakpoint, where it is true.
-      expect(note.className).toContain("lg:hidden");
-      expect(screen.getByTestId("reading-preview-width").className).toContain("max-lg:hidden");
+      const row = screen.getByRole("group", { name: /reading width/i }).closest("div[class*='py-3']")!;
+      expect(row.textContent).toMatch(/desktop only/i);
+      expect(screen.queryByText(/fills this screen/i)).toBeNull();
+      expect(screen.queryByTestId("reading-preview-narrow-note")).toBeNull();
     });
 
     it("renders the sample through the reader's ArticleContent, links and quotes included", () => {

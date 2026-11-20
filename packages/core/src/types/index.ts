@@ -216,6 +216,9 @@ export const ARTICLE_SORT_MODES: readonly ArticleSortMode[] = [
 /** Reader body text scale. "medium" is the historical default. */
 export type ReaderTextSize = "small" | "medium" | "large" | "x-large";
 
+/** Which side of an article row its lead image sits on. */
+export type ArticleImagePosition = "left" | "right";
+
 /** Article list scale; the same steps as the reader's text size. */
 export type ListTextSize = ReaderTextSize;
 
@@ -268,6 +271,11 @@ export interface UserPreferences {
    */
   showArticleImages?: boolean;
   /**
+   * Side of the row the lead image sits on. Optional for back-compat;
+   * `undefined` reads as "left", where it has always been.
+   */
+  articleImagePosition?: ArticleImagePosition;
+  /**
    * Unread-only reading mode: read articles drop out of the list so a
    * finished session leaves an empty view. Optional for the same
    * back-compat reason as the fields above; `undefined` reads as false.
@@ -317,6 +325,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   readerLineHeight: "normal",
   openArticlesIn: "feed",
   showArticleImages: false,
+  articleImagePosition: "left",
   hideReadArticles: false,
   showArticleFeedIcons: true,
   showArticlePreview: true,

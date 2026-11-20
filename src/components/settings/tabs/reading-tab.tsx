@@ -48,7 +48,10 @@ export function ReadingTab() {
             onChange={(value) => void updatePreferences({ readerLineHeight: value })}
           />
         </SettingRow>
-        <SettingRow label="Reading width" description="How wide the article column gets.">
+        <SettingRow
+          label="Reading width"
+          description="Maximum width of the article column. Desktop only: on a phone the article always uses the full screen."
+        >
           <SegmentedControl
             label="Reading width"
             options={READER_WIDTHS}
