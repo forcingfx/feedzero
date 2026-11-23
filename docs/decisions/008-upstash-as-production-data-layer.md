@@ -80,7 +80,11 @@ Doesn't match the Vercel-only production deployment model. Self-hosters already 
 - **`SyncStorageAdapter` interface** (in `src/core/sync/types.ts`) is preserved — Upstash is just another implementation, alongside `filesystem` (self-host) and `memory` (test). Self-hosters who don't use Upstash continue to work via filesystem.
 - **`resolveAdapter` cascade** prefers Upstash over Vercel Blob when both env-var pairs are present. Blob remains reachable via explicit `SYNC_STORAGE=vercel-blob` for rollback.
 - **Memory adapters are test fixtures, not production fallbacks.** Per ADR 011's smoke-test discipline and the post-mortems below, the module-load log line surfaces "memory" mode as a regression signal. Eventually we'll move them to `src/test-utils/` and have the resolvers refuse them in `NODE_ENV=production`.
-- **Single point of failure.** If Upstash has an incident, five subsystems degrade simultaneously. Mitigated by: (a) license + sync degrade gracefully (cached locally on the client), (b) rate limiter fails open (per ADR 010), (c) catalog is a stats display that can show stale data, (d) Stripe event dedup falls back to the issuer's per-subscription idempotency.
+- **Single point of failure.** If Upstash has an incident, five subsystems degrade simultaneously. Mitigated by: (a) license + sync degrade gracefully (cached locally on the client), (b) rate limiter fails open (per ADR 010), (c) catalog is a stats display that can show stale data, (d) when the event store is unreachable the webhook returns 500 before any license work, so Stripe retries the event and the license waits until storage returns. Issuer idempotency protects retries; it is not a fallback that keeps issuing during an outage.
+
+## Capacity limits
+
+This decision originally budgeted commands only. The 2026-11-23 outage came from **bandwidth**: the Free plan's 10 GB monthly limit suspended the database, and all five uses went with it for about 17.5 hours. Vault traffic dominates bandwidth because each sync moves a whole vault, while the other four uses move small records. Production has been on Pay As You Go since that date. See the [Upstash runbook](../operations/upstash-storage.md).
 
 ## References
 
