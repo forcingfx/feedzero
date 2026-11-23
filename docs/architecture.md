@@ -334,7 +334,7 @@ Schema migrations are handled by Dexie's `version().stores()` API.
 | Passphrase theft from localStorage | Raw passphrase never persisted — only derived JWK key material stored. Stolen keys cannot be used to recover the passphrase or access the vault from a different device. |
 | Feed URL logging by proxy | Proxy uses POST with JSON body; URLs never appear in query strings, access logs, or CDN logs |
 | User IP leaked via favicons | Favicons proxied through the CORS proxy, not loaded directly from publisher servers |
-| Timing analysis of sync patterns | 0-30s random jitter added after debounce; vault payloads padded to power-of-2 bucket sizes |
+| Timing analysis of sync patterns | 0-30s random jitter added after debounce; vault payloads padded to power-of-2 bucket sizes. Accepted limit: uploads are skipped when nothing changed, so upload times show roughly when a vault changed, though not what changed |
 | IndexedDB metadata leakage | Index fields (url, feedId, guid) are HMAC-SHA256 hashed — deterministic for queries but non-reversible |
 | User-Agent fingerprinting via proxy | Fixed `User-Agent: FeedZero/1.0` on feed-fetch proxy requests; article-page fetches (`/api/page`) use a fixed browser UA so the FeedZero identifier doesn't get blocked by WAFs and silently break extraction. Both UAs are constants — no per-user fingerprint. |
 | Data persistence after logout | "Delete all data" removes IndexedDB, localStorage (including derived keys), and cloud blob |

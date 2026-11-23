@@ -308,6 +308,7 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 - **Hono standalone server** — 14kB Web standard framework. Runs on Node, Deno, Bun. Same `Request/Response` API as handlers.
 - **Three size limits, each on a different quantity** — compressed bytes sent, JSON before padding, JSON after decompression. See [Payload size ceiling](#payload-size-ceiling). The looser server limit is deliberate: a self-hosted deployment has no platform body cap, and older clients still send bodies this build would no longer produce.
 - **Compression is transport-only** — the handler unpacks before storing, so the stored format is untouched and a device on an older build can still pull. This is what let the wire format change without a migration.
+- **Skip uploads when nothing changed** — A push compares a fingerprint of the vault with the content last synced. Export time and refresh bookkeeping (fetch timestamps, publisher cache validators, errors, the 304 streak) do not count as changes, so each device keeps its own. The fingerprint is a hash of decrypted content, so it stays in memory and is forgotten whenever the server's state is uncertain. The trade-off: upload times now show the server roughly when a vault changed, though never what changed.
 - **Merge by URL for feeds, by guid for articles** — When merging local and cloud vaults, feeds are deduplicated by URL (local preferred for duplicates). Articles are deduplicated by guid. Cloud article feedIds are remapped to local feed ids when the parent feed URL matches.
 
 ## Limitations
