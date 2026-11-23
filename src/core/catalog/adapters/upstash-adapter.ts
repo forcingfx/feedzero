@@ -18,7 +18,8 @@
  *
  * Command cost (Upstash bills per command; upsert runs on every 2xx
  * /api/feed fetch, so it is the hot path):
- *   - upsert: 1 SET NX + 1 ZINCRBY. No read-modify-write, no GET.
+ *   - upsert: 1 SET NX + 1 ZINCRBY for the one hit in ten that is sampled
+ *     in production, nothing for the rest. No read-modify-write, no GET.
  *   - get: 1 GET + 1 ZSCORE.
  *   - popular(N): 1 ZRANGE WITHSCORES + 1 MGET (NOT N+1 individual GETs).
  *   - count: 1 ZCARD (O(1) on the sorted set's size counter).
@@ -137,15 +138,37 @@ async function tryUpstash<T>(op: () => Promise<T>): Promise<Result<T>> {
   }
 }
 
+/** Records one hit in `oneIn`, weighted so the count stays an estimate. */
+export interface HitSampling {
+  oneIn: number;
+  random: () => number;
+}
+
+const EVERY_HIT: HitSampling = { oneIn: 1, random: () => 0 };
+
+/**
+ * The catalog is the largest share of Upstash commands, and it only feeds
+ * the public popularity stats, which do not need exact counts.
+ */
+export const PRODUCTION_HIT_SAMPLING: HitSampling = {
+  oneIn: 10,
+  random: Math.random,
+};
+
 export class UpstashCatalogAdapter implements CatalogStorageAdapter {
-  constructor(private readonly client: UpstashCatalogClient) {}
+  constructor(
+    private readonly client: UpstashCatalogClient,
+    private readonly sampling: HitSampling = EVERY_HIT,
+  ) {}
 
   async upsert(url: string): Promise<Result<true>> {
+    const { oneIn, random } = this.sampling;
+    if (random() >= 1 / oneIn) return ok(true);
     return tryUpstash(async () => {
       // SET NX creates the record on first sighting and is a no-op after,
       // so metadata written by updateMetadata is never clobbered.
       await this.client.set(feedKey(url), newRecord(url), { nx: true });
-      await this.client.zincrby(RANKING_KEY, 1, url);
+      await this.client.zincrby(RANKING_KEY, oneIn, url);
       return true as const;
     });
   }
@@ -254,5 +277,6 @@ export async function createUpstashCatalogAdapter(
   const { Redis } = await import("@upstash/redis");
   return new UpstashCatalogAdapter(
     new Redis({ url: creds.url, token: creds.token }),
+    PRODUCTION_HIT_SAMPLING,
   );
 }
