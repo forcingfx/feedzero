@@ -16,6 +16,7 @@ import {
 import type { VaultData, EncryptedVault, KdfSpec } from "./types.ts";
 import { syncFetch } from "./sync-fetch.ts";
 import { formatMegabytes } from "./vault-headroom.ts";
+import { fingerprintVault } from "./vault-fingerprint.ts";
 import {
   encodePushBody,
   PUSH_ENCODING_HEADER,
@@ -212,6 +213,9 @@ async function withLocalBodies(incoming: Article[]): Promise<Article[]> {
  * cache without an extra round-trip.
  */
 export interface PushOutcome {
+  unchanged?: false;
+  /** Fingerprint of the content uploaded; see `fingerprintVault`. */
+  fingerprint?: string;
   updatedAt: number;
   etag: string | null;
   /**
@@ -302,9 +306,26 @@ async function putEncryptedVault(
   });
 }
 
+/** A push that sent nothing because the server already has this content. */
+export interface UnchangedPush {
+  unchanged: true;
+  fingerprint: string;
+}
+
+/**
+ * With `syncedFingerprint`, skips the upload when local content still
+ * matches it. Each upload gets fresh random padding, so an unneeded one
+ * also makes every other device download the whole vault again.
+ */
+export function pushVault(auth: SyncAuth): Promise<Result<PushOutcome>>;
+export function pushVault(
+  auth: SyncAuth,
+  options: { syncedFingerprint: string | null },
+): Promise<Result<PushOutcome | UnchangedPush>>;
 export async function pushVault(
   auth: SyncAuth,
-): Promise<Result<PushOutcome>> {
+  options?: { syncedFingerprint: string | null },
+): Promise<Result<PushOutcome | UnchangedPush>> {
   try {
     const [credsResult, vaultResult] = await Promise.all([
       resolveCredentials(auth),
@@ -313,6 +334,11 @@ export async function pushVault(
     if (!credsResult.ok) return credsResult;
     if (!vaultResult.ok) return vaultResult;
     const { vaultId, vaultKey } = credsResult.value;
+
+    const fingerprint = await fingerprintVault(vaultResult.value);
+    if (options?.syncedFingerprint === fingerprint) {
+      return ok({ unchanged: true, fingerprint });
+    }
 
     const encryptedResult = await encryptVault(
       vaultKey,
@@ -323,11 +349,12 @@ export async function pushVault(
 
     // `await` inside the try, not a bare `return`: a rejected fetch must
     // land in the catch below rather than escaping to the caller.
-    return await putEncryptedVault(
+    const pushed = await putEncryptedVault(
       vaultId,
       encryptedResult.value,
       "Sync push failed",
     );
+    return pushed.ok ? ok({ ...pushed.value, fingerprint }) : pushed;
   } catch (e) {
     return err(`Sync push failed: ${(e as Error).message}`);
   }

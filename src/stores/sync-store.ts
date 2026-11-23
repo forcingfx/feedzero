@@ -10,7 +10,12 @@ import {
   exportVault,
   mergeVaults,
 } from "../core/sync/sync-service";
-import type { SyncCredentials, PushOutcome } from "../core/sync/sync-service";
+import type {
+  SyncCredentials,
+  PushOutcome,
+  UnchangedPush,
+} from "../core/sync/sync-service";
+import { fingerprintVault } from "../core/sync/vault-fingerprint.ts";
 import { LOCAL_STORAGE } from "@feedzero/core/utils/constants";
 import type { VaultData } from "../core/sync/types.ts";
 import {
@@ -91,8 +96,25 @@ function syncedState(outcome: PushOutcome): Partial<SyncStore> {
     lastSyncedAt: outcome.updatedAt,
     lastVaultEtag: outcome.etag,
     lastPushBytes: outcome.bytes,
+    syncedFingerprint: outcome.fingerprint ?? null,
     error: null,
   };
+}
+
+/** A skipped upload leaves the server's ETag and size as they were. */
+function pushedState(outcome: PushOutcome | UnchangedPush): Partial<SyncStore> {
+  if (outcome.unchanged) {
+    return { status: "synced", lastSyncedAt: Date.now(), error: null };
+  }
+  return syncedState(outcome);
+}
+
+/**
+ * The fingerprint only describes the server's vault while this device
+ * knows that vault's ETag, so without one a push must not be skipped.
+ */
+function knownFingerprint(state: SyncStore): string | null {
+  return state.lastVaultEtag ? state.syncedFingerprint : null;
 }
 
 type SwitchMode = "replace" | "merge";
@@ -116,6 +138,11 @@ interface SyncStore {
    * Settings headroom readout; never leaves the device.
    */
   lastPushBytes: number | null;
+  /**
+   * Fingerprint of the vault at `lastVaultEtag`. Memory only, because it
+   * is a hash of decrypted content.
+   */
+  syncedFingerprint: string | null;
 
   enableSync: (passphrase: string) => Promise<void>;
   restoreSync: (credentials: SyncCredentials) => void;
@@ -177,6 +204,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   credentials: null,
   lastVaultEtag: null,
   lastPushBytes: loadStoredVaultBytes(),
+  syncedFingerprint: null,
 
   enableSync: async (passphrase) => {
     // Derive vault keys and persist alongside existing DB keys
@@ -205,6 +233,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       credentials,
       status: "synced",
       lastSyncedAt: Date.now(),
+      syncedFingerprint: null,
       error: null,
     });
   },
@@ -221,6 +250,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       lastSyncedAt: null,
       error: null,
       credentials: null,
+      syncedFingerprint: null,
     });
   },
 
@@ -229,6 +259,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     if (!credentials) return err("no-credentials");
     const result = await deleteVault(credentials);
     if (!result.ok) return err(result.error);
+    set({ syncedFingerprint: null });
     return ok(undefined);
   },
 
@@ -253,6 +284,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       lastSyncedAt: null,
       error: null,
       credentials: null,
+      syncedFingerprint: null,
     });
     resetAllStores();
   },
@@ -261,10 +293,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     const { credentials } = get();
     if (!credentials) return;
 
-    const result = await pushVault(credentials);
+    const result = await pushVault(credentials, {
+      syncedFingerprint: knownFingerprint(get()),
+    });
     if (result.ok) {
       clearPendingPush();
-      set(syncedState(result.value));
+      set(pushedState(result.value));
     } else {
       set({ status: "error", error: result.error });
     }
@@ -286,20 +320,25 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       // than to clobber it. Forced cloud-replacement bypasses this via
       // forceResync, which calls pullVault directly.
       if (hasPendingPush()) {
-        const flushResult = await pushVault(credentials);
+        const flushResult = await pushVault(credentials, {
+          syncedFingerprint: knownFingerprint(get()),
+        });
         if (!flushResult.ok) {
           set({ status: "error", error: flushResult.error });
           return;
         }
         clearPendingPush();
-        // The flush wrote a fresh ETag — record it so the conditional
-        // pull below short-circuits with 304 (the vault we'd download
-        // is exactly the one we just uploaded).
-        set({
-          lastVaultEtag: flushResult.value.etag,
-          lastPushBytes: flushResult.value.bytes,
-        });
-        rememberVaultBytes(flushResult.value.bytes);
+        if (!flushResult.value.unchanged) {
+          // The flush wrote a fresh ETag — record it so the conditional
+          // pull below short-circuits with 304 (the vault we'd download
+          // is exactly the one we just uploaded).
+          set({
+            lastVaultEtag: flushResult.value.etag,
+            lastPushBytes: flushResult.value.bytes,
+            syncedFingerprint: flushResult.value.fingerprint ?? null,
+          });
+          rememberVaultBytes(flushResult.value.bytes);
+        }
       }
 
       // Send If-None-Match when we have a cached ETag from the
@@ -309,7 +348,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       const cachedEtag = get().lastVaultEtag ?? undefined;
       const pullResult = await pullVaultIfChanged(credentials, cachedEtag);
       if (!pullResult.ok) {
-        set({ status: "error", error: pullResult.error });
+        // The cloud copy may be gone, so the next push must not be skipped.
+        set({
+          status: "error",
+          error: pullResult.error,
+          syncedFingerprint: null,
+        });
         return;
       }
 
@@ -338,6 +382,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         status: "synced",
         lastSyncedAt: Date.now(),
         lastVaultEtag: pullResult.value.etag,
+        // Of the vault as downloaded, not as merged locally: if the merge
+        // kept anything newer, the next push sees a difference and sends it.
+        syncedFingerprint: await fingerprintVault(pullResult.value.vault),
         error: null,
       });
     })().finally(() => {
@@ -361,7 +408,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     syncCoordinator.cancelScheduled();
     clearPendingPush();
 
-    set({ status: "syncing", error: null });
+    set({ status: "syncing", error: null, syncedFingerprint: null });
 
     const pullResult = await pullVault(credentials);
     if (!pullResult.ok) {
@@ -399,7 +446,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   switchToExistingCloud: async (passphrase, mode) => {
-    set({ status: "syncing", error: null });
+    set({ status: "syncing", error: null, syncedFingerprint: null });
 
     // Mode-specific source data: either the cloud vault directly
     // (replace) or local merged with cloud (merge). The destructive
