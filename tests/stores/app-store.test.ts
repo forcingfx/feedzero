@@ -281,11 +281,10 @@ describe("app-store", () => {
 
       expect(useAppStore.getState().isDbReady).toBe(true);
       expect(useSyncStore.getState().credentials).toBe(mockCredentials);
-      // Pull runs in the background — flush microtasks so its .then settles
-      // and the status transitions from "syncing" to "synced".
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(useSyncStore.getState().status).toBe("synced");
+      // Pull runs in the background, so wait for it to settle.
+      await vi.waitFor(() =>
+        expect(useSyncStore.getState().status).toBe("synced"),
+      );
     });
 
     it("still initializes when sync pull fails", async () => {

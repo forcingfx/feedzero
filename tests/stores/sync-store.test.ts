@@ -290,7 +290,9 @@ describe("sync-store", () => {
 
       await useSyncStore.getState().push();
 
-      expect(mockPushVault).toHaveBeenCalledWith(mockCredentials);
+      expect(mockPushVault).toHaveBeenCalledWith(mockCredentials, {
+        syncedFingerprint: null,
+      });
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
