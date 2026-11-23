@@ -16,6 +16,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  PRODUCTION_HIT_SAMPLING,
   UpstashCatalogAdapter,
   type UpstashCatalogClient,
 } from "@/core/catalog/adapters/upstash-adapter";
@@ -82,6 +83,56 @@ const URL2 = "https://other.com/rss";
 const URL3 = "https://third.com/atom";
 
 describe("UpstashCatalogAdapter", () => {
+  // Pins a product trade-off: public request counts become estimates in
+  // steps of 10, in exchange for about 90% fewer catalog commands on the
+  // hottest Upstash path.
+  describe("hit sampling", () => {
+    it("records one hit in ten in production", () => {
+      expect(PRODUCTION_HIT_SAMPLING.oneIn).toBe(10);
+    });
+
+    it("spends no commands on a hit outside the sample", async () => {
+      const client = fakeClient();
+      const adapter = new UpstashCatalogAdapter(client, {
+        oneIn: 10,
+        random: () => 0.1,
+      });
+
+      const result = await adapter.upsert(URL1);
+
+      expect(result.ok).toBe(true);
+      expect(client.commands).toEqual([]);
+    });
+
+    it("weights a sampled hit so the count stays an unbiased estimate", async () => {
+      const client = fakeClient();
+      const adapter = new UpstashCatalogAdapter(client, {
+        oneIn: 10,
+        random: () => 0.09,
+      });
+
+      await adapter.upsert(URL1);
+
+      expect(client.commands).toEqual(["set nx", "zincrby"]);
+      const feed = await adapter.get(URL1);
+      expect(feed.ok && feed.value?.requestCount).toBe(10);
+    });
+
+    it("estimates the true count across many hits", async () => {
+      const client = fakeClient();
+      let seed = 0;
+      const adapter = new UpstashCatalogAdapter(client, {
+        oneIn: 10,
+        random: () => (seed++ % 10) / 10,
+      });
+
+      for (let hit = 0; hit < 1000; hit++) await adapter.upsert(URL1);
+
+      const feed = await adapter.get(URL1);
+      expect(feed.ok && feed.value?.requestCount).toBe(1000);
+    });
+  });
+
   describe("upsert", () => {
     it("creates a new feed entry with requestCount=1 and status=active", async () => {
       const client = fakeClient();

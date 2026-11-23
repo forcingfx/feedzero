@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
  * either falls back to the memory adapter, the proxy's writes never
  * reach the reader and stats silently report zero.
  *
- * This smoke test triggers a proxy fetch, then verifies the catalog
+ * This smoke test triggers proxy fetches, then verifies the catalog
  * /api/catalog?url=<...> shows the upserted entry — proving the same
  * Upstash backend is hit by both lambdas.
  *
@@ -35,36 +35,44 @@ describe.skipIf(SKIP)("production /api/catalog (live)", () => {
         ? (await before.json()).feed.requestCount
         : 0;
 
-    // 2. Trigger a proxy fetch — this fires a fire-and-forget upsert
-    //    into the catalog adapter.
-    const proxyRes = await fetch(`${BASE_URL}/api/feed`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: SENTINEL_FEED }),
-    });
-    expect(proxyRes.status).toBe(200);
-    // Drain body so the lambda can complete the upsert.
-    await proxyRes.arrayBuffer();
-
-    // 3. Poll for the upsert to land. Fire-and-forget upserts in Vercel
-    //    Lambda complete on a timescale that varies with cold-start state
-    //    (50ms warm, several seconds cold). A fixed wait either over-waits
-    //    or under-waits depending on lambda state. Polling at 1s intervals
-    //    is more robust than a fixed sleep.
+    // 2. Trigger proxy fetches until one is counted. Production samples one
+    //    hit in ten, so a single fetch usually records nothing. 45 fetches
+    //    miss the sample less than 1% of the time and stay inside the
+    //    proxy's rate limit. Each upsert is fire-and-forget, so poll briefly
+    //    after every small batch.
+    const FETCH_BATCHES = 9;
+    const FETCHES_PER_BATCH = 5;
     const POLL_INTERVAL_MS = 1_000;
-    const MAX_POLLS = 15;
+    const POLLS_PER_BATCH = 2;
     let afterCount = beforeCount;
     let afterBody: { ok: boolean; feed: { url: string; requestCount: number } } | null = null;
-    for (let i = 0; i < MAX_POLLS; i++) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-      const after = await fetch(
-        `${BASE_URL}/api/catalog?url=${encodeURIComponent(SENTINEL_FEED)}`,
+    for (let batch = 0; batch < FETCH_BATCHES && afterCount <= beforeCount; batch++) {
+      const responses = await Promise.all(
+        Array.from({ length: FETCHES_PER_BATCH }, () =>
+          fetch(`${BASE_URL}/api/feed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: SENTINEL_FEED }),
+          }),
+        ),
       );
-      if (after.status !== 200) continue;
-      afterBody = await after.json();
-      if (afterBody && afterBody.ok) {
-        afterCount = afterBody.feed.requestCount;
-        if (afterCount > beforeCount) break;
+      for (const response of responses) {
+        expect(response.status).toBe(200);
+        // Drain body so the lambda can complete the upsert.
+        await response.arrayBuffer();
+      }
+
+      for (let poll = 0; poll < POLLS_PER_BATCH; poll++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        const after = await fetch(
+          `${BASE_URL}/api/catalog?url=${encodeURIComponent(SENTINEL_FEED)}`,
+        );
+        if (after.status !== 200) continue;
+        afterBody = await after.json();
+        if (afterBody && afterBody.ok) {
+          afterCount = afterBody.feed.requestCount;
+          if (afterCount > beforeCount) break;
+        }
       }
     }
 
@@ -72,7 +80,7 @@ describe.skipIf(SKIP)("production /api/catalog (live)", () => {
     expect(afterBody!.ok).toBe(true);
     expect(afterBody!.feed.url).toBe(SENTINEL_FEED);
     expect(afterCount).toBeGreaterThan(beforeCount);
-  }, 30_000);
+  }, 60_000);
 
   it("/api/catalog?action=count returns a positive integer", async () => {
     const res = await fetch(`${BASE_URL}/api/catalog?action=count`);
